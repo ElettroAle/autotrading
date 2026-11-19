@@ -35,6 +35,7 @@ import {
 import { lastDecisionOf } from './last-decision';
 import { notificationChannelHandlers } from './notification-channel-handlers';
 import { notificationEmailHandlers } from './notification-email-handlers';
+import { notificationInboxHandlers } from './notification-inbox-handlers';
 import {
   configurationOf,
   FAKE_FLOW_COMMANDS,
@@ -459,6 +460,7 @@ export const handlers = [
   ...providerKeyHandlers,
   ...notificationEmailHandlers,
   ...notificationChannelHandlers,
+  ...notificationInboxHandlers,
   ...capitalChangeHandlers,
   http.get('*/me', ({ request }) =>
     withUser(request, (user) =>

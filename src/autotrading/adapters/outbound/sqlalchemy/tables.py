@@ -591,3 +591,17 @@ alerts = Table(
     ),
     Index("alerts_newest", "tenant_id", text("opened_at DESC"), text("id DESC")),
 )
+
+inbox_notifications = Table(
+    "inbox_notifications",
+    metadata,
+    Column("id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("notified_at", DateTime(timezone=True), nullable=False),
+    Column("icon", Text, nullable=False),
+    Column("title", Text, nullable=False),
+    Column("text", Text, nullable=False),
+    Column("targets", JSON, nullable=False),
+    Column("read_at", DateTime(timezone=True)),
+    Index("inbox_notifications_newest", "tenant_id", text("notified_at DESC"), text("id DESC")),
+)

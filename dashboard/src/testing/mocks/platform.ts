@@ -5,6 +5,7 @@ import { aCompletedCycle, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
 import { fakeNotificationChannels } from './notification-channels';
+import { fakeInbox } from './notification-inbox';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 import { fakeReconciliation } from './reconciliation';
 
@@ -627,6 +628,7 @@ export const fakePlatform = {
     fakeReconciliation.reset();
     fakeNotificationChannels.reset();
     fakeAlerts.reset();
+    fakeInbox.reset();
   },
 
   addUser(account: string, { hasUserRole }: { hasUserRole: boolean }): void {

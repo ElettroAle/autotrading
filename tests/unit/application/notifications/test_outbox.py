@@ -27,7 +27,7 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import notification_routes
+from tests.support.notifications import notification_inbox, notification_routes
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CHAT, OTHER_CHAT = ChatId(1001), ChatId(2002)
@@ -52,6 +52,7 @@ class Outbox:
             self.mail_servers.repository(tenant_id),
             self.outbox,
             notification_routes(tenant_id),
+            notification_inbox(tenant_id),
         ).execute(notification)
 
     def process(self) -> None:

@@ -2,6 +2,7 @@ import {
   ArrowDown,
   ArrowLeftRight,
   ArrowUp,
+  Bell,
   ChevronDown,
   CircleAlert,
   CircleCheck,
@@ -36,6 +37,7 @@ const DRAWINGS = {
   settings: Settings,
   menu: Menu,
   'triangle-alert': TriangleAlert,
+  bell: Bell,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;

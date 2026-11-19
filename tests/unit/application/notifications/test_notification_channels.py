@@ -55,6 +55,7 @@ from tests.fakes.notification_email_repository import (
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.mail_servers import MailServers
+from tests.support.notifications import notification_inbox
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 ALFA, BETA = NotifiedFlow(uuid4(), "alfa"), NotifiedFlow(uuid4(), "beta")
@@ -124,6 +125,7 @@ class Channels:
             self.servers.repository(tenant_id),
             self.outbox,
             NotificationRoutes(self.repository(tenant_id), FakeNotificationLinkAdapter(dashboard=False)),
+            notification_inbox(tenant_id),
         ).execute(notification)
 
     def chat_texts(self) -> list[str]:

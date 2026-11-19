@@ -46,7 +46,7 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter, OutboxState
 from tests.support.mail_servers import PASSWORD, MailServers
-from tests.support.notifications import notification_routes
+from tests.support.notifications import notification_inbox, notification_routes
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 ANNA_ADDRESS = EmailAddress.parse("anna@example.com")
@@ -99,7 +99,8 @@ class Mail:
         # The tenant chose both channels for the event: R3.5.3 sends each event only on its channel.
         both = {tenant_id: ChannelPreferences.of(tenant_id).choosing(PAUSED_EVENT, frozenset(NotificationChannel))}
         servers = self.servers.repository(tenant_id)
-        return NotifyUseCase(chats, self.repository(tenant_id), servers, outbox, notification_routes(tenant_id, both))
+        routes = notification_routes(tenant_id, both)
+        return NotifyUseCase(chats, self.repository(tenant_id), servers, outbox, routes, notification_inbox(tenant_id))
 
     def notify(self, tenant_id: TenantId, notification: Notification = PAUSED) -> None:
         self.notify_for(tenant_id, self.outbox).execute(notification)

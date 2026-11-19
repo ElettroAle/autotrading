@@ -112,12 +112,16 @@ from autotrading.application.flows.resume_flow_openings import ResumeFlowOpening
 from autotrading.application.flows.stop_flow import StopFlowUseCase
 from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelUseCase
 from autotrading.application.notifications.count_open_alerts import CountOpenAlertsUseCase
+from autotrading.application.notifications.count_unread_notifications import CountUnreadNotificationsUseCase
 from autotrading.application.notifications.get_alert import GetAlertUseCase
 from autotrading.application.notifications.get_linked_chat import GetLinkedChatUseCase
 from autotrading.application.notifications.get_mail_server import GetMailServerUseCase
 from autotrading.application.notifications.get_notification_channels import GetNotificationChannelsUseCase
 from autotrading.application.notifications.get_notification_email import GetNotificationEmailUseCase
 from autotrading.application.notifications.list_alerts import ListAlertsUseCase
+from autotrading.application.notifications.list_inbox_notifications import ListInboxNotificationsUseCase
+from autotrading.application.notifications.mark_all_notifications_read import MarkAllNotificationsReadUseCase
+from autotrading.application.notifications.mark_notification_read import MarkNotificationReadUseCase
 from autotrading.application.notifications.notify_cash_out_done import NotifyCashOutDoneUseCase
 from autotrading.application.notifications.notify_emergency_closing_done import NotifyEmergencyClosingDoneUseCase
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
@@ -132,6 +136,7 @@ from autotrading.application.notifications.ports import (
     MailPasswordSealerPort,
     MailServerRepositoryPort,
     NotificationEmailRepositoryPort,
+    NotificationInboxPort,
     NotifiedFlowsPort,
     NotifierPort,
 )
@@ -221,6 +226,7 @@ class TenantPorts:
     emergency_closings: EmergencyClosingLogPort
     alerts: AlertRepositoryPort
     alert_resolution: AlertResolutionPort
+    notification_inbox: NotificationInboxPort
     environment: str
     settlement_currency: str
 
@@ -311,6 +317,10 @@ class TenantUseCases:
     count_open_alerts: CountOpenAlertsUseCase
     get_alert: GetAlertUseCase
     resolve_alert: ResolveAlertUseCase
+    list_inbox_notifications: ListInboxNotificationsUseCase
+    count_unread_notifications: CountUnreadNotificationsUseCase
+    mark_notification_read: MarkNotificationReadUseCase
+    mark_all_notifications_read: MarkAllNotificationsReadUseCase
 
     @classmethod
     def on(cls, tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
@@ -481,4 +491,8 @@ class TenantUseCases:
             count_open_alerts=CountOpenAlertsUseCase(ports.alerts),
             get_alert=GetAlertUseCase(ports.alerts),
             resolve_alert=ResolveAlertUseCase(ports.alerts),
+            list_inbox_notifications=ListInboxNotificationsUseCase(ports.notification_inbox),
+            count_unread_notifications=CountUnreadNotificationsUseCase(ports.notification_inbox),
+            mark_notification_read=MarkNotificationReadUseCase(ports.notification_inbox),
+            mark_all_notifications_read=MarkAllNotificationsReadUseCase(ports.notification_inbox),
         )

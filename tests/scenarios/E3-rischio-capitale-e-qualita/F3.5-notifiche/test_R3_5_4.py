@@ -41,7 +41,7 @@ from tests.fakes.notification_email_repository import (
 )
 from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.mail_servers import MailServers
-from tests.support.notifications import chat_named, notification_routes
+from tests.support.notifications import chat_named, notification_inbox, notification_routes
 from tests.support.steps import quoted
 
 scenarios(
@@ -85,7 +85,9 @@ class Notices:
     def notify(self) -> NotifyUseCase:
         emails = InMemoryNotificationEmailRepositoryAdapter(self.emails, self.tenant_id)
         servers = self.mail_servers.repository(self.tenant_id)
-        return NotifyUseCase(self.linked_chats, emails, servers, self.outbox, self.every_channel)
+        return NotifyUseCase(
+            self.linked_chats, emails, servers, self.outbox, self.every_channel, notification_inbox(self.tenant_id)
+        )
 
     @property
     def every_channel(self) -> NotificationRoutes:

@@ -165,6 +165,13 @@ def test_the_state_of_the_flow_closes_the_text() -> None:
     assert notification.body_lines()[-1] == STATUS.text
 
 
+def test_the_heading_is_the_title_without_its_icon() -> None:
+    notification = Notification.cycle_failed(FLOW_ID, "alfa", "timeout")
+
+    assert notification.heading == "alfa: ciclo fallito"
+    assert notification.title == f"{WARNING} {notification.heading}"
+
+
 def test_a_notification_without_values_is_its_title() -> None:
     notification = Notification("alfa", "in pausa", (), NotificationEvent.FLOW_PAUSED, PAUSE)
 

@@ -600,6 +600,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Inbox Notifications */
+        get: operations["list_inbox_notifications_notifications_inbox_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/inbox/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Inbox Summary */
+        get: operations["read_inbox_summary_notifications_inbox_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/inbox/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark All Notifications Read */
+        post: operations["mark_all_notifications_read_notifications_inbox_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/inbox/{notification_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Notification Read */
+        post: operations["mark_notification_read_notifications_inbox__notification_id__read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows": {
         parameters: {
             query?: never;
@@ -2670,6 +2738,66 @@ export interface components {
             /** Tenant Id */
             tenant_id: string;
         };
+        /**
+         * InboxNotificationResponse
+         * @description A notification of the bell: its icon, title and values, when it was generated, when it was read, if it was, and
+         *     the pages it leads to, the first one where choosing it leads.
+         */
+        InboxNotificationResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Icon */
+            icon: string;
+            /** Title */
+            title: string;
+            /** Text */
+            text: string;
+            /**
+             * Notified At
+             * Format: date-time
+             */
+            notified_at: string;
+            /** Read At */
+            read_at: string | null;
+            /** Targets */
+            targets: components["schemas"]["InboxTargetResponse"][];
+        };
+        /**
+         * InboxPageResponse
+         * @description At most 20 notifications, newest first; `next` is the `cursor` of the following page, null on the last one.
+         */
+        InboxPageResponse: {
+            /** Items */
+            items: components["schemas"]["InboxNotificationResponse"][];
+            /** Next */
+            next: string | null;
+        };
+        /** InboxSummaryResponse */
+        InboxSummaryResponse: {
+            /** Unread Count */
+            unread_count: number;
+        };
+        /**
+         * InboxTargetResponse
+         * @description A page the notification leads to, by what finds it: the flow and, for a position, its asset and the instant it
+         *     closed; or the alert it opened. The dashboard builds the address (ADR notifiche-nell-app-salvate-per-tenant).
+         */
+        InboxTargetResponse: {
+            kind: components["schemas"]["TargetKind"];
+            /** Label */
+            label: string;
+            /** Flow Id */
+            flow_id: string | null;
+            /** Asset */
+            asset: string | null;
+            /** Closed At */
+            closed_at: string | null;
+            /** Alert Id */
+            alert_id: string | null;
+        };
         /** LastCycleResponse */
         LastCycleResponse: {
             /**
@@ -3368,6 +3496,12 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /**
+         * TargetKind
+         * @description What a notification leads to: a flow, one of its positions, open or closed, or the alert it opened.
+         * @enum {string}
+         */
+        TargetKind: "flow" | "open_position" | "closed_position" | "alert";
         /**
          * UnattributableKind
          * @enum {string}
@@ -4684,6 +4818,105 @@ export interface operations {
             path: {
                 flow_id: string;
                 event: components["schemas"]["NotificationEvent"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_inbox_notifications_notifications_inbox_get: {
+        parameters: {
+            query?: {
+                /** @description `next` della pagina precedente */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxPageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_inbox_summary_notifications_inbox_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxSummaryResponse"];
+                };
+            };
+        };
+    };
+    mark_all_notifications_read_notifications_inbox_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mark_notification_read_notifications_inbox__notification_id__read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notification_id: string;
             };
             cookie?: never;
         };

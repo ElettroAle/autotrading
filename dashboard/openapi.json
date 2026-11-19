@@ -1934,6 +1934,148 @@
         }
       }
     },
+    "/notifications/inbox": {
+      "get": {
+        "tags": [
+          "campanello delle notifiche"
+        ],
+        "summary": "List Inbox Notifications",
+        "operationId": "list_inbox_notifications_notifications_inbox_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`next` della pagina precedente",
+              "title": "Cursor"
+            },
+            "description": "`next` della pagina precedente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxPageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/inbox/summary": {
+      "get": {
+        "tags": [
+          "campanello delle notifiche"
+        ],
+        "summary": "Read Inbox Summary",
+        "operationId": "read_inbox_summary_notifications_inbox_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxSummaryResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/inbox/read": {
+      "post": {
+        "tags": [
+          "campanello delle notifiche"
+        ],
+        "summary": "Mark All Notifications Read",
+        "operationId": "mark_all_notifications_read_notifications_inbox_read_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/notifications/inbox/{notification_id}/read": {
+      "post": {
+        "tags": [
+          "campanello delle notifiche"
+        ],
+        "summary": "Mark Notification Read",
+        "operationId": "mark_notification_read_notifications_inbox__notification_id__read_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "notification_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Notification Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows": {
       "post": {
         "tags": [
@@ -9141,6 +9283,174 @@
         ],
         "title": "Identity"
       },
+      "InboxNotificationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "notified_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Notified At"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/InboxTargetResponse"
+            },
+            "type": "array",
+            "title": "Targets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "icon",
+          "title",
+          "text",
+          "notified_at",
+          "read_at",
+          "targets"
+        ],
+        "title": "InboxNotificationResponse",
+        "description": "A notification of the bell: its icon, title and values, when it was generated, when it was read, if it was, and\nthe pages it leads to, the first one where choosing it leads."
+      },
+      "InboxPageResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InboxNotificationResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next"
+        ],
+        "title": "InboxPageResponse",
+        "description": "At most 20 notifications, newest first; `next` is the `cursor` of the following page, null on the last one."
+      },
+      "InboxSummaryResponse": {
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "title": "Unread Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "unread_count"
+        ],
+        "title": "InboxSummaryResponse"
+      },
+      "InboxTargetResponse": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/TargetKind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "flow_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow Id"
+          },
+          "asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "alert_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "flow_id",
+          "asset",
+          "closed_at",
+          "alert_id"
+        ],
+        "title": "InboxTargetResponse",
+        "description": "A page the notification leads to, by what finds it: the flow and, for a position, its asset and the instant it\nclosed; or the alert it opened. The dashboard builds the address (ADR notifiche-nell-app-salvate-per-tenant)."
+      },
       "LastCycleResponse": {
         "properties": {
           "planned_at": {
@@ -11035,6 +11345,17 @@
           "name"
         ],
         "title": "StrategySource"
+      },
+      "TargetKind": {
+        "type": "string",
+        "enum": [
+          "flow",
+          "open_position",
+          "closed_position",
+          "alert"
+        ],
+        "title": "TargetKind",
+        "description": "What a notification leads to: a flow, one of its positions, open or closed, or the alert it opened."
       },
       "UnattributableKind": {
         "type": "string",
