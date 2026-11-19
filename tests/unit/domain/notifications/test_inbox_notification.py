@@ -38,7 +38,9 @@ def test_a_notification_is_kept_unread_with_its_icon_heading_values_and_pages() 
 
 
 def test_every_kept_notification_has_an_identity_of_its_own() -> None:
-    assert a_notification().id != a_notification().id
+    first, second = a_notification(), a_notification()
+
+    assert first.id != second.id
 
 
 def test_a_notification_without_values_keeps_an_empty_text() -> None:
@@ -81,7 +83,9 @@ def test_an_instant_without_its_zone_is_a_defect() -> None:
 
 
 def test_the_identity_of_a_kept_notification_is_new_each_time() -> None:
-    assert InboxNotificationId.new() != InboxNotificationId.new()
+    first, second = InboxNotificationId.new(), InboxNotificationId.new()
+
+    assert first != second
 
 
 def test_a_notification_of_the_bell_belongs_to_its_tenant() -> None:
