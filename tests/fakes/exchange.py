@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError, ExchangeUnavailableError
@@ -59,6 +59,10 @@ class FakeExchangeAdapter:
         self.refusal: ExchangeRejectedCredentialsError | None = None
         self._refusal_reasons: dict[Credentials, str] = {}
         self._rate_limited: set[Credentials] = set()
+        # Whether the exchange tells until when credentials work, and the day it tells for each (R6.2.2).
+        self.reads_expiry = False
+        self.expiries: dict[Credentials, date] = {}
+        self.expiry_refusal: ExchangeRejectedCredentialsError | None = None
 
     def is_real(self) -> bool:
         return self._real
@@ -113,6 +117,21 @@ class FakeExchangeAdapter:
         shown = replace(state, positions=(*state.positions, *self._traded_positions(credentials)))
         self.shown.setdefault(credentials, []).append(shown)
         return shown
+
+    def reads_credential_expiry(self) -> bool:
+        return self.reads_expiry
+
+    def credential_expiry(self, credentials: Credentials) -> date | None:
+        if not self.reachable:
+            raise ExchangeUnavailableError
+        if self.expiry_refusal is not None:
+            raise self.expiry_refusal
+        return self.expiries.get(credentials)
+
+    def valid_until(self, credentials: Credentials, expires_on: date) -> None:
+        """The exchange tells the day the credentials stop working, as Hyperliquid does for an API wallet."""
+        self.reads_expiry = True
+        self.expiries[credentials] = expires_on
 
     def verification_reading(self, access: VerificationAccess) -> AccountReading:
         try:

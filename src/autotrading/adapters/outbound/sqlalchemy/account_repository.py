@@ -18,6 +18,7 @@ from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
+from autotrading.domain.accounts.key_expiry import KeyExpiry, KeyExpirySource
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
@@ -163,6 +164,8 @@ def _row_of(account: Account) -> dict[str, object]:
         "credentials_key_version": account.credentials.key_version,
         "credentials_ciphertext": account.credentials.ciphertext,
         "deviation_threshold": account.deviation_threshold.percent,
+        "expires_on": None if account.expiry is None else account.expiry.expires_on,
+        "expiry_source": None if account.expiry is None else account.expiry.source.value,
     }
 
 
@@ -175,7 +178,14 @@ def _account_of(row: RowMapping) -> Account:
         ExchangeAccount(row["exchange_account_fingerprint"], row["exchange_account_public_fields"]),
         SealedCredentials(row["credentials_key_version"], row["credentials_ciphertext"]),
         DeviationThreshold(row["deviation_threshold"]),
+        _expiry_of(row),
     )
+
+
+def _expiry_of(row: RowMapping) -> KeyExpiry | None:
+    if row["expires_on"] is None:
+        return None
+    return KeyExpiry(row["expires_on"], KeyExpirySource(row["expiry_source"]))
 
 
 def _public_fields_of(exchange_account: ExchangeAccount) -> dict[str, str] | None:

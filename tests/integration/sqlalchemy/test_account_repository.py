@@ -1,9 +1,10 @@
+from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import Engine, func, select, text
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.tables import accounts
@@ -17,6 +18,7 @@ from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
+from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
@@ -289,3 +291,38 @@ def test_the_threshold_of_an_account_is_replaced_and_read_for_its_tenant_only(da
     assert repository.deviation_threshold(account.id.value) == Decimal("2.5")
     with pytest.raises(FlowAccountNotFoundError):
         SqlAlchemyAccountRepositoryAdapter(database, bruno).deviation_threshold(account.id.value)
+
+
+def test_the_expiry_of_the_credentials_and_who_gave_it_read_back_and_can_be_forgotten(database: Engine) -> None:
+    """R6.2.2."""
+    tenant = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, tenant)
+    account = account_of(tenant).with_expiry(KeyExpiry.read(date(2026, 12, 30)))
+    repository.add(account)
+
+    saved = repository.get(account.id)
+    repository.replace(account.with_expiry(KeyExpiry.entered(date(2027, 1, 15))))
+    entered = repository.get(account.id)
+    repository.replace(account.with_expiry(None))
+
+    assert saved == account
+    assert entered is not None
+    assert entered.expiry == KeyExpiry.entered(date(2027, 1, 15))
+    assert repository.get(account.id) == account.with_expiry(None)
+
+
+def test_an_expiry_without_who_gave_it_is_refused_by_the_database(database: Engine) -> None:
+    tenant = new_tenant(database)
+    account = account_of(tenant)
+    SqlAlchemyAccountRepositoryAdapter(database, tenant).add(account)
+
+    with pytest.raises(IntegrityError):
+        expiry_without_source(database, tenant, account.id)
+
+
+def expiry_without_source(database: Engine, tenant: TenantId, account_id: AccountId) -> None:
+    with database.begin() as connection:
+        connection.execute(select(func.set_config("app.tenant_id", str(tenant.value), True)))
+        connection.execute(
+            accounts.update().where(accounts.c.id == account_id.value).values(expires_on=date(2026, 12, 30))
+        )

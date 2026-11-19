@@ -3,7 +3,9 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     Column,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -57,6 +59,11 @@ accounts = Table(
     Column("removed_at", DateTime(timezone=True)),
     # In percent of the expected balance, 1 unless the user sets another (R3.3.1).
     Column("deviation_threshold", Numeric, nullable=False, server_default=text("1")),
+    # The day the credentials stop working and who gave it, both empty while unknown (R6.2.2).
+    Column("expires_on", Date),
+    Column("expiry_source", Text),
+    CheckConstraint("expiry_source IN ('read', 'entered')", name="accounts_expiry_source_known"),
+    CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="accounts_expiry_complete"),
     Index(
         "accounts_name_unique_in_tenant",
         "tenant_id",
@@ -129,6 +136,11 @@ provider_keys = Table(
     Column("ciphertext", LargeBinary, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # The day the key stops working and who gave it, both empty while unknown (R6.2.2).
+    Column("expires_on", Date),
+    Column("expiry_source", Text),
+    CheckConstraint("expiry_source IN ('read', 'entered')", name="provider_keys_expiry_source_known"),
+    CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="provider_keys_expiry_complete"),
 )
 
 # A flow keeps its name unique among the flows of the tenant not archived (R1.1.1, ADR 0031).

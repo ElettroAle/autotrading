@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -77,6 +77,7 @@ class FakeSdk(HyperliquidSdkAdapter):
     abstraction: Any = "default"
     role: Any = field(default_factory=lambda: {"role": "agent", "data": {"user": ADDRESS.lower()}})
     spot: Any = field(default_factory=lambda: {"balances": []})
+    agents: Any = field(default_factory=list)
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -113,6 +114,12 @@ class FakeSdk(HyperliquidSdkAdapter):
     def spot_user_state(self, address: str) -> Any:
         self.calls.append(("spot", address))
         return self.spot
+
+    def extra_agents(self, user: str) -> Any:
+        self.calls.append(("agents", user))
+        if isinstance(self.agents, Exception):
+            raise self.agents
+        return self.agents
 
 
 def read(sdk: FakeSdk, credentials: Credentials = CREDENTIALS) -> AccountState:
@@ -574,3 +581,66 @@ def test_a_role_of_unexpected_shape_makes_the_exchange_unavailable(role: object)
 def test_a_role_the_exchange_does_not_give_makes_it_unavailable() -> None:
     with pytest.raises(ExchangeUnavailableError):
         read(FakeSdk(role=ServerError(500, "down")))
+
+
+# 30 December 2026 at noon UTC, in the milliseconds the exchange gives the validity of an API wallet in.
+VALID_UNTIL_MS = 1_798_632_000_000
+
+
+def an_agent(address: str, valid_until: object = VALID_UNTIL_MS) -> dict[str, object]:
+    return {"name": "autotrading", "address": address, "validUntil": valid_until}
+
+
+def test_hyperliquid_reads_the_expiry_of_the_credentials() -> None:
+    assert HyperliquidExchangeAdapter(BASE_URL, FakeSdk()).reads_credential_expiry()
+    assert HyperliquidTestnetExchangeAdapter(FakeSdk()).reads_credential_expiry()
+
+
+def test_the_expiry_is_the_day_the_api_wallet_of_the_credentials_is_valid_until() -> None:
+    other = EthereumAccount.create().address
+    sdk = FakeSdk(agents=[an_agent(other, 1), an_agent(WALLET.address.lower())])
+
+    expiry = HyperliquidExchangeAdapter(BASE_URL, sdk).credential_expiry(CREDENTIALS)
+
+    assert expiry == date(2026, 12, 30)
+    assert sdk.calls == [("info", (BASE_URL, TIMEOUT_SECONDS)), ("agents", ADDRESS)]
+
+
+def test_an_api_wallet_the_account_lists_no_validity_for_has_no_expiry() -> None:
+    sdk = FakeSdk(agents=[an_agent(EthereumAccount.create().address)])
+
+    assert HyperliquidExchangeAdapter(BASE_URL, sdk).credential_expiry(CREDENTIALS) is None
+
+
+def test_an_account_that_signs_for_itself_has_no_expiry_and_asks_nothing() -> None:
+    sdk = FakeSdk()
+
+    expiry = HyperliquidExchangeAdapter(BASE_URL, sdk).credential_expiry(
+        hyperliquid_credentials(WALLET.address, WALLET.key.hex())
+    )
+
+    assert expiry is None
+    assert sdk.calls == []
+
+
+@pytest.mark.parametrize(
+    "agents", ["unexpected", [{"address": WALLET.address}], [{"address": WALLET.address, "validUntil": "soon"}]]
+)
+def test_agents_of_unknown_shape_are_a_fault_of_the_exchange(agents: object) -> None:
+    with pytest.raises(ExchangeUnavailableError):
+        HyperliquidExchangeAdapter(BASE_URL, FakeSdk(agents=agents)).credential_expiry(CREDENTIALS)
+
+
+def test_a_client_error_while_reading_the_agents_is_a_rejection_with_its_message_masked() -> None:
+    sdk = FakeSdk(agents=ClientError(422, None, f"Failed to deserialize user {ADDRESS}", None))
+
+    with pytest.raises(ExchangeRejectedCredentialsError) as raised:
+        HyperliquidExchangeAdapter(BASE_URL, sdk).credential_expiry(CREDENTIALS)
+
+    assert raised.value.exchange_message == "Failed to deserialize user ***"
+
+
+@pytest.mark.parametrize("failure", [ServerError(500, "down"), requests.ConnectionError("unreachable")])
+def test_the_exchange_out_of_reach_while_reading_the_agents_is_unavailable(failure: Exception) -> None:
+    with pytest.raises(ExchangeUnavailableError):
+        HyperliquidExchangeAdapter(BASE_URL, FakeSdk(agents=failure)).credential_expiry(CREDENTIALS)

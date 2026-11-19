@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -12,6 +13,7 @@ from autotrading.application.accounts.errors import (
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
@@ -133,3 +135,43 @@ def test_an_exchange_the_worker_does_not_support_is_refused_before_opening(
 
     with pytest.raises(UnsupportedExchangeError):
         use_case.execute(ReadExchangeStateCommand(account.id))
+
+
+def test_every_reading_keeps_the_expiry_the_exchange_reads_again_for_the_credentials(
+    use_case: ReadExchangeStateUseCase,
+    exchange: FakeExchangeAdapter,
+    store: AccountStore,
+    account: Account,
+    credentials: Credentials,
+) -> None:
+    exchange.valid_until(credentials, date(2026, 12, 30))
+
+    use_case.execute(ReadExchangeStateCommand(account.id))
+
+    assert store.accounts == [account.with_expiry(KeyExpiry.read(date(2026, 12, 30)))]
+
+
+def test_a_reading_that_finds_the_same_expiry_saves_nothing(
+    use_case: ReadExchangeStateUseCase,
+    exchange: FakeExchangeAdapter,
+    store: AccountStore,
+    account: Account,
+    credentials: Credentials,
+) -> None:
+    exchange.valid_until(credentials, date(2026, 12, 30))
+    kept = account.with_expiry(KeyExpiry.read(date(2026, 12, 30)))
+    store.accounts[:] = [kept]
+
+    use_case.execute(ReadExchangeStateCommand(account.id))
+
+    assert store.accounts[0] is kept
+
+
+def test_an_exchange_that_reads_no_expiry_leaves_the_date_the_user_gave(
+    use_case: ReadExchangeStateUseCase, store: AccountStore, account: Account
+) -> None:
+    store.accounts[:] = [account.with_expiry(KeyExpiry.entered(date(2026, 12, 15)))]
+
+    use_case.execute(ReadExchangeStateCommand(account.id))
+
+    assert store.accounts[0].expiry == KeyExpiry.entered(date(2026, 12, 15))

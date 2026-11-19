@@ -8,14 +8,21 @@ from autotrading.adapters.outbound.sqlalchemy.tables import provider_keys
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError, ProviderKeyNotFoundError
 from autotrading.application.agent.ports import ProviderKeyRegistration
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.agent.key_expiry import KeyExpiry, KeyExpirySource
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 PRIMARY_KEY = "provider_keys_pkey"
-# The last registration or replacement of a key is the instant the database stamped on its row (ADR 0130).
-_REGISTRATION_COLUMNS = (provider_keys.c.provider, provider_keys.c.updated_at)
+# The last registration or replacement of a key is the instant the database stamped on its row (ADR 0130), and the
+# expiry of the key is kept beside it (R6.2.2).
+_REGISTRATION_COLUMNS = (
+    provider_keys.c.provider,
+    provider_keys.c.updated_at,
+    provider_keys.c.expires_on,
+    provider_keys.c.expiry_source,
+)
 
 
 class SqlAlchemyProviderKeyRepositoryAdapter:
@@ -61,7 +68,12 @@ class SqlAlchemyProviderKeyRepositoryAdapter:
         statement = (
             update(provider_keys)
             .where(provider_keys.c.provider == key.provider.value)
-            .values(key_version=key.sealed.key_version, ciphertext=key.sealed.ciphertext, updated_at=func.now())
+            .values(
+                key_version=key.sealed.key_version,
+                ciphertext=key.sealed.ciphertext,
+                updated_at=func.now(),
+                **_expiry_columns_of(key.expiry),
+            )
             .returning(*_REGISTRATION_COLUMNS)
         )
         with self._transaction() as connection:
@@ -72,6 +84,14 @@ class SqlAlchemyProviderKeyRepositoryAdapter:
 
     def remove(self, provider: ProviderName) -> None:
         statement = delete(provider_keys).where(provider_keys.c.provider == provider.value)
+        with self._transaction() as connection:
+            if connection.execute(statement).rowcount != 1:
+                raise ProviderKeyNotFoundError(provider)
+
+    def set_expiry(self, provider: ProviderName, expiry: KeyExpiry | None) -> None:
+        statement = (
+            update(provider_keys).where(provider_keys.c.provider == provider.value).values(**_expiry_columns_of(expiry))
+        )
         with self._transaction() as connection:
             if connection.execute(statement).rowcount != 1:
                 raise ProviderKeyNotFoundError(provider)
@@ -94,11 +114,24 @@ def _row_of(key: RegisteredProviderKey) -> dict[str, object]:
         "provider": key.provider.value,
         "key_version": key.sealed.key_version,
         "ciphertext": key.sealed.ciphertext,
+        **_expiry_columns_of(key.expiry),
     }
 
 
+def _expiry_columns_of(expiry: KeyExpiry | None) -> dict[str, object]:
+    if expiry is None:
+        return {"expires_on": None, "expiry_source": None}
+    return {"expires_on": expiry.expires_on, "expiry_source": expiry.source.value}
+
+
+def _expiry_of(row: RowMapping) -> KeyExpiry | None:
+    if row["expires_on"] is None:
+        return None
+    return KeyExpiry(row["expires_on"], KeyExpirySource(row["expiry_source"]))
+
+
 def _registration_of(row: RowMapping) -> ProviderKeyRegistration:
-    return ProviderKeyRegistration(ProviderName(row["provider"]), row["updated_at"])
+    return ProviderKeyRegistration(ProviderName(row["provider"]), row["updated_at"], _expiry_of(row))
 
 
 def _key_of(row: RowMapping) -> RegisteredProviderKey:
@@ -106,4 +139,5 @@ def _key_of(row: RowMapping) -> RegisteredProviderKey:
         TenantId(row["tenant_id"]),
         ProviderName(row["provider"]),
         SealedProviderKey(row["key_version"], row["ciphertext"]),
+        _expiry_of(row),
     )

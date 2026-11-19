@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import uuid4
 
 import pytest
@@ -8,6 +9,7 @@ from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchem
 from autotrading.application.agent.errors import ProviderKeyAlreadyRegisteredError, ProviderKeyNotFoundError
 from autotrading.application.agent.ports import ProviderKeyRegistration
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.agent.key_expiry import KeyExpiry
 from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
@@ -104,3 +106,25 @@ def test_the_registration_and_the_replacement_answer_with_the_instant_the_databa
     assert [item for item in keys.registrations() if item.provider == OPENROUTER] == [replacement]
     assert [item.provider for item in keys.registrations()] == [ANTHROPIC, OPENROUTER]
     assert all(isinstance(item, ProviderKeyRegistration) for item in keys.registrations())
+
+
+def test_the_expiry_of_a_key_reads_back_with_who_gave_it_and_goes_with_the_key(database: Engine) -> None:
+    """R6.2.2."""
+    anna, bruno = new_tenant(database), new_tenant(database)
+    keys = SqlAlchemyProviderKeyRepositoryAdapter(database, anna)
+    entered = KeyExpiry.entered(date(2026, 12, 15))
+    keys.add(RegisteredProviderKey(anna, OPENROUTER, SealedProviderKey(1, b"sealed"), entered))
+
+    saved = keys.get(OPENROUTER)
+    [registration] = keys.registrations()
+    keys.set_expiry(OPENROUTER, KeyExpiry.entered(date(2027, 1, 15)))
+    changed = keys.get(OPENROUTER)
+    keys.replace(a_key(anna, OPENROUTER, b"new"))
+
+    assert saved is not None
+    assert (saved.expiry, registration.expiry) == (entered, entered)
+    assert changed is not None
+    assert changed.expiry == KeyExpiry.entered(date(2027, 1, 15))
+    assert keys.get(OPENROUTER) == a_key(anna, OPENROUTER, b"new")
+    with pytest.raises(ProviderKeyNotFoundError):
+        SqlAlchemyProviderKeyRepositoryAdapter(database, bruno).set_expiry(OPENROUTER, entered)

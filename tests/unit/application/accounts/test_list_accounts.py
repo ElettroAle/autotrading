@@ -1,3 +1,4 @@
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -5,6 +6,7 @@ import pytest
 from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
+from autotrading.domain.accounts.key_expiry import KeyExpiry, KeyExpiryStatus
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
@@ -15,6 +17,7 @@ from tests.support.flows import a_configuration, a_flow
 
 ANNA, BRUNO = TenantId.new(), TenantId.new()
 CURRENCY = "USDC"
+NOW = datetime(2026, 11, 19, 9, 0, tzinfo=UTC)
 
 
 @pytest.fixture
@@ -27,14 +30,36 @@ def flows() -> FlowStore:
     return FlowStore()
 
 
-def list_accounts(store: AccountStore, flows: FlowStore, *, real: bool = False) -> list[AccountSummary]:
+def list_accounts(
+    store: AccountStore, flows: FlowStore, *, real: bool = False, exchange: FakeExchangeAdapter | None = None
+) -> list[AccountSummary]:
     use_case = ListAccountsUseCase(
         InMemoryAccountRepositoryAdapter(store, ANNA),
         InMemoryFlowRepositoryAdapter(flows, ANNA),
-        {"Hyperliquid": FakeExchangeAdapter(real=real)},
+        {"Hyperliquid": exchange or FakeExchangeAdapter(real=real)},
         CURRENCY,
+        lambda: NOW,
     )
     return use_case.execute()
+
+
+def test_each_account_carries_the_expiry_of_its_credentials_as_of_today(store: AccountStore, flows: FlowStore) -> None:
+    store.accounts += [
+        an_account(ANNA, "senza-data"),
+        an_account(ANNA, "in-scadenza").with_expiry(KeyExpiry.read(date(2026, 11, 26))),
+        an_account(ANNA, "scaduto").with_expiry(KeyExpiry.read(date(2026, 11, 19))),
+    ]
+    exchange = FakeExchangeAdapter()
+    exchange.reads_expiry = True
+
+    listed = {summary.name.value: summary.expiry for summary in list_accounts(store, flows, exchange=exchange)}
+
+    assert [(expiry.reading.status, expiry.reading.days_left) for expiry in listed.values()] == [
+        (KeyExpiryStatus.UNKNOWN, None),
+        (KeyExpiryStatus.EXPIRING, 7),
+        (KeyExpiryStatus.EXPIRED, 0),
+    ]
+    assert not any(expiry.editable for expiry in listed.values())
 
 
 def test_the_list_holds_the_accounts_of_the_tenant_only(store: AccountStore, flows: FlowStore) -> None:

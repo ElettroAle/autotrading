@@ -1,5 +1,6 @@
 import logging
 from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -9,6 +10,7 @@ from autotrading.application.accounts.errors import (
     AccountNotFoundError,
     ExchangeRejectedCredentialsError,
     ExchangeUnavailableError,
+    KeyExpiryReadByAdapterError,
     UnsupportedExchangeError,
 )
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand, ReplaceCredentialsUseCase
@@ -20,6 +22,7 @@ from autotrading.domain.accounts.errors import (
     PublicCredentialFieldNotReplaceableError,
 )
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
+from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter
@@ -207,3 +210,40 @@ def test_the_command_never_shows_the_credentials(account: Account) -> None:
 
     assert ROTATED.value("account_address") not in shown
     assert ROTATED.value("secret_key") not in shown
+
+
+def test_new_credentials_carry_the_expiry_the_exchange_reads_for_them(
+    use_case: ReplaceCredentialsUseCase, exchange: FakeExchangeAdapter, store: AccountStore, account: Account
+) -> None:
+    store.accounts[:] = [account.with_expiry(KeyExpiry.read(date(2026, 11, 24)))]
+    exchange.accept(ROTATED)
+    exchange.valid_until(ROTATED, date(2027, 3, 15))
+
+    use_case.execute(command(account))
+
+    assert store.accounts[0].expiry == KeyExpiry.read(date(2027, 3, 15))
+
+
+def test_new_credentials_forget_the_date_given_for_the_old_ones_unless_another_comes_with_them(
+    use_case: ReplaceCredentialsUseCase, exchange: FakeExchangeAdapter, store: AccountStore, account: Account
+) -> None:
+    store.accounts[:] = [account.with_expiry(KeyExpiry.entered(date(2026, 11, 24)))]
+    exchange.accept(ROTATED)
+
+    use_case.execute(command(account))
+    assert store.accounts[0].expiry is None
+
+    use_case.execute(replace(command(account), expires_on=date(2027, 3, 15)))
+    assert store.accounts[0].expiry == KeyExpiry.entered(date(2027, 3, 15))
+
+
+def test_a_date_given_with_credentials_whose_expiry_the_exchange_reads_keeps_the_old_ones(
+    use_case: ReplaceCredentialsUseCase, exchange: FakeExchangeAdapter, store: AccountStore, account: Account
+) -> None:
+    exchange.accept(ROTATED)
+    exchange.reads_expiry = True
+
+    with pytest.raises(KeyExpiryReadByAdapterError):
+        use_case.execute(replace(command(account), expires_on=date(2027, 3, 15)))
+
+    assert store.accounts == [account]

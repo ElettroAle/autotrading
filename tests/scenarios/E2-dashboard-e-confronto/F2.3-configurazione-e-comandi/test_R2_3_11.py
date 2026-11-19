@@ -102,5 +102,6 @@ def _summary_of(platform: Platform, user: str, account: str) -> AccountSummary:
         InMemoryFlowRepositoryAdapter(platform.flows, tenant_id),
         platform.exchanges,
         CURRENCY,
+        lambda: platform.now,
     ).execute()
     return next(summary for summary in listed if summary.name.value == account)

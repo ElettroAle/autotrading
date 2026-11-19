@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -7,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.key_expiry import KeyExpiryRequest, KeyExpiryResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.accounts.account_details import AccountDetails
 from autotrading.application.accounts.account_summary import AccountSummary
@@ -14,6 +16,7 @@ from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
+from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryCommand
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.tenancy.user_id import UserId
@@ -25,6 +28,8 @@ class AccountRegistrationRequest(BaseModel):
     name: str = ""
     exchange: str = ""
     credentials: dict[str, str] = Field(default_factory=dict)
+    # Only for an exchange that does not read the expiry of the credentials (R6.2.2).
+    expires_on: date | None = None
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return [("name", self.name), ("exchange", self.exchange)]
@@ -32,6 +37,7 @@ class AccountRegistrationRequest(BaseModel):
 
 class CredentialsReplacementRequest(BaseModel):
     credentials: dict[str, str] = Field(default_factory=dict)
+    expires_on: date | None = None
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return []
@@ -60,12 +66,18 @@ class AccountDetailsResponse(BaseModel):
 
 class AccountSummaryResponse(AccountDetailsResponse):
     """An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,
-    which the exchange gives at /accounts/{id}/state."""
+    which the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state
+    (`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it
+    (R6.2.2)."""
 
     network: str
     network_name: str
     allocated_capital: str
     currency: str
+    expiry: KeyExpiryResponse | None
+    expiry_status: str
+    days_left: int | None
+    expiry_editable: bool
 
     @classmethod
     def of_summary(cls, summary: AccountSummary) -> AccountSummaryResponse:
@@ -79,7 +91,16 @@ class AccountSummaryResponse(AccountDetailsResponse):
             network_name=summary.network.name,
             allocated_capital=amount_text(summary.allocated_capital),
             currency=summary.currency,
+            expiry=_expiry_response_of(summary),
+            expiry_status=summary.expiry.reading.status.value,
+            days_left=summary.expiry.reading.days_left,
+            expiry_editable=summary.expiry.editable,
         )
+
+
+def _expiry_response_of(summary: AccountSummary) -> KeyExpiryResponse | None:
+    expiry = summary.expiry.expiry
+    return None if expiry is None else KeyExpiryResponse.of(expiry.expires_on, expiry.source)
 
 
 class BalanceResponse(BaseModel):
@@ -113,7 +134,7 @@ def accounts_router(
     def register_account(
         request: AccountRegistrationRequest, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
     ) -> AccountRegistrationResponse:
-        command = RegisterAccountCommand(request.name, request.exchange, request.credentials)
+        command = RegisterAccountCommand(request.name, request.exchange, request.credentials, request.expires_on)
         return AccountRegistrationResponse.of(use_cases.register_account.execute(command))
 
     @router.get("")
@@ -135,8 +156,18 @@ def accounts_router(
         request: CredentialsReplacementRequest,
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> AccountDetailsResponse:
-        command = ReplaceCredentialsCommand(AccountId(account_id), request.credentials)
+        command = ReplaceCredentialsCommand(AccountId(account_id), request.credentials, request.expires_on)
         return AccountDetailsResponse.of(use_cases.replace_credentials.execute(command))
+
+    @router.put("/{account_id}/expiry", status_code=status.HTTP_204_NO_CONTENT)
+    def set_key_expiry(
+        account_id: UUID,
+        request: KeyExpiryRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> None:
+        """The day the user says the credentials stop working, only when the exchange does not read it (R6.2.2)."""
+        command = SetAccountKeyExpiryCommand(AccountId(account_id), request.expires_on)
+        use_cases.set_account_key_expiry.execute(command)
 
     @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
     def remove_account(

@@ -250,3 +250,11 @@ def test_the_catalog_of_the_worker_takes_the_name_of_its_gateway(tmp_path: Path)
     assert list(catalogs) == ["litellm"]
     assert isinstance(catalogs["litellm"], WorkerModelCatalogAdapter)
     assert WORKER_TOKEN not in repr(catalogs["litellm"])
+
+
+def test_the_catalog_of_the_worker_reads_no_expiry_of_the_keys() -> None:
+    """R6.2.2: as the library it describes, the user gives the date of every key."""
+    adapter, worker = adapter_on(worker_of(InMemoryModelCatalogAdapter(MODELS)))
+
+    assert not adapter.reads_key_expiry(ProviderName("anthropic"))
+    assert worker.requests == []

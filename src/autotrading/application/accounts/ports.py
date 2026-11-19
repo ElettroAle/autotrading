@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from typing import Protocol
 
@@ -25,6 +26,17 @@ class ExchangePort(Protocol):
 
     def read_state(self, credentials: Credentials) -> AccountState:
         """Reads balance, margin and positions, proving the credentials work on the exchange.
+
+        Raises ExchangeRejectedCredentialsError with the message of the exchange, or ExchangeUnavailableError.
+        """
+        ...
+
+    def reads_credential_expiry(self) -> bool:
+        """True when the exchange tells until when credentials work: then the user never gives the date (R6.2.2)."""
+        ...
+
+    def credential_expiry(self, credentials: Credentials) -> date | None:
+        """The day, in UTC, the credentials stop working as the exchange tells it; none when it tells none for them.
 
         Raises ExchangeRejectedCredentialsError with the message of the exchange, or ExchangeUnavailableError.
         """

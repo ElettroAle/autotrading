@@ -6,6 +6,7 @@ from typing import Protocol
 
 from autotrading.domain.agent.agent_context import ModelMessage
 from autotrading.domain.agent.answer_format import AnswerFormat
+from autotrading.domain.agent.key_expiry import KeyExpiry
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_parameter import ParameterValue
 from autotrading.domain.agent.model_usage import ModelUsage
@@ -31,10 +32,12 @@ class ProviderKeyOpenerPort(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class ProviderKeyRegistration:
-    """A provider the tenant has a key for, and the instant of its last registration or replacement (ADR 0130)."""
+    """A provider the tenant has a key for, the instant of its last registration or replacement (ADR 0130) and the
+    expiry of the key, none while unknown (R6.2.2)."""
 
     provider: ProviderName
     registered_at: datetime
+    expiry: KeyExpiry | None = None
 
 
 class ProviderKeyRepositoryPort(Protocol):
@@ -58,6 +61,10 @@ class ProviderKeyRepositoryPort(Protocol):
 
     def remove(self, provider: ProviderName) -> None:
         """Raises ProviderKeyNotFoundError when the tenant has no key for that provider."""
+        ...
+
+    def set_expiry(self, provider: ProviderName, expiry: KeyExpiry | None) -> None:
+        """Keeps the expiry of the key, none to forget it; raises ProviderKeyNotFoundError without a key (R6.2.2)."""
         ...
 
 
@@ -91,6 +98,11 @@ class ModelCatalogPort(Protocol):
 
     def catalog(self) -> ModelCatalog:
         """Raises ModelCatalogUnavailableError."""
+        ...
+
+    def reads_key_expiry(self, provider: ProviderName) -> bool:
+        """True when the gateway tells until when the keys of the provider work: then the user never gives the date
+        (R6.2.2, ADR scadenza-delle-chiavi-letta-o-indicata)."""
         ...
 
 

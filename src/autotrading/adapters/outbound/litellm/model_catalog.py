@@ -62,6 +62,10 @@ class LiteLlmModelCatalogAdapter:
         self._required_keys = library.required_keys
         self._catalog: ModelCatalog | None = None
 
+    def reads_key_expiry(self, provider: ProviderName) -> bool:  # noqa: ARG002 - the signature of the port
+        """No provider behind the library tells until when a key works: the user gives the date (R6.2.2)."""
+        return False
+
     def catalog(self) -> ModelCatalog:
         if self._catalog is None:
             models = tuple(self._definitions())

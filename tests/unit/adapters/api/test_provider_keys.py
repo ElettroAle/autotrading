@@ -86,7 +86,14 @@ def test_the_list_shows_only_the_providers_of_the_user(client_of: Client) -> Non
     client_of("anna").post("/provider-keys", json={"provider": "openrouter", "key": {"api_key": KEY}})
 
     assert client_of("anna").get("/provider-keys").json() == [
-        {"provider": "openrouter", "registered_at": "2026-11-01T08:00:00+00:00"}
+        {
+            "provider": "openrouter",
+            "registered_at": "2026-11-01T08:00:00+00:00",
+            "expiry": None,
+            "expiry_status": "unknown",
+            "days_left": None,
+            "expiry_editable": True,
+        }
     ]
     assert client_of("bruno").get("/provider-keys").json() == []
 
@@ -100,7 +107,8 @@ def test_the_replacement_answers_with_the_provider_and_the_new_instant(client_of
 
     assert response.status_code == 200
     assert response.json() == {"provider": "openrouter", "registered_at": "2026-11-14T10:07:00+00:00"}
-    assert anna.get("/provider-keys").json() == [response.json()]
+    [listed] = anna.get("/provider-keys").json()
+    assert (listed["provider"], listed["registered_at"]) == ("openrouter", "2026-11-14T10:07:00+00:00")
 
 
 def test_the_replacement_of_a_key_never_registered_is_not_found(client_of: Client) -> None:
@@ -186,3 +194,32 @@ def test_the_requests_never_show_the_key() -> None:
 
     assert repr(registration) == "ProviderKeyRegistrationRequest(provider='openrouter')"
     assert KEY not in repr(replacement)
+
+
+def test_the_key_carries_the_expiry_the_user_gives_with_its_state(client_of: Client) -> None:
+    anna = client_of("anna")
+    anna.post("/provider-keys", json={"provider": "openrouter", "key": {"api_key": KEY}, "expires_on": "2026-12-15"})
+
+    [listed] = anna.get("/provider-keys").json()
+
+    assert (listed["expiry"], listed["expiry_status"], listed["days_left"], listed["expiry_editable"]) == (
+        {"expires_on": "2026-12-15", "source": "entered"},
+        "valid",
+        35,
+        True,
+    )
+
+
+def test_the_user_gives_and_forgets_the_expiry_of_a_key_only_once_saved(client_of: Client) -> None:
+    anna = client_of("anna")
+    missing = anna.put("/provider-keys/openrouter/expiry", json={"expires_on": "2026-12-15"})
+    anna.post("/provider-keys", json={"provider": "openrouter", "key": {"api_key": KEY}})
+
+    given = anna.put("/provider-keys/openrouter/expiry", json={"expires_on": "2026-12-15"})
+    expiry_given = anna.get("/provider-keys").json()[0]["expiry"]
+    forgotten = anna.put("/provider-keys/openrouter/expiry", json={})
+
+    assert missing.status_code == 404
+    assert (given.status_code, forgotten.status_code) == (204, 204)
+    assert expiry_given == {"expires_on": "2026-12-15", "source": "entered"}
+    assert anna.get("/provider-keys").json()[0]["expiry"] is None

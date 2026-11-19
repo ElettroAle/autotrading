@@ -174,3 +174,8 @@ def test_a_flow_learns_when_the_model_is_missing() -> None:
 def test_a_flow_learns_when_the_list_is_unavailable() -> None:
     with pytest.raises(FlowModelCatalogUnavailableError):
         catalog_on(OpenRouter(status=503, text="down")).definition_of("openrouter/deepseek/deepseek-chat")
+
+
+def test_openrouter_does_not_tell_until_when_its_keys_work() -> None:
+    """R6.2.2: the user gives the date of the key."""
+    assert not catalog_on(OpenRouter()).reads_key_expiry(ProviderName("openrouter"))
