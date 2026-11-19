@@ -16,9 +16,10 @@ from autotrading.domain.sources.sentiment import SENTIMENT
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_definition import SourceDefinition
 from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.whale import WHALE
 
 # The sources of the platform: the adapters that offer each one declare themselves (R1.3.1, R4.1.1).
-SOURCES = (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS)
+SOURCES = (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE)
 
 
 @dataclass(frozen=True, slots=True)

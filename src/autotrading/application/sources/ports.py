@@ -18,6 +18,7 @@ from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.source_trial import SourceTrial
 from autotrading.domain.sources.timeframe import Timeframe
+from autotrading.domain.sources.whale_transfer import WhaleTransfer
 
 
 class SentimentPort(Protocol):
@@ -44,6 +45,25 @@ class NewsPort(Protocol):
 
     def read_latest(self) -> Sequence[NewsItem]:
         """The stories the outlets publish now, in any order; raises SourceUnavailableError when none answers."""
+        ...
+
+
+class WhaleTransfersPort(Protocol):
+    """One provider of the large on-chain transfers: each one is an adapter of the whale source (R5.1.1, ADR
+    fonte-whale-con-adapter-arkham)."""
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter declares of itself, its threshold of value included, without asking the provider
+        (R4.1.1)."""
+        ...
+
+    def transfers(
+        self, since: datetime, until: datetime, minimum_usd: int, credentials: Mapping[str, str]
+    ) -> Sequence[WhaleTransfer]:
+        """The transfers between the two instants worth at least the threshold, in dollars, in any order, read with the
+        credentials the tenant gave the adapter (R4.1.2); raises SourceUnavailableError when they cannot be read and
+        SourceCredentialsRejectedError when the provider refuses the credentials.
+        """
         ...
 
 

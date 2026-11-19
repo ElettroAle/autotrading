@@ -117,6 +117,7 @@ from tests.fakes.provider_keys import (
 from tests.fakes.source_credentials import FakeSourceSecretsOpenerAdapter, InMemorySourceCredentialsRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
+from tests.fakes.whale_transfers import FakeWhaleTransfersAdapter
 from tests.support.cycle_composition import (
     CycleServices,
     TenantCyclePorts,
@@ -172,6 +173,8 @@ class FlowCycles:
         # The two adapters of the sentiment, by the name each declares (R4.1.1).
         self.sentiments = {name: FakeSentimentAdapter(name) for name in ("alternative.me", "CoinMarketCap")}
         self.news = FakeNewsAdapter()
+        # The providers of the large transfers a test offers, by the name each declares (R5.1.1).
+        self.whales: dict[str, FakeWhaleTransfersAdapter] = {}
         self.prices = FakePriceHistoryAdapter()
         self.forecaster = FakePriceForecasterAdapter()
         self.market = FakeMarketDataAdapter()
@@ -328,7 +331,14 @@ class FlowCycles:
         )
 
     def systems(self) -> SourceSystems:
-        return SourceSystems(tuple(self.sentiments.values()), self.news, self.prices, self.forecaster, self.market)
+        return SourceSystems(
+            tuple(self.sentiments.values()),
+            self.news,
+            self.prices,
+            self.forecaster,
+            self.market,
+            tuple(self.whales.values()),
+        )
 
     def samples_of(self, tenant_id: TenantId) -> InMemorySampleRepositoryAdapter:
         return self.samples.setdefault(tenant_id, InMemorySampleRepositoryAdapter())

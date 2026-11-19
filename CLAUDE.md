@@ -78,7 +78,7 @@ src/autotrading/
     inbound/api/                FastAPI
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
-                                alternative_me/, coinmarketcap/, litellm/, openrouter/, forecaster/,
+                                alternative_me/, coinmarketcap/, arkham/, litellm/, openrouter/, forecaster/,
                                 apscheduler/, smtp/, dashboard/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
@@ -306,6 +306,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-rss.md` | `adapters/outbound/rss/**` |
 | `tech-alternative-me.md` | `adapters/outbound/alternative_me/**` |
 | `tech-coinmarketcap.md` | `adapters/outbound/coinmarketcap/**` |
+| `tech-arkham.md` | `adapters/outbound/arkham/**` |
 | `tech-system-clock.md` | `adapters/outbound/system_clock/**` |
 | `tech-litellm.md` | `adapters/outbound/litellm/**` |
 | `tech-oidc.md` | `adapters/outbound/oidc/**` |
