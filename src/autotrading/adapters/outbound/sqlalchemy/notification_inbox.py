@@ -23,6 +23,7 @@ from autotrading.application.notifications.errors import (
     InboxNotificationNotFoundError,
     NotificationInboxUnavailableError,
 )
+from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.notifications.inbox_notification import (
     INBOX_RETENTION,
     InboxNotification,
@@ -50,7 +51,7 @@ class SqlAlchemyNotificationInboxAdapter:
         self._tenant_id = tenant_id
 
     def add(self, notification: Notification, at: datetime) -> None:
-        row = _row_of(InboxNotification.of(notification, at), self._tenant_id)
+        row = _row_of(InboxNotification.of(self._tenant_id, notification, at), self._tenant_id)
         try:
             with self._transaction() as connection:
                 connection.execute(
@@ -102,9 +103,11 @@ class SqlAlchemyNotificationInboxAdapter:
 
 
 def _row_of(notification: InboxNotification, tenant_id: TenantId) -> dict[str, object]:
+    if notification.tenant_id != tenant_id:
+        raise CrossTenantAccessError
     return {
         "id": notification.id.value,
-        "tenant_id": tenant_id.value,
+        "tenant_id": notification.tenant_id.value,
         "notified_at": notification.notified_at,
         "icon": notification.icon,
         "title": notification.title,
@@ -134,6 +137,7 @@ def _target_of(row: dict[str, str | None]) -> NotificationTarget:
 
 def _inbox_notification_of(row: RowMapping) -> InboxNotification:
     return InboxNotification(
+        TenantId(row["tenant_id"]),
         InboxNotificationId(row["id"]),
         row["notified_at"],
         row["icon"],

@@ -4,12 +4,16 @@ from uuid import uuid4
 from autotrading.domain.notifications.inbox_notification import InboxNotification
 from autotrading.domain.notifications.inbox_page import INBOX_PAGE_SIZE, InboxCursor, InboxPage
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.tenancy.tenant_id import TenantId
 
 NINE = datetime(2026, 11, 19, 9, 0, tzinfo=UTC)
+TENANT = TenantId.new()
 
 
 def kept(minutes: int) -> InboxNotification:
-    return InboxNotification.of(Notification.cycle_failed(uuid4(), "alfa", "errore"), NINE + timedelta(minutes=minutes))
+    return InboxNotification.of(
+        TENANT, Notification.cycle_failed(uuid4(), "alfa", "errore"), NINE + timedelta(minutes=minutes)
+    )
 
 
 def test_the_cursor_is_the_place_of_a_notification_by_instant_then_identity() -> None:

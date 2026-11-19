@@ -5,6 +5,8 @@ from uuid import UUID, uuid4
 from autotrading.domain.notifications.errors import InvalidInboxNotificationError
 from autotrading.domain.notifications.notification import Notification
 from autotrading.domain.notifications.notification_target import NotificationTarget
+from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.tenant_owned import TenantOwned
 
 # A notification of the bell older than this is forgotten (R6.2.1).
 INBOX_RETENTION = timedelta(days=90)
@@ -20,12 +22,13 @@ class InboxNotificationId:
 
 
 @dataclass(frozen=True, slots=True)
-class InboxNotification:
+class InboxNotification(TenantOwned):
     """A notification the platform generated for the tenant, as the bell keeps it: its icon, the flow or account and the
     event, its values, the pages it leads to, and when the user read it (R6.2.1, ADR
     notifiche-nell-app-salvate-per-tenant). Kept whatever its channels, read or not, for INBOX_RETENTION.
     """
 
+    tenant_id: TenantId
     id: InboxNotificationId
     notified_at: datetime
     icon: str
@@ -52,9 +55,10 @@ class InboxNotification:
         return self.notified_at < now - INBOX_RETENTION
 
     @classmethod
-    def of(cls, notification: Notification, at: datetime) -> InboxNotification:
-        """The notification generated at the instant, unread."""
+    def of(cls, tenant_id: TenantId, notification: Notification, at: datetime) -> InboxNotification:
+        """The notification generated for the tenant at the instant, unread."""
         return cls(
+            tenant_id,
             InboxNotificationId.new(),
             at,
             notification.icon,

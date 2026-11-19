@@ -36,7 +36,7 @@ class InMemoryNotificationInboxAdapter:
         if not self.reachable:
             raise NotificationInboxUnavailableError
         kept = [each for each in self.notifications if not each.forgotten_at(at)]
-        self._store[self._tenant_id] = [*kept, InboxNotification.of(notification, at)]
+        self._store[self._tenant_id] = [*kept, InboxNotification.of(self._tenant_id, notification, at)]
 
     def list(self, cursor: InboxCursor | None) -> InboxPage:
         newest_first = sorted(self.notifications, key=InboxCursor.of, reverse=True)
