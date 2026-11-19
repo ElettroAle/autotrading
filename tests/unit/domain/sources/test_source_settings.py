@@ -42,6 +42,16 @@ def test_the_refusal_names_the_parameter_and_the_values_it_admits() -> None:
     )
 
 
+def test_the_refusal_tells_the_field_and_its_limits_to_the_page_of_a_trial() -> None:
+    with pytest.raises(SourceParameterOutOfRangeError) as raised:
+        NEWS.settings({"max_items": 0})
+
+    assert (raised.value.status_code, raised.value.details) == (
+        422,
+        {"field": "max_items", "minimum": 1, "maximum": 50},
+    )
+
+
 def test_the_parameters_of_an_adapter_are_checked_with_those_of_the_source() -> None:
     own = SourceParameter("lingua", "lingua", 1, 1, 3)
 

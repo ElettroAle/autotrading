@@ -41,7 +41,12 @@ class CycleSchedule:
 
     @property
     def source_wait(self) -> timedelta:
-        return min(self.interval / SOURCE_WAIT_SHARE, LONGEST_SOURCE_WAIT)
+        return source_wait_of(self.interval)
+
+
+def source_wait_of(interval: timedelta) -> timedelta:
+    """How long the cycles of that interval wait for a source (R1.2.5)."""
+    return min(interval / SOURCE_WAIT_SHARE, LONGEST_SOURCE_WAIT)
 
 
 def delay_seconds(planned_at: datetime, started_at: datetime) -> int | None:

@@ -244,11 +244,13 @@ from autotrading.application.orders.read_minimum_value import ReadMinimumValueUs
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceCredentialServices
 from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
+from autotrading.application.sources.open_source_credentials import OpenSourceCredentialsUseCase
 from autotrading.application.sources.ports import (
     PriceForecasterPort,
 )
 from autotrading.application.sources.record_actual_prices import RecordActualPricesCommand
 from autotrading.application.sources.record_actual_prices_of_tenants import RecordActualPricesOfTenantsUseCase
+from autotrading.application.sources.try_source_adapter import TrialServices, TrySourceAdapterUseCase
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.application.verification.errors import VerificationAccountNotFoundError, VerificationStepError
 from autotrading.application.verification.ports import ProcedureOrders
@@ -258,6 +260,7 @@ from autotrading.application.verification.run_exchange_verification import (
     VerificationReadings,
 )
 from autotrading.domain.flows.cycle_flow import CycleFlow
+from autotrading.domain.flows.cycle_interval import DEFAULT_CYCLE_INTERVAL
 from autotrading.domain.flows.cycle_order import CycleOrder
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.orders.slippage import Slippage
@@ -291,6 +294,7 @@ def tenant_use_cases(
             ledger_recording,
             on_demand_cycles,
             email_tests,
+            source_trials,
         ) = worker_of(tenant_id)
         flow_ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
@@ -330,6 +334,7 @@ def tenant_use_cases(
             sources=sources,
             source_credentials=source_credentials,
             source_secrets_sealer=source_secrets_sealer(tenant_id),
+            source_trials=source_trials,
             provider_keys=provider_keys,
             provider_key_sealer=provider_key_sealer(tenant_id),
             provider_key_usage=flows,
@@ -397,12 +402,14 @@ def worker_use_cases(
     openers: tuple[SodiumCredentialOpenerAdapter, Callable[[TenantId], SodiumMailPasswordOpenerAdapter]],
     trading: tuple[str, Slippage, HyperliquidAdaptersOfInstallation],
     notifications: tuple[OutboxPort, MailerPort, NotificationLinkPort],
-    cycle_for: Callable[[TenantId], WorkerCycle],
+    cycles: tuple[Callable[[TenantId], WorkerCycle], SourceSystems, SodiumSourceSecretsOpenerAdapter],
 ) -> Callable[[TenantId], WorkerUseCases]:
     """Builds, for each request of the API, the worker use cases on adapters bound to the tenant it names.
 
-    The cycle asked for now runs on the graph of the planned cycles, composed only when the request asks for it.
+    The cycle asked for now runs on the graph of the planned cycles, composed only when the request asks for it; the
+    trial of a source reads it as a cycle of the interval of a flow that names none (R6.3.1).
     """
+    cycle_for, systems, source_secrets_opener = cycles
     environment, slippage, hyperliquid = trading
     exchanges, _, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
     opener, mail_password_opener = openers
@@ -458,6 +465,14 @@ def worker_use_cases(
                 SqlAlchemyFlowTimingAdapter(engine, tenant_id),
                 system_clock_adapters(),
                 lambda command: cycle_for(tenant_id).execute(command),
+            ),
+            try_source_adapter=TrySourceAdapterUseCase(
+                systems,
+                SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
+                OpenSourceCredentialsUseCase(
+                    SqlAlchemySourceCredentialsRepositoryAdapter(engine, tenant_id), source_secrets_opener
+                ),
+                TrialServices(ThreadPoolConcurrentCallsAdapter(), system_clock_adapters(), DEFAULT_CYCLE_INTERVAL),
             ),
         )
 
@@ -740,7 +755,8 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
     bot = bot_polling(inbox, lambda bot_inbox: telegram_bot(engine, bot_inbox, messenger, (outbox, links)))
     library_gateways = litellm_adapters()
     models: ModelGateways = {**library_gateways, **openrouter_adapters()}
-    predictors = (models, forecaster_adapters(source))
+    forecaster = forecaster_adapters(source)
+    predictors = (models, forecaster)
     cycle_for = cycle_of(
         engine,
         (opener, provider_key_opener, source_secrets_opener),
@@ -749,7 +765,11 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
         predictors,
     )
     for_tenant = worker_use_cases(
-        engine, (opener, mail_password_opener), (environment, slippage, hyperliquid), (outbox, mailer, links), cycle_for
+        engine,
+        (opener, mail_password_opener),
+        (environment, slippage, hyperliquid),
+        (outbox, mailer, links),
+        (cycle_for, source_systems(hyperliquid, forecaster), source_secrets_opener),
     )
     cycles = worker_cycles(engine, cycle_for, hyperliquid)
     library_catalog = ReadModelCatalogUseCase(

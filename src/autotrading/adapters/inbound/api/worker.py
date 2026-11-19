@@ -16,6 +16,7 @@ from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.cycles import CycleDetailResponse
 from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
+from autotrading.adapters.inbound.api.source_trials import SourceTrialRequest, SourceTrialResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.adapters.inbound.api.worker_model_catalog import WorkerModelCatalogResponse
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
@@ -37,6 +38,7 @@ from autotrading.application.orders.close_exchange_position import (
     CloseExchangePositionCommand,
     CloseExchangePositionUseCase,
 )
+from autotrading.application.sources.try_source_adapter import TrySourceAdapterCommand, TrySourceAdapterUseCase
 from autotrading.application.tenancy.errors import NotAuthenticatedError
 from autotrading.application.verification.run_exchange_verification import (
     RunExchangeVerificationCommand,
@@ -78,6 +80,7 @@ class WorkerUseCases:
     read_account_transfers: ReadAccountTransfersUseCase
     record_account_executions: RecordAccountExecutionsUseCase
     run_cycle_on_demand: RunCycleOnDemandUseCase
+    try_source_adapter: TrySourceAdapterUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,6 +339,15 @@ def create_worker_api(
         ciclo-su-richiesta-nel-worker): a failed cycle is its record, a refusal is a Problem Details."""
         command = RunCycleOnDemandCommand(flow_id)
         return CycleDetailResponse.of(for_tenant(TenantId(tenant_id)).run_cycle_on_demand.execute(command))
+
+    @api.post("/tenants/{tenant_id}/sources/{source}/adapters/{adapter}/trials", dependencies=[Depends(require_api)])
+    def try_source_adapter(
+        tenant_id: UUID, source: str, adapter: str, request: SourceTrialRequest
+    ) -> SourceTrialResponse:
+        """An adapter of a source read now with the credentials of the tenant, which only the worker opens (ADR
+        prova-di-un-adapter-di-fonte-nel-worker): a source that fails is the outcome, a refusal is a Problem Details."""
+        command = TrySourceAdapterCommand(source, adapter, request.asset, request.parameters)
+        return SourceTrialResponse.of(for_tenant(TenantId(tenant_id)).try_source_adapter.execute(command))
 
     @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])
     def notify(tenant_id: UUID, request: NotificationRequest) -> dict[str, str]:

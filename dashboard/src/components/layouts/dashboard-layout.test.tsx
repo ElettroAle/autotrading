@@ -80,6 +80,10 @@ describe('DashboardLayout', () => {
       'href',
       '/alerts',
     );
+    expect(within(navigation).getByRole('link', { name: 'Fonti' })).toHaveAttribute(
+      'href',
+      '/fonti',
+    );
     expect(within(navigation).getByRole('link', { name: 'Generale' })).toHaveAttribute(
       'href',
       '/settings/general',
@@ -92,6 +96,18 @@ describe('DashboardLayout', () => {
       'href',
       '/notifications',
     );
+  });
+
+  it('puts Fonti in the main group, after Avvisi (ADR pagina-fonti-con-la-prova)', () => {
+    renderLayout();
+
+    const navigation = screen.getByRole('navigation', { name: 'Navigazione' });
+    const [main] = within(navigation).getAllByRole('list');
+    expect(
+      within(main as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/', '/accounts', '/history', '/alerts', '/fonti']);
   });
 
   it('gathers the settings under a visible heading', () => {
@@ -118,6 +134,7 @@ describe('DashboardLayout', () => {
     ['/history?tab=orders', 'Storico'],
     ['/alerts?state=all', 'Avvisi'],
     ['/alerts/alert-1', 'Avvisi'],
+    ['/fonti', 'Fonti'],
     ['/settings/general', 'Generale'],
     ['/provider-keys', 'Chiavi'],
     ['/notifications', 'Notifiche'],

@@ -71,10 +71,10 @@ from tests.support.accounts import an_account
 from tests.support.flows import a_flow
 from tests.support.installation import (
     WORKER_TOKEN,
-    cycles_of_installation,
     dev_installation_on_testnet,
     installation_configuration,
     worker_configuration,
+    worker_cycles_of_installation,
 )
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.problems import reason_of
@@ -373,7 +373,7 @@ def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
         (opener, partial(SodiumMailPasswordOpenerAdapter, {})),
         (environment, Slippage.default(), hyperliquid),
         (InMemoryOutboxAdapter(), FakeMailerAdapter(), FakeNotificationLinkAdapter()),
-        cycles_of_installation(opener),
+        worker_cycles_of_installation(opener),
     )
 
     first, second = factory(TenantId.new()), factory(TenantId.new())

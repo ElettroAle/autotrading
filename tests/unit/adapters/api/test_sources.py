@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
-from tests.fakes.sources import FakeSentimentAdapter
+from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
@@ -124,3 +124,87 @@ def test_an_adapter_the_tenant_configured_is_activatable(platform: Platform) -> 
         True,
         None,
     )
+
+
+def test_a_trial_answers_the_values_the_adapter_read_with_their_instant_and_the_time_of_the_answer(
+    client_of: Client,
+) -> None:
+    response = client_of("anna").post(
+        "/sources/indicatori/adapters/Hyperliquid/trials", json={"asset": "BTC", "parameters": {"lunghezza_serie": 5}}
+    )
+
+    body = response.json()
+    assert (response.status_code, body["outcome"], body["reason"], body["permanent"]) == (200, "succeeded", None, False)
+    assert [value["values"]["prezzo"] for value in body["values"]] == ["100"]
+    assert body["data_at"] == body["values"][0]["reference_at"]
+    assert body["response_milliseconds"] >= 0
+
+
+def test_a_source_that_fails_is_the_outcome_of_the_trial_not_an_error(platform: Platform) -> None:
+    platform.source_systems = replace(platform.source_systems, news=FakeNewsAdapter(reachable=False))
+
+    response = client_of_platform(platform)("anna").post("/sources/notizie/adapters/RSS/trials", json={})
+
+    assert response.status_code == 200
+    assert {name: response.json()[name] for name in ("outcome", "values", "data_at", "reason", "permanent")} == {
+        "outcome": "failed",
+        "values": [],
+        "data_at": None,
+        "reason": "fonte non raggiungibile: notizie",
+        "permanent": False,
+    }
+
+
+def test_a_parameter_outside_its_values_stops_the_trial_and_names_the_field_and_its_limits(client_of: Client) -> None:
+    response = client_of("anna").post(
+        "/sources/indicatori/adapters/Hyperliquid/trials", json={"asset": "BTC", "parameters": {"lunghezza_serie": 51}}
+    )
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {
+            "detail": "parametro fuori dai valori ammessi: lunghezza serie, da 1 a 50",
+            "field": "lunghezza_serie",
+            "minimum": 1,
+            "maximum": 50,
+        },
+    )
+
+
+def test_a_trial_of_a_per_asset_source_without_an_asset_does_not_start(client_of: Client) -> None:
+    response = client_of("anna").post("/sources/pivot/adapters/Hyperliquid/trials", json={})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "scegli l'asset su cui provare la fonte pivot", "field": "asset"},
+    )
+
+
+@pytest.mark.parametrize(
+    ("path", "detail"),
+    [
+        ("/sources/oroscopo/adapters/RSS/trials", "fonte non disponibile: oroscopo"),
+        ("/sources/notizie/adapters/Altro/trials", "adapter non disponibile per la fonte notizie: Altro"),
+    ],
+)
+def test_a_trial_of_a_source_or_an_adapter_outside_the_catalog_is_not_found(
+    client_of: Client, path: str, detail: str
+) -> None:
+    response = client_of("anna").post(path, json={})
+
+    assert (response.status_code, reason_of(response)) == (404, {"detail": detail})
+
+
+def test_a_trial_with_the_worker_away_is_a_service_not_available(platform: Platform) -> None:
+    platform.worker_reachable = False
+
+    response = client_of_platform(platform)("anna").post("/sources/notizie/adapters/RSS/trials", json={})
+
+    assert (response.status_code, reason_of(response)) == (
+        503,
+        {"detail": "servizio di esecuzione non raggiungibile, riprovare"},
+    )
+
+
+def test_the_trial_needs_an_identity(client_of: Client) -> None:
+    assert TestClient(client_of("anna").app).post("/sources/notizie/adapters/RSS/trials", json={}).status_code == 401

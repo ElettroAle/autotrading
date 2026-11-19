@@ -6,6 +6,7 @@ import pytest
 
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.application.flows.ports import CallAnswered, CallFailed, CallUnanswered
+from autotrading.application.sources.errors import SourceUnansweredError
 from tests.fakes.cycles import FakeTransientError
 
 WAIT_SECONDS = 1.0
@@ -55,3 +56,30 @@ def test_a_defect_of_a_call_is_not_hidden() -> None:
 
     with pytest.raises(ZeroDivisionError):
         ThreadPoolConcurrentCallsAdapter().call_all({"a": broken}, WAIT_SECONDS)
+
+
+def test_one_call_within_the_wait_gives_its_answer() -> None:
+    assert ThreadPoolConcurrentCallsAdapter().call_within(lambda: 7, WAIT_SECONDS) == 7
+
+
+def test_one_call_still_running_at_the_end_of_the_wait_is_a_source_without_answer() -> None:
+    released = threading.Event()
+    try:
+        with pytest.raises(SourceUnansweredError, match=r"^nessuna risposta entro 0 secondi$") as raised:
+            ThreadPoolConcurrentCallsAdapter().call_within(released.wait, 0.05)
+    finally:
+        released.set()
+
+    assert not raised.value.permanent
+
+
+def test_one_call_that_fails_with_a_project_error_raises_it() -> None:
+    error = FakeTransientError("limite di richieste superato")
+
+    def fail() -> int:
+        raise error
+
+    with pytest.raises(FakeTransientError) as raised:
+        ThreadPoolConcurrentCallsAdapter().call_within(fail, WAIT_SECONDS)
+
+    assert raised.value is error

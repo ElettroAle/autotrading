@@ -164,8 +164,13 @@ from autotrading.application.sources.get_source import GetSourceUseCase
 from autotrading.application.sources.list_source_credentials import ListSourceCredentialsUseCase
 from autotrading.application.sources.list_source_offers import ListSourceOffersUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
-from autotrading.application.sources.ports import SourceCredentialsRepositoryPort, SourceSecretsSealerPort
+from autotrading.application.sources.ports import (
+    SourceCredentialsRepositoryPort,
+    SourceSecretsSealerPort,
+    SourceTrialPort,
+)
 from autotrading.application.sources.remove_source_credentials import RemoveSourceCredentialsUseCase
+from autotrading.application.sources.request_source_trial import RequestSourceTrialUseCase
 from autotrading.application.sources.set_source_credentials_expiry import SetSourceCredentialsExpiryUseCase
 from autotrading.application.verification.ports import VerificationPort
 from autotrading.application.verification.run_verification import RunVerificationUseCase
@@ -189,6 +194,8 @@ class TenantPorts:
     # The credentials the tenant gave the adapters of the sources, and their seal: the API never opens them (R4.1.2).
     source_credentials: SourceCredentialsRepositoryPort
     source_secrets_sealer: SourceSecretsSealerPort
+    # The trial of an adapter, run by the worker, which alone opens the credentials (R6.3.1).
+    source_trials: SourceTrialPort
     provider_keys: ProviderKeyRepositoryPort
     provider_key_sealer: ProviderKeySealerPort
     provider_key_usage: ProviderKeyUsagePort
@@ -263,6 +270,7 @@ class TenantUseCases:
     configure_source_adapter: ConfigureSourceAdapterUseCase
     remove_source_credentials: RemoveSourceCredentialsUseCase
     set_source_credentials_expiry: SetSourceCredentialsExpiryUseCase
+    request_source_trial: RequestSourceTrialUseCase
     register_provider_key: RegisterProviderKeyUseCase
     replace_provider_key: ReplaceProviderKeyUseCase
     remove_provider_key: RemoveProviderKeyUseCase
@@ -375,6 +383,7 @@ class TenantUseCases:
             ),
             remove_source_credentials=RemoveSourceCredentialsUseCase(ports.source_credentials),
             set_source_credentials_expiry=SetSourceCredentialsExpiryUseCase(ports.source_credentials),
+            request_source_trial=RequestSourceTrialUseCase(ports.sources, ports.source_trials),
             register_provider_key=RegisterProviderKeyUseCase(tenant_id, keys, key_services),
             replace_provider_key=ReplaceProviderKeyUseCase(keys, key_services),
             remove_provider_key=RemoveProviderKeyUseCase(keys, ports.provider_key_usage),

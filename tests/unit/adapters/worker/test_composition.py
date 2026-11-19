@@ -17,6 +17,7 @@ from autotrading.adapters.outbound.worker.ledger_recording import WorkerLedgerRe
 from autotrading.adapters.outbound.worker.notifications import WorkerNotificationAdapter
 from autotrading.adapters.outbound.worker.on_demand_cycle import WorkerOnDemandCycleAdapter
 from autotrading.adapters.outbound.worker.position_closing import WorkerPositionClosingAdapter
+from autotrading.adapters.outbound.worker.source_trial import WorkerSourceTrialAdapter
 from autotrading.adapters.outbound.worker.verification import WorkerVerificationAdapter
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -38,9 +39,18 @@ def test_each_tenant_gets_the_adapters_of_the_worker_bound_to_it(source: Configu
     adapters_of = worker_adapters(source)
     tenant_id = TenantId.new()
 
-    (start_link, state, activity, closing, verification, notifier, ledger_recording, on_demand, email_tests) = (
-        adapters_of(tenant_id)
-    )
+    (
+        start_link,
+        state,
+        activity,
+        closing,
+        verification,
+        notifier,
+        ledger_recording,
+        on_demand,
+        email_tests,
+        source_trials,
+    ) = adapters_of(tenant_id)
 
     assert isinstance(start_link, WorkerBotIdentityAdapter)
     assert isinstance(state, WorkerAccountStateAdapter)
@@ -55,6 +65,8 @@ def test_each_tenant_gets_the_adapters_of_the_worker_bound_to_it(source: Configu
     assert str(tenant_id.value) in repr(on_demand)
     assert isinstance(email_tests, WorkerEmailTestAdapter)
     assert str(tenant_id.value) in repr(email_tests)
+    assert isinstance(source_trials, WorkerSourceTrialAdapter)
+    assert str(tenant_id.value) in repr(source_trials)
 
 
 def test_the_start_link_is_one_for_the_installation(source: ConfigurationSource) -> None:

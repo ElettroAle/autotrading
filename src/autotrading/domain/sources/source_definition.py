@@ -39,5 +39,5 @@ class SourceDefinition:
             raise UnknownSourceParameterError(self.name, key)
         # A boolean is an int in Python, never a number a user meant.
         if isinstance(value, bool) or not isinstance(value, int) or not parameter.accepts(value):
-            raise SourceParameterOutOfRangeError(parameter.label, parameter.minimum, parameter.maximum)
+            raise SourceParameterOutOfRangeError(parameter.label, parameter.minimum, parameter.maximum, parameter.key)
         return value

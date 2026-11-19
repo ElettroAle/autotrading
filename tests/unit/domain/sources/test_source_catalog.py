@@ -6,6 +6,7 @@ from autotrading.domain.sources.errors import (
     SourceAdapterWithoutConfigurationError,
     SourceNotAvailableError,
     SourceParameterOutOfRangeError,
+    TrialAssetRequiredError,
 )
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
@@ -139,3 +140,27 @@ def test_an_adapter_offered_by_no_source_is_not_available() -> None:
         SourceCatalog([offered("sentiment")]).configurable_adapter("oroscopo")
 
     assert (str(raised.value), raised.value.status_code) == ("adapter della fonte non disponibile: oroscopo", 404)
+
+
+def test_a_trial_of_a_per_asset_source_reads_the_asset_chosen() -> None:
+    assert offered("indicatori").asset_of_trial(" BTC ") == "BTC"
+
+
+@pytest.mark.parametrize("asset", [None, "", "  "])
+def test_a_trial_of_a_per_asset_source_without_an_asset_does_not_start(asset: str | None) -> None:
+    with pytest.raises(TrialAssetRequiredError) as raised:
+        offered("indicatori").asset_of_trial(asset)
+
+    assert (str(raised.value), raised.value.status_code, raised.value.details) == (
+        "scegli l'asset su cui provare la fonte indicatori",
+        422,
+        {"field": "asset"},
+    )
+
+
+def test_a_trial_of_a_market_source_reads_the_whole_market() -> None:
+    market = OfferedSource(
+        SourceDefinition("notizie", "fonte notizie", per_asset=False, parameters=()), (adapter("RSS"),)
+    )
+
+    assert market.asset_of_trial("BTC") is None

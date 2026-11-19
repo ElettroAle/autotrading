@@ -387,6 +387,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sources/{name}/adapters/{adapter}/trials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Try Source Adapter
+         * @description Reads the adapter now as a cycle does and records nothing: a source that fails is the outcome (R6.3.1).
+         */
+        post: operations["try_source_adapter_sources__name__adapters__adapter__trials_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/source-credentials": {
         parameters: {
             query?: never;
@@ -3562,6 +3582,47 @@ export interface components {
             /** Adapters */
             adapters: components["schemas"]["AdapterSelectionResponse"][];
         };
+        /**
+         * SourceTrialRequest
+         * @description The asset, only for a per-asset source, and the parameters the user set: the others take their default.
+         */
+        SourceTrialRequest: {
+            /** Asset */
+            asset?: string | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * SourceTrialResponse
+         * @description What the adapter answered the trial: a source that fails is the outcome, not an error of the request (R6.3.1).
+         */
+        SourceTrialResponse: {
+            outcome: components["schemas"]["TrialOutcome"];
+            /** Values */
+            values: components["schemas"]["SourceTrialValueResponse"][];
+            /** Data At */
+            data_at: string | null;
+            /** Response Milliseconds */
+            response_milliseconds: number;
+            /** Reason */
+            reason: string | null;
+            /** Permanent */
+            permanent: boolean;
+        };
+        /** SourceTrialValueResponse */
+        SourceTrialValueResponse: {
+            /**
+             * Reference At
+             * Format: date-time
+             */
+            reference_at: string;
+            /** Values */
+            values: {
+                [key: string]: string;
+            };
+        };
         /** StepDocumentResponse */
         StepDocumentResponse: {
             /** Step */
@@ -3784,6 +3845,11 @@ export interface components {
          * @enum {string}
          */
         TargetKind: "flow" | "open_position" | "closed_position" | "alert";
+        /**
+         * TrialOutcome
+         * @enum {string}
+         */
+        TrialOutcome: "succeeded" | "failed";
         /**
          * UnattributableKind
          * @enum {string}
@@ -4604,6 +4670,54 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    try_source_adapter_sources__name__adapters__adapter__trials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                adapter: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceTrialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceTrialResponse"];
+                };
+            };
+            /** @description fonte o adapter non disponibile */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description parametro fuori dai valori ammessi o asset mancante: la prova non parte */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description servizio di esecuzione non raggiungibile */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
@@ -76,11 +76,17 @@ def account_id_of(name: str) -> UUID:
 
 
 class FakeClockAdapter:
-    def __init__(self, now: datetime) -> None:
+    """Stands still, unless the test makes every reading a step later than the one before, as time passes during a
+    call it measures (R6.3.1)."""
+
+    def __init__(self, now: datetime, step: timedelta = timedelta(0)) -> None:
         self.current = now
+        self.step = step
 
     def now(self) -> datetime:
-        return self.current
+        current = self.current
+        self.current += self.step
+        return current
 
 
 class InMemoryCycleRepositoryAdapter:

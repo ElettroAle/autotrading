@@ -84,3 +84,12 @@ def cycles_of_installation(opener: SodiumCredentialOpenerAdapter) -> Callable[[T
         (InMemoryOutboxAdapter(), FakeNotificationLinkAdapter()),
         ({}, FakePriceForecasterAdapter()),
     )
+
+
+def worker_cycles_of_installation(
+    opener: SodiumCredentialOpenerAdapter,
+) -> tuple[Callable[[TenantId], WorkerCycle], SourceSystems, SodiumSourceSecretsOpenerAdapter]:
+    """The cycles of the worker of an installation dev on the testnet with what the trial of a source reads: the
+    adapters of the sources and the opener of their secrets (R6.3.1)."""
+    _, _, systems = dev_installation_on_testnet()
+    return cycles_of_installation(opener), systems, SodiumSourceSecretsOpenerAdapter({})

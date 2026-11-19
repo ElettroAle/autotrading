@@ -1,6 +1,6 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
@@ -16,6 +16,7 @@ from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
+from autotrading.domain.sources.source_trial import SourceTrial
 from autotrading.domain.sources.timeframe import Timeframe
 
 
@@ -120,9 +121,12 @@ class ForecastRepositoryPort(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class SourceRequest:
-    """What a reader of a source is asked: for an asset, or for the whole market when asset is None (R1.3.2)."""
+    """What a reader of a source is asked: for an asset, or for the whole market when asset is None (R1.3.2).
 
-    flow_id: UUID
+    A trial asks it outside every flow, so nothing it reads is recorded (R6.3.1).
+    """
+
+    flow_id: UUID | None
     asset: str | None
     settings: Mapping[str, int]
     now: datetime
@@ -232,3 +236,39 @@ class SourceCredentialsRejectionNoticePort(Protocol):
     of the notifications (R4.1.2)."""
 
     def execute(self, adapter: str) -> None: ...
+
+
+class ConcurrentCallsPort(Protocol):
+    """The calls of the cycle, which wait for a source only up to its wait (R1.2.5)."""
+
+    def call_within[R](self, call: Callable[[], R], seconds: float) -> R:
+        """The answer of the call; a call still running at the end of the wait is abandoned and raises
+        SourceUnansweredError, a call that fails with an error of the project raises it."""
+        ...
+
+
+class ClockPort(Protocol):
+    def now(self) -> datetime: ...
+
+
+class TrialIntervalPort(Protocol):
+    """The cycle a trial reads as: the interval of a flow that names none and the wait of its sources (R6.3.1)."""
+
+    @property
+    def minutes(self) -> int: ...
+
+    @property
+    def source_wait(self) -> timedelta: ...
+
+
+class SourceTrialPort(Protocol):
+    """Bound to the tenant of the request: tries an adapter of a source now (R6.3.1, ADR
+    prova-di-un-adapter-di-fonte-nel-worker).
+
+    Only the worker opens the credentials of the adapters: in the API it is the client that asks the worker to run
+    TrySourceAdapterUseCase. A source that fails is the outcome of the trial, not an error.
+    """
+
+    def try_adapter(self, source: str, adapter: str, asset: str | None, parameters: Mapping[str, int]) -> SourceTrial:
+        """Raises SourceTrialWorkerUnavailableError when the worker cannot be reached or answers in another shape."""
+        ...
