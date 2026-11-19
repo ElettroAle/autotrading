@@ -97,6 +97,7 @@ from tests.fakes.flow_repository import (
     InMemoryFlowTimingAdapter,
 )
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
+from tests.fakes.key_expiries import InMemoryKeyExpiriesAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
@@ -301,6 +302,7 @@ class FlowCycles:
             openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify_flow),
             opening_reduced_notice=NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
             opening_blocked_notice=NotifyOpeningBlockedUseCase(notify_flow),
+            flow_keys=InMemoryKeyExpiriesAdapter(platform.accounts, platform.provider_keys, platform.flows, tenant_id),
         )
 
     def services(self) -> CycleServices:
@@ -343,7 +345,9 @@ class FlowCycles:
         if any(key.provider == name for key in self.platform.provider_keys.of(tenant_id)):
             return
         sealed = FakeProviderKeySealerAdapter(tenant_id, self.platform.key_vault).seal(name, api_key_of(KEY))
-        self.platform.provider_keys.keys.append(RegisteredProviderKey(tenant_id, name, sealed))
+        key = RegisteredProviderKey(tenant_id, name, sealed)
+        self.platform.provider_keys.keys.append(key)
+        self.platform.provider_keys.stamp(key)
 
     def add_flow(
         self,

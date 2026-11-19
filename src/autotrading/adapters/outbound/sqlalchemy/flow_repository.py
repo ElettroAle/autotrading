@@ -98,7 +98,7 @@ class SqlAlchemyFlowRepositoryAdapter:
 
     def list(self) -> list[Flow]:
         with self._transaction() as connection:
-            return [_flow_of(row) for row in connection.execute(_in_force().order_by(flows.c.name)).mappings()]
+            return [flow_of(row) for row in connection.execute(flows_in_force().order_by(flows.c.name)).mappings()]
 
     def exists(self, flow_id: UUID) -> bool:
         """For the cycles (ADR 0046): the flow belongs to the tenant of the request."""
@@ -114,10 +114,10 @@ class SqlAlchemyFlowRepositoryAdapter:
 
     def get(self, flow_id: FlowId) -> Flow:
         with self._transaction() as connection:
-            row = connection.execute(_in_force().where(flows.c.id == flow_id.value)).mappings().one_or_none()
+            row = connection.execute(flows_in_force().where(flows.c.id == flow_id.value)).mappings().one_or_none()
         if row is None:
             raise FlowNotFoundError
-        return _flow_of(row)
+        return flow_of(row)
 
     def version(self, flow_id: FlowId, number: int) -> FlowConfiguration:
         query = select(flow_versions.c.configuration).where(
@@ -268,7 +268,7 @@ class SqlAlchemyFlowRepositoryAdapter:
             yield connection
 
 
-def _in_force() -> Select[tuple[object, ...]]:
+def flows_in_force() -> Select[tuple[object, ...]]:
     """Every flow with its configuration version in force: the highest number it has."""
     current = (
         select(flow_versions.c.flow_id, func.max(flow_versions.c.version).label("version"))
@@ -376,7 +376,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
     )
 
 
-def _flow_of(row: RowMapping) -> Flow:
+def flow_of(row: RowMapping) -> Flow:
     return Flow(
         FlowId(row["id"]),
         TenantId(row["tenant_id"]),

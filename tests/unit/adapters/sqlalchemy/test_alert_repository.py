@@ -60,7 +60,7 @@ def test_a_filter_narrows_by_state_severity_resource_and_period() -> None:
     state, severity, resource_kind, resource, since, before = _admitted(criteria)
 
     assert sql_of(state) == "alerts.resolved_at IS NULL"
-    assert params_of(severity) == [["unattributable_fill", "unattributable_position"]]
+    assert params_of(severity) == [["key_expiring", "unattributable_fill", "unattributable_position"]]
     assert params_of(resource_kind) == ["account"]
     assert params_of(resource) == [ACCOUNT]
     assert (">=" in sql_of(since), params_of(since)) == (True, [OPENED_AT])

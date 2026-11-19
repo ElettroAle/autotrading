@@ -604,6 +604,19 @@ alerts = Table(
     Index("alerts_newest", "tenant_id", text("opened_at DESC"), text("id DESC")),
 )
 
+# The thresholds told for each expiry of a key, once each: a new date of the key is told again (R6.2.2).
+key_expiry_notices = Table(
+    "key_expiry_notices",
+    metadata,
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), primary_key=True),
+    Column("key_kind", Text, primary_key=True),
+    Column("key_id", Uuid, primary_key=True),
+    Column("expires_on", Date, primary_key=True),
+    Column("threshold", Integer, primary_key=True),
+    Column("notified_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint("key_kind IN ('account', 'provider')", name="key_expiry_notices_kind_known"),
+)
+
 inbox_notifications = Table(
     "inbox_notifications",
     metadata,

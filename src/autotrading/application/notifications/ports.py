@@ -1,13 +1,14 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, time
 from typing import Protocol
 from uuid import UUID
 
-from autotrading.domain.notifications.alert import Alert, AlertCause, AlertId
+from autotrading.domain.notifications.alert import Alert, AlertCause, AlertId, AlertKind
 from autotrading.domain.notifications.alert_page import AlertCursor, AlertFilter, AlertPage
 from autotrading.domain.notifications.channel_preferences import ChannelPreferences
 from autotrading.domain.notifications.chat_id import ChatId
+from autotrading.domain.notifications.expiring_key import ExpiringKey, KeyExpiryNotice
 from autotrading.domain.notifications.flow_status import FlowStatusFigures
 from autotrading.domain.notifications.inbox_notification import InboxNotificationId
 from autotrading.domain.notifications.inbox_page import InboxCursor, InboxPage
@@ -275,6 +276,38 @@ class AlertRepositoryPort(Protocol):
         ...
 
     def open_count(self) -> int: ...
+
+    def resolve_all_but(self, kind: AlertKind, kept: frozenset[UUID]) -> None:
+        """Resolves the open alerts of the kind whose resource is not among the kept ones (R6.2.2)."""
+        ...
+
+
+class ExpiringKeysPort(Protocol):
+    """Bound to the tenant: every key of its accounts and providers that has an expiry, with the names of the flows not
+    archived that use it (R6.2.2, ADR controllo-giornaliero-delle-scadenze)."""
+
+    def expiring_keys(self) -> tuple[ExpiringKey, ...]: ...
+
+
+class KeyExpiryNoticeRepositoryPort(Protocol):
+    """Bound to the tenant: the thresholds already told for each expiry of its keys (R6.2.2)."""
+
+    def record(self, notice: KeyExpiryNotice) -> bool:
+        """Records the notice; False when it was already recorded, so a threshold is told once."""
+        ...
+
+
+class KeyExpiryTenantsPort(Protocol):
+    """Every tenant of the platform, for the daily check of the expiries of their keys (R6.2.2)."""
+
+    def tenant_ids(self) -> tuple[TenantId, ...]: ...
+
+
+class DailyCheckSchedulerPort(Protocol):
+    def keep_daily(self, name: str, at: time, run: Callable[[], None]) -> None:
+        """Runs the check once at once, then every day at the instant, while the worker is up; an error of the project
+        it raises is recorded, never raised (ADR controllo-giornaliero-delle-scadenze)."""
+        ...
 
 
 class NotificationInboxPort(Protocol):

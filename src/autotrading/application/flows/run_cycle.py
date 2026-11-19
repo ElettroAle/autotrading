@@ -3,8 +3,9 @@ from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.flows.cycle_graph import CycleGraph, FailedCycle, PlannedCycle, recorded
-from autotrading.application.flows.errors import CycleInProgressError, FlowNotActiveError
+from autotrading.application.flows.errors import CycleInProgressError, FlowKeyExpiredError, FlowNotActiveError
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
+from autotrading.application.flows.pause_flows_on_expired_keys import PauseFlowsOnExpiredKeysCommand
 from autotrading.application.flows.ports import (
     ClockPort,
     ConsecutiveFailuresPausePort,
@@ -12,6 +13,7 @@ from autotrading.application.flows.ports import (
     CycleFailureNoticePort,
     CycleFlowActivityPort,
     CycleRepositoryPort,
+    ExpiredKeysPausePort,
     FlowLockPort,
     FlowPausePort,
 )
@@ -32,8 +34,8 @@ class RunCycleCommand:
 @dataclass(frozen=True, slots=True)
 class CycleGuards:
     """What keeps a planned cycle unique and alone and only for an active flow, what pauses the flows on a permanent
-    error or after too many failed cycles in a row and tells the user of a failed cycle: everything but the lock bound
-    to the tenant of the flow.
+    error, after too many failed cycles in a row or on an expired key, and tells the user of a failed cycle: everything
+    but the lock bound to the tenant of the flow.
     """
 
     cycles: CycleRepositoryPort
@@ -43,6 +45,7 @@ class CycleGuards:
     failures: CycleFailureNoticePort
     activity: CycleFlowActivityPort
     consecutive_failures: ConsecutiveFailuresPausePort
+    expired_keys: ExpiredKeysPausePort
 
 
 class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:
@@ -53,7 +56,8 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     error counts towards the maximum of failed cycles in a row of the flow (R3.2.4).
     Every cycle that read the state of its flow, completed or failed, records the equity of the last state it read
     (R2.2.3, ADR 0120). A cycle whose flow is no longer active when it starts runs nothing and leaves no trace: the
-    planner may still hold its job for a few seconds (Bug 373).
+    planner may still hold its job for a few seconds (Bug 373). A flow that uses an expired key goes in pause with the
+    flows of the key before its cycle starts, which leaves no trace either (R6.2.2).
 
     A cycle the user asks for now (R6.5.2, ADR ciclo-su-richiesta-nel-worker) answers the user where the planned one
     would pass in silence: a flow not active and a cycle in progress are refused. A permanent error fails fast as for
@@ -76,6 +80,9 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
             if not acquired:
                 _refuse_if_asked(command, CycleInProgressError())
                 return recorded(self._guards.cycles, CycleRecord.skipped(command.flow_id, command.planned_at))
+            if self._guards.expired_keys.execute(PauseFlowsOnExpiredKeysCommand(command.flow_id)):
+                _refuse_if_asked(command, FlowKeyExpiredError())
+                return None
             cycle = PlannedCycle(command.flow_id, command.schedule, command.planned_at, command.trigger)
             outcome = self._graph.run(cycle, self._guards.clock.now())
             if isinstance(outcome, FailedCycle):

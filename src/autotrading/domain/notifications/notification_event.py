@@ -9,6 +9,7 @@ TAKE_PROFIT_ICON = "\U0001f3af"
 WARNING_ICON = "\u26a0\ufe0f"
 PAUSE_ICON = "\u23f8\ufe0f"
 ALARM_ICON = "\U0001f6a8"
+KEY_ICON = "\U0001f511"
 
 
 class NotificationEvent(StrEnum):
@@ -34,6 +35,8 @@ class NotificationEvent(StrEnum):
     CASH_OUT = "incasso eseguito"
     # The scope of an emergency closing may hold several flows of the account at once (R3.2.3).
     EMERGENCY_CLOSING = "chiusura di emergenza eseguita"
+    # A key may serve several flows, or none (R6.2.2).
+    KEY_EXPIRY = "scadenza di una chiave"
 
     @property
     def of_flow(self) -> bool:
@@ -58,6 +61,7 @@ _OF_ACCOUNT = frozenset(
         NotificationEvent.UNATTRIBUTABLE_FILL,
         NotificationEvent.RECONCILIATION_ALARM,
         NotificationEvent.EMERGENCY_CLOSING,
+        NotificationEvent.KEY_EXPIRY,
     }
 )
 # The reasons of closing as the flows write them in their history (R1.7.2, R3.1.2, R3.5.1).
@@ -85,4 +89,5 @@ _ICONS = {
     NotificationEvent.RECONCILIATION_ALARM: ALARM_ICON,
     NotificationEvent.CASH_OUT: PROFIT_ICON,
     NotificationEvent.EMERGENCY_CLOSING: ALARM_ICON,
+    NotificationEvent.KEY_EXPIRY: KEY_ICON,
 }

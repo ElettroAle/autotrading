@@ -1,11 +1,12 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
 from autotrading.domain.italian_text import money_text
 from autotrading.domain.notifications.errors import InvalidNotificationError
+from autotrading.domain.notifications.expiring_key import ExpiringKey
 from autotrading.domain.notifications.flow_status import FlowStatusLine
 from autotrading.domain.notifications.notification_event import LOSS_ICON, NotificationEvent
 from autotrading.domain.notifications.notification_target import NotificationTarget, TargetKind
@@ -243,6 +244,18 @@ class Notification:
     def cash_out_done(cls, flow_id: UUID, flow: str, freed: Amount) -> Notification:
         return cls.of_flow(
             NotificationEvent.CASH_OUT, flow_id, flow, "incasso eseguito", NotificationLine("Importo", str(freed))
+        )
+
+    @classmethod
+    def key_expiry(cls, alert_id: UUID, key: ExpiringKey, today: date) -> Notification:
+        """The key, what happens to it, its date and the flows that use it; it leads to the alert it opened (R6.2.2)."""
+        return cls.told(
+            NotificationEvent.KEY_EXPIRY,
+            key.subject,
+            key.headline_on(today),
+            NotificationLine("Scadenza", key.expiry_text),
+            NotificationLine("Flussi", key.flows_text),
+            targets=(NotificationTarget.alert(alert_id),),
         )
 
     @classmethod

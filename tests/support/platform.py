@@ -14,6 +14,11 @@ from autotrading.application.flows.close_flow_positions import ClosingPorts
 from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
+from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsUseCase
+from autotrading.application.flows.pause_flows_on_expired_keys import (
+    PauseFlowsOnExpiredKeysCommand,
+    PauseFlowsOnExpiredKeysUseCase,
+)
 from autotrading.application.flows.ports import AccountRemovalPorts, FlowAccountPorts
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
@@ -24,10 +29,12 @@ from autotrading.application.flows.run_cycle_on_demand import CycleRun, RunCycle
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
+from autotrading.application.notifications.check_key_expiries import CheckKeyExpiriesUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
 from autotrading.application.notifications.link_chat import LinkChatUseCase
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
+from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.ports import BotMessage, LinkStores
 from autotrading.application.notifications.send_test_email import SendTestEmailUseCase
@@ -88,6 +95,11 @@ from tests.fakes.flow_repository import (
 )
 from tests.fakes.flow_status import FakeFlowStatusAdapter
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
+from tests.fakes.key_expiries import (
+    InMemoryKeyExpiriesAdapter,
+    InMemoryKeyExpiryNoticeRepositoryAdapter,
+    KeyExpiryNoticeStore,
+)
 from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.link_code_repository import (
     InMemoryLinkCodeLookupAdapter,
@@ -217,8 +229,9 @@ class Platform:
         # The emergency closings of every tenant, as their record keeps them (R3.2.3).
         self.emergency_closings: list[EmergencyClosing] = []
         # The alerts of every tenant, opened by the worker and read by the API (R6.2.3), and the bell of every tenant,
-        # where the worker keeps each notification and the API reads it (R6.2.1).
-        self.alerts, self.inbox = {}, {}
+        # where the worker keeps each notification and the API reads it (R6.2.1), and the thresholds of the expiries of
+        # the keys already told (R6.2.2).
+        self.alerts, self.inbox, self.key_expiry_notices = {}, {}, KeyExpiryNoticeStore()
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
@@ -428,6 +441,20 @@ class Platform:
             notification_routes(tenant_id, self.channel_preferences, self.links),
             notification_inbox(tenant_id, self.inbox, self.worker_clock),
         )
+
+    def check_key_expiries(self, tenant_id: TenantId) -> None:
+        """What the daily check of the worker runs for a tenant, on its clock (R6.2.2): bootstrap.check_key_expiries."""
+        keys = InMemoryKeyExpiriesAdapter(self.accounts, self.provider_keys, self.flows, tenant_id)
+        notify, alerts = self.notify_for(tenant_id), self.alerts_of(tenant_id)
+        notices = InMemoryKeyExpiryNoticeRepositoryAdapter(self.key_expiry_notices, tenant_id)
+        CheckKeyExpiriesUseCase(keys, notices, alerts, notify, self.worker_clock).execute()
+        flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
+        pause = PauseAffectedFlowsUseCase(
+            flows,
+            InMemoryAutomaticPauseAdapter(self.flows, tenant_id),
+            NotifyFlowPausedUseCase(NotifyFlowEventUseCase(notify, self.flow_status), alerts),
+        )
+        PauseFlowsOnExpiredKeysUseCase(keys, flows, pause, self.worker_clock).execute(PauseFlowsOnExpiredKeysCommand())
 
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
         """What the worker runs after every closing: the protections of the position leave the exchange (R3.1.2)."""

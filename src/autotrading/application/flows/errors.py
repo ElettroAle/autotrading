@@ -288,6 +288,16 @@ class CycleInProgressError(ApplicationError):
         super().__init__("un ciclo del flusso è già in corso")
 
 
+class FlowKeyExpiredError(ApplicationError):
+    """A cycle asked for now on a flow whose account or model uses an expired key: the flows of the key go in pause
+    instead (R6.2.2, ADR controllo-giornaliero-delle-scadenze)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("una chiave del flusso è scaduta")
+
+
 class OnDemandCycleFailedError(ApplicationError):
     """A cycle asked for now stopped by a permanent error: recorded and the flow paused by the worker, which gives its
     reason back (R6.5.2, R1.2.4). The cycle the request asked for did not complete because of what it depends on."""

@@ -93,6 +93,9 @@ class SqlAlchemyAlertRepositoryAdapter:
             alerts.c.kind == position.value, alerts.c.resource_id == account_id, alerts.c.cause_key.not_in(held)
         )
 
+    def resolve_all_but(self, kind: AlertKind, kept: frozenset[UUID]) -> None:
+        self._resolve(alerts.c.kind == kind.value, alerts.c.resource_id.not_in(sorted(kept)))
+
     def _resolve(self, *chosen: ColumnElement[bool]) -> None:
         with self._transaction() as connection:
             connection.execute(update(alerts).where(OPEN_ALERT, *chosen).values(resolved_at=func.now()))

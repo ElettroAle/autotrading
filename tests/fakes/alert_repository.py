@@ -74,6 +74,9 @@ class InMemoryAlertRepositoryAdapter:
             )
         )
 
+    def resolve_all_but(self, kind: AlertKind, kept: frozenset[UUID]) -> None:
+        self._resolve(lambda alert: alert.cause.kind is kind and alert.cause.resource.resource_id not in kept)
+
     def _resolve(self, chosen: Callable[[Alert], bool]) -> None:
         now = self._clock()
         self._store[self._tenant_id] = [

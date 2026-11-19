@@ -13,6 +13,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand
+from autotrading.application.flows.pause_flows_on_expired_keys import PauseFlowsOnExpiredKeysCommand
 from autotrading.application.flows.ports import (
     CycleJob,
     FailedModelCall,
@@ -320,6 +321,23 @@ class FakeFlowActivityAdapter:
         return self._flows.flows[flow_id].status == ACTIVE
 
 
+class FakeExpiredKeysAdapter:
+    """No key of the flows has expired, unless a test names the flows whose key has: those it pauses (R6.2.2)."""
+
+    def __init__(self, flows: FakeFlowsAdapter) -> None:
+        self._flows = flows
+        self.expired_for: dict[UUID, str] = {}
+
+    def execute(self, command: PauseFlowsOnExpiredKeysCommand) -> bool:
+        flow_id = command.flow_id
+        reason = None if flow_id is None else self.expired_for.get(flow_id)
+        if flow_id is None or reason is None:
+            return False
+        flow = self._flows.flows[flow_id]
+        flow.status, flow.pause_reason = PAUSED, reason
+        return True
+
+
 class FakeFlowsAdapter:
     """The flows context as the cycle sees it: schedules, state, pause."""
 
@@ -353,7 +371,7 @@ class FakeFlowsAdapter:
         return {"flow": self.flows[flow_id].name, "executions": len(executions)}
 
     def execute(self, command: PauseAffectedFlowsCommand) -> None:
-        failing = self.flows[command.flow_id]
+        failing = None if command.flow_id is None else self.flows[command.flow_id]
         for flow in self.flows.values():
             involved = (
                 flow is failing
