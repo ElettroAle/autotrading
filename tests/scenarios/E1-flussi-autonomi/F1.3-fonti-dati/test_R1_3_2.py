@@ -211,6 +211,8 @@ WEIGHT_RULE = (
     " suo peso;",
     "- le istruzioni del flusso prevalgono sui pesi quando li contraddicono;",
     "- nel ragionamento di un'apertura nomina la fonte che ha deciso la direzione quando le fonti erano in disaccordo;",
+    # An aggregate of several adapters carries no weight of its own (R5.1.2, ADR fonte-volumi-con-adapter-binance).
+    "- una voce senza peso è un aggregato: riassume gli adapter elencati della sua fonte, ciascuno col suo peso;",
 )
 
 

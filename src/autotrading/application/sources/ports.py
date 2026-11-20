@@ -18,6 +18,7 @@ from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.source_trial import SourceTrial
 from autotrading.domain.sources.timeframe import Timeframe
+from autotrading.domain.sources.volume_snapshot import UnlistedAsset, VolumeSnapshot
 from autotrading.domain.sources.whale_transfer import WhaleTransfer
 
 
@@ -63,6 +64,22 @@ class WhaleTransfersPort(Protocol):
         """The transfers between the two instants worth at least the threshold, in dollars, in any order, read with the
         credentials the tenant gave the adapter (R4.1.2); raises SourceUnavailableError when they cannot be read and
         SourceCredentialsRejectedError when the provider refuses the credentials.
+        """
+        ...
+
+
+class VolumesPort(Protocol):
+    """One exchange that publishes its market data: each one is an adapter of the volumes source (R5.1.2, ADR
+    fonte-volumi-con-adapter-binance)."""
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter declares of itself, without asking the exchange (R4.1.1)."""
+        ...
+
+    def snapshot(self, asset: str, interval_minutes: int) -> VolumeSnapshot | UnlistedAsset:
+        """The volume of the last 24 hours, the aggressive trades of the last interval of the cycle and the order book
+        of the asset now; UnlistedAsset when the exchange does not list it. Raises SourceUnavailableError when they
+        cannot be read.
         """
         ...
 
@@ -161,6 +178,22 @@ class SourceReaderPort(Protocol):
     def execute(self, command: SourceRequest) -> Sequence[SourceValue]:
         """The values read, each with its reference instant. Raises a typed error when the source has no data."""
         ...
+
+
+class CycleSourceDatumPort(Protocol):
+    """A datum of an adapter of an active source in the context of a cycle, as the flows hand it over (R4.1.1)."""
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def adapter(self) -> str: ...
+
+    @property
+    def asset(self) -> str | None: ...
+
+    @property
+    def values(self) -> Mapping[str, str]: ...
 
 
 class SampleRepositoryPort(Protocol):

@@ -33,6 +33,7 @@ WEIGHT_RULE = "\n".join(
         "- le istruzioni del flusso prevalgono sui pesi quando li contraddicono;",
         "- nel ragionamento di un'apertura nomina la fonte che ha deciso la direzione quando le fonti erano in"
         " disaccordo;",
+        "- una voce senza peso è un aggregato: riassume gli adapter elencati della sua fonte, ciascuno col suo peso;",
     )
 )
 

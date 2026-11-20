@@ -57,6 +57,7 @@ from autotrading.application.notifications.notify_opening_blocked import NotifyO
 from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
 from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersUseCase
+from autotrading.application.sources.aggregate_cycle_sources import AggregateCycleSourcesUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceCredentialServices
 from autotrading.application.sources.list_sources import SourceSystems
 from autotrading.application.sources.ports import (
@@ -156,7 +157,9 @@ def run_cycle_for(
             services.clock,
         ),
         calls=ThreadPoolConcurrentCallsAdapter(),
-        context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), ListAgentActionsUseCase(), services.clock),
+        context=ComposeCycleContextUseCase(
+            ComposeAgentContextUseCase(), ListAgentActionsUseCase(), AggregateCycleSourcesUseCase(), services.clock
+        ),
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(
                 ComposeAgentContextUseCase(),

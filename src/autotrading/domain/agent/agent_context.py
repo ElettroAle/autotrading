@@ -55,12 +55,13 @@ class FlowStateView:
 @dataclass(frozen=True, slots=True)
 class SourceData:
     """The values one adapter of an active source collected in the cycle; asset is None for a source of the whole
-    market. The agent reads the source and the adapter of every datum (R4.1.1).
+    market. The agent reads the source and the adapter of every datum (R4.1.1). An aggregate of several adapters has
+    no weight of its own (R5.1.2).
     """
 
     source: str
     adapter: str
-    weight: int
+    weight: int | None
     asset: str | None
     values: Mapping[str, str]
 
@@ -157,10 +158,13 @@ def _text_or_none(price: Decimal | None) -> str | None:
 
 
 def _source_document(source: SourceData) -> dict[str, object]:
+    # A presence, not a computation: an aggregate has no weight of its own (R5.1.2).
+    weight = source.weight
+    weighted: dict[str, object] = {} if weight is None else {"peso": weight}
     return {
         "fonte": source.source,
         "adapter": source.adapter,
-        "peso": source.weight,
+        **weighted,
         "asset": source.asset,
         "valori": dict(source.values),
     }

@@ -6,6 +6,7 @@ from autotrading.application.sources.ports import (
     PriceForecasterPort,
     PriceHistoryPort,
     SentimentPort,
+    VolumesPort,
     WhaleTransfersPort,
 )
 from autotrading.domain.sources.forecast import FORECAST
@@ -14,6 +15,7 @@ from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
 from autotrading.domain.sources.source_catalog import OfferedSource, SourceCatalog
+from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 
 
@@ -29,6 +31,7 @@ class SourceSystems:
     forecaster: PriceForecasterPort
     market: MarketDataPort
     whales: tuple[WhaleTransfersPort, ...]
+    volumes: tuple[VolumesPort, ...]
 
 
 class ListSourcesUseCase:
@@ -49,5 +52,6 @@ class ListSourcesUseCase:
             OfferedSource(SENTIMENT, tuple(sentiment.declaration() for sentiment in systems.sentiments)),
             OfferedSource(NEWS, (systems.news.declaration(),)),
             OfferedSource(WHALE, tuple(whales.declaration() for whales in systems.whales)),
+            OfferedSource(VOLUMES, tuple(volumes.declaration() for volumes in systems.volumes)),
         )
         return SourceCatalog(source for source in offered if source.adapters)

@@ -63,6 +63,7 @@ class World:
             FakePriceForecasterAdapter(),
             self.market,
             (),
+            (),
         )
         self.trial = TrySourceAdapterUseCase(
             systems,

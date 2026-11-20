@@ -17,6 +17,7 @@ from autotrading.domain.sources.source_adapter_declaration import SourceAdapterD
 from autotrading.domain.sources.source_catalog import SOURCES, OfferedSource, SourceCatalog
 from autotrading.domain.sources.source_definition import SourceDefinition
 from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 
 OWN = SourceParameter("profondita", "profondità", 3, 1, 5)
@@ -35,7 +36,7 @@ def offered(name: str, *adapters: SourceAdapterDeclaration) -> OfferedSource:
 
 
 def test_the_sources_of_the_platform_are_declared_once_with_a_single_sentiment() -> None:
-    assert SOURCES == (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE)
+    assert SOURCES == (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE, VOLUMES)
 
 
 def test_lists_the_sources_in_the_order_they_were_declared() -> None:

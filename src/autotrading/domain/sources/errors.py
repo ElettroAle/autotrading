@@ -99,6 +99,14 @@ class InvalidWhaleTransferError(DomainError):
         super().__init__("trasferimento non valido")
 
 
+class InvalidVolumeSnapshotError(DomainError):
+    """A volume or an aggressive trade that is negative, or a level of the book without a price or with a negative
+    quantity."""
+
+    def __init__(self) -> None:
+        super().__init__("dati di volume non validi")
+
+
 class InvalidPriceForecastError(DomainError):
     """A forecast without the time zone of its instant or with a price that is not positive: a defect."""
 

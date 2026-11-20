@@ -4,6 +4,7 @@ from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
 from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import MINIMUM_USD, WHALE
 
 
@@ -54,4 +55,4 @@ def test_no_large_transfer_is_itself_a_datum_for_the_agent() -> None:
 
 
 def test_every_source_describes_itself() -> None:
-    assert all(source.description for source in (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE))
+    assert all(source.description for source in (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE, VOLUMES))
