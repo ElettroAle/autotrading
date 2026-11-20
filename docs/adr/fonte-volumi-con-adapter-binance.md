@@ -2,7 +2,7 @@
 
 - Stato: proposta (19 novembre 2026)
 - Requisiti: US 343 R5.1.2, Task 344
-- Collegate: ADR fonti-con-adapter-dichiarati, ADR 0105; `.claude/rules/context-sources.md`
+- Collegate: ADR fonti-con-adapter-dichiarati, ADR peso-delle-fonti-nel-system-prompt, ADR 0105; `.claude/rules/context-sources.md`
 - Verifica: prova
 
 ## Contesto e problema
@@ -22,7 +22,10 @@ con più adapter un aggregato pesato sui volumi; un asset non quotato si dichiar
   e le regole: rapporto taker = acquisti/vendite aggressivi; squilibrio = valore dei bid entro −1% dal prezzo medio
   diviso il valore di bid e ask entro ±1%; un asset non quotato dà «non quotato su <adapter>». L'aggregato pesato sui
   volumi 24 ore tra gli adapter attivi della stessa fonte è una regola del domain applicata quando si compone il
-  contesto del ciclo, presente solo con due o più adapter.
+  contesto del ciclo, presente solo con due o più adapter che hanno misurato l'asset. L'aggregato non ha un peso
+  proprio: il peso è dell'adapter scelto dall'utente e nessun codice calcola sui pesi (ADR
+  peso-delle-fonti-nel-system-prompt); nel contesto la voce dell'aggregato non porta «peso» e la regola del segnaposto
+  `{source_weights}` dice che un aggregato riassume gli adapter elencati, ciascuno col suo peso.
 - **Application**: porta `VolumesPort` (`declaration()`, `snapshot(asset, interval_minutes)`) e lettore
   `ReadVolumesUseCase` registrato per (volumi, adapter).
 - **Adapter `adapters/outbound/binance/`** (`BinanceVolumesAdapter`): endpoint pubblici dei dati di mercato
