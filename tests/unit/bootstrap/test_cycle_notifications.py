@@ -494,10 +494,10 @@ def test_what_no_flow_explains_is_notified_once_at_the_end_of_the_cycle_but_a_ch
     update(world)
     reader.executions[world.address] = [a_fill("ETH", None, executed_at=CLOSED_AT)]
     # The declared withdrawal explains 25.50 of the balance; the 5 left are within the threshold (R3.3.1).
+    reader.movements[world.address] = [a_movement(Decimal("-25.5"), moved_at=CLOSED_AT)]
     reader.activities[world.address] = an_activity(
         balance=Decimal("979.5"),
         positions=(a_position("SOL"),),
-        movements=(a_movement(Decimal("-25.5"), moved_at=CLOSED_AT),),
         read_at=CLOSED_AT + timedelta(minutes=1),
     )
 

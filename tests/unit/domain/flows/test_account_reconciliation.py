@@ -15,7 +15,14 @@ from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.ledger import AccountLedger, Execution, ExecutionKind, FundingEntry, LedgerEntry
+from autotrading.domain.flows.ledger import (
+    AccountLedger,
+    BalanceMovement,
+    Execution,
+    ExecutionKind,
+    FundingEntry,
+    LedgerEntry,
+)
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableItem, UnattributableKind
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -53,18 +60,19 @@ def reconcile(
     funding: tuple[FundingEntry, ...] = (),
     booked: tuple[LedgerEntry, ...] = (),
     booked_funding: tuple[FundingEntry, ...] = (),
+    booked_movements: tuple[BalanceMovement, ...] = (),
     last: AccountReading | None = None,
     threshold: Decimal = Decimal(1),
 ) -> AccountReconciliation:
-    """`recorded` and `funding` are what the ledger has just written; `booked` and `booked_funding` what it holds
-    after the previous reading, whoever recorded it."""
+    """`recorded` and `funding` are what the ledger has just written; `booked`, `booked_funding` and
+    `booked_movements` what it holds after the previous reading, whoever recorded it."""
     return AccountReconciliation.of(
         ACCOUNT,
         flows,
         activity or an_activity(),
         last,
         AccountLedger(recorded, funding),
-        AccountLedger(booked, booked_funding),
+        AccountLedger(booked, booked_funding, booked_movements),
         threshold,
     )
 
@@ -109,9 +117,11 @@ def test_an_execution_of_an_order_of_the_platform_is_explained_even_without_a_fl
 
 
 def test_without_a_previous_reading_the_past_executions_and_movements_are_the_starting_point() -> None:
-    activity = an_activity(movements=(a_movement(Decimal(200)),))
-
-    result = reconcile([flow_on("BTC")], activity, recorded=(unattributed(a_fill("BTC", None)),))
+    result = reconcile(
+        [flow_on("BTC")],
+        recorded=(unattributed(a_fill("BTC", None)),),
+        booked_movements=(a_movement(Decimal(200)),),
+    )
 
     assert result.items == ()
     assert result.closed_outside == ()
@@ -120,9 +130,15 @@ def test_without_a_previous_reading_the_past_executions_and_movements_are_the_st
 def test_a_movement_the_exchange_declares_is_no_unattributable_change_of_the_balance() -> None:
     movements = (a_movement(Decimal(200), movement_id="0x1"),)
 
-    result = reconcile([flow_on("BTC")], an_activity(movements=movements), last=previous())
+    result = reconcile(
+        [flow_on("BTC")],
+        an_activity(balance=Decimal(1200)),
+        booked_movements=movements,
+        last=previous(reference=Decimal(1000)),
+    )
 
     assert result.items == ()
+    assert result.alarm is None
 
 
 def test_a_position_of_a_flow_gone_from_the_exchange_was_closed_outside_the_platform() -> None:
@@ -420,18 +436,32 @@ def test_a_row_recorded_before_this_reconciliation_is_neither_an_unknown_fill_no
     assert result.comparison == BalanceComparison(Decimal(1003), Decimal(1003), READ_AT)
 
 
-def test_the_movements_declared_after_the_last_reading_explain_the_balance() -> None:
+def test_the_movements_in_the_ledger_after_the_last_reading_explain_the_balance() -> None:
     movements = (a_movement(Decimal(500), movement_id="0x1"), a_movement(Decimal(-300), moved_at=BEFORE))
 
     result = reconcile(
         [flow_on("BTC")],
-        an_activity(balance=Decimal(1500), movements=movements),
+        an_activity(balance=Decimal(1500)),
+        booked_movements=movements,
         last=previous(reference=Decimal(1000)),
     )
 
     assert result.comparison == BalanceComparison(Decimal(1500), Decimal(1500), READ_AT)
     assert result.items == ()
     assert result.alarm is None
+
+
+def test_a_movement_after_this_reading_is_left_to_the_next_one() -> None:
+    later = a_movement(Decimal(500), movement_id="0x1", moved_at=READ_AT + timedelta(seconds=1))
+
+    result = reconcile(
+        [flow_on("BTC")],
+        an_activity(balance=Decimal(1000)),
+        booked_movements=(later,),
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1000), Decimal(1000), READ_AT)
 
 
 def test_a_deviation_within_the_threshold_is_an_unexplained_change_of_the_balance() -> None:

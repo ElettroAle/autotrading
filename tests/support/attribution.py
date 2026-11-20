@@ -19,12 +19,12 @@ from autotrading.application.flows.record_account_executions import (
     RecordAccountExecutionsCommand,
     RecordAccountExecutionsUseCase,
 )
-from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.ledger import Execution, FlowTotals
+from autotrading.domain.flows.ledger import BalanceMovement, Execution, FlowTotals
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
@@ -136,15 +136,11 @@ class AttributionBench:
     ) -> None:
         activity = self.activity_of(account_id)
         self.exchange.executions.setdefault(account_id, []).extend(fills)
+        self.exchange.movements.setdefault(account_id, []).extend(movements)
         moved = sum((movement.amount for movement in movements), Decimal(0))
         self.show(
             account_id,
-            replace(
-                activity,
-                balance=activity.balance + moved,
-                positions=activity.positions + positions,
-                movements=activity.movements + movements,
-            ),
+            replace(activity, balance=activity.balance + moved, positions=activity.positions + positions),
         )
 
     def record_executions(self, account_id: UUID) -> None:

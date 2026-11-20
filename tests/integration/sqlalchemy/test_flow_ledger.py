@@ -13,12 +13,14 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import (
     AccountLedger,
+    BalanceMovement,
     Execution,
     ExecutionKind,
     FlowTotals,
     FundingEntry,
     FundingPayment,
     LedgerEntry,
+    LedgerKeys,
 )
 from autotrading.domain.tenancy.tenant import Tenant
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -187,6 +189,57 @@ def test_the_rows_of_an_account_by_instant_are_served_by_an_index(database: Engi
     assert "(tenant_id, account_id, paid_at DESC)" in indexes["account_funding_of_account"]
 
 
+# ADR movimenti-del-conto-nel-registro-con-cursore: the movements of the balance are rows of the ledger.
+def test_the_movements_enter_the_ledger_once_and_move_the_cursor(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
+    deposit = BalanceMovement("0x1", Decimal("500.5"), READ_AT)
+    withdrawal = BalanceMovement("0x2", Decimal(-300), EARLIER)
+    recorded = AccountLedger((), (), (deposit, withdrawal))
+
+    added = ledger.record(account_id, recorded, READ_AT)
+    again = ledger.record(account_id, recorded, READ_AT)
+
+    assert added.movements == (deposit, withdrawal)
+    assert again.movements == ()
+    assert ledger.cursor(account_id) == READ_AT
+    assert ledger.recorded_since(account_id, READ_AT).movements == frozenset({("0x1", READ_AT)})
+
+
+def test_two_movements_with_the_same_identifier_at_different_moments_are_both_kept(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
+    first, second = BalanceMovement("0x0", Decimal(1), EARLIER), BalanceMovement("0x0", Decimal(2), READ_AT)
+
+    added = ledger.record(account_id, AccountLedger((), (), (first, second)), READ_AT)
+
+    assert added.movements == (first, second)
+
+
+def test_the_movements_recorded_after_a_moment_are_read_back_oldest_first(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    _, other_account = new_account(database)
+    ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
+    later = READ_AT + timedelta(minutes=1)
+    movements = (
+        BalanceMovement("0x3", Decimal(7), later),
+        BalanceMovement("0x1", Decimal(5), EARLIER),
+        BalanceMovement("0x2", Decimal(-2), READ_AT),
+    )
+    ledger.record(account_id, AccountLedger((), (), movements), later)
+
+    assert ledger.recorded_after(account_id, EARLIER).movements == (movements[2], movements[0])
+    assert ledger.recorded_after(other_account, EARLIER) == AccountLedger((), ())
+
+
+def test_the_movements_of_an_account_by_instant_are_served_by_an_index(database: Engine) -> None:
+    query = text("SELECT indexdef FROM pg_indexes WHERE indexname = 'account_movements_of_account'")
+    with database.connect() as connection:
+        definition = connection.execute(query).scalar_one()
+
+    assert "(tenant_id, account_id, moved_at DESC)" in str(definition)
+
+
 def test_a_late_cycle_never_moves_the_cursor_back(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
@@ -207,13 +260,25 @@ def test_another_tenant_sees_nothing_of_the_ledger(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     bruno, _ = new_account(database)
     flow_id = FlowId.new()
-    SqlAlchemyFlowLedgerAdapter(database, tenant_id).record(account_id, of_flow(flow_id, an_execution("1")), READ_AT)
+    recorded = AccountLedger(
+        of_flow(flow_id, an_execution("1")).entries, (), (BalanceMovement("0x1", Decimal(1), READ_AT),)
+    )
+    SqlAlchemyFlowLedgerAdapter(database, tenant_id).record(account_id, recorded, READ_AT)
     theirs = SqlAlchemyFlowLedgerAdapter(database, bruno)
 
     assert theirs.cursor(account_id) is None
     assert theirs.totals_of([flow_id]) == {}
-    assert theirs.recorded_since(account_id, EARLIER).executions == frozenset()
+    assert theirs.recorded_since(account_id, EARLIER) == LedgerKeys()
     assert theirs.recorded_after(account_id, EARLIER) == AccountLedger((), ())
+
+
+def test_the_movements_of_an_account_of_another_tenant_cannot_be_written(database: Engine) -> None:
+    _, account_id = new_account(database)
+    bruno, _ = new_account(database)
+    movements = AccountLedger((), (), (BalanceMovement("0x1", Decimal(1), READ_AT),))
+
+    with pytest.raises(IntegrityError, match="account_movements_account_of_tenant"):
+        SqlAlchemyFlowLedgerAdapter(database, bruno).record(account_id, movements, READ_AT)
 
 
 def test_the_ledger_of_an_account_of_another_tenant_cannot_be_written(database: Engine) -> None:
@@ -233,6 +298,8 @@ def test_the_history_cannot_be_changed_by_the_application(database: Engine) -> N
         "DELETE FROM account_fills",
         "UPDATE account_funding SET amount = 0",
         "DELETE FROM account_funding",
+        "UPDATE account_movements SET amount = 0",
+        "DELETE FROM account_movements",
     )
     for statement in statements:
         with database.begin() as connection:

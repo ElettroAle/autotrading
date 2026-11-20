@@ -81,10 +81,11 @@ class AccountReconciliation:
     What is new are the executions the ledger has just recorded (ADR 0063). Without a previous reading, past executions
     and movements are the starting point, not something to report.
     The expected balance is the reference of the previous reading plus the executions, fees and funding of the flows
-    the ledger holds since then, whoever recorded them, and the deposits and withdrawals the exchange declares since
-    then, each counted once (ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente). A deviation within
-    the threshold is a change of the balance no flow explains, and the balance read becomes the reference; beyond it,
-    an alarm, and the expected balance stays the reference until the user confirms.
+    the ledger holds since then, whoever recorded them, and the deposits and withdrawals of the account it holds since
+    then, each counted once (ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente, ADR
+    movimenti-del-conto-nel-registro-con-cursore). A deviation within the threshold is a change of the balance no flow
+    explains, and the balance read becomes the reference; beyond it, an alarm, and the expected balance stays the
+    reference until the user confirms.
     """
 
     items: tuple[UnattributableItem, ...]
@@ -176,7 +177,7 @@ def _comparison(
 
 
 def _explained(ledger: AccountLedger, activity: AccountActivity, since: datetime) -> Decimal:
-    """What moved the balance since the last reading with a reason: the flows, and what the exchange declares.
+    """What moved the balance since the last reading with a reason: the flows, and the movements of the account.
 
     A row not after the last reading was already in the balance read then, the reference now, even when the exchange
     published it later (ADR saldo-atteso-con-le-sole-righe-successive-alla-lettura-precedente). A row after this
@@ -198,7 +199,9 @@ def _explained(ledger: AccountLedger, activity: AccountActivity, since: datetime
         ),
         ZERO,
     )
-    movements = sum((movement.amount for movement in activity.movements if movement.moved_at > since), ZERO)
+    movements = sum(
+        (movement.amount for movement in ledger.movements if since < movement.moved_at <= activity.read_at), ZERO
+    )
     return executions + funding + movements
 
 

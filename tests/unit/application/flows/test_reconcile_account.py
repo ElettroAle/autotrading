@@ -158,7 +158,24 @@ def test_the_reading_is_saved_for_the_next_reconciliation(bench: Bench) -> None:
 def test_a_movement_the_exchange_declares_explains_the_balance(bench: Bench) -> None:
     flow = bench.flow("BTC")
     bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {}, Decimal(1000)))
-    bench.activity.activities[ACCOUNT] = an_activity(balance=Decimal(1200), movements=(a_movement(Decimal(200)),))
+    bench.activity.activities[ACCOUNT] = an_activity(balance=Decimal(1200))
+    bench.activity.movements[ACCOUNT] = [a_movement(Decimal(200))]
+
+    outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert outcome.new_items == ()
+    assert bench.readings.alarms == []
+
+
+def test_a_movement_recorded_by_an_earlier_reconciliation_after_the_last_reading_explains_the_balance(
+    bench: Bench,
+) -> None:
+    # ADR movimenti-del-conto-nel-registro-con-cursore: the movements are rows of the ledger, read once.
+    flow = bench.flow("BTC")
+    bench.ledger.movements[ACCOUNT] = [a_movement(Decimal(200))]
+    bench.ledger.cursors[ACCOUNT] = READ_AT
+    bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {}, Decimal(1000)))
+    bench.activity.activities[ACCOUNT] = an_activity(balance=Decimal(1200))
 
     outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
 

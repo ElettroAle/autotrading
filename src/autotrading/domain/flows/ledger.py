@@ -69,12 +69,31 @@ class FundingPayment:
 
 
 @dataclass(frozen=True, slots=True)
+class BalanceMovement:
+    """A change of the balance the exchange records outside the executions: a deposit, a withdrawal, a transfer.
+
+    It belongs to no flow: the ledger keeps it to explain the balance of the account (ADR
+    movimenti-del-conto-nel-registro-con-cursore).
+    """
+
+    movement_id: str
+    amount: Decimal
+    moved_at: datetime
+
+    @property
+    def key(self) -> tuple[str, datetime]:
+        # The exchange may give more than one movement the same identifier: the moment tells them apart.
+        return self.movement_id, self.moved_at
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionsWindow:
     """What the exchange still holds of an account since a moment; incomplete when part of it is gone already."""
 
     executions: tuple[Execution, ...]
     funding: tuple[FundingPayment, ...]
     complete: bool
+    movements: tuple[BalanceMovement, ...] = ()
 
     @property
     def order_ids(self) -> frozenset[UUID]:
@@ -83,16 +102,19 @@ class ExecutionsWindow:
 
 @dataclass(frozen=True, slots=True)
 class LedgerKeys:
-    """What of an account the ledger holds already: executions by fill and order, funding by asset and moment."""
+    """What of an account the ledger holds already: executions by fill and order, funding by asset and moment,
+    movements by identifier and moment."""
 
     executions: frozenset[tuple[str, str]] = frozenset()
     funding: frozenset[tuple[str, datetime]] = frozenset()
+    movements: frozenset[tuple[str, datetime]] = frozenset()
 
     def unknown_in(self, window: ExecutionsWindow) -> ExecutionsWindow:
         return replace(
             window,
             executions=tuple(execution for execution in window.executions if execution.key not in self.executions),
             funding=tuple(payment for payment in window.funding if payment.key not in self.funding),
+            movements=tuple(movement for movement in window.movements if movement.key not in self.movements),
         )
 
 
@@ -140,7 +162,8 @@ class FlowTotals:
 
 @dataclass(frozen=True, slots=True)
 class AccountLedger:
-    """The new executions and funding of an account, each given to the flow it belongs to (ADR 0063).
+    """The new executions and funding of an account, each given to the flow it belongs to (ADR 0063), and the
+    movements of its balance, which belong to no flow (ADR movimenti-del-conto-nel-registro-con-cursore).
 
     An order of the platform belongs to its flow; one sent for no flow (a manual command, a stop) belongs to the flow
     that owns the asset. Without an order of the platform, a liquidation and a closing of exactly the position the
@@ -149,11 +172,13 @@ class AccountLedger:
 
     entries: tuple[LedgerEntry, ...]
     funding: tuple[FundingEntry, ...]
+    movements: tuple[BalanceMovement, ...] = ()
 
     @property
     def latest(self) -> datetime | None:
         instants = [entry.execution.executed_at for entry in self.entries]
         instants += [entry.payment.paid_at for entry in self.funding]
+        instants += [movement.moved_at for movement in self.movements]
         return max(instants, default=None)
 
     @classmethod
@@ -180,7 +205,7 @@ class AccountLedger:
             funding.append(FundingEntry(event, holder))
             if holder is not None:
                 running[holder] = _totals(running, holder).with_funding(event)
-        return cls(tuple(entries), tuple(funding))
+        return cls(tuple(entries), tuple(funding), window.movements)
 
 
 def _owners_of(flows: Iterable[Flow]) -> dict[str, FlowId]:

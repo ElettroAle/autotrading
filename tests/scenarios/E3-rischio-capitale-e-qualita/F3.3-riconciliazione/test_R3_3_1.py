@@ -156,9 +156,11 @@ def address_of(flow_cycles: FlowCycles, account: str) -> str:
 
 
 def exchange_shows(flow_cycles: FlowCycles, account: str, balance: Decimal, declared: tuple[Decimal, ...] = ()) -> None:
-    movements = tuple(a_movement(movement) for movement in declared)
-    activity = an_activity(balance=balance, available_margin=balance, movements=movements)
-    flow_cycles.platform.activity_reader.activities[address_of(flow_cycles, account)] = activity
+    """The balance read now, and the deposits and withdrawals declared since the previous reading."""
+    reader, address = flow_cycles.platform.activity_reader, address_of(flow_cycles, account)
+    reader.activities[address] = an_activity(balance=balance, available_margin=balance)
+    movements = [a_movement(movement, movement_id=f"0x{index}") for index, movement in enumerate(declared)]
+    reader.movements.setdefault(address, []).extend(movements)
 
 
 def next_cycle(flow_cycles: FlowCycles, flow: str) -> None:

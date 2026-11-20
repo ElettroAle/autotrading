@@ -12,7 +12,7 @@ from hyperliquid.utils.error import ClientError, ServerError
 from autotrading.adapters.outbound.hyperliquid.activity import HyperliquidAccountActivityAdapter
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidSdkAdapter
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
-from autotrading.domain.flows.account_activity import AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
 from autotrading.domain.flows.statistics_period import TimeWindow
@@ -140,7 +140,6 @@ def test_the_activity_is_read_on_the_address_without_signing() -> None:
 
     assert ("info", ("https://exchange.invalid", 3.0)) in sdk.calls
     assert ("user_state", ADDRESS) in sdk.calls
-    assert ("user_non_funding_ledger_updates", (ADDRESS, 0, None)) in sdk.calls
     assert all(call[0] != "exchange" for call in sdk.calls)
 
 
@@ -152,31 +151,13 @@ def test_the_executions_are_not_read_with_the_activity() -> None:
     assert all(call[0] != "user_fills_by_time" for call in sdk.calls)
 
 
-@pytest.mark.parametrize(
-    ("delta", "amount"),
-    [
-        ({"type": "deposit", "usdc": "200.0"}, Decimal(200)),
-        ({"type": "withdraw", "usdc": "50", "fee": "1"}, Decimal(-50)),
-        ({"type": "internalTransfer", "usdc": "10", "destination": ADDRESS.lower()}, Decimal(10)),
-        ({"type": "internalTransfer", "usdc": "10", "destination": OTHER}, Decimal(-10)),
-        ({"type": "subAccountTransfer", "usdc": "4", "destination": ADDRESS.upper()[2:].join(["0x", ""])}, Decimal(4)),
-        ({"type": "subAccountTransfer", "usdc": "4", "destination": OTHER}, Decimal(-4)),
-        ({"type": "accountClassTransfer", "usdc": "3", "toPerp": True}, Decimal(3)),
-        ({"type": "accountClassTransfer", "usdc": "3", "toPerp": False}, Decimal(-3)),
-    ],
-)
-def test_the_movements_of_the_balance_carry_their_sign(delta: dict[str, Any], amount: Decimal) -> None:
-    ledger = [{"time": 1762941000000, "hash": "0xfeed", "delta": delta}]
+def test_the_movements_of_the_balance_are_not_read_with_the_activity() -> None:
+    # ADR movimenti-del-conto-nel-registro-con-cursore: they enter the ledger with the executions.
+    sdk = FakeSdk()
 
-    (movement,) = read(FakeSdk(ledger=ledger)).movements
+    read(sdk)
 
-    assert movement == BalanceMovement("0xfeed", amount, datetime(2025, 11, 12, 9, 50, tzinfo=UTC))
-
-
-def test_a_ledger_update_that_moves_no_balance_is_not_a_movement() -> None:
-    ledger = [{"time": 1, "hash": "0x1", "delta": {"type": "liquidation", "accountValue": "3"}}]
-
-    assert read(FakeSdk(ledger=ledger)).movements == ()
+    assert all(call[0] != "user_non_funding_ledger_updates" for call in sdk.calls)
 
 
 @pytest.mark.parametrize(
@@ -198,10 +179,8 @@ def test_an_exchange_that_cannot_answer_is_unavailable(failure: Exception) -> No
     [
         FakeSdk(state={"withdrawable": "1"}),
         FakeSdk(state={**STATE, "withdrawable": "many"}),
-        FakeSdk(ledger=[{"time": 1, "delta": {"type": "deposit", "usdc": "1"}}]),
-        FakeSdk(ledger=None),
     ],
-    ids=["no summary", "not a number", "movement without hash", "no ledger"],
+    ids=["no summary", "not a number"],
 )
 def test_an_answer_of_unexpected_shape_is_unavailable(sdk: FakeSdk) -> None:
     with pytest.raises(FlowExchangeUnavailableError):

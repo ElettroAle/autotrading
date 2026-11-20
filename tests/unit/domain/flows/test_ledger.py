@@ -7,6 +7,7 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import (
     AccountLedger,
+    BalanceMovement,
     Execution,
     ExecutionKind,
     ExecutionsWindow,
@@ -18,7 +19,7 @@ from autotrading.domain.flows.ledger import (
     PlatformOrders,
 )
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.activity import READ_AT, a_fill, a_payment
+from tests.support.activity import READ_AT, a_fill, a_movement, a_payment
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -43,8 +44,10 @@ def attributed(
     return AccountLedger.attributed(flows, window, orders or {}, totals or {})
 
 
-def window_of(*executions: Execution, funding: tuple[FundingPayment, ...] = ()) -> ExecutionsWindow:
-    return ExecutionsWindow(executions, funding, complete=True)
+def window_of(
+    *executions: Execution, funding: tuple[FundingPayment, ...] = (), movements: tuple[BalanceMovement, ...] = ()
+) -> ExecutionsWindow:
+    return ExecutionsWindow(executions, funding, complete=True, movements=movements)
 
 
 def test_an_execution_of_an_order_of_the_flow_belongs_to_the_flow() -> None:
@@ -211,6 +214,32 @@ def test_the_keys_already_recorded_leave_only_the_unknown_part_of_the_window() -
     unknown = keys.unknown_in(window_of(known, new, funding=(paid, unpaid)))
 
     assert (unknown.executions, unknown.funding) == ((new,), (unpaid,))
+
+
+def test_the_movements_already_recorded_leave_only_the_unknown_ones() -> None:
+    known, new = a_movement(Decimal(200), movement_id="0x1"), a_movement(Decimal(-50), movement_id="0x2")
+    keys = LedgerKeys(movements=frozenset({known.key}))
+
+    assert keys.unknown_in(window_of(movements=(known, new))).movements == (new,)
+
+
+def test_a_movement_is_known_by_its_identifier_and_its_moment() -> None:
+    first = a_movement(Decimal(200), movement_id="0x0", moved_at=EARLIER)
+    second = a_movement(Decimal(100), movement_id="0x0")
+
+    assert first.key != second.key
+
+
+def test_the_movements_of_the_window_enter_the_ledger_as_they_are() -> None:
+    movements = (a_movement(Decimal(200), movement_id="0x1"), a_movement(Decimal(-50), movement_id="0x2"))
+
+    assert attributed([flow_on("BTC")], window_of(movements=movements)).movements == movements
+
+
+def test_the_latest_moment_counts_the_movements() -> None:
+    window = window_of(a_fill("BTC", None, executed_at=EARLIER), movements=(a_movement(Decimal(1)),))
+
+    assert attributed([flow_on("BTC")], window).latest == READ_AT
 
 
 def test_a_closing_of_the_size_of_the_flow_out_of_a_bigger_position_belongs_to_no_flow() -> None:

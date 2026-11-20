@@ -29,26 +29,17 @@ class AccountPosition:
 
 
 @dataclass(frozen=True, slots=True)
-class BalanceMovement:
-    """A change of the balance the exchange records outside the executions: a deposit, a withdrawal, a transfer."""
-
-    movement_id: str
-    amount: Decimal
-    moved_at: datetime
-
-
-@dataclass(frozen=True, slots=True)
 class AccountActivity:
-    """What the exchange shows of an account now: the totals, the open positions, the movements of the balance.
+    """What the exchange shows of an account now: the totals and the open positions.
 
-    The executions are not part of it: the platform records them in its ledger as they happen (ADR 0063).
+    The executions, the funding and the movements of the balance are not part of it: the platform records them in its
+    ledger as they happen (ADR 0063, ADR movimenti-del-conto-nel-registro-con-cursore).
     """
 
     currency: str
     balance: Decimal
     available_margin: Decimal
     positions: tuple[AccountPosition, ...]
-    movements: tuple[BalanceMovement, ...]
     read_at: datetime
 
     @property

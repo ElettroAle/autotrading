@@ -18,7 +18,7 @@ from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
-from tests.support.activity import READ_AT, a_fill, a_payment
+from tests.support.activity import READ_AT, a_fill, a_movement, a_payment
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -110,6 +110,30 @@ def test_what_the_overlap_reads_again_is_not_recorded_twice(bench: Bench) -> Non
     assert (again.entries, again.funding) == ((), ())
     assert bench.ledger.realized(flow.id) == Decimal(5)
     assert len(bench.ledger.funding[ACCOUNT]) == 1
+
+
+# ADR movimenti-del-conto-nel-registro-con-cursore: the movements of the balance are read with the executions.
+def test_the_movements_since_the_cursor_less_the_overlap_enter_the_ledger_once(bench: Bench) -> None:
+    bench.ledger.cursors[ACCOUNT] = EARLIER
+    old = a_movement(Decimal(100), movement_id="0xold", moved_at=EARLIER - OVERLAP - timedelta(seconds=1))
+    late = a_movement(Decimal(200), movement_id="0xlate", moved_at=EARLIER - OVERLAP)
+    bench.exchange.movements[ACCOUNT] = [old, late]
+
+    recorded = bench.use_case.execute(RecordAccountExecutionsCommand(ACCOUNT))
+    again = bench.use_case.execute(RecordAccountExecutionsCommand(ACCOUNT))
+
+    assert recorded.movements == (late,)
+    assert again.movements == ()
+    assert bench.ledger.movements[ACCOUNT] == [late]
+
+
+def test_a_movement_moves_the_cursor_as_an_execution_does(bench: Bench) -> None:
+    bench.exchange.executions[ACCOUNT] = [a_fill("BTC", None, executed_at=EARLIER)]
+    bench.exchange.movements[ACCOUNT] = [a_movement(Decimal(200))]
+
+    bench.record()
+
+    assert bench.ledger.cursors[ACCOUNT] == READ_AT
 
 
 def test_without_anything_new_the_ledger_is_not_written(bench: Bench) -> None:

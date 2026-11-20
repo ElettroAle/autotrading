@@ -12,7 +12,7 @@ from autotrading.adapters.outbound.worker.account_activity import TIMEOUT_SECOND
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.activity import a_movement, a_position, an_activity
+from tests.support.activity import a_position, an_activity
 from tests.support.served_in_memory import served_in_memory
 from tests.support.worker import TENANT, TOKEN, Worker
 
@@ -48,11 +48,23 @@ def test_the_activity_read_by_the_worker_arrives_unchanged(worker: Worker) -> No
                 mark_price=Decimal("59850.5"),
             ),
         ),
-        movements=(a_movement(Decimal(-20)),),
     )
     worker.activity_reader.activities[address] = activity
 
     assert adapter_on(worker).execute(account.id.value) == activity
+
+
+def test_the_worker_no_longer_sends_the_movements_of_the_balance(worker: Worker) -> None:
+    # ADR movimenti-del-conto-nel-registro-con-cursore: they enter the ledger with the executions.
+    account = worker.saved_account()
+    client = served_in_memory(create_worker_api(TOKEN, worker.for_tenant))
+
+    answer = client.get(
+        f"/tenants/{TENANT.value}/accounts/{account.id.value}/activity", headers={"Authorization": f"Bearer {TOKEN}"}
+    )
+
+    assert answer.status_code == httpx.codes.OK
+    assert "movements" not in answer.json()
 
 
 def test_an_account_of_another_tenant_is_not_found_by_the_worker(worker: Worker) -> None:
@@ -115,7 +127,6 @@ def test_a_refusal_of_the_worker_is_never_read_as_an_activity() -> None:
         "balance": "1",
         "available_margin": "1",
         "positions": [],
-        "movements": [],
         "read_at": "2026-11-12T10:00:00+00:00",
     }
 

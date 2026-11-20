@@ -23,11 +23,11 @@ class RecordAccountExecutionsCommand:
 
 class RecordAccountExecutionsUseCase:
     """At every cycle, before anything reads the flows of the account: what the exchange added to the account since
-    the last time enters the ledger, each execution given to its flow and added to its totals (ADR 0063).
+    the last time enters the ledger, each execution given to its flow and added to its totals (ADR 0063), and the
+    movements of the balance with them, from the same window (ADR movimenti-del-conto-nel-registro-con-cursore).
 
     Only what is new is read and written: the cycle never reads the whole history, of the exchange or of the ledger.
-    The answer is what entered the ledger now, executions and funding, for the reconciliation to explain the balance
-    with (R3.3.1).
+    The answer is what entered the ledger now, executions, funding and movements (R3.3.1).
     """
 
     def __init__(

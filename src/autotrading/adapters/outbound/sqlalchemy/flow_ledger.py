@@ -12,12 +12,14 @@ from autotrading.adapters.outbound.sqlalchemy.tables import (
     account_fill_cursors,
     account_fills,
     account_funding,
+    account_movements,
     flow_position_totals,
     flow_totals,
 )
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import (
     AccountLedger,
+    BalanceMovement,
     Execution,
     ExecutionKind,
     FlowTotals,
@@ -32,7 +34,8 @@ ZERO = Decimal(0)
 
 
 class SqlAlchemyFlowLedgerAdapter:
-    """The ledger of the executions and the running totals of the flows, bound to the tenant of the request.
+    """The ledger of the executions and the movements of the accounts and the running totals of the flows, bound to
+    the tenant of the request.
 
     A row enters the ledger once, by the unique key of the exchange; the totals change only for a row that was
     really added, in the same transaction, so two cycles of the same account never count an execution twice.
@@ -55,10 +58,14 @@ class SqlAlchemyFlowLedgerAdapter:
         funding = select(account_funding.c.asset, account_funding.c.paid_at).where(
             account_funding.c.account_id == account_id, account_funding.c.paid_at >= since
         )
+        movements = select(account_movements.c.movement_id, account_movements.c.moved_at).where(
+            account_movements.c.account_id == account_id, account_movements.c.moved_at >= since
+        )
         with self._transaction() as connection:
             executions = frozenset((str(fill_id), str(order)) for fill_id, order in connection.execute(fills))
             payments = frozenset((str(asset), paid_at) for asset, paid_at in connection.execute(funding))
-        return LedgerKeys(executions, payments)
+            moved = frozenset((str(movement_id), moved_at) for movement_id, moved_at in connection.execute(movements))
+        return LedgerKeys(executions, payments, moved)
 
     def recorded_after(self, account_id: UUID, since: datetime) -> AccountLedger:
         fills = (
@@ -71,17 +78,26 @@ class SqlAlchemyFlowLedgerAdapter:
             .where(account_funding.c.account_id == account_id, account_funding.c.paid_at > since)
             .order_by(account_funding.c.paid_at, account_funding.c.id)
         )
+        movements = (
+            select(account_movements)
+            .where(account_movements.c.account_id == account_id, account_movements.c.moved_at > since)
+            .order_by(account_movements.c.moved_at, account_movements.c.id)
+        )
         with self._transaction() as connection:
             entries = tuple(_entry_of(row) for row in connection.execute(fills).mappings())
             payments = tuple(_funding_of(row) for row in connection.execute(funding).mappings())
-        return AccountLedger(entries, payments)
+            moved = tuple(_movement_of(row) for row in connection.execute(movements).mappings())
+        return AccountLedger(entries, payments, moved)
 
     def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
         with self._transaction() as connection:
             added = tuple(entry for entry in ledger.entries if self._add_execution(connection, account_id, entry))
             paid = tuple(payment for payment in ledger.funding if self._add_funding(connection, account_id, payment))
+            moved = tuple(
+                movement for movement in ledger.movements if self._add_movement(connection, account_id, movement)
+            )
             self._move_cursor(connection, account_id, cursor)
-        return AccountLedger(added, paid)
+        return AccountLedger(added, paid, moved)
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         identifiers = [flow_id.value for flow_id in flow_ids]
@@ -178,6 +194,21 @@ class SqlAlchemyFlowLedgerAdapter:
             self._add_to_totals(connection, flow_id, ZERO, ZERO, payment.amount)
         return True
 
+    def _add_movement(self, connection: Connection, account_id: UUID, movement: BalanceMovement) -> bool:
+        statement = (
+            insert(account_movements)
+            .values(
+                tenant_id=self._tenant_id.value,
+                account_id=account_id,
+                movement_id=movement.movement_id,
+                amount=movement.amount,
+                moved_at=movement.moved_at,
+            )
+            .on_conflict_do_nothing(constraint="account_movements_once")
+            .returning(account_movements.c.id)
+        )
+        return connection.execute(statement).first() is not None
+
     def _add_to_totals(
         self, connection: Connection, flow_id: UUID, realized_pnl: Decimal, fee: Decimal, funding: Decimal
     ) -> None:
@@ -250,3 +281,7 @@ def _entry_of(row: RowMapping) -> LedgerEntry:
 
 def _funding_of(row: RowMapping) -> FundingEntry:
     return FundingEntry(FundingPayment(row["asset"], row["amount"], row["paid_at"]), _flow_of(row))
+
+
+def _movement_of(row: RowMapping) -> BalanceMovement:
+    return BalanceMovement(row["movement_id"], row["amount"], row["moved_at"])
