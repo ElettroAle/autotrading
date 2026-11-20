@@ -35,15 +35,18 @@ ogni lettura successiva vede lo stesso scarto finché l'utente non conferma.
 
 ## Decisione
 
-- `FlowLedgerPort` ha un metodo nuovo che restituisce, come `AccountLedger`, le esecuzioni e il funding del conto con
-  istante successivo a un momento dato, già registrati (`executed_at > since`, `paid_at > since`).
+- `FlowLedgerPort` ha un metodo nuovo, `recorded_after`, che restituisce, come `AccountLedger`, le esecuzioni e il funding
+  del conto con istante successivo a un momento dato, già registrati (`executed_at > since`, `paid_at > since`).
 - `ReconcileAccountUseCase`, dopo aver registrato le righe nuove, legge dal registro quelle successive alla lettura
-  precedente e le passa ad `AccountReconciliation.of`, che le usa per `_explained` (solo quelle con flusso, come oggi).
+  precedente e le passa ad `AccountReconciliation.of`, che le usa per `_explained` (solo quelle con flusso, come oggi). Una riga spiega il saldo solo se il suo istante
+  è successivo alla lettura precedente e non successivo alla lettura corrente: il registro si legge dopo l'exchange, e
+  una riga registrata nel frattempo da un altro flusso dello stesso conto la conta la lettura successiva.
   Senza lettura precedente non le legge.
 - Le righe appena registrate restano la base di ciò che è nuovo: esecuzioni sconosciute (R1.6.2), chiusure fuori
   piattaforma e chiusure per protezione. Nessun cambio a registro, totali dei flussi, inversione o incasso.
-- Migrazione Alembic con gli indici `account_fills (tenant_id, account_id, executed_at)` e
-  `account_funding (tenant_id, account_id, paid_at)`: servono la lettura nuova e quella di `recorded_since`.
+- Indici per la lettura per istante: `account_fills (tenant_id, account_id, executed_at DESC)` esiste già dalla
+  migrazione 0017 e serve anche questa lettura; la migrazione 0052 aggiunge
+  `account_funding (tenant_id, account_id, paid_at DESC)`, che serve anche `recorded_since`.
 
 ## Alternative scartate
 
@@ -56,5 +59,5 @@ ogni lettura successiva vede lo stesso scarto finché l'utente non conferma.
 ## Conseguenze
 
 - Le chiusure registrate da inversione e incasso entrano nel saldo atteso: niente più allarmi finti dopo un'inversione.
-- Una query in più per riconciliazione, su poche righe (l'intervallo tra due letture), servita dall'indice.
+- Una query in più per riconciliazione, su poche righe (l'intervallo tra due letture), servita dagli indici.
 - L'allarme aperto il 20 novembre 2026 non si chiude da solo: lo conferma l'utente.
