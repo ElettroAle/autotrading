@@ -1,6 +1,6 @@
 """The context, the decisions of the agent and the risk check of a cycle, on the flow alone (R1.4.3-R1.5.4)."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -173,9 +173,30 @@ class Actions:
         return ("apri", "chiudi")
 
 
-def a_context() -> CycleContext:
+@dataclass(frozen=True, slots=True)
+class Aggregated:
+    source: str
+    adapter: str
+    weight: int
+    asset: str | None
+    values: Mapping[str, str]
+
+
+class Aggregates:
+    """The aggregates of the sources, with the answer the test gives, and the data it received."""
+
+    def __init__(self, *answer: Aggregated) -> None:
+        self.answer = answer
+        self.received: list[tuple[SourceData, ...]] = []
+
+    def execute(self, data: Sequence[SourceData]) -> tuple[Aggregated, ...]:
+        self.received.append(tuple(data))
+        return self.answer
+
+
+def a_context(aggregates: Aggregates | None = None) -> CycleContext:
     readings = [SourceReading("news", (SourceData("news", "RSS", 2, None, {"titolo": "t"}),))]
-    return ComposeCycleContextUseCase(Composer(), Actions(), Clock()).execute(
+    return ComposeCycleContextUseCase(Composer(), Actions(), aggregates or Aggregates(), Clock()).execute(
         FLOW.id.value, SNAPSHOT, readings, [AbsentSource("pivots", "fonte non disponibile")]
     )
 
@@ -193,6 +214,19 @@ def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_mi
         state=CYCLE_FLOW.state_view(),
         sources=(SourceData("news", "RSS", 2, None, {"titolo": "t"}),),
         missing=("pivots: fonte non disponibile",),
+    )
+
+
+def test_the_aggregates_of_the_sources_follow_the_data_they_were_made_of() -> None:
+    aggregated = Aggregated("volumi", "aggregato", 7, "BTC", {"volume_24h_usd": "400"})
+    aggregates = Aggregates(aggregated)
+
+    question = a_context(aggregates).question
+
+    assert aggregates.received == [(SourceData("news", "RSS", 2, None, {"titolo": "t"}),)]
+    assert question.sources == (
+        SourceData("news", "RSS", 2, None, {"titolo": "t"}),
+        SourceData("volumi", "aggregato", 7, "BTC", {"volume_24h_usd": "400"}),
     )
 
 

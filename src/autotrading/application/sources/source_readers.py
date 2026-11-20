@@ -7,12 +7,14 @@ from autotrading.application.sources.read_indicators import ReadIndicatorsUseCas
 from autotrading.application.sources.read_news import ReadNewsUseCase
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
+from autotrading.application.sources.read_volumes import ReadVolumesUseCase
 from autotrading.application.sources.read_whale_transfers import ReadWhaleTransfersUseCase
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 
 
@@ -22,8 +24,8 @@ def readers_of(
     """The reader of every adapter of every source, by the source and the name the adapter declares: the same for the
     cycles and for the trials (R4.1.1, R6.3.1, ADR prova-di-un-adapter-di-fonte-nel-worker).
 
-    The indicators read candles of the cycle interval and the large transfers its last interval (R1.3.3, R5.1.1); the
-    forecasts are recorded only for a flow (R1.3.5).
+    The indicators read candles of the cycle interval, the large transfers and the aggressive trades of the volumes its
+    last interval (R1.3.3, R5.1.1, R5.1.2); the forecasts are recorded only for a flow (R1.3.5).
     """
     market = systems.market.declaration().name
     readers: dict[Reader, SourceReaderPort] = {
@@ -38,4 +40,6 @@ def readers_of(
     readers[PIVOTS.name, market] = ReadPivotsUseCase(systems.market)
     for whales in systems.whales:
         readers[WHALE.name, whales.declaration().name] = ReadWhaleTransfersUseCase(whales, cycle_minutes)
+    for volumes in systems.volumes:
+        readers[VOLUMES.name, volumes.declaration().name] = ReadVolumesUseCase(volumes, cycle_minutes)
     return readers

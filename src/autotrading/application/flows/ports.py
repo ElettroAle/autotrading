@@ -61,6 +61,7 @@ from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCyc
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ActiveSource, ModelSelection, SourceSelection
+from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
@@ -1135,6 +1136,33 @@ class AgentActionsPort(Protocol):
     """
 
     def execute(self) -> Sequence[str]: ...
+
+
+class AggregatedSourcePort(Protocol):
+    """What several adapters of an active source say together of an asset, as the sources hand it over (R5.1.2)."""
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def adapter(self) -> str: ...
+
+    @property
+    def weight(self) -> int: ...
+
+    @property
+    def asset(self) -> str | None: ...
+
+    @property
+    def values(self) -> Mapping[str, str]: ...
+
+
+class SourceAggregatesPort(Protocol):
+    """It is AggregateCycleSourcesUseCase of the sources: the aggregates the context adds to the data of the adapters of
+    the active sources, such as the volumes of several exchanges (R5.1.2, ADR fonte-volumi-con-adapter-binance).
+    """
+
+    def execute(self, data: Sequence[SourceData]) -> Sequence[AggregatedSourcePort]: ...
 
 
 class AgentPromptComposerPort(Protocol):

@@ -6,6 +6,7 @@ from autotrading.application.sources.ports import SourceRequest
 from autotrading.application.sources.source_readers import readers_of
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
+from tests.fakes.volumes import FakeVolumesAdapter, VolumesAsked
 from tests.fakes.whale_transfers import FakeWhaleTransfersAdapter
 from tests.support.source_selections import platform_systems
 
@@ -57,3 +58,14 @@ def test_every_provider_of_the_large_transfers_reads_the_last_cycle_interval() -
     )
 
     assert [(asked.since, asked.until) for asked in whales.asked] == [(NOW - timedelta(minutes=30), NOW)]
+
+
+def test_every_exchange_of_the_volumes_reads_the_asset_over_the_cycle_interval() -> None:
+    exchanges = (FakeVolumesAdapter("Borsa"), FakeVolumesAdapter("Mercato"))
+    systems = replace(platform_systems(), volumes=exchanges)
+    readers = readers_of(systems, InMemoryForecastRepositoryAdapter(), 30)
+
+    for exchange in exchanges:
+        readers["volumi", exchange.name].execute(SourceRequest(uuid4(), "BTC", {}, NOW))
+
+    assert [exchange.asked for exchange in exchanges] == [[VolumesAsked("BTC", 30)], [VolumesAsked("BTC", 30)]]

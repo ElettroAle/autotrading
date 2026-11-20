@@ -176,6 +176,7 @@ modules = [
     "autotrading.adapters.outbound.hyperliquid",
     "autotrading.adapters.outbound.alternative_me",
     "autotrading.adapters.outbound.arkham",
+    "autotrading.adapters.outbound.binance",
     "autotrading.adapters.outbound.coinmarketcap",
     "autotrading.adapters.outbound.dashboard",
     "autotrading.adapters.outbound.forecaster",

@@ -18,6 +18,7 @@ from autotrading.adapters.inbound.api.worker import (
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters, apscheduler_daily_check_adapters
 from autotrading.adapters.outbound.arkham.composition import arkham_adapters
+from autotrading.adapters.outbound.binance.composition import binance_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.dashboard.composition import dashboard_adapters
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
@@ -243,6 +244,7 @@ from autotrading.application.orders.protect_open_positions import ProtectOpenPos
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
+from autotrading.application.sources.aggregate_cycle_sources import AggregateCycleSourcesUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceCredentialServices
 from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.application.sources.open_source_credentials import OpenSourceCredentialsUseCase
@@ -612,7 +614,9 @@ def cycle_of(
                 clock,
             ),
             calls=ThreadPoolConcurrentCallsAdapter(),
-            context=ComposeCycleContextUseCase(ComposeAgentContextUseCase(), ListAgentActionsUseCase(), clock),
+            context=ComposeCycleContextUseCase(
+                ComposeAgentContextUseCase(), ListAgentActionsUseCase(), AggregateCycleSourcesUseCase(), clock
+            ),
             agent=DecideCycleUseCase(
                 AskFlowAgentUseCase(
                     ComposeAgentContextUseCase(),
@@ -723,6 +727,7 @@ def source_systems(hyperliquid: HyperliquidAdaptersOfInstallation, forecaster: P
         forecaster,
         market,
         (arkham_adapters(),),
+        (binance_adapters(),),
     )
 
 

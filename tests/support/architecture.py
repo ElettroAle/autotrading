@@ -120,6 +120,9 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/apscheduler": frozenset({"apscheduler"}),
     # The Intel API of Arkham, reached with the transport of the platform (ADR fonte-whale-con-adapter-arkham).
     "adapters/outbound/arkham": frozenset({"httpx"}),
+    # The public market data of Binance, reached with the transport of the platform (ADR
+    # fonte-volumi-con-adapter-binance).
+    "adapters/outbound/binance": frozenset({"httpx"}),
     "adapters/outbound/coinmarketcap": frozenset({"httpx"}),
     # The routes of the dashboard and its address, composed with the standard library: no request reaches it (ADR
     # destinazioni-delle-notifiche-nella-dashboard).
