@@ -1,8 +1,8 @@
 """Fake of the adapter that reads what an exchange shows of an address: a reading per address, or out of reach.
 
-It also holds the executions and funding of each address, read since a moment as the exchange does. A late execution
-is published only after the first reading of its address, as the exchange may do with an execution of a moment ago.
-And the deposits and withdrawals of each address, read in a window (R3.4.2).
+It also holds the executions, funding and movements of each address, read since a moment as the exchange does. A late
+execution is published only after the first reading of its address, as the exchange may do with an execution of a
+moment ago. And the deposits and withdrawals of each address, read in a window (R3.4.2).
 """
 
 from datetime import datetime
@@ -11,7 +11,7 @@ from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.capital_history import AccountTransfer
-from autotrading.domain.flows.ledger import Execution, ExecutionsWindow, FundingPayment
+from autotrading.domain.flows.ledger import BalanceMovement, Execution, ExecutionsWindow, FundingPayment
 from autotrading.domain.flows.statistics_period import TimeWindow
 from tests.support.activity import an_activity
 
@@ -25,6 +25,7 @@ class FakeActivityReaderAdapter:
         self.executions: dict[str, list[Execution]] = {}
         self.late: dict[str, list[Execution]] = {}
         self.funding: dict[str, list[FundingPayment]] = {}
+        self.movements: dict[str, list[BalanceMovement]] = {}
         self.complete = True
         self.reachable = True
         self.executions_reachable = True
@@ -51,6 +52,7 @@ class FakeActivityReaderAdapter:
             tuple(e for e in self.executions.get(address, []) if since is None or e.executed_at >= since),
             tuple(p for p in self.funding.get(address, []) if since is None or p.paid_at >= since),
             self.complete or since is None,
+            tuple(m for m in self.movements.get(address, []) if since is None or m.moved_at >= since),
         )
         self.executions.setdefault(address, []).extend(self.late.pop(address, []))
         self.executions_reachable = not self.unreachable_after_first_reading

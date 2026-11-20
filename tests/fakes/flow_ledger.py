@@ -1,4 +1,5 @@
-"""In-memory ledger of the executions with the running totals of the flows, as the SQL adapter keeps them."""
+"""In-memory ledger of the executions and movements with the running totals of the flows, as the SQL adapter keeps
+them."""
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -9,6 +10,7 @@ from uuid import UUID
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import (
     AccountLedger,
+    BalanceMovement,
     Execution,
     ExecutionKind,
     FlowTotals,
@@ -22,6 +24,7 @@ from autotrading.domain.flows.ledger import (
 class InMemoryFlowLedgerAdapter:
     entries: dict[UUID, list[LedgerEntry]] = field(default_factory=dict)
     funding: dict[UUID, list[FundingEntry]] = field(default_factory=dict)
+    movements: dict[UUID, list[BalanceMovement]] = field(default_factory=dict)
     cursors: dict[UUID, datetime] = field(default_factory=dict)
     totals: dict[FlowId, FlowTotals] = field(default_factory=dict)
     asked_after: list[tuple[UUID, datetime]] = field(default_factory=list)
@@ -39,6 +42,7 @@ class InMemoryFlowLedgerAdapter:
             frozenset(
                 entry.payment.key for entry in self.funding.get(account_id, []) if entry.payment.paid_at >= since
             ),
+            frozenset(movement.key for movement in self.movements.get(account_id, []) if movement.moved_at >= since),
         )
 
     def recorded_after(self, account_id: UUID, since: datetime) -> AccountLedger:
@@ -54,6 +58,12 @@ class InMemoryFlowLedgerAdapter:
                 sorted(
                     (entry for entry in self.funding.get(account_id, []) if entry.payment.paid_at > since),
                     key=lambda entry: entry.payment.paid_at,
+                )
+            ),
+            tuple(
+                sorted(
+                    (movement for movement in self.movements.get(account_id, []) if movement.moved_at > since),
+                    key=lambda movement: movement.moved_at,
                 )
             ),
         )
@@ -73,8 +83,12 @@ class InMemoryFlowLedgerAdapter:
             payments.append(payment)
             if payment.flow_id is not None:
                 self.totals[payment.flow_id] = self._of(payment.flow_id).with_funding(payment.payment)
+        moved = self.movements.setdefault(account_id, [])
+        known_movements = {movement.key for movement in moved}
+        new_movements = tuple(movement for movement in ledger.movements if movement.key not in known_movements)
+        moved.extend(new_movements)
         self.cursors[account_id] = max(cursor, self.cursors.get(account_id, cursor))
-        return AccountLedger(added, new_payments)
+        return AccountLedger(added, new_payments, new_movements)
 
     def totals_of(self, flow_ids: Iterable[FlowId]) -> Mapping[FlowId, FlowTotals]:
         return {flow_id: self.totals[flow_id] for flow_id in flow_ids if flow_id in self.totals}

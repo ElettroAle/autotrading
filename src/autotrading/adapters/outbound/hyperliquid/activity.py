@@ -16,7 +16,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
 )
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
-from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
 from autotrading.domain.flows.statistics_period import TimeWindow
@@ -30,8 +30,6 @@ TRANSFER_DIRECTIONS = {"deposit": TransferDirection.DEPOSIT, "withdraw": Transfe
 class _LedgerDelta(TypedDict, total=False):
     type: str
     usdc: str
-    destination: str
-    toPerp: bool
 
 
 class _LedgerUpdate(TypedDict):
@@ -43,11 +41,12 @@ class _LedgerUpdate(TypedDict):
 
 
 class HyperliquidAccountActivityAdapter:
-    """What Hyperliquid shows of an account: positions with their margin, movements of the balance (R1.6.1), and the
-    deposits and withdrawals of its history of the capital (R3.4.2, ADR storico-delle-variazioni-di-capitale).
+    """What Hyperliquid shows of an account: positions with their margin (R1.6.1), and the deposits and withdrawals
+    of its history of the capital (R3.4.2, ADR storico-delle-variazioni-di-capitale).
 
-    Everything is public information of the address: no signature, so no secret leaves the opener. The executions
-    are read apart, only the new ones, for the ledger (ADR 0063). Funding payments are not movements.
+    Everything is public information of the address: no signature, so no secret leaves the opener. The executions,
+    the funding and the movements of the balance are read apart, only the new ones, for the ledger (ADR 0063, ADR
+    movimenti-del-conto-nel-registro-con-cursore).
     """
 
     def __init__(
@@ -79,13 +78,11 @@ class HyperliquidAccountActivityAdapter:
                 info.query_user_abstraction_state(address),
                 info.spot_user_state(address),
             )
-            ledger = info.user_non_funding_ledger_updates(address, FROM_THE_START)
             return AccountActivity(
                 currency=MARGIN_CURRENCY,
                 balance=state.account_value,
                 available_margin=state.withdrawable,
                 positions=tuple(_position_of(position) for position in state.positions),
-                movements=tuple(movement for update in ledger if (movement := _movement_of(update, address))),
                 read_at=state.read_at,
             )
 
@@ -121,29 +118,6 @@ def _position_of(position: _UserPosition) -> AccountPosition:
         entry_price=position.entry_price,
         mark_price=position.mark_price,
     )
-
-
-def _movement_of(update: _LedgerUpdate, address: str) -> BalanceMovement | None:
-    delta = update["delta"]
-    amount = _signed_amount(delta, address.lower())
-    if amount is None:
-        return None
-    return BalanceMovement(str(update["hash"]), amount, _instant(update["time"]))
-
-
-def _signed_amount(delta: _LedgerDelta, address: str) -> Decimal | None:
-    """The change of the perpetual balance a ledger update makes, or None for one that is not a movement."""
-    kind = delta["type"]
-    if kind == "deposit":
-        return _decimal(delta["usdc"])
-    if kind == "withdraw":
-        return -_decimal(delta["usdc"])
-    if kind in {"internalTransfer", "subAccountTransfer"}:
-        incoming = str(delta["destination"]).lower() == address
-        return _decimal(delta["usdc"]) if incoming else -_decimal(delta["usdc"])
-    if kind == "accountClassTransfer":
-        return _decimal(delta["usdc"]) if delta["toPerp"] else -_decimal(delta["usdc"])
-    return None
 
 
 def _transfer_of(update: _LedgerUpdate) -> AccountTransfer | None:

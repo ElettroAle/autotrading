@@ -428,7 +428,7 @@ class CycleAccountReaderPort(Protocol):
 
 
 class ActivityReaderPort(Protocol):
-    """What an exchange shows of an account: positions, balance and movements (R1.6.1)."""
+    """What an exchange shows of an account: positions and balance (R1.6.1)."""
 
     def reference_fields(self) -> frozenset[str]:
         """The names of the fields of the credentials the reader needs to find the account on its exchange."""
@@ -541,7 +541,8 @@ class UnattributableFillNoticePort(Protocol):
 
 
 class AccountExecutionsPort(Protocol):
-    """In the worker: the executions and the funding the exchange still holds of an account since a moment (ADR 0063).
+    """In the worker: the executions, the funding and the movements of the balance the exchange still holds of an
+    account since a moment (ADR 0063, ADR movimenti-del-conto-nel-registro-con-cursore).
 
     It is ReadAccountExecutionsUseCase; the window says when part of what was asked is gone already.
     """
@@ -552,7 +553,9 @@ class AccountExecutionsPort(Protocol):
 
 
 class ExecutionsReaderPort(Protocol):
-    """The executions and the funding an exchange still holds of an account since a moment (ADR 0063)."""
+    """The executions, the funding and the movements of the balance an exchange still holds of an account since a
+    moment (ADR 0063, ADR movimenti-del-conto-nel-registro-con-cursore).
+    """
 
     def reference_fields(self) -> frozenset[str]:
         """The names of the fields of the credentials the reader needs to find the account on its exchange."""
@@ -566,12 +569,14 @@ class ExecutionsReaderPort(Protocol):
 
 
 class FlowLedgerPort(Protocol):
-    """Bound to the tenant of the request: the ledger of the executions of its accounts and the running totals of
-    every flow, kept together (ADR 0063).
+    """Bound to the tenant of the request: the ledger of the executions and the movements of its accounts and the
+    running totals of every flow, kept together (ADR 0063, ADR movimenti-del-conto-nel-registro-con-cursore).
     """
 
     def cursor(self, account_id: UUID) -> datetime | None:
-        """The moment of the most recent execution or funding recorded for the account, or None before the first."""
+        """The moment of the most recent execution, funding or movement recorded for the account, or None before the
+        first.
+        """
         ...
 
     def recorded_since(self, account_id: UUID, since: datetime) -> LedgerKeys:
@@ -579,15 +584,16 @@ class FlowLedgerPort(Protocol):
         ...
 
     def recorded_after(self, account_id: UUID, since: datetime) -> AccountLedger:
-        """The executions and funding of the account recorded already, whoever recorded them, that happened after that
-        moment, oldest first: what explains the balance since a reading (ADR
-        saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente).
+        """The executions, funding and movements of the account recorded already, whoever recorded them, that happened
+        after that moment, oldest first: what explains the balance since a reading (ADR
+        saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente, ADR
+        movimenti-del-conto-nel-registro-con-cursore).
         """
         ...
 
     def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
         """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new,
-        executions and funding.
+        executions, funding and movements.
         """
         ...
 

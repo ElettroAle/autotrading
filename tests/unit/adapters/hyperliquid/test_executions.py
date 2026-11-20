@@ -15,13 +15,15 @@ from autotrading.adapters.outbound.hyperliquid.executions import (
     FILLS_KEPT,
     FILLS_PAGE,
     FUNDING_PAGE,
+    MOVEMENTS_PAGE,
     HyperliquidAccountExecutionsAdapter,
 )
 from autotrading.application.flows.errors import FlowCredentialsFieldMissingError, FlowExchangeUnavailableError
 from autotrading.domain.flows.account_reference import AccountReference
-from autotrading.domain.flows.ledger import Execution, FundingPayment
+from autotrading.domain.flows.ledger import BalanceMovement, Execution, FundingPayment
 
 ADDRESS = "0x00000000000000000000000000000000000000Aa"
+OTHER = "0x00000000000000000000000000000000000000bb"
 CLOID = "0x1234567890abcdef1234567890abcdef"
 SINCE = datetime(2025, 11, 12, 9, 0, tzinfo=UTC)
 SINCE_MS = 1762938000000
@@ -48,10 +50,15 @@ def a_payment(time: int, coin: str = "BTC", usdc: str = "-0.3") -> dict[str, Any
     return {"time": time, "hash": "0x0", "delta": {"type": "funding", "coin": coin, "usdc": usdc, "szi": "0.002"}}
 
 
+def an_update(time: int, delta: dict[str, Any], hash_: str = "0xfeed") -> dict[str, Any]:
+    return {"time": time, "hash": hash_, "delta": delta}
+
+
 @dataclass
 class FakeSdk(HyperliquidSdkAdapter):
     fill_pages: list[list[dict[str, Any]]] = field(default_factory=lambda: [[a_fill(7, 1762941500000)]])
     funding_pages: list[list[dict[str, Any]]] = field(default_factory=lambda: [[a_payment(1762941600000)]])
+    ledger_pages: list[Any] = field(default_factory=lambda: [[]])
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -72,6 +79,15 @@ class FakeSdk(HyperliquidSdkAdapter):
     def user_funding_history(self, user: str, startTime: int) -> Any:  # noqa: N803 - the SDK names it
         self.calls.append(("user_funding_history", (user, startTime)))
         return self.funding_pages.pop(0)
+
+    def user_non_funding_ledger_updates(
+        self,
+        user: str,
+        startTime: int,  # noqa: N803 - the SDK names it
+        endTime: int | None = None,  # noqa: N803 - the SDK names it
+    ) -> Any:
+        self.calls.append(("user_non_funding_ledger_updates", (user, startTime, endTime)))
+        return self.ledger_pages.pop(0)
 
 
 def read(sdk: FakeSdk, since: datetime | None = SINCE) -> Any:
@@ -142,6 +158,7 @@ def test_only_what_is_newer_than_the_moment_is_asked() -> None:
 
     assert ("user_fills_by_time", (ADDRESS, SINCE_MS)) in sdk.calls
     assert ("user_funding_history", (ADDRESS, SINCE_MS)) in sdk.calls
+    assert ("user_non_funding_ledger_updates", (ADDRESS, SINCE_MS, None)) in sdk.calls
     assert all(call[0] != "exchange" for call in sdk.calls)
 
 
@@ -151,6 +168,7 @@ def test_without_a_moment_everything_the_exchange_keeps_is_asked() -> None:
     window = read(sdk, None)
 
     assert ("user_fills_by_time", (ADDRESS, 0)) in sdk.calls
+    assert ("user_non_funding_ledger_updates", (ADDRESS, 0, None)) in sdk.calls
     assert window.complete
 
 
@@ -166,6 +184,44 @@ def test_the_executions_and_the_funding_are_read_page_after_page() -> None:
     funding_pages = [call[1][1] for call in sdk.calls if call[0] == "user_funding_history"]
     assert fill_pages == [SINCE_MS, 1000 + FILLS_PAGE]
     assert funding_pages == [SINCE_MS, 2000 + FUNDING_PAGE]
+
+
+def test_the_movements_are_read_page_after_page() -> None:
+    deposit = {"type": "deposit", "usdc": "1"}
+    deposits = [an_update(3000 + index, deposit, f"0x{index}") for index in range(MOVEMENTS_PAGE)]
+    sdk = FakeSdk(ledger_pages=[deposits, [an_update(9000, {"type": "deposit", "usdc": "2"})]])
+
+    window = read(sdk)
+
+    assert len(window.movements) == MOVEMENTS_PAGE + 1
+    pages = [call[1][1] for call in sdk.calls if call[0] == "user_non_funding_ledger_updates"]
+    assert pages == [SINCE_MS, 3000 + MOVEMENTS_PAGE]
+
+
+# ADR movimenti-del-conto-nel-registro-con-cursore: the movements of the balance travel with the executions.
+@pytest.mark.parametrize(
+    ("delta", "amount"),
+    [
+        ({"type": "deposit", "usdc": "200.0"}, Decimal(200)),
+        ({"type": "withdraw", "usdc": "50", "fee": "1"}, Decimal(-50)),
+        ({"type": "internalTransfer", "usdc": "10", "destination": ADDRESS.lower()}, Decimal(10)),
+        ({"type": "internalTransfer", "usdc": "10", "destination": OTHER}, Decimal(-10)),
+        ({"type": "subAccountTransfer", "usdc": "4", "destination": ADDRESS.upper()[2:].join(["0x", ""])}, Decimal(4)),
+        ({"type": "subAccountTransfer", "usdc": "4", "destination": OTHER}, Decimal(-4)),
+        ({"type": "accountClassTransfer", "usdc": "3", "toPerp": True}, Decimal(3)),
+        ({"type": "accountClassTransfer", "usdc": "3", "toPerp": False}, Decimal(-3)),
+    ],
+)
+def test_the_movements_of_the_balance_carry_their_sign(delta: dict[str, Any], amount: Decimal) -> None:
+    (movement,) = read(FakeSdk(ledger_pages=[[an_update(1762941000000, delta)]])).movements
+
+    assert movement == BalanceMovement("0xfeed", amount, datetime(2025, 11, 12, 9, 50, tzinfo=UTC))
+
+
+def test_a_ledger_update_that_moves_no_balance_is_not_a_movement() -> None:
+    update = an_update(1, {"type": "liquidation", "accountValue": "3"})
+
+    assert read(FakeSdk(ledger_pages=[[update]])).movements == ()
 
 
 def test_as_many_executions_as_the_exchange_keeps_since_the_moment_make_the_window_incomplete() -> None:
@@ -208,8 +264,10 @@ def test_an_exchange_that_cannot_answer_is_unavailable(failure: Exception) -> No
         FakeSdk(fill_pages=[[{"tid": 1}]]),
         FakeSdk(fill_pages=[[a_fill(1, 1, cloid="0xnothex")]]),
         FakeSdk(funding_pages=[[{"time": 1, "delta": {"type": "funding"}}]]),
+        FakeSdk(ledger_pages=[[{"time": 1, "delta": {"type": "deposit", "usdc": "1"}}]]),
+        FakeSdk(ledger_pages=[None]),
     ],
-    ids=["fill without fields", "cloid not hex", "payment without fields"],
+    ids=["fill without fields", "cloid not hex", "payment without fields", "movement without hash", "no ledger"],
 )
 def test_an_answer_of_unexpected_shape_is_unavailable(sdk: FakeSdk) -> None:
     with pytest.raises(FlowExchangeUnavailableError):

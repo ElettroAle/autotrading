@@ -6,7 +6,7 @@ from uuid import UUID
 import httpx
 
 from autotrading.application.flows.errors import FlowAccountNotFoundError, FlowExchangeUnavailableError
-from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.capital_history import AccountTransfer, TransferDirection
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
@@ -29,12 +29,6 @@ class _PositionBody(TypedDict):
     mark_price: str
 
 
-class _MovementBody(TypedDict):
-    movement_id: str
-    amount: str
-    moved_at: str
-
-
 class _TransferBody(TypedDict):
     transferred_at: str
     amount: str
@@ -48,7 +42,6 @@ class _ActivityBody(TypedDict):
     balance: str
     available_margin: str
     positions: list[_PositionBody]
-    movements: list[_MovementBody]
     read_at: str
 
 
@@ -108,7 +101,6 @@ def _activity_of(body: _ActivityBody) -> AccountActivity:
         balance=Decimal(body["balance"]),
         available_margin=Decimal(body["available_margin"]),
         positions=tuple(_position_of(position) for position in body["positions"]),
-        movements=tuple(_movement_of(movement) for movement in body["movements"]),
         read_at=datetime.fromisoformat(body["read_at"]),
     )
 
@@ -123,12 +115,6 @@ def _position_of(position: _PositionBody) -> AccountPosition:
         leverage=int(position["leverage"]),
         entry_price=Decimal(position["entry_price"]),
         mark_price=Decimal(position["mark_price"]),
-    )
-
-
-def _movement_of(movement: _MovementBody) -> BalanceMovement:
-    return BalanceMovement(
-        str(movement["movement_id"]), Decimal(movement["amount"]), datetime.fromisoformat(movement["moved_at"])
     )
 
 

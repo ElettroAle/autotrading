@@ -96,7 +96,6 @@ ACTIVITY_BODY = {
     "balance": "1000",
     "available_margin": "800",
     "positions": [],
-    "movements": [],
     "read_at": "2026-11-20T10:00:00+00:00",
 }
 

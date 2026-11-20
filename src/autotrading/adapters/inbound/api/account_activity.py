@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
 from autotrading.domain.flows.capital_history import AccountTransfer
 
 
@@ -29,18 +29,6 @@ class ActivityPositionResponse(BaseModel):
         )
 
 
-class ActivityMovementResponse(BaseModel):
-    movement_id: str
-    amount: str
-    moved_at: str
-
-    @classmethod
-    def of(cls, movement: BalanceMovement) -> ActivityMovementResponse:
-        return cls(
-            movement_id=movement.movement_id, amount=str(movement.amount), moved_at=movement.moved_at.isoformat()
-        )
-
-
 class AccountActivityResponse(BaseModel):
     """What the exchange shows of an account, from the worker to the API for the state of its flows (R1.6.1)."""
 
@@ -48,7 +36,6 @@ class AccountActivityResponse(BaseModel):
     balance: str
     available_margin: str
     positions: list[ActivityPositionResponse]
-    movements: list[ActivityMovementResponse]
     read_at: str
 
     @classmethod
@@ -58,7 +45,6 @@ class AccountActivityResponse(BaseModel):
             balance=str(activity.balance),
             available_margin=str(activity.available_margin),
             positions=[ActivityPositionResponse.of(position) for position in activity.positions],
-            movements=[ActivityMovementResponse.of(movement) for movement in activity.movements],
             read_at=activity.read_at.isoformat(),
         )
 

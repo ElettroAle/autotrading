@@ -511,6 +511,21 @@ account_funding = Table(
     UniqueConstraint("tenant_id", "account_id", "asset", "paid_at", name="account_funding_once"),
 )
 
+# The deposits, withdrawals and transfers of every account, read with the executions from the same cursor (ADR
+# movimenti-del-conto-nel-registro-con-cursore).
+account_movements = Table(
+    "account_movements",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, nullable=False),
+    Column("movement_id", Text, nullable=False),
+    Column("amount", Numeric, nullable=False),
+    Column("moved_at", DateTime(timezone=True), nullable=False),
+    Column("recorded_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("tenant_id", "account_id", "movement_id", "moved_at", name="account_movements_once"),
+)
+
 # Where the next reading of the executions of each account starts (ADR 0063).
 account_fill_cursors = Table(
     "account_fill_cursors",

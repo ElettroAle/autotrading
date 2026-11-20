@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition, BalanceMovement
-from autotrading.domain.flows.ledger import Execution, FundingPayment
+from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
+from autotrading.domain.flows.ledger import BalanceMovement, Execution, FundingPayment
 from autotrading.domain.flows.trade_side import TradeSide
 
 CURRENCY = "USDC"
@@ -66,7 +66,6 @@ def an_activity(
     balance: Decimal = Decimal(1000),
     available_margin: Decimal = Decimal(1000),
     positions: tuple[AccountPosition, ...] = (),
-    movements: tuple[BalanceMovement, ...] = (),
     read_at: datetime = READ_AT,
 ) -> AccountActivity:
-    return AccountActivity(CURRENCY, balance, available_margin, positions, movements, read_at)
+    return AccountActivity(CURRENCY, balance, available_margin, positions, read_at)

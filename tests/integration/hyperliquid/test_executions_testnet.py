@@ -1,4 +1,4 @@
-"""The executions adapter against the testnet: the executions and funding of an address are public."""
+"""The executions adapter against the testnet: the executions, funding and movements of an address are public."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -16,4 +16,4 @@ def test_a_fresh_address_has_a_complete_empty_window(since: datetime | None) -> 
 
     window = adapter.since(EthereumAccount.create().address, since)
 
-    assert (window.executions, window.funding, window.complete) == ((), (), True)
+    assert (window.executions, window.funding, window.movements, window.complete) == ((), (), (), True)
