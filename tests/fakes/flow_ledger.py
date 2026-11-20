@@ -24,6 +24,7 @@ class InMemoryFlowLedgerAdapter:
     funding: dict[UUID, list[FundingEntry]] = field(default_factory=dict)
     cursors: dict[UUID, datetime] = field(default_factory=dict)
     totals: dict[FlowId, FlowTotals] = field(default_factory=dict)
+    asked_after: list[tuple[UUID, datetime]] = field(default_factory=list)
 
     def cursor(self, account_id: UUID) -> datetime | None:
         return self.cursors.get(account_id)
@@ -37,6 +38,23 @@ class InMemoryFlowLedgerAdapter:
             ),
             frozenset(
                 entry.payment.key for entry in self.funding.get(account_id, []) if entry.payment.paid_at >= since
+            ),
+        )
+
+    def recorded_after(self, account_id: UUID, since: datetime) -> AccountLedger:
+        self.asked_after.append((account_id, since))
+        return AccountLedger(
+            tuple(
+                sorted(
+                    (entry for entry in self.entries.get(account_id, []) if entry.execution.executed_at > since),
+                    key=lambda entry: entry.execution.executed_at,
+                )
+            ),
+            tuple(
+                sorted(
+                    (entry for entry in self.funding.get(account_id, []) if entry.payment.paid_at > since),
+                    key=lambda entry: entry.payment.paid_at,
+                )
             ),
         )
 

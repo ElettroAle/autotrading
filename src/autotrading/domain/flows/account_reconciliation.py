@@ -78,12 +78,13 @@ class AccountReconciliation:
     """What a reading of the account shows that no flow explains, compared with the previous reading (R1.6.2), and
     whether its balance is the one expected (R3.3.1).
 
-    The executions are those the ledger has just recorded (ADR 0063). Without a previous reading, past executions and
-    movements are the starting point, not something to report.
+    What is new are the executions the ledger has just recorded (ADR 0063). Without a previous reading, past executions
+    and movements are the starting point, not something to report.
     The expected balance is the reference of the previous reading plus the executions, fees and funding of the flows
-    and the deposits and withdrawals the exchange declares since then, each counted once. A deviation within the
-    threshold is a change of the balance no flow explains, and the balance read becomes the reference; beyond it, an
-    alarm, and the expected balance stays the reference until the user confirms.
+    the ledger holds since then, whoever recorded them, and the deposits and withdrawals the exchange declares since
+    then, each counted once (ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente). A deviation within
+    the threshold is a change of the balance no flow explains, and the balance read becomes the reference; beyond it,
+    an alarm, and the expected balance stays the reference until the user confirms.
     """
 
     items: tuple[UnattributableItem, ...]
@@ -102,11 +103,12 @@ class AccountReconciliation:
         activity: AccountActivity,
         previous: AccountReading | None,
         recorded: AccountLedger,
+        ledger_since_previous: AccountLedger,
         threshold_percent: Decimal,
     ) -> AccountReconciliation:
         flows = [flow for flow in flows_of_account if flow.status != FlowStatus.ARCHIVED]
         new_entries = () if previous is None else recorded.entries
-        comparison = _comparison(previous, recorded, activity)
+        comparison = _comparison(previous, ledger_since_previous, activity)
         alarm = _alarm(account_id, comparison, threshold_percent)
         reading = AccountReading(
             account_id,
@@ -165,33 +167,34 @@ def _read_balance(activity: AccountActivity) -> Decimal:
 
 
 def _comparison(
-    previous: AccountReading | None, recorded: AccountLedger, activity: AccountActivity
+    previous: AccountReading | None, ledger: AccountLedger, activity: AccountActivity
 ) -> BalanceComparison | None:
     if previous is None or previous.reference_balance is None:
         return None
-    expected = previous.reference_balance + _explained(recorded, activity, previous.read_at)
+    expected = previous.reference_balance + _explained(ledger, activity, previous.read_at)
     return BalanceComparison(expected, _read_balance(activity), activity.read_at)
 
 
-def _explained(recorded: AccountLedger, activity: AccountActivity, since: datetime) -> Decimal:
+def _explained(ledger: AccountLedger, activity: AccountActivity, since: datetime) -> Decimal:
     """What moved the balance since the last reading with a reason: the flows, and what the exchange declares.
 
     A row not after the last reading was already in the balance read then, the reference now, even when the exchange
-    published it later (ADR saldo-atteso-con-le-sole-righe-successive-alla-lettura-precedente).
+    published it later (ADR saldo-atteso-con-le-sole-righe-successive-alla-lettura-precedente). A row after this
+    reading, recorded meanwhile by another path, is not in the balance read now: the next reading counts it.
     """
     executions = sum(
         (
             entry.execution.realized_pnl - entry.execution.fee
-            for entry in recorded.entries
-            if entry.flow_id is not None and entry.execution.executed_at > since
+            for entry in ledger.entries
+            if entry.flow_id is not None and since < entry.execution.executed_at <= activity.read_at
         ),
         ZERO,
     )
     funding = sum(
         (
             entry.payment.amount
-            for entry in recorded.funding
-            if entry.flow_id is not None and entry.payment.paid_at > since
+            for entry in ledger.funding
+            if entry.flow_id is not None and since < entry.payment.paid_at <= activity.read_at
         ),
         ZERO,
     )

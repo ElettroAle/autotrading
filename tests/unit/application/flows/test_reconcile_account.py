@@ -9,6 +9,7 @@ from autotrading.application.flows.ports import ReconciliationAlarmPorts
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.domain.flows.account_reconciliation import AccountReading, ProtectionClosing
+from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
@@ -37,6 +38,7 @@ from tests.support.flows import a_configuration, a_flow
 TENANT = TenantId(uuid4())
 ACCOUNT = uuid4()
 BEFORE = READ_AT - timedelta(minutes=5)
+MINUTE = timedelta(minutes=1)
 
 
 class Bench:
@@ -56,7 +58,15 @@ class Bench:
         alarms = ReconciliationAlarmPorts(self.thresholds, self.thresholds, self.notices)
         self.alerts = InMemoryAlertRepositoryAdapter({}, TENANT)
         self.use_case = ReconcileAccountUseCase(
-            flows, self.activity, self.readings, self.closed, record, self.closed_by_protection, alarms, self.alerts
+            flows,
+            self.activity,
+            self.readings,
+            self.closed,
+            record,
+            self.ledger,
+            self.closed_by_protection,
+            alarms,
+            self.alerts,
         )
 
     def flow(self, *assets: str, account_id: UUID = ACCOUNT) -> Flow:
@@ -190,6 +200,36 @@ def test_the_executions_are_recorded_in_the_ledger_before_the_reconciliation(ben
     bench.use_case.execute(ReconcileAccountCommand(flow.id))
 
     assert bench.ledger.realized(flow.id) == Decimal(4)
+
+
+# ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente: a reversal or a cash out records its closing
+# before the reconciliation, which reads it from the ledger for the expected balance (Bug 633).
+def test_an_execution_recorded_before_the_reconciliation_explains_the_balance(bench: Bench) -> None:
+    flow, order = bench.flow("BTC"), uuid4()
+    bench.orders.add(order, ACCOUNT, flow.id)
+    bench.readings.save_reading(AccountReading(ACCOUNT, BEFORE, {}, Decimal(1000)))
+    closing = a_fill("BTC", order, realized_pnl=Decimal("4.6"), fee=Decimal("0.1"), executed_at=BEFORE + MINUTE)
+    bench.ledger.add(ACCOUNT, flow.id, closing)
+    bench.activity.executions[ACCOUNT] = [closing]
+    bench.activity.activities[ACCOUNT] = an_activity(balance=Decimal("1004.5"))
+
+    outcome = bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert outcome.new_items == ()
+    assert bench.readings.alarms == []
+    assert bench.readings.readings[ACCOUNT].comparison == BalanceComparison(
+        Decimal("1004.5"), Decimal("1004.5"), READ_AT
+    )
+    assert bench.ledger.asked_after == [(ACCOUNT, BEFORE)]
+
+
+def test_without_a_previous_reading_the_ledger_is_not_read_for_the_balance(bench: Bench) -> None:
+    flow = bench.flow("BTC")
+    bench.activity.activities[ACCOUNT] = an_activity()
+
+    bench.use_case.execute(ReconcileAccountCommand(flow.id))
+
+    assert bench.ledger.asked_after == []
 
 
 def test_executions_already_recorded_are_not_reported_again(bench: Bench) -> None:

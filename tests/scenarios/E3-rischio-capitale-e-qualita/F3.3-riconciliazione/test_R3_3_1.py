@@ -67,6 +67,7 @@ class LateRows:
         self.ledger = InMemoryFlowLedgerAdapter()
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.reconciled_at: datetime | None = None
+        self.recorded_at: datetime | None = None
         flows = InMemoryFlowRepositoryAdapter(self.store, self.tenant_id)
         accounts = FakeAccountThresholdsAdapter({self.account_id: "principale"})
         record = RecordAccountExecutionsUseCase(flows, self.exchange, self.orders, self.ledger)
@@ -77,6 +78,7 @@ class LateRows:
             self.readings,
             InMemoryClosedPositionsAdapter(),
             record,
+            self.ledger,
             InMemoryProtectionClosingsAdapter(),
             alarms,
             InMemoryAlertRepositoryAdapter({}, self.tenant_id),
@@ -102,6 +104,20 @@ class LateRows:
         assert self.reconciled_at > previous.read_at
         # The ledger was read up to the previous reading: what comes late falls in the hour it reads again (ADR 0076).
         self.ledger.cursors[self.account_id] = previous.read_at
+
+    def record_before_the_reading(self, clock: str) -> None:
+        """Another path of the platform records rows after the previous reading and before the next (Bug 633)."""
+        previous = self.readings.last_reading(self.account_id)
+        assert previous is not None
+        self.recorded_at = at(clock)
+        assert self.recorded_at > previous.read_at
+
+    def read_at(self, clock: str) -> None:
+        """The balance is read when the rows are published late, or after what was recorded before it."""
+        if self.recorded_at is not None:
+            assert at(clock) > self.recorded_at
+            self.reconciled_at = at(clock)
+        assert at(clock) == self.reconciled_at
 
 
 @pytest.fixture(name="flow_cycles")
@@ -458,9 +474,29 @@ def late_execution(late_rows: LateRows, clock: str, flow: str, *, executed: str,
     late_rows.exchange.executions.setdefault(late_rows.account_id, []).append(fill)
 
 
+# ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente: a reversal records the closing as soon as the
+# order executes, before the reconciliation reads the account (Bug 633).
+@given(
+    quoted(
+        "che alle {clock} un'inversione registra un'esecuzione del flusso \"{flow}\" delle {executed} "
+        "con PnL realizzato {pnl} e commissione {fee}"
+    )
+)
+def execution_recorded_by_a_reversal(
+    late_rows: LateRows, clock: str, flow: str, *, executed: str, pnl: str, fee: str
+) -> None:
+    order_id = uuid4()
+    flow_id = late_rows.flow(flow).id
+    late_rows.orders.add(order_id, late_rows.account_id, flow_id)
+    late_rows.record_before_the_reading(clock)
+    fill = a_fill(LATE_ASSET, order_id, realized_pnl=amount(pnl), fee=amount(fee), executed_at=at(executed))
+    late_rows.exchange.executions.setdefault(late_rows.account_id, []).append(fill)
+    late_rows.ledger.add(late_rows.account_id, flow_id, fill)
+
+
 @given(quoted("che il saldo letto alle {clock} è {balance}"))
 def balance_read(late_rows: LateRows, clock: str, balance: str) -> None:
-    assert at(clock) == late_rows.reconciled_at
+    late_rows.read_at(clock)
     late_rows.exchange.activities[late_rows.account_id] = an_activity(
         balance=amount(balance), positions=(a_position(LATE_ASSET),), read_at=at(clock)
     )

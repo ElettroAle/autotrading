@@ -87,6 +87,7 @@ class AttributionBench:
             self.readings,
             self.closed,
             self.record,
+            self.ledger,
             self.closed_by_protection,
             alarms,
             self.alerts,

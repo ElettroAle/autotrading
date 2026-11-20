@@ -9,7 +9,9 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
   l'ultimo saldo di riferimento più ciò che lo spiega, cioè esecuzioni, commissioni e funding dei flussi, e depositi e
   prelievi che l'exchange dichiara (R1.6.1). Ogni esecuzione e pagamento di funding dei flussi conta una sola volta:
   quello pubblicato dall'exchange dopo una lettura del saldo, con un istante non successivo a quella lettura, era già
-  compreso nel saldo letto allora (Bug 506).
+  compreso nel saldo letto allora (Bug 506). Conta invece ogni esecuzione e pagamento di funding dei flussi successivo
+  alla lettura precedente, chiunque lo abbia registrato: anche le chiusure di un'inversione o di un incasso dei profitti,
+  registrate prima della riconciliazione (Bug 633).
   Ogni conto ha una soglia di scostamento, in percentuale del saldo atteso, da 0,1 a 100, pari a 1 se non indicata.
   Uno scostamento oltre la soglia apre un allarme di riconciliazione sul conto (RF-13.07): si registrano saldo atteso,
   saldo letto e scostamento, l'utente viene avvisato, e le aperture di tutti i flussi del conto sono sospese finché
@@ -114,3 +116,11 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
     E che il saldo letto alle 10:15 è 1000
     Quando il conto si riconcilia
     Allora nessuna variazione del saldo non spiegata si registra
+
+  Scenario: Esecuzione registrata prima della riconciliazione contata nel saldo atteso
+    Dato che il conto "principale" ha una lettura precedente alle 10:00 con saldo di riferimento 1000
+    E che alle 10:05 un'inversione registra un'esecuzione del flusso "alfa" delle 10:04 con PnL realizzato 4 e commissione 0,1
+    E che il saldo letto alle 10:15 è 1003,9
+    Quando il conto si riconcilia
+    Allora il saldo atteso è 1003,9
+    E nessuna variazione del saldo non spiegata si registra

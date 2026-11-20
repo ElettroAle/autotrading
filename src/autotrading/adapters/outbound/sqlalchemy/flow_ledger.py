@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Connection, Engine, func, select
+from sqlalchemy import Connection, Engine, RowMapping, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from autotrading.adapters.outbound.sqlalchemy.tables import (
@@ -16,7 +16,16 @@ from autotrading.adapters.outbound.sqlalchemy.tables import (
     flow_totals,
 )
 from autotrading.domain.flows.flow_id import FlowId
-from autotrading.domain.flows.ledger import AccountLedger, FlowTotals, FundingEntry, LedgerEntry, LedgerKeys
+from autotrading.domain.flows.ledger import (
+    AccountLedger,
+    Execution,
+    ExecutionKind,
+    FlowTotals,
+    FundingEntry,
+    FundingPayment,
+    LedgerEntry,
+    LedgerKeys,
+)
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 ZERO = Decimal(0)
@@ -50,6 +59,22 @@ class SqlAlchemyFlowLedgerAdapter:
             executions = frozenset((str(fill_id), str(order)) for fill_id, order in connection.execute(fills))
             payments = frozenset((str(asset), paid_at) for asset, paid_at in connection.execute(funding))
         return LedgerKeys(executions, payments)
+
+    def recorded_after(self, account_id: UUID, since: datetime) -> AccountLedger:
+        fills = (
+            select(account_fills)
+            .where(account_fills.c.account_id == account_id, account_fills.c.executed_at > since)
+            .order_by(account_fills.c.executed_at, account_fills.c.id)
+        )
+        funding = (
+            select(account_funding)
+            .where(account_funding.c.account_id == account_id, account_funding.c.paid_at > since)
+            .order_by(account_funding.c.paid_at, account_funding.c.id)
+        )
+        with self._transaction() as connection:
+            entries = tuple(_entry_of(row) for row in connection.execute(fills).mappings())
+            payments = tuple(_funding_of(row) for row in connection.execute(funding).mappings())
+        return AccountLedger(entries, payments)
 
     def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
         with self._transaction() as connection:
@@ -200,3 +225,28 @@ class SqlAlchemyFlowLedgerAdapter:
             # Local to the transaction: a pooled connection never carries the tenant of a previous request.
             connection.execute(select(func.set_config("app.tenant_id", str(self._tenant_id.value), True)))
             yield connection
+
+
+def _flow_of(row: RowMapping) -> FlowId | None:
+    return None if row["flow_id"] is None else FlowId(row["flow_id"])
+
+
+def _entry_of(row: RowMapping) -> LedgerEntry:
+    execution = Execution(
+        fill_id=row["fill_id"],
+        exchange_order_id=row["exchange_order_id"],
+        order_id=row["order_id"],
+        asset=row["asset"],
+        size=row["size"],
+        price=row["price"],
+        fee=row["fee"],
+        realized_pnl=row["realized_pnl"],
+        start_position=row["start_position"],
+        liquidation=row["liquidation"],
+        executed_at=row["executed_at"],
+    )
+    return LedgerEntry(execution, _flow_of(row), ExecutionKind(row["kind"]), platform_order=row["platform_order"])
+
+
+def _funding_of(row: RowMapping) -> FundingEntry:
+    return FundingEntry(FundingPayment(row["asset"], row["amount"], row["paid_at"]), _flow_of(row))

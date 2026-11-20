@@ -84,6 +84,7 @@ class Bench:
             self.readings,
             InMemoryClosedPositionsAdapter(),
             record,
+            ledger,
             InMemoryProtectionClosingsAdapter(),
             ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
             InMemoryAlertRepositoryAdapter({}, TENANT),

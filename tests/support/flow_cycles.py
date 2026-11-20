@@ -231,6 +231,7 @@ class FlowCycles:
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),
             record_executions,
+            platform.ledger,
             RecordProtectionClosingUseCase(
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),
