@@ -13,6 +13,7 @@ from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 from hyperliquid.utils.types import Cloid
 
+from autotrading.adapters.outbound.hyperliquid.market_metadata import _MarketMetadata
 from autotrading.adapters.outbound.hyperliquid.user_state import _UserPosition, in_account_mode, user_state_of
 from autotrading.application.accounts.errors import (
     CredentialFieldMalformedError,
@@ -76,14 +77,29 @@ CREDENTIAL_FIELDS = (
 class HyperliquidSdkAdapter:
     """The official Hyperliquid SDK, the only client of the exchange (rule tech-hyperliquid).
 
-    The adapters of the folder take it in their constructor; a test hands them a subclass that answers for the exchange.
+    One for the process, created by the composition and handed to every adapter of the folder; a test hands them a
+    subclass that answers for the exchange. Every use builds a new client, whose HTTP session is not shared between
+    threads, with the market metadata of its network already read, so building it asks nothing of the network (Bug 635,
+    ADR metadati-di-mercato-hyperliquid-riusati-dal-client-unico).
     """
 
+    def __init__(self, metadata: _MarketMetadata | None = None) -> None:
+        self._metadata = metadata or _MarketMetadata()
+
     def exchange(self, wallet: LocalAccount, base_url: str, account_address: str, timeout: float) -> Exchange:
-        return Exchange(wallet, base_url, account_address=account_address, timeout=timeout)
+        metadata = self._metadata.of(base_url, timeout)
+        return Exchange(
+            wallet,
+            base_url,
+            meta=metadata.meta,
+            account_address=account_address,
+            spot_meta=metadata.spot_meta,
+            timeout=timeout,
+        )
 
     def info(self, base_url: str, timeout: float) -> Info:
-        return Info(base_url, skip_ws=True, timeout=timeout)
+        metadata = self._metadata.of(base_url, timeout)
+        return Info(base_url, skip_ws=True, meta=metadata.meta, spot_meta=metadata.spot_meta, timeout=timeout)
 
 
 class HyperliquidExchangeAdapter:

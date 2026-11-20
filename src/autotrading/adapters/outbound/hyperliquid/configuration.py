@@ -15,6 +15,13 @@ class _HyperliquidOrderSettings:
     slippage: Slippage
 
 
+@dataclass(frozen=True, slots=True)
+class _HyperliquidMetadataSettings:
+    """How long a process keeps the market metadata of a network: the owner chose an hour (Bug 635)."""
+
+    validity_seconds: float = 3600.0
+
+
 def _order_settings_of(source: ConfigurationSource) -> _HyperliquidOrderSettings:
     """Five percent unless the installation declares it; the range is a rule of the domain (Slippage)."""
     text = source.optional(SLIPPAGE)
