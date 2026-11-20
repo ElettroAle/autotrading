@@ -10,9 +10,10 @@ from autotrading.application.sources.ports import SourceRequest
 from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase, text_of
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.domain.sources.errors import InsufficientHistoryError
+from autotrading.domain.sources.extended_indicators import ExtendedIndicatorChoice, fibonacci_levels
 from autotrading.domain.sources.indicator_series import WARM_UP
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
-from autotrading.domain.sources.timeframe import Timeframe
+from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe
 from tests.fakes.market_data import DEFAULT_CLOSES, FakeMarketDataAdapter
 
 NOW = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
@@ -81,6 +82,41 @@ def test_a_market_too_short_makes_the_indicators_insufficient() -> None:
 
     with pytest.raises(InsufficientHistoryError):
         ReadIndicatorsUseCase(market, 15).execute(command())
+
+
+def extended(asset: str = "BTC", **settings: int) -> SourceRequest:
+    return SourceRequest(uuid4(), asset, {"lunghezza_serie": 10, **settings}, NOW)
+
+
+def test_without_extended_indicators_the_context_has_none_of_their_values() -> None:
+    [value] = ReadIndicatorsUseCase(FakeMarketDataAdapter(), 15).execute(extended(candele_estese=300))
+
+    assert not [key for key in value.values if key.startswith(("lungo.fibonacci", "lungo.gann", "lungo.ciclo"))]
+    assert "lungo.candele_estese" not in value.values
+
+
+def test_the_extended_indicators_read_their_candles_on_the_long_timeframe() -> None:
+    market = FakeMarketDataAdapter()
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(fibonacci=1, gann=1, ciclo=1, candele_estese=300))
+
+    long = market.candles("BTC", LONG_TIMEFRAME, 300, NOW)
+    expected = ExtendedIndicatorChoice(fibonacci=True, gann=True, cycle=True, candles=300).values(long)
+    assert market.requests[1] == ("BTC", "4h", 300)
+    assert value.values["lungo.candele_estese"] == "300"
+    assert value.values["lungo.fibonacci.61.8%"] == text_of(fibonacci_levels(long)["61.8%"])
+    assert value.values["lungo.gann.perno"] == expected["gann.perno"]
+    assert value.values["lungo.ciclo.periodo_candele"] == "9"
+    assert "lungo.nota_storico" not in value.values
+
+
+def test_a_long_history_shorter_than_the_candles_asked_is_declared() -> None:
+    market = FakeMarketDataAdapter(closes={("BTC", "4h"): DEFAULT_CLOSES[:60]})
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(fibonacci=1))
+
+    assert value.values["lungo.nota_storico"] == "storico di 60 candele, meno delle 100 richieste"
+    assert value.values["lungo.candele_estese"] == "60"
 
 
 @pytest.mark.parametrize(

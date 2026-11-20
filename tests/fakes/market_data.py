@@ -15,13 +15,17 @@ DEFAULT_SNAPSHOT = MarketSnapshot(Decimal(100), Decimal("100.5"), Decimal(1000),
 DEFAULT_DAY = DailyRange(high=Decimal(110), low=Decimal(90), close=Decimal(100))
 STANDARD_INTERVALS = tuple(Timeframe(minutes) for minutes in (1, 3, 5, 15, 30, 60, 120, 240, 480, 720, 1440))
 MARKET_DECLARATION = SourceAdapterDeclaration("Hyperliquid", "dati di mercato", (), (), offers_history=True)
+# Without a known range a candle spans one unit on each side of its close.
+DEFAULT_SPREAD = Decimal(1)
 
 
 @dataclass
 class FakeMarketDataAdapter:
-    """The market of the exchange as the test decides it: known closes per timeframe, current values, previous day."""
+    """The market of the exchange as the test decides it: known closes and ranges (high, low) per timeframe, current
+    values, previous day."""
 
     closes: dict[tuple[str, str], Sequence[Decimal]] = field(default_factory=dict)
+    ranges: dict[tuple[str, str], Sequence[tuple[Decimal, Decimal]]] = field(default_factory=dict)
     snapshots: dict[str, MarketSnapshot] = field(default_factory=dict)
     days: dict[str, DailyRange] = field(default_factory=dict)
     requests: list[tuple[str, str, int]] = field(default_factory=list)
@@ -36,12 +40,15 @@ class FakeMarketDataAdapter:
 
     def candles(self, asset: str, timeframe: Timeframe, count: int, now: datetime) -> Sequence[Candle]:
         self.requests.append((asset, timeframe.label, count))
-        closes = list(self.closes.get((asset, timeframe.label), DEFAULT_CLOSES))[-count:]
+        key = (asset, timeframe.label)
+        every_close = list(self.closes.get(key, DEFAULT_CLOSES))
+        every_range = self.ranges.get(key, [(close + DEFAULT_SPREAD, close - DEFAULT_SPREAD) for close in every_close])
+        closes, ranges = every_close[-count:], list(every_range)[-count:]
         span = timedelta(minutes=timeframe.minutes)
         last_close = now - (now - datetime.min.replace(tzinfo=now.tzinfo)) % span
         return [
-            Candle(last_close - span * (len(closes) - 1 - index), close, Decimal(5) + index)
-            for index, close in enumerate(closes)
+            Candle(last_close - span * (len(closes) - 1 - index), close, Decimal(5) + index, high, low)
+            for index, (close, (high, low)) in enumerate(zip(closes, ranges, strict=True))
         ]
 
     def snapshot(self, asset: str) -> MarketSnapshot:

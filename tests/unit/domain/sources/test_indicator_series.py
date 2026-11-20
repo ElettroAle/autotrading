@@ -16,7 +16,10 @@ from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe, shor
 
 START = datetime(2026, 11, 12, tzinfo=UTC)
 CLOSES = [Decimal(100) + Decimal(index * index % 23) / 10 for index in range(120)]
-CANDLES = [Candle(START + timedelta(minutes=15 * index), close, Decimal(index)) for index, close in enumerate(CLOSES)]
+CANDLES = [
+    Candle(START + timedelta(minutes=15 * index), close, Decimal(index), close + 1, close - 1)
+    for index, close in enumerate(CLOSES)
+]
 
 
 def test_the_short_timeframe_has_the_averages_of_20_the_macd_the_rsi_and_the_volume() -> None:
