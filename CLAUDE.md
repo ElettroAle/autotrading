@@ -79,7 +79,7 @@ src/autotrading/
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
                                 alternative_me/, coinmarketcap/, arkham/, binance/, lunarcrush/, litellm/,
-                                openrouter/, forecaster/, apscheduler/, smtp/, dashboard/
+                                openrouter/, forecaster/, apscheduler/, smtp/, dashboard/, grafana_cloud/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -316,6 +316,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-apscheduler.md` | `adapters/outbound/apscheduler/**` |
 | `tech-openrouter.md` | `adapters/outbound/openrouter/**` |
 | `tech-forecaster.md` | `forecaster/**`, `adapters/outbound/forecaster/**` |
+| `tech-grafana-cloud.md` | `adapters/outbound/grafana_cloud/**` |
 | `tech-dashboard.md` | `dashboard/**`, `adapters/outbound/dashboard/**` |
 | `tech-sqlalchemy.md` | `adapters/outbound/sqlalchemy/**`, `migrations/**` |
 | `ci.md` | `.github/**`, `deploy/**`, `tools/**`, `Dockerfile` |

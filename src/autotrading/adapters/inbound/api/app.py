@@ -2,6 +2,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated
 
+import fastapi
 from fastapi import APIRouter, Depends, FastAPI, Request, Response, Security
 from fastapi.security import HTTPBearer
 from pydantic import BaseModel
@@ -79,7 +80,9 @@ def create_api(
     for_tenant: Callable[[TenantId], TenantUseCases],
     authentication: Authentication | None = None,
 ) -> FastAPI:
-    api = FastAPI(title="AutoTrading", swagger_ui_init_oauth=_swagger_login(authentication))
+    # Read from the module at each call: the telemetry, installed first, replaces it with its instrumented subclass
+    # (ADR telemetria-opentelemetry-verso-grafana-cloud).
+    api = fastapi.FastAPI(title="AutoTrading", swagger_ui_init_oauth=_swagger_login(authentication))
     install_error_responses(api)
     _declare_environment_on_every_response(api, health)
     _publish_login(api, authentication)

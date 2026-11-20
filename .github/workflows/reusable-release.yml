@@ -127,6 +127,9 @@ jobs:
           auth-scope: ${{ vars.AUTH_SCOPE }}
           dashboard-url: ${{ vars.DASHBOARD_URL }}
           telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          grafana-otlp-endpoint: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
+          grafana-instance-id: ${{ vars.GRAFANA_INSTANCE_ID }}
+          grafana-otlp-token: ${{ secrets.GRAFANA_OTLP_TOKEN }}
       - uses: ./.github/actions/health-check
         with:
           hostname: ${{ steps.host.outputs.hostname }}
@@ -203,6 +206,9 @@ jobs:
           auth-scope: ${{ vars.AUTH_SCOPE }}
           dashboard-url: ${{ vars.DASHBOARD_URL }}
           telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          grafana-otlp-endpoint: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
+          grafana-instance-id: ${{ vars.GRAFANA_INSTANCE_ID }}
+          grafana-otlp-token: ${{ secrets.GRAFANA_OTLP_TOKEN }}
       - uses: ./.github/actions/health-check
         with:
           hostname: ${{ steps.host.outputs.hostname }}
