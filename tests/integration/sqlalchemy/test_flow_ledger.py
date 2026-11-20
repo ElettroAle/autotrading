@@ -3,7 +3,7 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import Engine, func, select, text
+from sqlalchemy import Engine, bindparam, func, select, text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
@@ -134,6 +134,59 @@ def test_the_keys_recorded_since_a_moment_are_only_the_newer_ones(database: Engi
     assert (keys.executions, keys.funding) == (frozenset({("2", "o-2")}), frozenset({("BTC", READ_AT)}))
 
 
+# ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente: the rows after a reading, whoever recorded them.
+def test_the_rows_recorded_after_a_moment_are_read_back_oldest_first(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
+    flow_id = FlowId.new()
+    later = READ_AT + timedelta(minutes=1)
+    funding = (
+        FundingEntry(FundingPayment("BTC", Decimal(1), EARLIER), flow_id),
+        FundingEntry(FundingPayment("BTC", Decimal("-0.5"), READ_AT), flow_id),
+        FundingEntry(FundingPayment("ETH", Decimal(2), later), None),
+    )
+    closing = an_execution("2", realized_pnl=Decimal("4.6"), fee=Decimal("0.1"), executed_at=later)
+    recorded = of_flow(flow_id, an_execution("1", executed_at=EARLIER), an_execution("3"), closing, funding=funding)
+    ledger.record(account_id, recorded, later)
+    unattributed = an_execution("4", executed_at=later)
+    ledger.record(account_id, of_flow(None, unattributed), later)
+
+    rows = ledger.recorded_after(account_id, EARLIER)
+
+    assert [(entry.execution, entry.flow_id) for entry in rows.entries] == [
+        (recorded.entries[1].execution, flow_id),
+        (closing, flow_id),
+        (unattributed, None),
+    ]
+    assert [entry.kind for entry in rows.entries] == [
+        ExecutionKind.FLOW_ORDER,
+        ExecutionKind.FLOW_ORDER,
+        ExecutionKind.UNATTRIBUTED,
+    ]
+    assert rows.funding == funding[1:]
+
+
+def test_the_rows_recorded_after_a_moment_are_only_those_of_the_account(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    _, other_account = new_account(database)
+    ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
+    ledger.record(account_id, of_flow(None, an_execution("1")), READ_AT)
+
+    assert ledger.recorded_after(other_account, EARLIER) == AccountLedger((), ())
+
+
+def test_the_rows_of_an_account_by_instant_are_served_by_an_index(database: Engine) -> None:
+    query = text("SELECT indexname, indexdef FROM pg_indexes WHERE indexname IN :names")
+    names = ("account_fills_of_account", "account_funding_of_account")
+    with database.connect() as connection:
+        rows = connection.execute(query.bindparams(bindparam("names", expanding=True)), {"names": names})
+        indexes = {str(name): str(definition) for name, definition in rows}
+
+    assert sorted(indexes) == list(names)
+    assert "(tenant_id, account_id, executed_at DESC)" in indexes["account_fills_of_account"]
+    assert "(tenant_id, account_id, paid_at DESC)" in indexes["account_funding_of_account"]
+
+
 def test_a_late_cycle_never_moves_the_cursor_back(database: Engine) -> None:
     tenant_id, account_id = new_account(database)
     ledger = SqlAlchemyFlowLedgerAdapter(database, tenant_id)
@@ -160,6 +213,7 @@ def test_another_tenant_sees_nothing_of_the_ledger(database: Engine) -> None:
     assert theirs.cursor(account_id) is None
     assert theirs.totals_of([flow_id]) == {}
     assert theirs.recorded_since(account_id, EARLIER).executions == frozenset()
+    assert theirs.recorded_after(account_id, EARLIER) == AccountLedger((), ())
 
 
 def test_the_ledger_of_an_account_of_another_tenant_cannot_be_written(database: Engine) -> None:

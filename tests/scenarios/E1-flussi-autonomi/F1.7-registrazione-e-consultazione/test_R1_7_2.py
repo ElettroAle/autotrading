@@ -150,6 +150,7 @@ class History:
             readings,
             history,
             record,
+            self.platform.ledger,
             InMemoryProtectionClosingsAdapter(),
             alarms,
             InMemoryAlertRepositoryAdapter(self.platform.alerts, operating.tenant_id),

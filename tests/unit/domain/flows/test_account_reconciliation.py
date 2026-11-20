@@ -51,11 +51,22 @@ def reconcile(
     *,
     recorded: tuple[LedgerEntry, ...] = (),
     funding: tuple[FundingEntry, ...] = (),
+    booked: tuple[LedgerEntry, ...] = (),
+    booked_funding: tuple[FundingEntry, ...] = (),
     last: AccountReading | None = None,
     threshold: Decimal = Decimal(1),
 ) -> AccountReconciliation:
-    ledger = AccountLedger(recorded, funding)
-    return AccountReconciliation.of(ACCOUNT, flows, activity or an_activity(), last, ledger, threshold)
+    """`recorded` and `funding` are what the ledger has just written; `booked` and `booked_funding` what it holds
+    after the previous reading, whoever recorded it."""
+    return AccountReconciliation.of(
+        ACCOUNT,
+        flows,
+        activity or an_activity(),
+        last,
+        AccountLedger(recorded, funding),
+        AccountLedger(booked, booked_funding),
+        threshold,
+    )
 
 
 def test_a_position_on_an_asset_of_no_flow_is_unattributable() -> None:
@@ -278,8 +289,8 @@ def test_the_executions_fees_and_funding_of_the_flows_explain_the_balance() -> N
     result = reconcile(
         [flow],
         an_activity(balance=Decimal(1025)),
-        recorded=(of_platform(fill, flow),),
-        funding=funding,
+        booked=(of_platform(fill, flow),),
+        booked_funding=funding,
         last=previous(reference=Decimal(1000)),
     )
 
@@ -301,7 +312,7 @@ def test_an_execution_of_a_flow_explains_the_balance_only_after_the_previous_rea
     result = reconcile(
         [flow],
         an_activity(balance=expected),
-        recorded=(of_platform(fill, flow),),
+        booked=(of_platform(fill, flow),),
         last=previous(reference=Decimal(1000)),
     )
 
@@ -319,7 +330,9 @@ def test_a_funding_payment_of_a_flow_explains_the_balance_only_after_the_previou
     flow = flow_on("BTC")
     funding = (FundingEntry(a_payment("BTC", Decimal("0.05"), paid_at=paid_at), flow.id),)
 
-    result = reconcile([flow], an_activity(balance=expected), funding=funding, last=previous(reference=Decimal(1000)))
+    result = reconcile(
+        [flow], an_activity(balance=expected), booked_funding=funding, last=previous(reference=Decimal(1000))
+    )
 
     assert result.comparison == BalanceComparison(expected, expected, READ_AT)
     assert result.items == ()
@@ -332,13 +345,79 @@ def test_the_executions_and_funding_of_no_flow_do_not_explain_the_balance() -> N
     result = reconcile(
         [flow_on("BTC")],
         an_activity(balance=Decimal(1035)),
-        recorded=(unattributed(fill),),
-        funding=funding,
+        booked=(unattributed(fill),),
+        booked_funding=funding,
         last=previous(reference=Decimal(1000)),
         threshold=Decimal(10),
     )
 
     assert result.comparison == BalanceComparison(Decimal(1000), Decimal(1035), READ_AT)
+
+
+# ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente: the rows another path recorded after the
+# previous reading, a reversal or a cash out, explain the balance as well (Bug 633).
+def test_the_rows_of_the_flows_in_the_ledger_after_the_previous_reading_explain_the_balance() -> None:
+    flow = flow_on("BTC")
+    closing = a_fill("BTC", uuid4(), realized_pnl=Decimal("4.6"), fee=Decimal("0.1"))
+    funding = (FundingEntry(a_payment("BTC", Decimal("-0.5")), flow.id),)
+
+    result = reconcile(
+        [flow],
+        an_activity(balance=Decimal(1004)),
+        booked=(of_platform(closing, flow),),
+        booked_funding=funding,
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1004), Decimal(1004), READ_AT)
+    assert result.items == ()
+
+
+def test_a_row_of_the_ledger_after_this_reading_explains_the_next_one() -> None:
+    flow = flow_on("BTC")
+    later = a_fill("BTC", uuid4(), realized_pnl=Decimal(30), executed_at=READ_AT + timedelta(seconds=1))
+    funding = (FundingEntry(a_payment("BTC", Decimal(5), paid_at=READ_AT + timedelta(seconds=1)), flow.id),)
+
+    result = reconcile(
+        [flow],
+        an_activity(balance=Decimal(1000)),
+        booked=(of_platform(later, flow),),
+        booked_funding=funding,
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1000), Decimal(1000), READ_AT)
+
+
+def test_the_rows_just_recorded_explain_the_balance_only_through_the_ledger() -> None:
+    flow = flow_on("BTC")
+    fill = a_fill("BTC", uuid4(), realized_pnl=Decimal(30), fee=Decimal(2))
+
+    result = reconcile(
+        [flow],
+        an_activity(balance=Decimal(1000)),
+        recorded=(of_platform(fill, flow),),
+        funding=(FundingEntry(a_payment("BTC", Decimal(5)), flow.id),),
+        last=previous(reference=Decimal(1000)),
+    )
+
+    assert result.comparison == BalanceComparison(Decimal(1000), Decimal(1000), READ_AT)
+
+
+def test_a_row_recorded_before_this_reconciliation_is_neither_an_unknown_fill_nor_a_closing_outside() -> None:
+    flow = flow_on("BTC")
+    fill = a_fill("BTC", None, fill_id="9", realized_pnl=Decimal(3), size=Decimal(-1), start_position=Decimal(1))
+
+    result = reconcile(
+        [flow],
+        an_activity(balance=Decimal(1003)),
+        booked=(LedgerEntry(fill, flow.id, ExecutionKind.OUTSIDE_CLOSING),),
+        last=previous({flow.id: frozenset({"BTC"})}, reference=Decimal(1000)),
+    )
+
+    assert result.items == ()
+    assert result.closed_outside == (OutsideClosing(flow.id, "BTC", Decimal(0), Decimal(0), READ_AT),)
+    assert result.comparison == BalanceComparison(Decimal(1003), Decimal(1003), READ_AT)
 
 
 def test_the_movements_declared_after_the_last_reading_explain_the_balance() -> None:

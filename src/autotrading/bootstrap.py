@@ -536,6 +536,7 @@ def cycle_of(
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),
             record_executions,
+            ledger,
             RecordProtectionClosingUseCase(
                 flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
             ),

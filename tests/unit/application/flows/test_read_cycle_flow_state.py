@@ -74,6 +74,7 @@ class Bench:
             InMemoryReconciliationRepositoryAdapter(),
             InMemoryClosedPositionsAdapter(),
             record,
+            self.ledger,
             InMemoryProtectionClosingsAdapter(),
             ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
             InMemoryAlertRepositoryAdapter({}, TENANT),

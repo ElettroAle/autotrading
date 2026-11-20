@@ -578,6 +578,13 @@ class FlowLedgerPort(Protocol):
         """What of the account is recorded already from that moment on, to read the overlap of two windows once."""
         ...
 
+    def recorded_after(self, account_id: UUID, since: datetime) -> AccountLedger:
+        """The executions and funding of the account recorded already, whoever recorded them, that happened after that
+        moment, oldest first: what explains the balance since a reading (ADR
+        saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente).
+        """
+        ...
+
     def record(self, account_id: UUID, ledger: AccountLedger, cursor: datetime) -> AccountLedger:
         """Records what is new and adds it to the totals of its flows in the same transaction; returns what was new,
         executions and funding.
