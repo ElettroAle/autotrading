@@ -199,6 +199,7 @@ modules = [
     "autotrading.adapters.outbound.lunarcrush",
     "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.openrouter",
+    "autotrading.adapters.outbound.process_memory",
     "autotrading.adapters.outbound.smtp",
     "autotrading.adapters.outbound.system_clock",
     "autotrading.adapters.outbound.threads",

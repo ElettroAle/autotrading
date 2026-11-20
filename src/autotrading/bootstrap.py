@@ -46,6 +46,10 @@ from autotrading.adapters.outbound.lunarcrush.composition import lunarcrush_adap
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
 from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterModelCatalogAdapter
+from autotrading.adapters.outbound.process_memory.composition import (
+    RememberedAccountActivity,
+    process_memory_adapters,
+)
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.smtp.composition import smtp_adapters
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
@@ -276,10 +280,15 @@ def tenant_use_cases(
     engine: SqlAlchemyEngine,
     sealers: SealersOfTenant,
     installation: tuple[str, HyperliquidAdaptersOfInstallation, SourceSystems],
-    worker_of: Callable[[TenantId], WorkerAdaptersOfTenant],
+    worker: tuple[Callable[[TenantId], WorkerAdaptersOfTenant], RememberedAccountActivity],
     models: tuple[ModelCatalogs, Mapping[str, FlowModelsPort]],
 ) -> Callable[[TenantId], TenantUseCases]:
-    """Builds, for each request, the adapters bound to its tenant and the use cases on top of them."""
+    """Builds, for each request, the adapters bound to its tenant and the use cases on top of them.
+
+    The readings of the accounts go through the memory of the process: in the API they serve only the dashboard (Bug
+    635, ADR cache-delle-letture-del-conto-come-decorator-in-memoria).
+    """
+    worker_of, remembered_activity = worker
     model_catalogs, flow_models = models
     credential_sealer, provider_key_sealer, mail_password_sealer, source_secrets_sealer = sealers
     environment, hyperliquid, systems = installation
@@ -292,7 +301,7 @@ def tenant_use_cases(
         (
             bot_identity,
             account_state,
-            account_activity,
+            worker_account_activity,
             position_closing,
             verification,
             notifier,
@@ -301,6 +310,7 @@ def tenant_use_cases(
             email_tests,
             source_trials,
         ) = worker_of(tenant_id)
+        account_activity = remembered_activity(worker_account_activity, tenant_id)
         flow_ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         provider_keys = SqlAlchemyProviderKeyRepositoryAdapter(engine, tenant_id)
         source_credentials = SqlAlchemySourceCredentialsRepositoryAdapter(engine, tenant_id)
@@ -356,7 +366,7 @@ def tenant_use_cases(
             closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
             account_activity=account_activity,
-            account_transfers=account_activity,
+            account_transfers=worker_account_activity,
             flow_ledger=flow_ledger,
             ledger_recording=ledger_recording,
             on_demand_cycles=on_demand_cycles,
@@ -750,7 +760,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
         engine,
         libsodium_sealing_adapters(source),
         (source.environment(), hyperliquid, source_systems(hyperliquid, forecaster_adapters(source))),
-        worker_adapters(source),
+        (worker_adapters(source), process_memory_adapters()),
         (catalogs, catalogs),
     )
     return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))

@@ -79,7 +79,8 @@ src/autotrading/
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
                                 alternative_me/, coinmarketcap/, arkham/, binance/, lunarcrush/, litellm/,
-                                openrouter/, forecaster/, apscheduler/, smtp/, dashboard/, grafana_cloud/
+                                openrouter/, forecaster/, apscheduler/, smtp/, dashboard/, grafana_cloud/,
+                                process_memory/
   bootstrap.py                  composition root
 tests/                          vedi .claude/rules/tests.md
 specs/                          vedi .claude/rules/specs.md
@@ -121,6 +122,9 @@ Le dipendenze puntano solo verso il centro: `adapters` ──> `application` ─
   d'uso e da `application` importa solo `ports.py` ed `errors.py`. Unica eccezione il decorator: riceve la
   stessa porta che dichiara di realizzare, per aggiungere un comportamento; prima di un decorator con
   effetti si valuta l'outbox.
+- **Una cache è un decorator della stessa porta, in una cartella propria** (es. `process_memory/` per la
+  memoria del processo), montato dalla composition; il suo stato lo crea una volta la composition e non sta
+  in variabili di modulo (ADR cache-delle-letture-del-conto-come-decorator-in-memoria).
 - **Niente ponti tra contesti.** Il contesto che usa un dato di un altro dichiara le sue porte, con i suoi
   errori, nel proprio `ports.py`; l'adapter della tecnologia che ha il dato le realizza nella sua cartella
   (un adapter può realizzare più porte); la sequenza sta nel caso d'uso.
@@ -315,6 +319,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `tech-threads.md` | `adapters/outbound/threads/**` |
 | `tech-apscheduler.md` | `adapters/outbound/apscheduler/**` |
 | `tech-openrouter.md` | `adapters/outbound/openrouter/**` |
+| `tech-process-memory.md` | `adapters/outbound/process_memory/**` |
 | `tech-forecaster.md` | `forecaster/**`, `adapters/outbound/forecaster/**` |
 | `tech-grafana-cloud.md` | `adapters/outbound/grafana_cloud/**` |
 | `tech-dashboard.md` | `dashboard/**`, `adapters/outbound/dashboard/**` |
