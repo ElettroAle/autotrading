@@ -13,6 +13,7 @@ from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, PricePoint
 from autotrading.domain.sources.sealed_source_secrets import SealedSourceSecrets
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from autotrading.domain.sources.social_snapshot import SocialSnapshot
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_credentials import SourceCredentials
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
@@ -80,6 +81,23 @@ class VolumesPort(Protocol):
         """The volume of the last 24 hours, the aggressive trades of the last interval of the cycle and the order book
         of the asset now; UnlistedAsset when the exchange does not list it. Raises SourceUnavailableError when they
         cannot be read.
+        """
+        ...
+
+
+class SocialPort(Protocol):
+    """One provider of what is said of the assets on the social networks: each one is an adapter of the social source
+    (R5.1.3, ADR fonte-social-con-adapter-lunarcrush)."""
+
+    def declaration(self) -> SourceAdapterDeclaration:
+        """What the adapter declares of itself, its number of posts included, without asking the provider (R4.1.1)."""
+        ...
+
+    def snapshot(self, asset: str, posts: int, credentials: Mapping[str, str]) -> SocialSnapshot:
+        """The sentiment, the mentions and the interactions of the last 24 hours and at least the number of posts asked
+        of the most influential creators, the most relevant first, read with the credentials the tenant gave the
+        adapter (R4.1.2); raises SourceUnavailableError when they cannot be read and SourceCredentialsRejectedError
+        when the provider refuses the credentials.
         """
         ...
 

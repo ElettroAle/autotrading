@@ -1,0 +1,17 @@
+{
+  "config": {
+    "coin": "2",
+    "topic": "ethereum",
+    "symbol": "ETH",
+    "interval": "1w",
+    "bucket": "hour"
+  },
+  "data": [
+    {
+      "time": 1794268800,
+      "interactions": 1281078,
+      "posts_created": 534,
+      "sentiment": 70
+    }
+  ]
+}

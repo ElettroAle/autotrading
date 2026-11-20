@@ -114,6 +114,7 @@ from tests.fakes.provider_keys import (
     FakeProviderKeySealerAdapter,
     InMemoryProviderKeyRepositoryAdapter,
 )
+from tests.fakes.social import FakeSocialAdapter
 from tests.fakes.source_credentials import FakeSourceSecretsOpenerAdapter, InMemorySourceCredentialsRepositoryAdapter
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
@@ -178,6 +179,8 @@ class FlowCycles:
         self.whales: dict[str, FakeWhaleTransfersAdapter] = {}
         # The exchanges of the volumes a test offers, by the name each declares (R5.1.2).
         self.volumes: dict[str, FakeVolumesAdapter] = {}
+        # The social providers a test offers, by the name each declares (R5.1.3).
+        self.socials: dict[str, FakeSocialAdapter] = {}
         self.prices = FakePriceHistoryAdapter()
         self.forecaster = FakePriceForecasterAdapter()
         self.market = FakeMarketDataAdapter()
@@ -342,6 +345,7 @@ class FlowCycles:
             self.market,
             tuple(self.whales.values()),
             tuple(self.volumes.values()),
+            tuple(self.socials.values()),
         )
 
     def samples_of(self, tenant_id: TenantId) -> InMemorySampleRepositoryAdapter:

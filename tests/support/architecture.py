@@ -135,6 +135,8 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/libsodium": frozenset({"nacl"}),
     # LiteLLM runs as a library inside the worker, the only process that composes it (ADR 0148).
     "adapters/outbound/litellm": frozenset({"litellm"}),
+    # The API v4 of LunarCrush, reached with the transport of the platform (ADR fonte-social-con-adapter-lunarcrush).
+    "adapters/outbound/lunarcrush": frozenset({"httpx"}),
     "adapters/outbound/oidc": frozenset({"jwt"}),
     # OpenRouter is reached on its own API with the transport of the platform (ADR 0109).
     "adapters/outbound/openrouter": frozenset({"httpx"}),

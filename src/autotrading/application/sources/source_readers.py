@@ -7,6 +7,7 @@ from autotrading.application.sources.read_indicators import ReadIndicatorsUseCas
 from autotrading.application.sources.read_news import ReadNewsUseCase
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
 from autotrading.application.sources.read_sentiment import ReadSentimentUseCase
+from autotrading.application.sources.read_social import ReadSocialUseCase
 from autotrading.application.sources.read_volumes import ReadVolumesUseCase
 from autotrading.application.sources.read_whale_transfers import ReadWhaleTransfersUseCase
 from autotrading.domain.sources.forecast import FORECAST
@@ -14,6 +15,7 @@ from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.social import SOCIAL
 from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 
@@ -42,4 +44,6 @@ def readers_of(
         readers[WHALE.name, whales.declaration().name] = ReadWhaleTransfersUseCase(whales, cycle_minutes)
     for volumes in systems.volumes:
         readers[VOLUMES.name, volumes.declaration().name] = ReadVolumesUseCase(volumes, cycle_minutes)
+    for social in systems.socials:
+        readers[SOCIAL.name, social.declaration().name] = ReadSocialUseCase(social)
     return readers

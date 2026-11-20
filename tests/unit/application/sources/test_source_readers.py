@@ -2,10 +2,14 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+import pytest
+
+from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.application.sources.ports import SourceRequest
 from autotrading.application.sources.source_readers import readers_of
 from tests.fakes.forecast_repository import InMemoryForecastRepositoryAdapter
 from tests.fakes.market_data import FakeMarketDataAdapter
+from tests.fakes.social import API_KEY, FakeSocialAdapter, SocialAsked
 from tests.fakes.volumes import FakeVolumesAdapter, VolumesAsked
 from tests.fakes.whale_transfers import FakeWhaleTransfersAdapter
 from tests.support.source_selections import platform_systems
@@ -69,3 +73,16 @@ def test_every_exchange_of_the_volumes_reads_the_asset_over_the_cycle_interval()
         readers["volumi", exchange.name].execute(SourceRequest(uuid4(), "BTC", {}, NOW))
 
     assert [exchange.asked for exchange in exchanges] == [[VolumesAsked("BTC", 30)], [VolumesAsked("BTC", 30)]]
+
+
+def test_every_social_provider_reads_the_asset_with_its_number_of_posts_and_the_credentials() -> None:
+    providers = (FakeSocialAdapter("Sociale"), FakeSocialAdapter("Altro"))
+    systems = replace(platform_systems(), socials=providers)
+    readers = readers_of(systems, InMemoryForecastRepositoryAdapter(), 30)
+    key = {API_KEY.name: "K-SOCIAL"}
+
+    for provider in providers:
+        with pytest.raises(SourceUnavailableError):
+            readers["social", provider.name].execute(SourceRequest(uuid4(), "BTC", {"numero_messaggi": 3}, NOW, key))
+
+    assert [provider.asked for provider in providers] == [[SocialAsked("BTC", 3, key)], [SocialAsked("BTC", 3, key)]]

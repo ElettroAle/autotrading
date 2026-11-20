@@ -185,6 +185,7 @@ modules = [
     "autotrading.adapters.outbound.worker",
     "autotrading.adapters.outbound.json",
     "autotrading.adapters.outbound.litellm",
+    "autotrading.adapters.outbound.lunarcrush",
     "autotrading.adapters.outbound.oidc",
     "autotrading.adapters.outbound.openrouter",
     "autotrading.adapters.outbound.smtp",

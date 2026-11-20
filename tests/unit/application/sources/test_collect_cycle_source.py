@@ -77,6 +77,7 @@ class World:
             self.market,
             (),
             (),
+            (),
         )
         services = SourceCredentialServices(self.credentials, FakeSourceSecretsOpenerAdapter(self.vault), self.notice)
         self.collect = CollectCycleSourceUseCase(systems, InMemoryForecastRepositoryAdapter(), self.samples, services)

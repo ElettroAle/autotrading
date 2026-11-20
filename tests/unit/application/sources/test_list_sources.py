@@ -4,12 +4,14 @@ from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.social import SOCIAL
 from autotrading.domain.sources.source_catalog import SOURCES
 from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 from tests.fakes.market_data import MARKET_DECLARATION, FakeMarketDataAdapter
 from tests.fakes.price_forecaster import FORECASTER_DECLARATION, FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
+from tests.fakes.social import FakeSocialAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.fakes.volumes import FakeVolumesAdapter
 from tests.fakes.whale_transfers import FakeWhaleTransfersAdapter
@@ -17,11 +19,13 @@ from tests.fakes.whale_transfers import FakeWhaleTransfersAdapter
 FIRST, SECOND = FakeSentimentAdapter("alternative.me"), FakeSentimentAdapter("CoinMarketCap")
 WHALES = FakeWhaleTransfersAdapter("Balene")
 EXCHANGES = (FakeVolumesAdapter("Borsa"), FakeVolumesAdapter("Mercato"))
+SOCIALS = (FakeSocialAdapter("Sociale"),)
 
 
 def catalog_use_case(
     whales: tuple[FakeWhaleTransfersAdapter, ...] = (WHALES,),
     volumes: tuple[FakeVolumesAdapter, ...] = EXCHANGES,
+    socials: tuple[FakeSocialAdapter, ...] = SOCIALS,
 ) -> ListSourcesUseCase:
     systems = SourceSystems(
         (FIRST, SECOND),
@@ -31,6 +35,7 @@ def catalog_use_case(
         FakeMarketDataAdapter(),
         whales,
         volumes,
+        socials,
     )
     return ListSourcesUseCase(systems)
 
@@ -52,6 +57,7 @@ def test_every_source_has_the_adapters_that_declare_they_offer_it() -> None:
         NEWS.name: (FakeNewsAdapter().declaration(),),
         WHALE.name: (WHALES.declaration(),),
         VOLUMES.name: tuple(exchange.declaration() for exchange in EXCHANGES),
+        SOCIAL.name: tuple(social.declaration() for social in SOCIALS),
     }
 
 
@@ -66,3 +72,9 @@ def test_the_volumes_without_an_exchange_are_not_in_the_catalog() -> None:
     catalog = catalog_use_case(volumes=()).execute()
 
     assert VOLUMES.name not in [source.name for source in catalog.sources]
+
+
+def test_the_social_source_without_a_provider_is_not_in_the_catalog() -> None:
+    catalog = catalog_use_case(socials=()).execute()
+
+    assert SOCIAL.name not in [source.name for source in catalog.sources]
