@@ -56,10 +56,11 @@ class ReadFlowResultsUseCase:
 
     def execute(self, command: ReadFlowResultsCommand) -> FlowResults:
         period = StatisticsPeriod.named(command.period, command.since, command.until)
-        window = period.window(self._clock())
+        now = self._clock()
+        window = period.window(now)
         flow_id = FlowId(command.flow_id)
         state = self._flow_state.execute(ReadFlowStateCommand(flow_id))
-        snapshots = self._recorded.equity.of_flow(command.flow_id, window)
+        snapshots = self._recorded.equity.of_flow(command.flow_id, window.ending_by(now))
         failed_cycles = self._recorded.history.failed_within(command.flow_id, window)
         suspension = self._openings_suspension.execute(ReadOpeningsSuspensionCommand(flow_id))
         next_cycle_at = self._next_cycle.execute(ReadNextCycleCommand(flow_id))

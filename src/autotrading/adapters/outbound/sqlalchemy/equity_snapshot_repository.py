@@ -57,12 +57,14 @@ class SqlAlchemyEquitySnapshotRepositoryAdapter:
         with self._transaction() as connection:
             return [snapshot_of(row) for row in connection.execute(of_flow_query(flow_id, window)).mappings()]
 
-    def loss_references(self, flow_id: UUID, day_start: datetime, peak_since: datetime) -> LossReferences:
+    def loss_references(
+        self, flow_id: UUID, day_start: datetime, peak_since: datetime, now: datetime
+    ) -> LossReferences:
         with self._transaction() as connection:
             daily = _first(connection, daily_until_query(flow_id, day_start)) or _first(
-                connection, daily_from_query(flow_id, day_start)
+                connection, daily_from_query(flow_id, day_start, now)
             )
-            return LossReferences(daily, _first(connection, peak_query(flow_id, peak_since)))
+            return LossReferences(daily, _first(connection, peak_query(flow_id, peak_since, now)))
 
     @contextmanager
     def _transaction(self) -> Iterator[Connection]:
@@ -91,23 +93,31 @@ def daily_until_query(flow_id: UUID, day_start: datetime) -> Select[tuple[object
     )
 
 
-def daily_from_query(flow_id: UUID, day_start: datetime) -> Select[tuple[object, ...]]:
-    """The first equity of the day, for a flow without equity before it (R3.2.2)."""
+def daily_from_query(flow_id: UUID, day_start: datetime, now: datetime) -> Select[tuple[object, ...]]:
+    """The first equity of the day up to now, for a flow without equity before it (R3.2.2)."""
     return (
         select(equity_snapshots)
-        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at >= day_start)
+        .where(
+            equity_snapshots.c.flow_id == flow_id,
+            equity_snapshots.c.planned_at >= day_start,
+            equity_snapshots.c.planned_at <= now,
+        )
         .order_by(equity_snapshots.c.planned_at)
         .limit(1)
     )
 
 
-def peak_query(flow_id: UUID, since: datetime) -> Select[tuple[object, ...]]:
-    """The equity highest once brought to the capital of now since the instant: the highest gain on its capital, so a
-    change of capital moves no reference (R3.2.2).
+def peak_query(flow_id: UUID, since: datetime, now: datetime) -> Select[tuple[object, ...]]:
+    """The equity highest once brought to the capital of now from the instant to now: the highest gain on its capital,
+    so a change of capital moves no reference (R3.2.2).
     """
     return (
         select(equity_snapshots)
-        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at >= since)
+        .where(
+            equity_snapshots.c.flow_id == flow_id,
+            equity_snapshots.c.planned_at >= since,
+            equity_snapshots.c.planned_at <= now,
+        )
         .order_by(
             (equity_snapshots.c.equity - equity_snapshots.c.allocated_capital).desc(),
             equity_snapshots.c.planned_at.desc(),

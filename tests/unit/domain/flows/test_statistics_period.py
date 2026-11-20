@@ -129,6 +129,30 @@ def test_a_window_without_bounds_holds_every_instant() -> None:
     assert TimeWindow().contains(datetime(2000, 1, 1, tzinfo=UTC))
 
 
+# ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore: an equity read always has an upper bound.
+def test_a_window_without_an_end_ends_at_the_instant_given_holding_it() -> None:
+    window = TimeWindow(since=NOW - timedelta(days=1)).ending_by(NOW)
+
+    assert window.since == NOW - timedelta(days=1)
+    assert window.until is not None
+    assert window.contains(NOW)
+    assert not window.contains(NOW + timedelta(microseconds=1))
+
+
+def test_a_window_without_bounds_ending_by_now_keeps_no_start() -> None:
+    window = TimeWindow().ending_by(NOW)
+
+    assert window.since is None
+    assert window.contains(datetime(2000, 1, 1, tzinfo=UTC))
+    assert not window.contains(NOW + timedelta(seconds=1))
+
+
+def test_a_window_with_its_own_end_keeps_it() -> None:
+    window = TimeWindow(NOW - timedelta(hours=1), NOW + timedelta(minutes=1))
+
+    assert window.ending_by(NOW) == window
+
+
 # ADR periodo-al-minuto: truncation to the minute, the minute of the end included, an instant without a zone in UTC.
 def test_the_window_of_minutes_truncates_both_instants_and_holds_the_minute_of_the_end() -> None:
     window = TimeWindow.of_minutes(

@@ -55,6 +55,15 @@ class TimeWindow:
             raise RangeEndingBeforeStartError
         return cls(first, None if last is None else last + MINUTE)
 
+    def ending_by(self, now: datetime) -> TimeWindow:
+        """The window, ended right after the instant given when it has no end of its own: nothing is recorded after
+        now, and a bounded read lets the database plan on the partitions it needs only (ADR
+        indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore).
+        """
+        if self.until is not None:
+            return self
+        return TimeWindow(self.since, now + timedelta.resolution)
+
     def contains(self, instant: datetime) -> bool:
         return (self.since is None or instant >= self.since) and (self.until is None or instant < self.until)
 

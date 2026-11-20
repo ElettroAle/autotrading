@@ -124,6 +124,17 @@ def test_the_peak_counts_from_the_first_start_without_a_resume() -> None:
     assert world.notices == [("alfa", "perdita dal picco 11% oltre il 10%")]
 
 
+def test_the_references_end_at_now_holding_the_equity_of_now() -> None:
+    # ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore: the peak read is bounded by the clock.
+    world = World()
+    world.recorded(MIDNIGHT, "1000")
+    world.recorded(NOW, "1100")
+    world.recorded(NOW + timedelta(microseconds=1), "5000")
+
+    assert world.guarded("979")
+    assert world.notices == [("alfa", "perdita dal picco 11% oltre il 10%")]
+
+
 def test_a_next_day_suspension_ended_resumes_the_openings_at_midnight_before_the_thresholds() -> None:
     world = World(OpeningsResume.NEXT_DAY)
     world.openings.suspend(world.flow.id.value, OpeningsSuspension("perdita giornaliera 6% oltre il 5%", NOW))

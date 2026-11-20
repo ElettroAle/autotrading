@@ -57,5 +57,5 @@ class GuardFlowLossUseCase:
         if configuration.max_daily_loss_percent is None and configuration.max_drawdown_percent is None:
             return None
         peak_since = status.peak_since(flow.started_at)
-        references = self._references.loss_references(flow.flow.id.value, day_start(now), peak_since)
+        references = self._references.loss_references(flow.flow.id.value, day_start(now), peak_since, now)
         return LossGuard.of(configuration, flow.total_value, references).breach()

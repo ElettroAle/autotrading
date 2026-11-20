@@ -32,5 +32,6 @@ class ReadFlowEquityUseCase:
     def execute(self, command: ReadFlowEquityCommand) -> FlowEquity:
         period = StatisticsPeriod.named(command.period, command.since, command.until)
         flow = self._flows.get(FlowId(command.flow_id))
-        snapshots = self._equity.of_flow(flow.id.value, period.window(self._clock()))
+        now = self._clock()
+        snapshots = self._equity.of_flow(flow.id.value, period.window(now).ending_by(now))
         return FlowEquity(flow.configuration.allocated_capital, tuple(snapshots))

@@ -74,6 +74,16 @@ def test_the_whole_life_of_the_flow_gives_every_cycle_from_the_oldest(
     assert [item.equity for item in equity.snapshots] == [Decimal(310), Decimal(295), Decimal(305)]
 
 
+def test_the_whole_life_ends_at_now_holding_the_equity_of_now(flows: FlowStore, store: EquitySnapshotStore) -> None:
+    # ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore: the read is bounded by the clock.
+    flow = a_flow_with_capital(flows)
+    recorded(store, snapshot(flow, 0, 305), snapshot(flow, -1, 999))
+
+    equity = use_case(flows, store).execute(ReadFlowEquityCommand(flow.id.value))
+
+    assert [item.planned_at for item in equity.snapshots] == [NOW]
+
+
 def test_the_initial_capital_is_the_capital_allocated_to_the_flow(flows: FlowStore, store: EquitySnapshotStore) -> None:
     flow = a_flow_with_capital(flows, capital=450)
 
