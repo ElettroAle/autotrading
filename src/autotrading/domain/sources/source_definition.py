@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from autotrading.domain.sources.errors import SourceParameterOutOfRangeError, UnknownSourceParameterError
+from autotrading.domain.sources.errors import UnknownSourceParameterError
 from autotrading.domain.sources.source_parameter import SourceParameter
 
 
@@ -37,7 +37,4 @@ class SourceDefinition:
         parameter = next((parameter for parameter in parameters if parameter.key == key), None)
         if parameter is None:
             raise UnknownSourceParameterError(self.name, key)
-        # A boolean is an int in Python, never a number a user meant.
-        if isinstance(value, bool) or not isinstance(value, int) or not parameter.accepts(value):
-            raise SourceParameterOutOfRangeError(parameter.label, parameter.minimum, parameter.maximum, parameter.key)
-        return value
+        return parameter.accepted(value)

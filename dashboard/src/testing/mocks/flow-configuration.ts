@@ -198,6 +198,18 @@ const adapterOf = (
     throw new Refusal(422, `peso fuori da 1-10: ${source.name}`, 'sources');
   }
   const given = (request.parameters ?? {}) as Record<string, number>;
+  const notAmongChoices = adapter.parameters.find((parameter) => {
+    const value = given[parameter.key];
+    return (
+      value !== undefined &&
+      parameter.choices.length > 0 &&
+      !parameter.choices.some((choice) => choice.value === value)
+    );
+  });
+  if (notAmongChoices !== undefined) {
+    const labels = notAmongChoices.choices.map((choice) => choice.label).join(', ');
+    throw new Refusal(422, `${notAmongChoices.label}: ammessi ${labels}`, 'sources');
+  }
   const outOfRange = adapter.parameters.find((parameter) => {
     const value = given[parameter.key];
     return value !== undefined && (value < parameter.minimum || value > parameter.maximum);

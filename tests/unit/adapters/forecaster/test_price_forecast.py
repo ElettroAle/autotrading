@@ -65,6 +65,20 @@ def test_the_history_is_sent_and_the_predicted_price_of_every_horizon_returned()
     }
 
 
+def test_the_long_horizons_are_asked_in_days_with_the_daily_history() -> None:
+    requests: list[httpx.Request] = []
+    daily = history_of([PricePoint(NOW - timedelta(days=age), Decimal(100 + age)) for age in (2, 1, 0)], 365, NOW)
+    answer = {
+        "forecasts": [{"horizon_minutes": 10080, "predicted_price": "107", "lower_price": "90", "upper_price": "120"}]
+    }
+
+    predicted = adapter(answering(answer, requests=requests)).predict("BTC", daily, (ForecastHorizon.WEEK_1,))
+
+    assert predicted == {ForecastHorizon.WEEK_1: Decimal(107)}
+    sent = json.loads(requests[0].content)
+    assert (sent["history_days"], sent["horizons_days"], "horizons_minutes" in sent) == (365, [7], False)
+
+
 @pytest.mark.parametrize(
     "transport",
     [

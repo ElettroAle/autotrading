@@ -13,12 +13,20 @@ from autotrading.domain.sources.source_adapter_declaration import SourceAdapterD
 from autotrading.domain.sources.source_parameter import SourceParameter
 
 
+class SourceParameterChoiceResponse(BaseModel):
+    value: int
+    label: str
+
+
 class SourceParameterResponse(BaseModel):
     key: str
     label: str
     default: int
     minimum: int
     maximum: int
+    # Empty for a parameter that admits its whole range, otherwise only these values (ADR
+    # orizzonti-lunghi-del-forecast).
+    choices: list[SourceParameterChoiceResponse]
 
     @classmethod
     def of(cls, parameter: SourceParameter) -> SourceParameterResponse:
@@ -28,6 +36,9 @@ class SourceParameterResponse(BaseModel):
             default=parameter.default,
             minimum=parameter.minimum,
             maximum=parameter.maximum,
+            choices=[
+                SourceParameterChoiceResponse(value=choice.value, label=choice.label) for choice in parameter.choices
+            ],
         )
 
 

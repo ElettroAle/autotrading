@@ -9,6 +9,7 @@ from forecaster.prophet_model import Forecast, PricePoint, TrainedModel
 from forecaster.service import create_application, retraining_interval
 
 START = datetime(2026, 11, 1, tzinfo=UTC)
+LAST = START + timedelta(minutes=6)
 
 
 def fit(points: list[PricePoint], _warm_start: TrainedModel | None) -> TrainedModel:
@@ -19,8 +20,8 @@ def predict(_model: TrainedModel, _at: datetime) -> Forecast:
     return Forecast(Decimal("101.25"), Decimal("100.5"), Decimal("102"))
 
 
-def client() -> TestClient:
-    return TestClient(create_application(ForecastModels(timedelta(minutes=15), fit, predict)))
+def client(models: ForecastModels | None = None) -> TestClient:
+    return TestClient(create_application(models or ForecastModels(timedelta(minutes=15), fit, predict)))
 
 
 def request(points: int = 3) -> dict[str, object]:
@@ -44,6 +45,56 @@ def test_the_forecast_has_the_predicted_price_and_its_interval_for_every_horizon
             {"horizon_minutes": 60, "predicted_price": "101.25", "lower_price": "100.5", "upper_price": "102"},
         ]
     }
+
+
+def daily_request(horizons_days: list[int]) -> dict[str, object]:
+    return {
+        "asset": "BTC",
+        "history_days": 365,
+        # Daily closes ending at the last point of the finest candles of request(): only the key tells them apart.
+        "points": [{"at": (LAST - timedelta(days=age)).isoformat(), "price": "100"} for age in (2, 1, 0)],
+        "horizons_days": horizons_days,
+    }
+
+
+def test_the_long_horizons_are_asked_in_days_on_daily_candles_and_answered_in_minutes() -> None:
+    asked: list[datetime] = []
+
+    def predict_at(_model: TrainedModel, at: datetime) -> Forecast:
+        asked.append(at)
+        return predict(_model, at)
+
+    response = client(ForecastModels(timedelta(minutes=15), fit, predict_at)).post(
+        "/forecast", json=daily_request([1, 7])
+    )
+
+    assert [entry["horizon_minutes"] for entry in response.json()["forecasts"]] == [1440, 10080]
+    assert asked == [LAST + timedelta(days=1), LAST + timedelta(days=7)]
+
+
+def test_the_daily_model_of_an_asset_is_apart_from_the_one_of_the_finest_candles() -> None:
+    trained: list[int] = []
+
+    def fit_counting(points: list[PricePoint], warm_start: TrainedModel | None) -> TrainedModel:
+        trained.append(len(points))
+        return fit(points, warm_start)
+
+    service = client(ForecastModels(timedelta(minutes=15), fit_counting, predict))
+    daily = daily_request([1]) | {"history_days": 7}
+    service.post("/forecast", json=request())
+    service.post("/forecast", json=daily)
+
+    assert len(trained) == 2
+
+
+@pytest.mark.parametrize(
+    "horizons",
+    [{"horizons_minutes": [], "horizons_days": []}, {"horizons_minutes": [15], "horizons_days": [1]}, {}],
+)
+def test_a_request_without_horizons_or_with_both_kinds_is_refused(horizons: dict[str, list[int]]) -> None:
+    body = {key: value for key, value in request().items() if key != "horizons_minutes"} | horizons
+
+    assert client().post("/forecast", json=body).status_code == 422
 
 
 def test_a_history_shorter_than_three_points_is_refused() -> None:

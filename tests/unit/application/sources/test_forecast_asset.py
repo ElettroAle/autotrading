@@ -20,7 +20,9 @@ def test_the_asset_is_forecast_at_every_horizon_and_recorded() -> None:
     forecaster = FakePriceForecasterAdapter()
     forecasts = InMemoryForecastRepositoryAdapter()
 
-    made = ForecastAssetUseCase(prices, forecaster, forecasts).execute(ForecastAssetCommand(FLOW, "BTC", 7, NOW))
+    made = ForecastAssetUseCase(prices, forecaster, forecasts).execute(
+        ForecastAssetCommand(FLOW, "BTC", 7, NOW, (), 365)
+    )
 
     assert [
         (forecast.horizon, forecast.last_price, forecast.predicted_price, forecast.history_days) for forecast in made
@@ -29,7 +31,7 @@ def test_the_asset_is_forecast_at_every_horizon_and_recorded() -> None:
         (ForecastHorizon.HOUR_1, Decimal(100), Decimal("100.60"), 7),
     ]
     assert forecasts.forecasts == list(made)
-    assert prices.requests == [("BTC", 7)]
+    assert (prices.requests, prices.daily_requests) == ([("BTC", 7)], [])
     assert forecaster.requests == [("BTC", 7, (ForecastHorizon.MINUTES_15, ForecastHorizon.HOUR_1))]
 
 
@@ -37,7 +39,7 @@ def test_the_forecast_of_a_trial_outside_every_flow_is_made_and_never_recorded()
     forecasts = InMemoryForecastRepositoryAdapter()
 
     made = ForecastAssetUseCase(FakePriceHistoryAdapter(), FakePriceForecasterAdapter(), forecasts).execute(
-        ForecastAssetCommand(None, "BTC", 7, NOW)
+        ForecastAssetCommand(None, "BTC", 7, NOW, (), 365)
     )
 
     assert [(forecast.flow_id, forecast.horizon) for forecast in made] == [
@@ -51,7 +53,7 @@ def test_a_shorter_history_is_declared_by_every_forecast() -> None:
     prices = FakePriceHistoryAdapter(available_days=3)
 
     made = ForecastAssetUseCase(prices, FakePriceForecasterAdapter(), InMemoryForecastRepositoryAdapter()).execute(
-        ForecastAssetCommand(FLOW, "BTC", 30, NOW)
+        ForecastAssetCommand(FLOW, "BTC", 30, NOW, (), 365)
     )
 
     assert {(forecast.history_days, forecast.shortened) for forecast in made} == {(3, True)}
@@ -62,7 +64,7 @@ def test_an_exchange_without_answer_records_nothing() -> None:
 
     with pytest.raises(SourceUnavailableError):
         ForecastAssetUseCase(FakePriceHistoryAdapter(missing={"BTC"}), FakePriceForecasterAdapter(), forecasts).execute(
-            ForecastAssetCommand(FLOW, "BTC", 7, NOW)
+            ForecastAssetCommand(FLOW, "BTC", 7, NOW, (), 365)
         )
 
     assert forecasts.forecasts == []
@@ -73,7 +75,54 @@ def test_a_forecaster_without_answer_records_nothing() -> None:
 
     with pytest.raises(SourceUnavailableError):
         ForecastAssetUseCase(FakePriceHistoryAdapter(), FakePriceForecasterAdapter(missing={"BTC"}), forecasts).execute(
-            ForecastAssetCommand(FLOW, "BTC", 7, NOW)
+            ForecastAssetCommand(FLOW, "BTC", 7, NOW, (), 365)
         )
+
+    assert forecasts.forecasts == []
+
+
+def test_the_long_horizon_chosen_is_forecast_on_the_daily_history_and_recorded() -> None:
+    prices = FakePriceHistoryAdapter(prices={"BTC": Decimal(100)})
+    forecaster = FakePriceForecasterAdapter()
+    forecasts = InMemoryForecastRepositoryAdapter()
+
+    made = ForecastAssetUseCase(prices, forecaster, forecasts).execute(
+        ForecastAssetCommand(FLOW, "BTC", 7, NOW, (ForecastHorizon.DAY_1,), 365)
+    )
+
+    assert [(forecast.horizon, forecast.predicted_price, forecast.history_days) for forecast in made] == [
+        (ForecastHorizon.MINUTES_15, Decimal("100.15"), 7),
+        (ForecastHorizon.HOUR_1, Decimal("100.60"), 7),
+        (ForecastHorizon.DAY_1, Decimal("114.40"), 365),
+    ]
+    assert forecasts.forecasts == list(made)
+    assert (prices.requests, prices.daily_requests) == ([("BTC", 7)], [("BTC", 365)])
+    assert forecaster.requests == [
+        ("BTC", 7, (ForecastHorizon.MINUTES_15, ForecastHorizon.HOUR_1)),
+        ("BTC", 365, (ForecastHorizon.DAY_1,)),
+    ]
+
+
+def test_a_shorter_daily_history_is_declared_only_by_the_long_forecast() -> None:
+    prices = FakePriceHistoryAdapter(daily_available_days=200)
+
+    made = ForecastAssetUseCase(prices, FakePriceForecasterAdapter(), InMemoryForecastRepositoryAdapter()).execute(
+        ForecastAssetCommand(FLOW, "BTC", 7, NOW, (ForecastHorizon.WEEK_1,), 365)
+    )
+
+    assert [(forecast.horizon, forecast.history_days, forecast.shortened) for forecast in made] == [
+        (ForecastHorizon.MINUTES_15, 7, False),
+        (ForecastHorizon.HOUR_1, 7, False),
+        (ForecastHorizon.WEEK_1, 200, True),
+    ]
+
+
+def test_a_daily_history_without_answer_records_not_even_the_short_forecasts() -> None:
+    forecasts = InMemoryForecastRepositoryAdapter()
+
+    with pytest.raises(SourceUnavailableError):
+        ForecastAssetUseCase(
+            FakePriceHistoryAdapter(daily_missing={"BTC"}), FakePriceForecasterAdapter(), forecasts
+        ).execute(ForecastAssetCommand(FLOW, "BTC", 7, NOW, (ForecastHorizon.DAY_1,), 365))
 
     assert forecasts.forecasts == []

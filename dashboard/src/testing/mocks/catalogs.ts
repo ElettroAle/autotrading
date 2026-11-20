@@ -21,6 +21,8 @@ export type FakeSourceParameter = {
   readonly default: number;
   readonly minimum: number;
   readonly maximum: number;
+  // Empty for a parameter that admits its whole range (ADR orizzonti-lunghi-del-forecast).
+  readonly choices: readonly { readonly value: number; readonly label: string }[];
 };
 
 /** An adapter of a source as it declares itself; no configuration field means none needed (R4.1.1). */
@@ -63,6 +65,7 @@ const SERIES_LENGTH: FakeSourceParameter = {
   default: 10,
   minimum: 1,
   maximum: 50,
+  choices: [],
 };
 const NEWS_COUNT: FakeSourceParameter = {
   key: 'numero_notizie',
@@ -70,6 +73,27 @@ const NEWS_COUNT: FakeSourceParameter = {
   default: 10,
   minimum: 1,
   maximum: 50,
+  choices: [],
+};
+const HISTORY_DAYS: FakeSourceParameter = {
+  key: 'profondita_storico_giorni',
+  label: 'profondità storico giorni',
+  default: 7,
+  minimum: 1,
+  maximum: 90,
+  choices: [],
+};
+const LONG_HORIZON: FakeSourceParameter = {
+  key: 'orizzonte_lungo',
+  label: 'orizzonte lungo',
+  default: 0,
+  minimum: 0,
+  maximum: 10080,
+  choices: [
+    { value: 0, label: 'nessuno' },
+    { value: 1440, label: '1 giorno' },
+    { value: 10080, label: '1 settimana' },
+  ],
 };
 
 /** The assets the exchange of the fake installation trades now, as the API lists them: by name (ADR 0147). */
@@ -135,6 +159,21 @@ export const FAKE_SOURCES: FakeSource[] = [
     parameters: [SERIES_LENGTH],
     adapters: [
       adapterOf('Hyperliquid', 'Dati di mercato pubblici di Hyperliquid.', [SERIES_LENGTH], true),
+    ],
+  },
+  {
+    name: 'forecast',
+    description:
+      'Previsione del prezzo a 15 minuti e a 1 ora e, a scelta, a 1 giorno o a 1 settimana.',
+    per_asset: true,
+    parameters: [HISTORY_DAYS, LONG_HORIZON],
+    adapters: [
+      adapterOf(
+        'Prophet',
+        'Previsione di Prophet dal servizio forecaster.',
+        [HISTORY_DAYS, LONG_HORIZON],
+        true,
+      ),
     ],
   },
   {

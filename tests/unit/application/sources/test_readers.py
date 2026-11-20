@@ -127,6 +127,41 @@ def test_a_shorter_history_is_declared_in_the_forecast() -> None:
     assert value.values["storico_ridotto"] == "lo storico dell'exchange è più corto di quello richiesto"
 
 
+def test_the_long_horizon_chosen_enters_the_forecast_with_the_depth_of_its_daily_history() -> None:
+    prices = FakePriceHistoryAdapter(prices={"BTC": Decimal(100)})
+
+    (value,) = forecast_reader(prices).execute(
+        SourceRequest(FLOW, "BTC", {"orizzonte_lungo": 1440, "profondita_lunga_giorni": 400}, NOW)
+    )
+
+    assert (value.reference_at, value.values["prezzo_previsto_1 giorno"]) == (NOW, "114.40")
+    assert value.values["variazione_percentuale_1 giorno"] == "14.40"
+    assert value.values["profondita_storico_lunga_giorni"] == "400"
+    assert "storico_lungo_ridotto" not in value.values
+    assert (prices.requests, prices.daily_requests) == ([("BTC", 7)], [("BTC", 400)])
+
+
+def test_without_a_long_horizon_the_forecast_reads_no_daily_history() -> None:
+    prices = FakePriceHistoryAdapter()
+
+    (value,) = forecast_reader(prices).execute(SourceRequest(FLOW, "BTC", {}, NOW))
+
+    assert "profondita_storico_lunga_giorni" not in value.values
+    assert prices.daily_requests == []
+
+
+def test_a_shorter_daily_history_is_declared_in_the_forecast() -> None:
+    prices = FakePriceHistoryAdapter(daily_available_days=200)
+
+    (value,) = forecast_reader(prices).execute(SourceRequest(FLOW, "BTC", {"orizzonte_lungo": 10080}, NOW))
+
+    assert value.values["profondita_storico_lunga_giorni"] == "200"
+    assert (
+        value.values["storico_lungo_ridotto"] == "lo storico giornaliero dell'exchange è più corto di quello richiesto"
+    )
+    assert "storico_ridotto" not in value.values
+
+
 def test_the_forecast_without_asset_is_a_defect_of_the_caller() -> None:
     with pytest.raises(AssetRequiredError, match="la fonte va interrogata per un asset") as raised:
         forecast_reader(FakePriceHistoryAdapter()).execute(market({"profondita_storico_giorni": 7}))

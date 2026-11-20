@@ -11420,6 +11420,24 @@
         "title": "SourceCredentialsResponse",
         "description": "An adapter that needs configuration on the page of the keys: the sources it offers, the fields it declares,\nwhether the tenant configured it, the values that are not secret and when they were saved, the expiry as of today\nand whether the provider refused the credentials; never a secret (R4.1.2, R6.2.2)."
       },
+      "SourceParameterChoiceResponse": {
+        "properties": {
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "SourceParameterChoiceResponse"
+      },
       "SourceParameterResponse": {
         "properties": {
           "key": {
@@ -11441,6 +11459,13 @@
           "maximum": {
             "type": "integer",
             "title": "Maximum"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/SourceParameterChoiceResponse"
+            },
+            "type": "array",
+            "title": "Choices"
           }
         },
         "type": "object",
@@ -11449,7 +11474,8 @@
           "label",
           "default",
           "minimum",
-          "maximum"
+          "maximum",
+          "choices"
         ],
         "title": "SourceParameterResponse"
       },

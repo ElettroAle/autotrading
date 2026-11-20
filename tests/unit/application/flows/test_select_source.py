@@ -76,6 +76,15 @@ def test_a_parameter_out_of_range_reaches_the_flow_with_its_label_and_the_values
     )
 
 
+def test_a_value_outside_the_choices_of_a_parameter_reaches_the_flow_with_the_choices_listed() -> None:
+    with pytest.raises(InvalidFlowSettingError) as raised:
+        SelectSourceUseCase(platform_sources(), NOTHING_CONFIGURED).execute(
+            "forecast", [AdapterRequest("Prophet", None, {"orizzonte_lungo": 129600})]
+        )
+
+    assert str(raised.value) == "orizzonte lungo: ammessi nessuno, 1 giorno, 1 settimana"
+
+
 def with_paid_adapter() -> ListSourcesUseCase:
     systems = platform_systems()
     key = SourceConfigurationField("api_key", "chiave API", secret=True)

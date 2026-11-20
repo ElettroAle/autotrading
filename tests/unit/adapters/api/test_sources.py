@@ -85,8 +85,26 @@ def test_one_source_shows_description_scope_and_parameters(client_of: Client) ->
     assert (response.status_code, body["name"], body["per_asset"]) == (200, "notizie", False)
     assert body["description"]
     assert body["parameters"] == [
-        {"key": "numero_notizie", "label": "numero notizie", "default": 10, "minimum": 1, "maximum": 50},
-        {"key": "eta_massima_ore", "label": "età massima ore", "default": 24, "minimum": 1, "maximum": 168},
+        {"key": "numero_notizie", "label": "numero notizie", "default": 10, "minimum": 1, "maximum": 50, "choices": []},
+        {
+            "key": "eta_massima_ore",
+            "label": "età massima ore",
+            "default": 24,
+            "minimum": 1,
+            "maximum": 168,
+            "choices": [],
+        },
+    ]
+
+
+def test_a_parameter_with_choices_shows_their_values_and_labels(client_of: Client) -> None:
+    body = client_of("anna").get("/sources/forecast").json()
+
+    [long_horizon] = [parameter for parameter in body["parameters"] if parameter["key"] == "orizzonte_lungo"]
+    assert long_horizon["choices"] == [
+        {"value": 0, "label": "nessuno"},
+        {"value": 1440, "label": "1 giorno"},
+        {"value": 10080, "label": "1 settimana"},
     ]
 
 

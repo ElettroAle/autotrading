@@ -83,3 +83,13 @@ def test_every_horizon_is_forecast_from_the_last_point() -> None:
     )
 
     assert asked == [START + timedelta(minutes=15), START + timedelta(hours=1)]
+
+
+def test_the_daily_candles_of_an_asset_and_depth_have_their_own_model() -> None:
+    trainer = RecordingTrainer()
+    cache = models(trainer)
+    cache.forecast(KEY, points_until(START), (timedelta(minutes=15),))
+
+    cache.forecast(ModelKey("BTC", 7, daily=True), points_until(START), (timedelta(days=1),))
+
+    assert trainer.warm_starts == [None, None]

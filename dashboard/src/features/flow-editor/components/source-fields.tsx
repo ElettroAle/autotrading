@@ -3,11 +3,16 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { reasonOf } from '@/lib/form-errors';
 
-import type { Source, SourceAdapter } from '../api/get-sources';
+import type { Source, SourceAdapter, SourceParameter } from '../api/get-sources';
 import { adapterKeyOf, type FlowFormValues } from '../utils/flow-form';
 
 const SOURCES_ID = 'flow-sources';
 const NO_CONFIGURATION = 'nessuna configurazione necessaria';
+
+// A parameter with choices names its default by its label; blank keeps the default of the catalog.
+const defaultLabelOf = (parameter: SourceParameter): string =>
+  parameter.choices.find((choice) => choice.value === parameter.default)?.label ??
+  String(parameter.default);
 
 // Weight and parameters of an adapter chosen: the parameters come from its declaration in the catalog, never from the
 // dashboard (ADR 0131, ADR scelta-degli-adapter-nell-editor-del-flusso).
@@ -46,17 +51,32 @@ const AdapterSettings = ({ source, adapter }: { source: Source; adapter: SourceA
           label={`${parameter.label} di ${label}`}
           error={adapterErrors?.parameters?.[parameter.key]?.message}
         >
-          {(control) => (
-            <input
-              {...control}
-              {...register(`${path}.parameters.${parameter.key}`)}
-              type="number"
-              min={parameter.minimum}
-              max={parameter.maximum}
-              placeholder={String(parameter.default)}
-              className={FORM_CONTROL}
-            />
-          )}
+          {(control) =>
+            parameter.choices.length === 0 ? (
+              <input
+                {...control}
+                {...register(`${path}.parameters.${parameter.key}`)}
+                type="number"
+                min={parameter.minimum}
+                max={parameter.maximum}
+                placeholder={String(parameter.default)}
+                className={FORM_CONTROL}
+              />
+            ) : (
+              <select
+                {...control}
+                {...register(`${path}.parameters.${parameter.key}`)}
+                className={FORM_CONTROL}
+              >
+                <option value="">{`predefinito (${defaultLabelOf(parameter)})`}</option>
+                {parameter.choices.map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+            )
+          }
         </FormField>
       ))}
     </div>

@@ -8,7 +8,7 @@ from autotrading.domain.sources.errors import (
     SourceAdapterNotAvailableError,
     SourceAdapterNotConfiguredError,
     SourceNotAvailableError,
-    SourceParameterOutOfRangeError,
+    SourceParameterRefusedError,
     UnknownSourceParameterError,
 )
 from autotrading.domain.sources.source_catalog import OfferedSource
@@ -32,7 +32,7 @@ class SelectSourceUseCase:
             SourceNotAvailableError,
             SourceAdapterNotAvailableError,
             SourceAdapterNotConfiguredError,
-            SourceParameterOutOfRangeError,
+            SourceParameterRefusedError,
             UnknownSourceParameterError,
         ) as error:
             raise InvalidFlowSettingError(str(error), FlowSetting.SOURCES) from error

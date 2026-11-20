@@ -112,6 +112,13 @@ class PriceHistoryPort(Protocol):
         """
         ...
 
+    def daily_history(self, asset: str, days: int, now: datetime) -> Sequence[PricePoint]:
+        """The closing prices of the daily candles of the last `days` days, for the long horizons (R5.1.5).
+
+        Fewer days when the exchange has less history. Raises SourceUnavailableError.
+        """
+        ...
+
     def current_price(self, asset: str) -> Decimal:
         """The price of the asset now. Raises SourceUnavailableError."""
         ...
@@ -156,7 +163,10 @@ class PriceForecasterPort(Protocol):
     def predict(
         self, asset: str, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]
     ) -> Mapping[ForecastHorizon, Decimal]:
-        """The predicted price at every horizon after the last point; SourceUnavailableError when it does not answer."""
+        """The predicted price at every horizon after the last point; SourceUnavailableError when it does not answer.
+
+        The horizons are all short, on a history of the finest candles, or all long, on a history of daily candles.
+        """
         ...
 
 
