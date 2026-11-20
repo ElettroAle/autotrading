@@ -41,6 +41,7 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumProviderKeyOpenerAdapter
 from autotrading.adapters.outbound.libsodium.source_secrets_opener import SodiumSourceSecretsOpenerAdapter
 from autotrading.adapters.outbound.litellm.composition import litellm_adapters
+from autotrading.adapters.outbound.lunarcrush.composition import lunarcrush_adapters
 from autotrading.adapters.outbound.oidc.composition import oidc_adapters
 from autotrading.adapters.outbound.openrouter.composition import openrouter_adapters
 from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterModelCatalogAdapter
@@ -728,6 +729,7 @@ def source_systems(hyperliquid: HyperliquidAdaptersOfInstallation, forecaster: P
         market,
         (arkham_adapters(),),
         (binance_adapters(),),
+        (lunarcrush_adapters(),),
     )
 
 

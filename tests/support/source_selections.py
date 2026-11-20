@@ -51,13 +51,15 @@ def a_source(
 
 def platform_systems() -> SourceSystems:
     """The adapters of the sources of the platform of E1, fakes declaring the names of the real ones: no provider of the
-    large transfers nor exchange of the volumes, which a test offers when it needs one (R5.1.1, R5.1.2)."""
+    large transfers, exchange of the volumes nor social provider, which a test offers when it needs one (R5.1.1,
+    R5.1.2, R5.1.3)."""
     return SourceSystems(
         (FakeSentimentAdapter("alternative.me"), FakeSentimentAdapter("CoinMarketCap")),
         FakeNewsAdapter(),
         FakePriceHistoryAdapter(),
         FakePriceForecasterAdapter(),
         FakeMarketDataAdapter(),
+        (),
         (),
         (),
     )

@@ -13,6 +13,7 @@ from autotrading.domain.sources.indicators import INDICATORS
 from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
+from autotrading.domain.sources.social import SOCIAL
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
 from autotrading.domain.sources.source_catalog import SOURCES, OfferedSource, SourceCatalog
 from autotrading.domain.sources.source_definition import SourceDefinition
@@ -36,7 +37,7 @@ def offered(name: str, *adapters: SourceAdapterDeclaration) -> OfferedSource:
 
 
 def test_the_sources_of_the_platform_are_declared_once_with_a_single_sentiment() -> None:
-    assert SOURCES == (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE, VOLUMES)
+    assert SOURCES == (INDICATORS, PIVOTS, FORECAST, SENTIMENT, NEWS, WHALE, VOLUMES, SOCIAL)
 
 
 def test_lists_the_sources_in_the_order_they_were_declared() -> None:

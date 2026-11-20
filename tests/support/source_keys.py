@@ -49,6 +49,7 @@ class Keys:
                 FakeMarketDataAdapter(),
                 (),
                 (),
+                (),
             )
         )
         self.credentials = InMemorySourceCredentialsRepositoryAdapter(self.store, self.tenant_id)

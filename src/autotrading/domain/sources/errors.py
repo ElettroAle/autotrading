@@ -107,6 +107,13 @@ class InvalidVolumeSnapshotError(DomainError):
         super().__init__("dati di volume non validi")
 
 
+class InvalidSocialSnapshotError(DomainError):
+    """A post without author, text or the time zone of its instant, a sentiment outside 0-100% or a negative count."""
+
+    def __init__(self) -> None:
+        super().__init__("dati social non validi")
+
+
 class InvalidPriceForecastError(DomainError):
     """A forecast without the time zone of its instant or with a price that is not positive: a defect."""
 

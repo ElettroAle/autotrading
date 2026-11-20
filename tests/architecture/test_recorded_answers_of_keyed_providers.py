@@ -9,12 +9,13 @@ from pathlib import Path
 import pytest
 
 from autotrading.adapters.outbound.arkham import whale_transfers
+from autotrading.adapters.outbound.lunarcrush import social
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 INTEGRATION = REPOSITORY / "tests" / "integration" / "sources"
 # The adapters of the sources that need a secret key, by the module that declares each of them.
-KEYED = {"arkham": whale_transfers}
+KEYED = {"arkham": whale_transfers, "lunarcrush": social}
 REQUIRED_ERRORS = ("401", "429", "500")
 
 

@@ -1,0 +1,25 @@
+{
+  "config": {
+    "topic": "bitcoin",
+    "type": "topic",
+    "symbol": "BTC"
+  },
+  "data": [
+    {
+      "post_type": "reddit-post",
+      "post_title": "Bitcoin casino New Zealand: two weeks of notes from three sites",
+      "post_created": 1794936894,
+      "creator_name": "AutoModerator",
+      "creator_display_name": "AutoModerator",
+      "interactions_24h": 305
+    },
+    {
+      "post_type": "tweet",
+      "post_title": "TOP HOT CALLS \nsmallcapCRYPTO\n@HotCommunities\nDM - Premium 👇 1M+ SUBSCRIPTIONS  $$$ \nVIP-CALLS- \n$ANSEM $three $JIMOTHY $ZERO $MAGA $WASTED \n$HOGE $MAD $nosis $Chonketha",
+      "post_created": 1794933024,
+      "creator_name": "HotCommunities",
+      "creator_display_name": "smallcapCRYPTO",
+      "interactions_24h": 114249
+    }
+  ]
+}

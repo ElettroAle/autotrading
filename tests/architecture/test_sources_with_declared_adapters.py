@@ -18,6 +18,7 @@ from autotrading.adapters.outbound.binance import volumes as binance
 from autotrading.adapters.outbound.coinmarketcap import sentiment as coinmarketcap
 from autotrading.adapters.outbound.forecaster import price_forecast
 from autotrading.adapters.outbound.hyperliquid import market_data
+from autotrading.adapters.outbound.lunarcrush import social as lunarcrush
 from autotrading.adapters.outbound.rss import news
 from autotrading.adapters.outbound.sqlalchemy import source_correspondence
 from autotrading.domain.sources.source_catalog import SOURCES
@@ -27,7 +28,15 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 DECLARATION = "SourceAdapterDeclaration"
 DECLARATION_METHOD = "declaration"
 SOURCE_PORTS = frozenset(
-    {"SentimentPort", "NewsPort", "MarketDataPort", "PriceForecasterPort", "WhaleTransfersPort", "VolumesPort"}
+    {
+        "SentimentPort",
+        "NewsPort",
+        "MarketDataPort",
+        "PriceForecasterPort",
+        "WhaleTransfersPort",
+        "VolumesPort",
+        "SocialPort",
+    }
 )
 SOURCE_PORTS_MODULE = "application/sources/ports.py"
 MIGRATION = REPOSITORY / "migrations" / "versions" / "0050_sources_with_adapters.py"
@@ -40,6 +49,7 @@ DECLARED = (
     news.DECLARATION,
     arkham.DECLARATION,
     binance.DECLARATION,
+    lunarcrush.DECLARATION,
 )
 
 DECLARED_IN_THE_CORE = SourceModule.parse(
