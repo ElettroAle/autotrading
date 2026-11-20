@@ -124,17 +124,40 @@ def test_a_unified_account_reads_its_balance_from_the_usdc_it_holds(mode: str) -
 
     state = in_account_mode(perps, mode, SPOT)
 
-    # 2999 USDC plus the open result -4.5 + 7.5; available: 2999 - 100 on hold - 1500 of isolated margin.
-    assert (state.account_value, state.withdrawable) == (Decimal("3002.0"), Decimal("1399.0"))
+    # 2999 USDC, which already holds the open result; available: 2999 - 100 on hold - 1500 of isolated margin.
+    assert (state.account_value, state.withdrawable) == (Decimal("2999.0"), Decimal("1399.0"))
     assert (state.positions, state.read_at) == (perps.positions, perps.read_at)
 
 
-def test_a_unified_account_without_usdc_has_no_balance_beyond_its_open_result() -> None:
+def test_a_unified_account_without_usdc_has_no_balance() -> None:
     perps = user_state_of(UNIFIED_PERPS)
 
     state = in_account_mode(perps, "unifiedAccount", {"balances": []})
 
-    assert (state.account_value, state.withdrawable) == (Decimal("3.0"), Decimal(0))
+    assert (state.account_value, state.withdrawable) == (Decimal(0), Decimal(0))
+
+
+# ADR-saldo-unified-comprensivo-del-risultato-aperto (Bug 597): the USDC total of the spot state already holds the
+# open result, so the balance is that total and the open result is never added a second time. A reading of the testnet
+# account of 20 November 2026, whose positions had an open result of -1.9346 USDC.
+TESTNET_UNIFIED_PERPS = {
+    "marginSummary": {"accountValue": "152.269011"},
+    "withdrawable": "0.0",
+    "assetPositions": [
+        {"type": "oneWay", "position": {**CROSS_BTC, "unrealizedPnl": "-2.0", "marginUsed": "100.0"}},
+        {"type": "oneWay", "position": {**CROSS_BTC, "coin": "ETH", "unrealizedPnl": "0.0654", "marginUsed": "52.0"}},
+    ],
+    "time": 1762941600000,
+}
+TESTNET_UNIFIED_SPOT = {"balances": [{"coin": "USDC", "token": 0, "total": "1007.303741", "hold": "152.269011"}]}
+
+
+@pytest.mark.parametrize("mode", ["unifiedAccount", "portfolioMargin"])
+def test_adr_saldo_unified_the_balance_is_the_usdc_total_without_adding_the_open_result_again(mode: str) -> None:
+    state = in_account_mode(user_state_of(TESTNET_UNIFIED_PERPS), mode, TESTNET_UNIFIED_SPOT)
+
+    assert state.account_value == Decimal("1007.303741")
+    assert state.withdrawable == Decimal("855.034730")
 
 
 @pytest.mark.parametrize(

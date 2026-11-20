@@ -236,6 +236,21 @@ def test_a_unified_account_shows_the_usdc_it_holds_as_balance() -> None:
     assert (activity.balance, activity.available_margin) == (Decimal(999), Decimal(999))
 
 
+def test_a_unified_account_with_open_positions_shows_the_usdc_total_that_already_holds_their_result() -> None:
+    # ADR-saldo-unified-comprensivo-del-risultato-aperto (Bug 597).
+    perps = {
+        "marginSummary": {"accountValue": "100.0"},
+        "withdrawable": "0.0",
+        "assetPositions": [{"position": position("BTC", "0.01", margin="100.0", pnl="-4.5")}],
+        "time": 1762941600000,
+    }
+    spot = {"balances": [{"coin": "USDC", "token": 0, "total": "995.5", "hold": "100.0", "entryNtl": "0.0"}]}
+
+    activity = read(FakeSdk(state=perps, abstraction="unifiedAccount", spot=spot))
+
+    assert activity.balance == Decimal("995.5")
+
+
 # R3.4.2, ADR storico-delle-variazioni-di-capitale: the deposits and withdrawals of the history of an account.
 DEPOSITED = {"time": 1762941000000, "hash": "0x1", "delta": {"type": "deposit", "usdc": "500.5"}}
 EVER = TimeWindow()
