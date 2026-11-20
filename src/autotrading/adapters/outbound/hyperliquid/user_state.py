@@ -90,9 +90,10 @@ def user_state_of(answer: object) -> _UserState:
 
 def in_account_mode(perps: _UserState, mode: object, spot: object) -> _UserState:
     """The state with the balance of the account mode the exchange declares (Bug 392, ADR
-    saldo-dalla-modalita-del-conto-hyperliquid). Under unified account and portfolio margin the USDC of the spot state
-    is the balance of spot and perps: the open result adds to it, and what orders hold and isolated positions use is
-    not available. Raises KeyError, TypeError, ValueError or ArithmeticError on a spot state of unexpected shape.
+    saldo-dalla-modalita-del-conto-hyperliquid). Under unified account and portfolio margin the USDC total of the spot
+    state is the balance of spot and perps and already holds the open result of the positions (Bug 597, ADR
+    saldo-unified-comprensivo-del-risultato-aperto); what orders hold and isolated positions use is not available.
+    Raises KeyError, TypeError, ValueError or ArithmeticError on a spot state of unexpected shape.
     """
     if mode not in UNIFIED_MODES:
         return perps
@@ -100,8 +101,7 @@ def in_account_mode(perps: _UserState, mode: object, spot: object) -> _UserState
     total = Decimal(0) if usdc is None else decimal_of(usdc["total"])
     held = Decimal(0) if usdc is None else decimal_of(usdc["hold"])
     isolated = sum((position.margin for position in perps.positions if position.isolated), Decimal(0))
-    open_result = sum((position.unrealized_pnl for position in perps.positions), Decimal(0))
-    return replace(perps, account_value=total + open_result, withdrawable=max(total - held - isolated, Decimal(0)))
+    return replace(perps, account_value=total, withdrawable=max(total - held - isolated, Decimal(0)))
 
 
 def decimal_of(value: object) -> Decimal:
