@@ -166,6 +166,48 @@ describe('the page Fonti with the trial of each adapter (R6.3.1, ADR pagina-font
     expect(fakeSourceTrials.requests()).toEqual([]);
   });
 
+  // ADR orizzonti-lunghi-del-forecast: a parameter with choices is a selection of their labels, as in the editor.
+  it('offers a parameter with choices as a selection of their labels and tries the value chosen', async () => {
+    await renderApp({ account: 'anna', url: SOURCES_PAGE });
+    const form = await trialForm('forecast');
+    await waitFor(() => expect(within(form).getByLabelText('Asset')).toHaveValue('BTC'));
+    const horizon = within(form).getByLabelText('orizzonte lungo');
+
+    expect(horizon).toHaveValue('0');
+    expect(
+      within(horizon)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Scegli orizzonte lungo', 'nessuno', '1 giorno', '1 settimana']);
+    await userEvent.selectOptions(horizon, '1 giorno');
+    await tryIt('forecast');
+
+    await waitFor(() =>
+      expect(fakeSourceTrials.requests()).toEqual([
+        {
+          account: 'anna',
+          source: 'forecast',
+          adapter: 'Prophet',
+          asset: 'BTC',
+          parameters: { profondita_storico_giorni: 7, orizzonte_lungo: 1440 },
+        },
+      ]),
+    );
+  });
+
+  it('does not start a trial without one of the choices of a parameter and says the admitted ones', async () => {
+    await renderApp({ account: 'anna', url: SOURCES_PAGE });
+    const form = await trialForm('forecast');
+    const horizon = within(form).getByLabelText('orizzonte lungo');
+    await userEvent.selectOptions(horizon, 'Scegli orizzonte lungo');
+
+    await tryIt('forecast');
+
+    expect(await within(form).findByText('ammessi nessuno, 1 giorno, 1 settimana')).toBeVisible();
+    expect(horizon).toHaveAttribute('aria-invalid', 'true');
+    expect(fakeSourceTrials.requests()).toEqual([]);
+  });
+
   it('asks the adapter of a source that has more than one, then asks no asset of a market source', async () => {
     await renderApp({ account: 'anna', url: SOURCES_PAGE });
     const form = await trialForm('sentiment');

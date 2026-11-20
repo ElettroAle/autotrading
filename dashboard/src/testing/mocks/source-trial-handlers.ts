@@ -22,6 +22,16 @@ const refusalOfParameters = (
       return problem(422, UNPROCESSABLE, `parametro sconosciuto della fonte ${source}: ${key}`);
     }
     if (
+      parameter.choices.length > 0 &&
+      !parameter.choices.some((choice) => choice.value === value)
+    ) {
+      const labels = parameter.choices.map((choice) => choice.label).join(', ');
+      return problem(422, UNPROCESSABLE, `${parameter.label}: ammessi ${labels}`, {
+        field: key,
+        choices: parameter.choices.map((choice) => choice.label),
+      });
+    }
+    if (
       typeof value !== 'number' ||
       !Number.isInteger(value) ||
       value < parameter.minimum ||

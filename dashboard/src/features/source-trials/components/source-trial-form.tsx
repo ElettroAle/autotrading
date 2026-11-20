@@ -12,6 +12,7 @@ import { CommandButton } from '@/components/ui/command-button';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField, type UnavailableList } from '@/components/ui/form/select-field';
 import { showRefusal } from '@/lib/form-errors';
+import { choiceOptionsOf, hasChoices } from '@/lib/parameter-choices';
 
 import type { TrialSource } from '../api/get-trial-sources';
 import { useTrySourceAdapter } from '../api/try-source-adapter';
@@ -155,19 +156,30 @@ export const SourceTrialForm = ({
             {...register('asset')}
           />
         )}
-        {adapter?.parameters.map((parameter) => (
-          <InputField
-            key={`${adapter.name}-${parameter.key}`}
-            label={parameter.label}
-            type="number"
-            inputMode="numeric"
-            min={parameter.minimum}
-            max={parameter.maximum}
-            step={1}
-            error={errors.parameters?.[parameter.key]}
-            {...register(`parameters.${parameter.key}`)}
-          />
-        ))}
+        {adapter?.parameters.map((parameter) =>
+          hasChoices(parameter) ? (
+            <SelectField
+              key={`${adapter.name}-${parameter.key}`}
+              label={parameter.label}
+              placeholder={`Scegli ${parameter.label}`}
+              choices={choiceOptionsOf(parameter)}
+              error={errors.parameters?.[parameter.key]}
+              {...register(`parameters.${parameter.key}`)}
+            />
+          ) : (
+            <InputField
+              key={`${adapter.name}-${parameter.key}`}
+              label={parameter.label}
+              type="number"
+              inputMode="numeric"
+              min={parameter.minimum}
+              max={parameter.maximum}
+              step={1}
+              error={errors.parameters?.[parameter.key]}
+              {...register(`parameters.${parameter.key}`)}
+            />
+          ),
+        )}
         <CommandButton tone="primary" type="submit" icon="play" disabled={trial.isPending}>
           Prova
         </CommandButton>

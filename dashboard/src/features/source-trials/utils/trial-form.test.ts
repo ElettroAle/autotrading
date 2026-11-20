@@ -15,6 +15,18 @@ const SERIES = {
   default: 10,
   minimum: 1,
   maximum: 50,
+  choices: [],
+};
+const HORIZON = {
+  key: 'orizzonte_lungo',
+  label: 'orizzonte lungo',
+  default: 0,
+  minimum: 0,
+  maximum: 10080,
+  choices: [
+    { value: 0, label: 'nessuno' },
+    { value: 1440, label: '1 giorno' },
+  ],
 };
 const HYPERLIQUID: TrialAdapter = {
   name: 'Hyperliquid',
@@ -45,6 +57,32 @@ const reasonsOf = (source: TrialSource, values: unknown): string[] => {
 describe('the form of a trial (ADR pagina-fonti-con-la-prova)', () => {
   it('says the values a parameter admits', () => {
     expect(admittedRangeOf(SERIES)).toBe('ammesso da 1 a 50');
+  });
+
+  it('says the choices a parameter with choices admits', () => {
+    expect(admittedRangeOf(HORIZON)).toBe('ammessi nessuno, 1 giorno');
+  });
+
+  it.each([
+    ['1440', []],
+    ['60', ['ammessi nessuno, 1 giorno']],
+    ['', ['ammessi nessuno, 1 giorno']],
+  ])('checks %j against the choices of the parameter', (typed, reasons) => {
+    const prophet: TrialAdapter = {
+      name: 'Prophet',
+      description: 'previsioni',
+      parameters: [HORIZON],
+    };
+    const forecast: TrialSource = { ...INDICATORS, name: 'forecast', adapters: [prophet] };
+    const result = trialSchemaOf(forecast, prophet).safeParse({
+      adapter: 'Prophet',
+      asset: 'BTC',
+      parameters: { orizzonte_lungo: typed },
+    });
+
+    expect(result.success ? [] : result.error.issues.map((issue) => issue.message)).toEqual(
+      reasons,
+    );
   });
 
   it('starts from the only adapter of the source at the defaults of the catalog', () => {
