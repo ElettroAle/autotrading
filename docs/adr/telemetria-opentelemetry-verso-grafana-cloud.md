@@ -30,8 +30,8 @@ Grafana Cloud (regione EU) e messo il token nel segreto `GRAFANA_OTLP_TOKEN` del
 
 - **Adapter `adapters/outbound/grafana_cloud/`**: il sistema integrato è Grafana Cloud. È l'unica cartella che
   importa `opentelemetry-*` (SDK, esportatore OTLP HTTP/protobuf, strumentazioni di FastAPI, httpx, SQLAlchemy e del
-  `logging` standard), dichiarate in `TECHNOLOGY_LIBRARIES`. `composition.py` offre `grafana_cloud_telemetry(source,
-  service_name)`: installa provider di tracce, metriche e log e le strumentazioni automatiche; `bootstrap.py` la chiama
+  `logging` standard), dichiarate in `TECHNOLOGY_LIBRARIES`. `composition.py` offre
+  `grafana_cloud_telemetry_adapters(source, service_name)` (in `bootstrap.py` la sorgente va solo a funzioni `*_adapters`): installa provider di tracce, metriche e log e le strumentazioni automatiche; `bootstrap.py` la chiama
   per prima in `create_application` (servizio `autotrading-api`) e in `create_worker_application`
   (`autotrading-worker`). Domain e application non cambiano: nessuna porta, solo strumentazione automatica.
 - **Segnali**: tracce delle richieste FastAPI, delle chiamate httpx e delle query SQLAlchemy; le metriche che quelle
