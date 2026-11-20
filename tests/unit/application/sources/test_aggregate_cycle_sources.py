@@ -1,11 +1,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from autotrading.application.sources.aggregate_cycle_sources import (
-    AGGREGATE,
-    AggregateCycleSourcesUseCase,
-    AggregatedSource,
-)
+from autotrading.application.sources.aggregate_cycle_sources import AggregateCycleSourcesUseCase, AggregatedSource
+from autotrading.domain.sources.volume_aggregate import AGGREGATE
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +22,7 @@ def volumes(adapter: str, weight: int, asset: str, figures: tuple[str, str, str]
     return Datum("volumi", adapter, weight, asset, dict(zip(keys, figures, strict=True)))
 
 
-def test_two_exchanges_of_the_volumes_add_their_aggregate_weighted_on_the_volumes_per_asset() -> None:
+def test_the_volumes_are_grouped_by_asset_and_every_aggregate_of_the_domain_is_a_datum_of_the_context() -> None:
     data = (
         volumes("Borsa", 3, "BTC", ("300", "2.0000", "0.6000")),
         volumes("Mercato", 7, "BTC", ("100", "1.0000", "0.2000")),
