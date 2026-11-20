@@ -8,7 +8,6 @@ from autotrading.domain.accounts.installation_environment import InstallationEnv
 
 ENDPOINT = "GRAFANA_OTLP_ENDPOINT"
 INSTANCE = "GRAFANA_INSTANCE_ID"
-TOKEN = "GRAFANA_OTLP_TOKEN"  # noqa: S105 - the name of the setting, never the token
 VERSION = "APP_VERSION"
 WEB_SCHEMES = frozenset({"https", "http"})
 INSTANCE_NUMBER = re.compile(r"[0-9]+")
@@ -31,7 +30,7 @@ def _settings_of(source: ConfigurationSource) -> _GrafanaCloudSettings | None:
     """None when any of endpoint, instance and token is missing: the telemetry is off and the service starts as ever."""
     endpoint = source.optional(ENDPOINT)
     instance_id = source.optional(INSTANCE)
-    token = source.optional_secret(TOKEN)
+    token = source.optional_secret("GRAFANA_OTLP_TOKEN")
     if endpoint is None or instance_id is None or token is None:
         return None
     parts = urlsplit(endpoint)
