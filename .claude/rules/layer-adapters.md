@@ -20,6 +20,10 @@ una sola tecnologia: virtualmente una libreria a sé, staccabile.
 - Un adapter non orchestra: non riceve porte né casi d'uso nel costruttore e da `application` importa solo
   `ports.py` ed `errors.py`. La sequenza tra adapter è del caso d'uso. Unica eccezione il decorator, che
   riceve la stessa porta che dichiara tra le sue basi; se aggiunge effetti si valuta l'outbox.
+- Una cache è un decorator della stessa porta in una cartella propria (`process_memory/` per la memoria del
+  processo), montato dalla composition: il suo stato (l'archivio) lo crea una volta la funzione
+  `*_adapters` della cartella, mai una variabile di modulo, e la cartella decorata non sa di essere decorata
+  (ADR cache-delle-letture-del-conto-come-decorator-in-memoria).
 - Niente ponti tra contesti: il contesto che usa un dato di un altro dichiara la sua porta e l'adapter della
   tecnologia che ha il dato la realizza qui, sollevando direttamente l'errore del contratto.
 - Nome `<Tecnologia><Ruolo>Adapter` (es. `SodiumCredentialSealerAdapter`); rispetta la porta

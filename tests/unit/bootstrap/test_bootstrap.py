@@ -1,4 +1,5 @@
 import base64
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from uuid import uuid4
@@ -11,6 +12,7 @@ from sqlalchemy import create_engine
 from autotrading import bootstrap
 from autotrading.adapters.configuration.errors import MissingConfigurationError
 from autotrading.adapters.configuration.source import ConfigurationSource
+from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
 from autotrading.adapters.outbound.hyperliquid.composition import hyperliquid_adapters
 from autotrading.adapters.outbound.libsodium.composition import SealersOfTenant
@@ -23,6 +25,9 @@ from autotrading.adapters.outbound.libsodium.opener import (
 from autotrading.adapters.outbound.libsodium.provider_key_sealer import SodiumProviderKeySealerAdapter
 from autotrading.adapters.outbound.libsodium.sealer import InvalidCredentialsKeyError, SodiumCredentialSealerAdapter
 from autotrading.adapters.outbound.libsodium.source_secrets_sealer import SodiumSourceSecretsSealerAdapter
+from autotrading.adapters.outbound.process_memory.account_activity import ProcessMemoryAccountActivityAdapter
+from autotrading.adapters.outbound.process_memory.composition import process_memory_adapters
+from autotrading.adapters.outbound.worker.account_activity import WorkerAccountActivityAdapter
 from autotrading.adapters.outbound.worker.composition import worker_adapters
 from autotrading.application.accounts.errors import ExchangeUnavailableError
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
@@ -85,6 +90,14 @@ AUTHENTICATION = {
     "AUTH_AUDIENCE": "api://autotrading",
     "AUTH_CLIENT_ID": "swagger-client",
     "AUTH_SCOPE": "api://autotrading/access",
+}
+ACTIVITY_BODY = {
+    "currency": "USDC",
+    "balance": "1000",
+    "available_margin": "800",
+    "positions": [],
+    "movements": [],
+    "read_at": "2026-11-20T10:00:00+00:00",
 }
 
 
@@ -215,7 +228,7 @@ def test_each_tenant_gets_use_cases_bound_to_it(tmp_path: Path) -> None:
         create_engine("sqlite://"),
         _sealers(public_key),
         dev_installation_on_testnet(),
-        worker,
+        (worker, process_memory_adapters()),
         providers_of(),
     )
 
@@ -247,7 +260,7 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
         create_engine("sqlite://"),
         _sealers(public_key),
         dev_installation_on_testnet(),
-        worker,
+        (worker, process_memory_adapters()),
         providers_of(),
     )
 
@@ -256,6 +269,64 @@ def test_the_worker_is_asked_for_the_tenant_of_the_request(tmp_path: Path, monke
 
     assert [request.url.path for request in asked] == [f"/tenants/{tenant_id.value}/accounts/{account.id.value}/state"]
     assert asked[0].headers["Authorization"] == f"Bearer {WORKER_TOKEN}"
+
+
+def _ports_of_the_api(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, worker_answer: Callable[[httpx.Request], httpx.Response]
+) -> Callable[[TenantId], TenantPorts]:
+    """The ports the API composes for each request, with the worker answering as the test says."""
+    composed: list[TenantPorts] = []
+    real_on = TenantUseCases.on
+
+    def on(tenant_id: TenantId, ports: TenantPorts) -> TenantUseCases:
+        composed.append(ports)
+        return real_on(tenant_id, ports)
+
+    monkeypatch.setattr(TenantUseCases, "on", staticmethod(on))
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    worker = worker_adapters(ConfigurationSource(configuration), httpx.MockTransport(worker_answer))
+    factory = tenant_use_cases(
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        dev_installation_on_testnet(),
+        (worker, process_memory_adapters()),
+        providers_of(),
+    )
+
+    def ports_of(tenant_id: TenantId) -> TenantPorts:
+        factory(tenant_id)
+        return composed[-1]
+
+    return ports_of
+
+
+def test_the_api_reads_the_account_through_the_memory_of_the_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ports = _ports_of_the_api(tmp_path, monkeypatch, lambda _: httpx.Response(503))(TenantId.new())
+
+    assert isinstance(ports.account_activity, ProcessMemoryAccountActivityAdapter)
+    assert ports.flow_checks.accounts.activity is ports.account_activity
+    assert isinstance(ports.account_transfers, WorkerAccountActivityAdapter)
+
+
+def test_two_requests_of_a_tenant_read_an_account_from_the_worker_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    asked: list[str] = []
+
+    def worker_answer(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.path)
+        return httpx.Response(200, json=ACTIVITY_BODY)
+
+    ports_of, tenant_id, account_id = _ports_of_the_api(tmp_path, monkeypatch, worker_answer), TenantId.new(), uuid4()
+
+    first = ports_of(tenant_id).account_activity.execute(account_id)
+    second = ports_of(tenant_id).account_activity.execute(account_id)
+
+    assert asked == [f"/tenants/{tenant_id.value}/accounts/{account_id}/activity"]
+    assert second == first
 
 
 @pytest.mark.parametrize("name", ["WORKER_URL", "WORKER_TOKEN_FILE"])
@@ -409,7 +480,7 @@ def test_the_cycle_asked_for_now_is_asked_to_the_worker_for_the_tenant(
         create_engine("sqlite://"),
         _sealers(public_key),
         dev_installation_on_testnet(),
-        worker,
+        (worker, process_memory_adapters()),
         providers_of(),
     )
 
@@ -434,7 +505,7 @@ def test_the_close_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_path: 
         create_engine("sqlite://"),
         _sealers(public_key),
         dev_installation_on_testnet(),
-        worker,
+        (worker, process_memory_adapters()),
         providers_of(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
@@ -462,7 +533,7 @@ def test_the_procedure_is_asked_to_the_worker_for_the_tenant_and_the_user(tmp_pa
         create_engine("sqlite://"),
         _sealers(public_key),
         dev_installation_on_testnet(),
-        worker,
+        (worker, process_memory_adapters()),
         providers_of(),
     )
     tenant_id, account_id = TenantId.new(), uuid4()
@@ -515,7 +586,7 @@ def test_the_api_notifies_stops_and_manual_closings_with_the_same_notice(
         create_engine("sqlite://"),
         _sealers(public_key),
         dev_installation_on_testnet(),
-        worker,
+        (worker, process_memory_adapters()),
         providers_of(),
     )
 

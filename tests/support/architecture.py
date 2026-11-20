@@ -143,6 +143,9 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/oidc": frozenset({"jwt"}),
     # OpenRouter is reached on its own API with the transport of the platform (ADR 0109).
     "adapters/outbound/openrouter": frozenset({"httpx"}),
+    # The memory of the API process: a store of readings with expiry needs no library (ADR
+    # cache-delle-letture-del-conto-come-decorator-in-memoria).
+    "adapters/outbound/process_memory": frozenset(),
     "adapters/outbound/rss": frozenset({"httpx"}),
     # psycopg is the PostgreSQL driver under SQLAlchemy and under the checkpointer of the cycle; procrastinate is the
     # queue of the outbox on the same database (ADR outbox-delle-integrazioni-esterne-con-procrastinate).
