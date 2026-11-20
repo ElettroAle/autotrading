@@ -282,6 +282,7 @@ def test_the_sources_of_the_api_are_offered_by_the_adapters_of_the_installation(
         ("forecast", ["Prophet"]),
         ("sentiment", ["alternative.me", "CoinMarketCap"]),
         ("notizie", ["RSS"]),
+        ("whale", ["Arkham"]),
     ]
 
 

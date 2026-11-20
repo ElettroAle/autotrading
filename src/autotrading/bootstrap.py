@@ -17,6 +17,7 @@ from autotrading.adapters.inbound.api.worker import (
 )
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters, apscheduler_daily_check_adapters
+from autotrading.adapters.outbound.arkham.composition import arkham_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.dashboard.composition import dashboard_adapters
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
@@ -716,7 +717,12 @@ def source_systems(hyperliquid: HyperliquidAdaptersOfInstallation, forecaster: P
     ADR fonti-con-adapter-dichiarati)."""
     *_, prices, market = hyperliquid
     return SourceSystems(
-        (alternative_me_adapters(), coinmarketcap_adapters()), rss_adapters(), prices, forecaster, market
+        (alternative_me_adapters(), coinmarketcap_adapters()),
+        rss_adapters(),
+        prices,
+        forecaster,
+        market,
+        (arkham_adapters(),),
     )
 
 

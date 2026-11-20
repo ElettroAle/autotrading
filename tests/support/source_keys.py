@@ -47,6 +47,7 @@ class Keys:
                 FakePriceHistoryAdapter(),
                 FakePriceForecasterAdapter(),
                 FakeMarketDataAdapter(),
+                (),
             )
         )
         self.credentials = InMemorySourceCredentialsRepositoryAdapter(self.store, self.tenant_id)
