@@ -7,6 +7,7 @@ import pytest
 import requests
 from eth_account import Account as EthereumAccount
 from eth_account.signers.local import LocalAccount
+from hyperliquid.api import API
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
 
@@ -20,6 +21,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
     HyperliquidSdkAdapter,
     HyperliquidTestnetExchangeAdapter,
 )
+from autotrading.adapters.outbound.hyperliquid.market_metadata import _MarketMetadata, _Metadata
 from autotrading.application.accounts.errors import (
     CredentialFieldMalformedError,
     ExchangeRejectedCredentialsError,
@@ -644,3 +646,77 @@ def test_a_client_error_while_reading_the_agents_is_a_rejection_with_its_message
 def test_the_exchange_out_of_reach_while_reading_the_agents_is_unavailable(failure: Exception) -> None:
     with pytest.raises(ExchangeUnavailableError):
         HyperliquidExchangeAdapter(BASE_URL, FakeSdk(agents=failure)).credential_expiry(CREDENTIALS)
+
+
+SDK_META = {"universe": [{"name": "BTC", "szDecimals": 5, "maxLeverage": 40}]}
+SDK_SPOT_META = {
+    "universe": [{"name": "PURR/USDC", "tokens": [1, 0], "index": 0, "isCanonical": True}],
+    "tokens": [{"name": "USDC", "szDecimals": 8, "index": 0}, {"name": "PURR", "szDecimals": 0, "index": 1}],
+}
+
+
+@dataclass
+class KnownMetadata(_MarketMetadata):
+    """Metadata already at hand, as the decorator of the composition answers them within the hour."""
+
+    asked: list[tuple[str, float]] = field(default_factory=list)
+
+    def of(self, base_url: str, timeout: float) -> _Metadata:
+        self.asked.append((base_url, timeout))
+        return _Metadata(SDK_META, SDK_SPOT_META)
+
+
+@pytest.fixture
+def network(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Every request the SDK sends, by kind; the answers are the metadata, enough for a client built without them."""
+    sent: list[str] = []
+
+    def post(_api: API, _url_path: str, payload: dict[str, object] | None = None) -> object:
+        kind = str((payload or {})["type"])
+        sent.append(kind)
+        return {"meta": SDK_META, "spotMeta": SDK_SPOT_META}[kind]
+
+    monkeypatch.setattr(API, "post", post)
+    return sent
+
+
+def test_a_reading_client_carries_the_metadata_of_its_network_without_asking_the_network(network: list[str]) -> None:
+    metadata = KnownMetadata()
+
+    info = HyperliquidSdkAdapter(metadata).info(TESTNET_API_URL, 3.0)
+
+    assert network == []
+    assert metadata.asked == [(TESTNET_API_URL, 3.0)]
+    assert (info.base_url, info.timeout, info.ws_manager) == (TESTNET_API_URL, 3.0, None)
+    assert (info.coin_to_asset["BTC"], info.name_to_coin["PURR/USDC"]) == (0, "PURR/USDC")
+
+
+def test_a_signing_client_carries_the_metadata_of_its_network_without_asking_the_network(network: list[str]) -> None:
+    metadata = KnownMetadata()
+
+    exchange = HyperliquidSdkAdapter(metadata).exchange(WALLET, MAINNET_API_URL, ADDRESS, 3.0)
+
+    assert network == []
+    assert metadata.asked == [(MAINNET_API_URL, 3.0)]
+    assert (exchange.wallet, exchange.base_url, exchange.account_address, exchange.timeout) == (
+        WALLET,
+        MAINNET_API_URL,
+        ADDRESS,
+        3.0,
+    )
+    assert exchange.info.coin_to_asset["BTC"] == 0
+
+
+def test_every_use_builds_a_client_of_its_own() -> None:
+    sdk = HyperliquidSdkAdapter(KnownMetadata())
+
+    assert sdk.info(MAINNET_API_URL, 3.0) is not sdk.info(MAINNET_API_URL, 3.0)
+
+
+def test_without_a_cache_the_client_reads_the_metadata_at_every_use(network: list[str]) -> None:
+    sdk = HyperliquidSdkAdapter()
+
+    sdk.info(MAINNET_API_URL, 3.0)
+    sdk.info(MAINNET_API_URL, 3.0)
+
+    assert sorted(network) == ["meta", "meta", "spotMeta", "spotMeta"]

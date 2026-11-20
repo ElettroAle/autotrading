@@ -12,6 +12,12 @@ paths:
   `HyperliquidTestnetExchangeAdapter` eredita da `HyperliquidExchangeAdapter` e ridefinisce solo rete e indirizzo
   dell'API; gli altri adapter si costruiscono sull'indirizzo della testnet. Le fonti di mercato leggono la rete reale
   (R2.3.11). Mai dedotto dalle credenziali.
+- Un solo `HyperliquidSdkAdapter` per processo, creato da `hyperliquid_adapters()` e passato a tutti gli adapter della
+  cartella. A ogni uso costruisce un `Info` o un `Exchange` nuovo (la sessione HTTP non si condivide tra thread) con
+  `meta` e `spot_meta` già letti: nessuna chiamata di rete nel costruttore. I metadati li legge `_MarketMetadata` e li
+  tiene per rete un'ora (`_HyperliquidMetadataSettings`) il decorator `_CachedMarketMetadata`, privati della cartella e
+  creati dalla composition; un errore della lettura non si salva (ADR
+  metadati-di-mercato-hyperliquid-riusati-dal-client-unico).
 - Il prezzo di mercato di una posizione è `positionValue / |szi|` del `clearinghouseState` (R1.4.7).
 - Ogni ordine porta il `cloid` assegnato dalla piattaforma.
 - Ordini a mercato con lo scostamento massimo ricevuto dal caso d'uso.
