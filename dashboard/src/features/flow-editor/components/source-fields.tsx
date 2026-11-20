@@ -2,6 +2,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 
 import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import { reasonOf } from '@/lib/form-errors';
+import { choiceOptionsOf, defaultChoiceLabelOf, hasChoices } from '@/lib/parameter-choices';
 
 import type { Source, SourceAdapter } from '../api/get-sources';
 import { adapterKeyOf, type FlowFormValues } from '../utils/flow-form';
@@ -46,17 +47,32 @@ const AdapterSettings = ({ source, adapter }: { source: Source; adapter: SourceA
           label={`${parameter.label} di ${label}`}
           error={adapterErrors?.parameters?.[parameter.key]?.message}
         >
-          {(control) => (
-            <input
-              {...control}
-              {...register(`${path}.parameters.${parameter.key}`)}
-              type="number"
-              min={parameter.minimum}
-              max={parameter.maximum}
-              placeholder={String(parameter.default)}
-              className={FORM_CONTROL}
-            />
-          )}
+          {(control) =>
+            !hasChoices(parameter) ? (
+              <input
+                {...control}
+                {...register(`${path}.parameters.${parameter.key}`)}
+                type="number"
+                min={parameter.minimum}
+                max={parameter.maximum}
+                placeholder={String(parameter.default)}
+                className={FORM_CONTROL}
+              />
+            ) : (
+              <select
+                {...control}
+                {...register(`${path}.parameters.${parameter.key}`)}
+                className={FORM_CONTROL}
+              >
+                <option value="">{`predefinito (${defaultChoiceLabelOf(parameter)})`}</option>
+                {choiceOptionsOf(parameter).map((choice) => (
+                  <option key={choice.value} value={choice.value}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+            )
+          }
         </FormField>
       ))}
     </div>

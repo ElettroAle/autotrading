@@ -1,4 +1,6 @@
-"""The cache of the trained models: one per asset and history depth, shared by every flow that asks for it."""
+"""The cache of the trained models: one per asset, history depth and kind of candles, shared by every flow that asks
+for it.
+"""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -14,6 +16,8 @@ type Predictor = Callable[[TrainedModel, datetime], Forecast]
 class ModelKey:
     asset: str
     history_days: int
+    # The daily candles of the long horizons are another series than the finest candles of the same depth.
+    daily: bool = False
 
 
 class ForecastModels:

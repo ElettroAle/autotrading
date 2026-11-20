@@ -87,6 +87,7 @@ describe('CreateFlow', () => {
     const sources = within(screen.getByRole('group', { name: 'Fonti' }));
     expect(sources.getAllByRole('checkbox').map((source) => source.getAttribute('id'))).toEqual([
       'flow-source-indicatori',
+      'flow-source-forecast',
       'flow-source-sentiment',
       'flow-source-notizie',
     ]);
@@ -468,6 +469,35 @@ describe('CreateFlow', () => {
       adapters: [
         { name: 'alternative.me', weight: 3, parameters: {} },
         { name: 'CoinMarketCap', weight: 7, parameters: {} },
+      ],
+    });
+  });
+
+  // ADR orizzonti-lunghi-del-forecast: a parameter with choices is a selection of their labels.
+  it('offers a parameter with choices as a selection of their labels, sending the value chosen', async () => {
+    const { router } = await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'forecast' }));
+    const horizon = field('orizzonte lungo di forecast · Prophet');
+    expect(
+      within(horizon)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['predefinito (nessuno)', 'nessuno', '1 giorno', '1 settimana']);
+    await userEvent.selectOptions(horizon, '1 giorno');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    const { sources } = configurationOf(fakePlatform.flowNamed('alfa'));
+    expect(sources.find((source) => source.name === 'forecast')).toEqual({
+      name: 'forecast',
+      adapters: [
+        {
+          name: 'Prophet',
+          weight: 5,
+          parameters: { profondita_storico_giorni: 7, orizzonte_lungo: 1440 },
+        },
       ],
     });
   });

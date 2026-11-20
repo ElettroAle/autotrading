@@ -97,6 +97,20 @@ describe('ForecastAccuracy', () => {
     expect(await errorOf('BTC · 4 ore')).toHaveTextContent('errore medio 500');
   });
 
+  // R5.1.5: the long horizons of the forecast are named in days and weeks.
+  it('names a horizon of days in days and one of weeks in weeks', async () => {
+    fakePlatform.addFlow('anna', 'alfa', {
+      forecasts: [
+        forecast(60500, 60000, { horizonMinutes: 1440, expiresAt: ago(DAY_MS) }),
+        forecast(61000, 60000, { horizonMinutes: 10080, expiresAt: ago(DAY_MS) }),
+      ],
+    });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await errorOf('BTC · 1 giorno')).toHaveTextContent('errore medio 500');
+    expect(await errorOf('BTC · 1 settimana')).toHaveTextContent('errore medio 1000');
+  });
+
   it('does not show the panel for a flow without forecasts', async () => {
     fakePlatform.addFlow('anna', 'alfa');
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });

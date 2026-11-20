@@ -1,8 +1,12 @@
 import pytest
 
-from autotrading.domain.sources.errors import SourceParameterOutOfRangeError, UnknownSourceParameterError
+from autotrading.domain.sources.errors import (
+    SourceParameterNotAmongChoicesError,
+    SourceParameterOutOfRangeError,
+    UnknownSourceParameterError,
+)
 from autotrading.domain.sources.source_definition import SourceDefinition
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter
 
 NEWS = SourceDefinition(
     name="notizie",
@@ -61,3 +65,12 @@ def test_the_parameters_of_an_adapter_are_checked_with_those_of_the_source() -> 
 def test_a_parameter_the_source_does_not_have_is_refused() -> None:
     with pytest.raises(UnknownSourceParameterError, match=r"^parametro sconosciuto della fonte notizie: lingua$"):
         NEWS.settings({"lingua": 1})
+
+
+def test_a_value_outside_the_choices_of_a_parameter_is_refused_listing_them() -> None:
+    horizon = SourceParameter.of_choices(
+        "orizzonte", "orizzonte", default=0, choices=(ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno"))
+    )
+
+    with pytest.raises(SourceParameterNotAmongChoicesError, match=r"^orizzonte: ammessi nessuno, 1 giorno$"):
+        NEWS.settings({"orizzonte": 60}, (horizon,))

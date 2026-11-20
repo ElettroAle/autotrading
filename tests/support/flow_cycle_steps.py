@@ -19,7 +19,7 @@ from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
-from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
+from autotrading.domain.sources.price_forecast import SHORT_HORIZONS, ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import BALANCE, FlowCycles, at
@@ -382,7 +382,7 @@ def position_still_open(flow_cycles: FlowCycles, asset: str) -> None:
 @then(quoted('il contesto contiene per "{asset}" una previsione a 15 minuti e una a 1 ora'))
 def forecasts_in_context(flow_cycles: FlowCycles, asset: str) -> None:
     [values] = flow_cycles.sources_in_context("forecast", asset)
-    for horizon in ForecastHorizon:
+    for horizon in SHORT_HORIZONS:
         assert f"prezzo_previsto_{horizon.label}" in values
 
 
@@ -394,7 +394,7 @@ def forecasts_in_context(flow_cycles: FlowCycles, asset: str) -> None:
 def forecast_values(flow_cycles: FlowCycles, price: str) -> None:
     for values in flow_cycles.sources_in_context("forecast"):
         assert number(values["prezzo_attuale"]) == number(price)
-        for horizon in ForecastHorizon:
+        for horizon in SHORT_HORIZONS:
             assert Decimal(values[f"prezzo_previsto_{horizon.label}"]) > 0
             Decimal(values[f"variazione_percentuale_{horizon.label}"])
 

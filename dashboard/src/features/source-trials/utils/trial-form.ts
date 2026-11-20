@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { admittedChoicesOf, hasChoices, isAmongChoices } from '@/lib/parameter-choices';
+
 import type { TrialAdapter, TrialParameter, TrialSource } from '../api/get-trial-sources';
 import type { SourceTrialRequest } from '../api/try-source-adapter';
 
@@ -12,15 +14,20 @@ export type TrialFormValues = {
 
 const WHOLE_NUMBER = /^-?\d+$/;
 
-/** The values a parameter admits, as the field says them when a value is outside (R6.3.1). */
+/** The values a parameter admits, as the field says them when a value is outside (R6.3.1): its choices, if it has. */
 export const admittedRangeOf = (parameter: TrialParameter): string =>
-  `ammesso da ${parameter.minimum} a ${parameter.maximum}`;
+  hasChoices(parameter)
+    ? admittedChoicesOf(parameter)
+    : `ammesso da ${parameter.minimum} a ${parameter.maximum}`;
 
 const accepts = (parameter: TrialParameter, typed: string): boolean => {
   const value = Number(typed.trim());
-  return (
-    WHOLE_NUMBER.test(typed.trim()) && value >= parameter.minimum && value <= parameter.maximum
-  );
+  if (!WHOLE_NUMBER.test(typed.trim())) {
+    return false;
+  }
+  return hasChoices(parameter)
+    ? isAmongChoices(parameter, value)
+    : value >= parameter.minimum && value <= parameter.maximum;
 };
 
 /** The adapter of the source the form names, the only one when the source has one. */

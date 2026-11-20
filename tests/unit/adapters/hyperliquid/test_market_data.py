@@ -116,6 +116,37 @@ def test_the_reading_stops_after_the_maximum_number_of_pages() -> None:
     assert len(points) == MAX_PAGES
 
 
+def test_the_daily_history_is_read_from_the_daily_candles_over_the_requested_days() -> None:
+    day_ms = 1440 * MINUTE_MS
+    yesterday = NOW_MS - day_ms
+    sdk = FakeSdk(pages=[[candle(yesterday - day_ms, "100", minutes=1440), candle(yesterday, "101", minutes=1440)]])
+
+    points = HyperliquidPriceHistoryAdapter(TESTNET_API_URL, sdk).daily_history("BTC", 365, NOW)
+
+    assert points == [
+        PricePoint(NOW - timedelta(days=1, milliseconds=1), Decimal(100)),
+        PricePoint(NOW - timedelta(milliseconds=1), Decimal(101)),
+    ]
+    assert sdk.calls[1] == ("candles_snapshot", ("BTC", "1d", NOW_MS - 365 * day_ms, NOW_MS))
+
+
+def test_the_candle_still_open_counts_at_its_price_of_now() -> None:
+    sdk = FakeSdk(pages=[[candle(NOW_MS - 600 * MINUTE_MS, "101", minutes=1440)]])
+
+    points = HyperliquidPriceHistoryAdapter(TESTNET_API_URL, sdk).daily_history("BTC", 30, NOW)
+
+    assert points == [PricePoint(NOW, Decimal(101))]
+
+
+def test_a_daily_history_the_exchange_does_not_answer_makes_the_forecast_unavailable() -> None:
+    adapter = HyperliquidPriceHistoryAdapter(TESTNET_API_URL, FakeSdk(failure=ServerError(500, "down")))
+
+    with pytest.raises(SourceUnavailableError) as raised:
+        adapter.daily_history("BTC", 365, NOW)
+
+    assert raised.value.source == "forecast"
+
+
 def test_the_current_price_is_the_mid_price_of_the_exchange() -> None:
     assert HyperliquidPriceHistoryAdapter(TESTNET_API_URL, FakeSdk()).current_price("BTC") == Decimal("74684.0")
 

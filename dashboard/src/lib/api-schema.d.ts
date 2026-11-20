@@ -3539,6 +3539,13 @@ export interface components {
             /** Expiry Editable */
             expiry_editable: boolean;
         };
+        /** SourceParameterChoiceResponse */
+        SourceParameterChoiceResponse: {
+            /** Value */
+            value: number;
+            /** Label */
+            label: string;
+        };
         /** SourceParameterResponse */
         SourceParameterResponse: {
             /** Key */
@@ -3551,6 +3558,8 @@ export interface components {
             minimum: number;
             /** Maximum */
             maximum: number;
+            /** Choices */
+            choices: components["schemas"]["SourceParameterChoiceResponse"][];
         };
         /** SourceResponse */
         SourceResponse: {

@@ -40,5 +40,23 @@ def test_the_container_forecasts_both_horizons_with_prophet() -> None:
         assert Decimal(forecast["lower_price"]) <= predicted <= Decimal(forecast["upper_price"])
 
 
+def test_the_container_forecasts_the_long_horizons_on_daily_candles() -> None:
+    points = [
+        {"at": (START + timedelta(days=index)).isoformat(), "price": str(100 + index / 10 + math.sin(index))}
+        for index in range(365)
+    ]
+    request = {"asset": "BTC", "history_days": 365, "points": points, "horizons_days": [1, 7]}
+
+    response = httpx.post(f"{_url()}/forecast", json=request, timeout=120)
+
+    assert response.status_code == 200
+    forecasts = response.json()["forecasts"]
+    assert [forecast["horizon_minutes"] for forecast in forecasts] == [1440, 10080]
+    for forecast in forecasts:
+        assert (
+            Decimal(forecast["lower_price"]) <= Decimal(forecast["predicted_price"]) <= Decimal(forecast["upper_price"])
+        )
+
+
 def test_the_container_answers_its_health() -> None:
     assert httpx.get(f"{_url()}/health", timeout=10).json() == {"status": "ok"}

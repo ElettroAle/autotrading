@@ -9,6 +9,7 @@ from uuid import UUID
 from autotrading.domain.sources.errors import InsufficientHistoryError, InvalidPriceForecastError
 
 DAY = timedelta(days=1)
+MINUTES_PER_DAY = 24 * 60
 # A trend and a change of it: fewer points describe no series.
 MINIMUM_POINTS = 3
 HUNDRED = Decimal(100)
@@ -18,10 +19,14 @@ EXTRA_PLACES = 2
 
 
 class ForecastHorizon(Enum):
-    """The two horizons of R1.3.5, with their label for the context of the agent."""
+    """The horizons of the forecast, with their label for the context of the agent: 15 minutes and 1 hour (R1.3.5),
+    1 day and 1 week (R5.1.5).
+    """
 
     MINUTES_15 = (15, "15 minuti")
     HOUR_1 = (60, "1 ora")
+    DAY_1 = (MINUTES_PER_DAY, "1 giorno")
+    WEEK_1 = (7 * MINUTES_PER_DAY, "1 settimana")
 
     def __init__(self, minutes: int, label: str) -> None:
         self.minutes = minutes
@@ -30,6 +35,28 @@ class ForecastHorizon(Enum):
     @property
     def length(self) -> timedelta:
         return timedelta(minutes=self.minutes)
+
+    @property
+    def on_daily_candles(self) -> bool:
+        """A horizon of days is forecast on the daily candles, as a step of the finest ones would be a fraction of it
+        (ADR orizzonti-lunghi-del-forecast).
+        """
+        return self.minutes >= MINUTES_PER_DAY
+
+    @property
+    def days(self) -> int:
+        return self.minutes // MINUTES_PER_DAY
+
+
+# Always forecast, on the finest candles the exchange keeps for the depth (R1.3.5).
+SHORT_HORIZONS = (ForecastHorizon.MINUTES_15, ForecastHorizon.HOUR_1)
+# At most one of them, as the flow chooses (R5.1.5).
+LONG_HORIZONS = (ForecastHorizon.DAY_1, ForecastHorizon.WEEK_1)
+
+
+def long_horizons_of(minutes: int) -> tuple[ForecastHorizon, ...]:
+    """The long horizon a flow chose by its minutes; none when it chose no long horizon."""
+    return tuple(horizon for horizon in LONG_HORIZONS if horizon.minutes == minutes)
 
 
 @dataclass(frozen=True, slots=True)

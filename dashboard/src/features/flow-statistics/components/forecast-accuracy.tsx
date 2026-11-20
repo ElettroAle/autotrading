@@ -11,13 +11,22 @@ import {
 } from '../api/get-forecast-accuracy';
 
 const MINUTES_IN_HOUR = 60;
+const MINUTES_IN_DAY = 24 * MINUTES_IN_HOUR;
+const MINUTES_IN_WEEK = 7 * MINUTES_IN_DAY;
 const NOT_AVAILABLE = 'non disponibile nel periodo';
 const SEPARATOR = ' · ';
 
 const counted = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
 
+// The long horizons of the forecast are days and weeks (R5.1.5).
 const horizonLabel = (minutes: number): string => {
+  if (minutes % MINUTES_IN_WEEK === 0) {
+    return counted(minutes / MINUTES_IN_WEEK, 'settimana', 'settimane');
+  }
+  if (minutes % MINUTES_IN_DAY === 0) {
+    return counted(minutes / MINUTES_IN_DAY, 'giorno', 'giorni');
+  }
   if (minutes % MINUTES_IN_HOUR !== 0) {
     return counted(minutes, 'minuto', 'minuti');
   }

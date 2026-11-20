@@ -9,6 +9,8 @@ const sourceParameterSchema = z.object({
   default: z.number(),
   minimum: z.number(),
   maximum: z.number(),
+  // Empty for a parameter that admits its whole range; otherwise only these values (ADR orizzonti-lunghi-del-forecast).
+  choices: z.array(z.object({ value: z.number(), label: z.string() })),
 });
 
 export type SourceParameter = z.infer<typeof sourceParameterSchema>;

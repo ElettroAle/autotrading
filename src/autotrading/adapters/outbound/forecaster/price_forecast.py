@@ -65,5 +65,14 @@ def _request_of(asset: str, history: PriceHistory, horizons: tuple[ForecastHoriz
         "asset": asset,
         "history_days": history.requested_days,
         "points": [{"at": point.at.isoformat(), "price": str(point.price)} for point in history.points],
-        "horizons_minutes": [horizon.minutes for horizon in horizons],
+        **_horizons_of(horizons),
     }
+
+
+def _horizons_of(horizons: tuple[ForecastHorizon, ...]) -> dict[str, list[int]]:
+    """The long horizons go in days with their daily history, the short ones in minutes (ADR
+    orizzonti-lunghi-del-forecast): the service keeps a model apart for each kind of candles.
+    """
+    if all(horizon.on_daily_candles for horizon in horizons):
+        return {"horizons_days": [horizon.days for horizon in horizons]}
+    return {"horizons_minutes": [horizon.minutes for horizon in horizons]}

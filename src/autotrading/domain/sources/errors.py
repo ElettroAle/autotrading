@@ -19,22 +19,39 @@ class SourceNotAvailableError(DomainError):
         self.name = name
 
 
-class SourceParameterOutOfRangeError(DomainError):
-    """The refusal names the parameter and the values it admits (R4.1.1)."""
+class SourceParameterRefusedError(DomainError):
+    """A value a parameter of a source does not admit: the refusal names the parameter and what it admits (R4.1.1)."""
 
     status_code = 422
 
-    def __init__(self, label: str, minimum: int, maximum: int, key: str) -> None:
-        super().__init__(f"parametro fuori dai valori ammessi: {label}, da {minimum} a {maximum}")
+    def __init__(self, reason: str, label: str, key: str) -> None:
+        super().__init__(reason)
         self.label = label
+        self.key = key
+
+
+class SourceParameterOutOfRangeError(SourceParameterRefusedError):
+    def __init__(self, label: str, minimum: int, maximum: int, key: str) -> None:
+        super().__init__(f"parametro fuori dai valori ammessi: {label}, da {minimum} a {maximum}", label, key)
         self.minimum = minimum
         self.maximum = maximum
-        self.key = key
 
     @property
     def details(self) -> Mapping[str, object]:
         """The parameter and its limits, so the page of a trial shows them beside its field (R6.3.1)."""
         return {"field": self.key, "minimum": self.minimum, "maximum": self.maximum}
+
+
+class SourceParameterNotAmongChoicesError(SourceParameterRefusedError):
+    """The refusal lists the choices by the names a user knows them by (ADR orizzonti-lunghi-del-forecast)."""
+
+    def __init__(self, label: str, choices: tuple[str, ...], key: str) -> None:
+        super().__init__(f"{label}: ammessi {', '.join(choices)}", label, key)
+        self.choices = choices
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.key, "choices": list(self.choices)}
 
 
 class SourceAdapterNotAvailableError(DomainError):

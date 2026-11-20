@@ -8,11 +8,14 @@ import pytest
 
 from autotrading.domain.sources.errors import InsufficientHistoryError, InvalidPriceForecastError
 from autotrading.domain.sources.price_forecast import (
+    LONG_HORIZONS,
+    SHORT_HORIZONS,
     ForecastHorizon,
     PriceForecast,
     PriceHistory,
     PricePoint,
     history_of,
+    long_horizons_of,
 )
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -32,11 +35,34 @@ def forecast(**changes: Any) -> PriceForecast:
     return replace(BASE, **changes)
 
 
-def test_the_horizons_are_15_minutes_and_1_hour() -> None:
+def test_the_horizons_are_15_minutes_1_hour_1_day_and_1_week() -> None:
     assert [(horizon.length, horizon.label) for horizon in ForecastHorizon] == [
         (timedelta(minutes=15), "15 minuti"),
         (timedelta(hours=1), "1 ora"),
+        (timedelta(days=1), "1 giorno"),
+        (timedelta(weeks=1), "1 settimana"),
     ]
+
+
+def test_the_short_horizons_are_always_forecast_on_the_finest_candles() -> None:
+    assert [(horizon, horizon.on_daily_candles) for horizon in SHORT_HORIZONS] == [
+        (ForecastHorizon.MINUTES_15, False),
+        (ForecastHorizon.HOUR_1, False),
+    ]
+
+
+def test_the_long_horizons_are_forecast_on_the_daily_candles_in_days() -> None:
+    assert [(horizon.on_daily_candles, horizon.days) for horizon in LONG_HORIZONS] == [(True, 1), (True, 7)]
+
+
+@pytest.mark.parametrize(
+    ("minutes", "horizons"),
+    [(0, ()), (1440, (ForecastHorizon.DAY_1,)), (10080, (ForecastHorizon.WEEK_1,)), (60, ())],
+)
+def test_the_long_horizon_chosen_by_its_minutes_none_for_no_long_horizon(
+    minutes: int, horizons: tuple[ForecastHorizon, ...]
+) -> None:
+    assert long_horizons_of(minutes) == horizons
 
 
 def test_a_history_covering_the_requested_days_is_not_shortened() -> None:
@@ -145,3 +171,13 @@ def test_a_last_price_that_is_not_a_number_cannot_be_forecast() -> None:
 
     with pytest.raises(InvalidPriceForecastError):
         PriceForecast.of(FLOW, "BTC", history, ForecastHorizon.MINUTES_15, Decimal(101))
+
+
+def test_a_daily_history_shorter_than_requested_declares_the_days_it_covers() -> None:
+    history = history_of(rising(200, timedelta(days=1)), 365, NOW)
+
+    assert (history.shortened, history.days) == (True, 200)
+
+
+def test_a_long_forecast_expires_after_its_days() -> None:
+    assert forecast(horizon=ForecastHorizon.WEEK_1).expires_at == NOW + timedelta(days=7)

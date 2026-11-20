@@ -88,9 +88,18 @@ class HyperliquidPriceHistoryAdapter:
         return self._base_url
 
     def history(self, asset: str, days: int, now: datetime) -> Sequence[PricePoint]:
+        return self._points(asset, days, now, interval_for(days))
+
+    def daily_history(self, asset: str, days: int, now: datetime) -> Sequence[PricePoint]:
+        """The daily candles of the long horizons (ADR orizzonti-lunghi-del-forecast): 1000 days stay within the
+        candles the exchange keeps.
+        """
+        return self._points(asset, days, now, (MINUTES_PER_DAY, DAY))
+
+    def _points(self, asset: str, days: int, now: datetime, interval: tuple[int, str]) -> list[PricePoint]:
         try:
             info = self._sdk.info(self._base_url, self._timeout)
-            return [_point_of(candle) for candle in _all_pages(info, asset, days, now)]
+            return [_point_of(candle, now) for candle in _all_pages(info, asset, days, now, interval)]
         except (*UNAVAILABLE, ValueError) as error:
             raise SourceUnavailableError(FORECAST.name) from error
 
@@ -110,8 +119,8 @@ def interval_for(days: int) -> tuple[int, str]:
     return INTERVALS[-1]
 
 
-def _all_pages(info: Info, asset: str, days: int, now: datetime) -> list[_Candle]:
-    minutes, interval = interval_for(days)
+def _all_pages(info: Info, asset: str, days: int, now: datetime, candles_of: tuple[int, str]) -> list[_Candle]:
+    minutes, interval = candles_of
     step = minutes * 60 * MILLISECONDS
     end = _milliseconds(now)
     page_start = _milliseconds(now - timedelta(days=days))
@@ -127,8 +136,10 @@ def _all_pages(info: Info, asset: str, days: int, now: datetime) -> list[_Candle
     return candles
 
 
-def _point_of(candle: _Candle) -> PricePoint:
-    return PricePoint(datetime.fromtimestamp(int(candle["T"]) / MILLISECONDS, UTC), Decimal(str(candle["c"])))
+def _point_of(candle: _Candle, now: datetime) -> PricePoint:
+    # The candle still open closes in the future: its close so far is the price of now.
+    closes_at = datetime.fromtimestamp(int(candle["T"]) / MILLISECONDS, UTC)
+    return PricePoint(min(closes_at, now), Decimal(str(candle["c"])))
 
 
 def _milliseconds(moment: datetime) -> int:
