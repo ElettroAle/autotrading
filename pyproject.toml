@@ -8,11 +8,20 @@ dependencies = [
     "apscheduler>=3.11,<4",
     "eth-account>=0.10,<0.11",
     "fastapi>=0.120",
+    # The SQLAlchemy instrumentation of OpenTelemetry imports sqlalchemy.ext.asyncio, which needs it (ADR
+    # telemetria-opentelemetry-verso-grafana-cloud).
+    "greenlet>=3.5",
     "httpx>=0.28",
     "hyperliquid-python-sdk>=0.24.0",
     "langgraph>=1.2",
     "langgraph-checkpoint-postgres>=3.0",
     "litellm>=1.109.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.45",
+    "opentelemetry-instrumentation-fastapi>=0.66b2",
+    "opentelemetry-instrumentation-httpx>=0.66b2",
+    "opentelemetry-instrumentation-logging>=0.66b2",
+    "opentelemetry-instrumentation-sqlalchemy>=0.66b2",
+    "opentelemetry-sdk>=1.45",
     "procrastinate>=3.11",
     "psycopg[binary]>=3.2",
     "pyjwt[crypto]>=2.10",
@@ -129,6 +138,7 @@ forbidden_modules = [
     "openai",
     "apscheduler",
     "procrastinate",
+    "opentelemetry",
 ]
 # The owner's named architectural exception (ADR 0104): LangGraph orchestrates the decision cycle, only here.
 ignore_imports = ["autotrading.application.flows.cycle_graph -> langgraph"]
@@ -180,6 +190,7 @@ modules = [
     "autotrading.adapters.outbound.coinmarketcap",
     "autotrading.adapters.outbound.dashboard",
     "autotrading.adapters.outbound.forecaster",
+    "autotrading.adapters.outbound.grafana_cloud",
     "autotrading.adapters.outbound.rss",
     "autotrading.adapters.outbound.telegram",
     "autotrading.adapters.outbound.worker",

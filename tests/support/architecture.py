@@ -129,6 +129,9 @@ TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/outbound/dashboard": frozenset(),
     # The internal API of the forecaster service (ADR 0107): Prophet stays inside the service.
     "adapters/outbound/forecaster": frozenset({"httpx"}),
+    # Traces, metrics and logs exported in OTLP to Grafana Cloud; the instrumentations of FastAPI, httpx, SQLAlchemy and
+    # the standard logging come with it (ADR telemetria-opentelemetry-verso-grafana-cloud).
+    "adapters/outbound/grafana_cloud": frozenset({"opentelemetry"}),
     # eth_account and requests are the signing and transport libraries of the official Hyperliquid SDK.
     "adapters/outbound/hyperliquid": frozenset({"hyperliquid", "eth_account", "requests"}),
     "adapters/outbound/json": frozenset(),

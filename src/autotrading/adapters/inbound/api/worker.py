@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+import fastapi
 from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel, Field
 
@@ -282,7 +283,9 @@ def create_worker_api(
     The tenant travels in the path because the API has already resolved it from the identity of the user; the
     worker trusts it only from a caller holding the token generated on the machine.
     """
-    api = FastAPI(
+    # Read from the module at each call: the telemetry, installed first, replaces it with its instrumented subclass
+    # (ADR telemetria-opentelemetry-verso-grafana-cloud).
+    api = fastapi.FastAPI(
         title="AutoTrading worker",
         openapi_url=None,
         docs_url=None,

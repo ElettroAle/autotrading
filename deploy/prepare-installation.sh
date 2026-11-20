@@ -34,6 +34,15 @@ if [ ! -e secrets/telegram_bot_token ]; then
         && chown 65532:65532 /secrets/telegram_bot_token && chmod 0400 /secrets/telegram_bot_token"
 fi
 
+# The token of Grafana Cloud (ADR telemetria-opentelemetry-verso-grafana-cloud, ADR 0071): created by the owner in the
+# Grafana Cloud stack, it arrives from the secret of the GitHub environment. Until then the file stays empty and api and
+# worker export no telemetry.
+if [ ! -e secrets/grafana_otlp_token ]; then
+  docker run --rm --user 0 --network none -v /opt/autotrading/secrets:/secrets --entrypoint sh "$postgres_image" \
+    -c "umask 077 && : > /secrets/grafana_otlp_token \
+        && chown 65532:65532 /secrets/grafana_otlp_token && chmod 0400 /secrets/grafana_otlp_token"
+fi
+
 # The LiteLLM proxy left the installation (ADR 0150): the library runs inside the worker. Its master key, its
 # configuration and the marker of a changed configuration go with it; --remove-orphans stops its container.
 rm -rf secrets/litellm_master_key secrets/litellm_config secrets/.litellm_config.new litellm .litellm_config_changed

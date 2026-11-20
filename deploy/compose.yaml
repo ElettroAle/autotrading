@@ -75,6 +75,7 @@ services:
     command: ["autotrading.bootstrap:create_worker_application", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/logging.json"]
     environment:
       APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
+      APP_VERSION: ${APP_VERSION:-}
       DATABASE_HOST: postgres
       DATABASE_NAME: autotrading
       DATABASE_USER: autotrading_app
@@ -90,11 +91,17 @@ services:
       # Indirizzo HTTPS della dashboard a cui portano i link delle notifiche; vuoto, le notifiche partono senza link
       # (ADR destinazioni-delle-notifiche-nella-dashboard).
       DASHBOARD_URL: ${DASHBOARD_URL:-}
+      # Telemetry to Grafana Cloud (ADR telemetria-opentelemetry-verso-grafana-cloud): endpoint and instance are
+      # public, the token is a file the release installs; with any of them empty the service exports nothing.
+      GRAFANA_OTLP_ENDPOINT: ${GRAFANA_OTLP_ENDPOINT:-}
+      GRAFANA_INSTANCE_ID: ${GRAFANA_INSTANCE_ID:-}
+      GRAFANA_OTLP_TOKEN_FILE: /run/secrets/grafana_otlp_token
     secrets:
       - postgres_app_password
       - credentials_private_key_v1
       - worker_token
       - telegram_bot_token
+      - grafana_otlp_token
     read_only: true
     tmpfs:
       - /tmp
@@ -134,10 +141,16 @@ services:
       # The API lists the sources as their adapters declare themselves, the forecaster among them; the declaration
       # needs no call to the service (R4.1.1, ADR fonti-con-adapter-dichiarati).
       FORECASTER_URL: http://forecaster:8000
+      # Telemetry to Grafana Cloud (ADR telemetria-opentelemetry-verso-grafana-cloud): endpoint and instance are
+      # public, the token is a file the release installs; with any of them empty the service exports nothing.
+      GRAFANA_OTLP_ENDPOINT: ${GRAFANA_OTLP_ENDPOINT:-}
+      GRAFANA_INSTANCE_ID: ${GRAFANA_INSTANCE_ID:-}
+      GRAFANA_OTLP_TOKEN_FILE: /run/secrets/grafana_otlp_token
     secrets:
       - postgres_app_password
       - credentials_public_key
       - worker_token
+      - grafana_otlp_token
     read_only: true
     tmpfs:
       - /tmp
@@ -195,6 +208,8 @@ secrets:
     file: ./secrets/worker_token
   telegram_bot_token:
     file: ./secrets/telegram_bot_token
+  grafana_otlp_token:
+    file: ./secrets/grafana_otlp_token
 
 volumes:
   postgres-data:

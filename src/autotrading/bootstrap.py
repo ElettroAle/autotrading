@@ -22,6 +22,7 @@ from autotrading.adapters.outbound.binance.composition import binance_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
 from autotrading.adapters.outbound.dashboard.composition import dashboard_adapters
 from autotrading.adapters.outbound.forecaster.composition import forecaster_adapters
+from autotrading.adapters.outbound.grafana_cloud.composition import grafana_cloud_telemetry_adapters
 from autotrading.adapters.outbound.hyperliquid.composition import (
     HyperliquidAdaptersOfInstallation,
     hyperliquid_adapters,
@@ -735,6 +736,7 @@ def source_systems(hyperliquid: HyperliquidAdaptersOfInstallation, forecaster: P
 
 def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
     source = ConfigurationSource(configuration)
+    grafana_cloud_telemetry_adapters(source, "autotrading-api")
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
     # The API never loads the LiteLLM library: it asks the worker for its catalog (ADR 0148, ADR 0149).
@@ -756,6 +758,7 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
 def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:
     """The worker: the only service that receives the private key of the credentials (ADR 0007, ADR 0021)."""
     source = ConfigurationSource(configuration)
+    grafana_cloud_telemetry_adapters(source, "autotrading-worker")
     environment = source.environment()
     opener, provider_key_opener, mail_password_opener, source_secrets_opener = libsodium_opening_adapters(source)
     slippage = hyperliquid_slippage_adapters(source)

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
-from sqlalchemy import URL, Engine, create_engine
+import sqlalchemy
+from sqlalchemy import URL, Engine
 
 APPLICATION_ROLE = "autotrading_app"
 
@@ -26,4 +27,6 @@ class SqlAlchemyDatabaseAdapter:
         )
 
     def engine(self) -> Engine:
-        return create_engine(self.url(), pool_pre_ping=True)
+        # Read from the module at each call: the telemetry, installed first, wraps it to trace the queries (ADR
+        # telemetria-opentelemetry-verso-grafana-cloud).
+        return sqlalchemy.create_engine(self.url(), pool_pre_ping=True)
