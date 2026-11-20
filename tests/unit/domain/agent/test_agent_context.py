@@ -142,6 +142,17 @@ def test_the_user_message_has_the_sources_with_their_weights_and_the_missing_dat
     assert document["dati_mancanti"] == ["forecast: servizio non raggiungibile"]
 
 
+def test_an_aggregate_of_several_adapters_carries_no_weight_of_its_own() -> None:
+    aggregate = SourceData("volumi", "aggregato", None, "BTC", {"volume_24h_usd": "400"})
+
+    document = user_document(context(sources=(RSI, aggregate)))
+
+    assert document["fonti"] == [
+        {"fonte": "indicatori", "adapter": "Hyperliquid", "peso": 7, "asset": "BTC", "valori": {"rsi_14": "61.2"}},
+        {"fonte": "volumi", "adapter": "aggregato", "asset": "BTC", "valori": {"volume_24h_usd": "400"}},
+    ]
+
+
 def test_the_context_has_nothing_but_what_it_declares() -> None:
     assert set(user_document(context())) == {
         "ora_corrente",

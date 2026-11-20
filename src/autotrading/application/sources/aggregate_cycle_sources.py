@@ -9,11 +9,11 @@ from autotrading.domain.sources.volumes import VOLUMES
 
 @dataclass(frozen=True, slots=True)
 class AggregatedSource:
-    """What several adapters of a source say together of an asset, with the weight of the heaviest of them (R5.1.2)."""
+    """What several adapters of a source say together of an asset, as the context reads it: without a weight of its
+    own, the weights are those of the adapters it summarizes (R5.1.2, ADR peso-delle-fonti-nel-system-prompt)."""
 
     source: str
     adapter: str
-    weight: int
     asset: str | None
     values: Mapping[str, str]
 
@@ -23,25 +23,18 @@ class AggregateCycleSourcesUseCase:
     volumes, when the domain says there is one (R5.1.2, ADR fonte-volumi-con-adapter-binance)."""
 
     def execute(self, data: Sequence[CycleSourceDatumPort]) -> tuple[AggregatedSource, ...]:
-        measured = _measured_volumes_by_asset(data)
-        aggregates = {
-            asset: volume_aggregate([figures for _, figures in readings]) for asset, readings in measured.items()
-        }
+        aggregates = {asset: volume_aggregate(measured) for asset, measured in _measured_volumes_by_asset(data).items()}
         return tuple(
-            AggregatedSource(VOLUMES.name, AGGREGATE, _heaviest(measured[asset]), asset, figures.values())
+            AggregatedSource(VOLUMES.name, AGGREGATE, asset, figures.values())
             for asset, figures in aggregates.items()
             if figures is not None
         )
 
 
-def _measured_volumes_by_asset(data: Sequence[CycleSourceDatumPort]) -> dict[str, list[tuple[int, VolumeFigures]]]:
-    by_asset: dict[str, list[tuple[int, VolumeFigures]]] = {}
+def _measured_volumes_by_asset(data: Sequence[CycleSourceDatumPort]) -> dict[str, list[VolumeFigures]]:
+    by_asset: dict[str, list[VolumeFigures]] = {}
     for datum in data:
         figures = VolumeFigures.of_values(datum.values) if datum.source == VOLUMES.name else None
         if figures is not None and datum.asset is not None:
-            by_asset.setdefault(datum.asset, []).append((datum.weight, figures))
+            by_asset.setdefault(datum.asset, []).append(figures)
     return by_asset
-
-
-def _heaviest(readings: list[tuple[int, VolumeFigures]]) -> int:
-    return max(weight for weight, _ in readings)

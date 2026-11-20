@@ -1139,16 +1139,14 @@ class AgentActionsPort(Protocol):
 
 
 class AggregatedSourcePort(Protocol):
-    """What several adapters of an active source say together of an asset, as the sources hand it over (R5.1.2)."""
+    """What several adapters of an active source say together of an asset, as the sources hand it over: without a
+    weight of its own (R5.1.2, ADR peso-delle-fonti-nel-system-prompt)."""
 
     @property
     def source(self) -> str: ...
 
     @property
     def adapter(self) -> str: ...
-
-    @property
-    def weight(self) -> int: ...
 
     @property
     def asset(self) -> str | None: ...

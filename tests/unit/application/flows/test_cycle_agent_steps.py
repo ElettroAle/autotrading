@@ -177,7 +177,6 @@ class Actions:
 class Aggregated:
     source: str
     adapter: str
-    weight: int
     asset: str | None
     values: Mapping[str, str]
 
@@ -218,7 +217,7 @@ def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_mi
 
 
 def test_the_aggregates_of_the_sources_follow_the_data_they_were_made_of() -> None:
-    aggregated = Aggregated("volumi", "aggregato", 7, "BTC", {"volume_24h_usd": "400"})
+    aggregated = Aggregated("volumi", "aggregato", "BTC", {"volume_24h_usd": "400"})
     aggregates = Aggregates(aggregated)
 
     question = a_context(aggregates).question
@@ -226,7 +225,7 @@ def test_the_aggregates_of_the_sources_follow_the_data_they_were_made_of() -> No
     assert aggregates.received == [(SourceData("news", "RSS", 2, None, {"titolo": "t"}),)]
     assert question.sources == (
         SourceData("news", "RSS", 2, None, {"titolo": "t"}),
-        SourceData("volumi", "aggregato", 7, "BTC", {"volume_24h_usd": "400"}),
+        SourceData("volumi", "aggregato", None, "BTC", {"volume_24h_usd": "400"}),
     )
 
 

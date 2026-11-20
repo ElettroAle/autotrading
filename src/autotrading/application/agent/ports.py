@@ -213,7 +213,8 @@ class QuestionStatePort(Protocol):
 
 
 class QuestionSourcePort(Protocol):
-    """The values of one adapter of an active source in the cycle, with its weight (R1.3.2, R4.1.1)."""
+    """The values of one adapter of an active source in the cycle, with its weight; an aggregate of several adapters has
+    none of its own (R1.3.2, R4.1.1, R5.1.2)."""
 
     @property
     def source(self) -> str: ...
@@ -222,7 +223,7 @@ class QuestionSourcePort(Protocol):
     def adapter(self) -> str: ...
 
     @property
-    def weight(self) -> int: ...
+    def weight(self) -> int | None: ...
 
     @property
     def asset(self) -> str | None: ...

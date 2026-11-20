@@ -58,6 +58,6 @@ class ComposeCycleContextUseCase:
 
     def _aggregated(self, data: tuple[SourceData, ...]) -> tuple[SourceData, ...]:
         return tuple(
-            SourceData(aggregate.source, aggregate.adapter, aggregate.weight, aggregate.asset, aggregate.values)
+            SourceData(aggregate.source, aggregate.adapter, None, aggregate.asset, aggregate.values)
             for aggregate in self._aggregates.execute(data)
         )

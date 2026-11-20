@@ -190,9 +190,6 @@ class CycleSourceDatumPort(Protocol):
     def adapter(self) -> str: ...
 
     @property
-    def weight(self) -> int: ...
-
-    @property
     def asset(self) -> str | None: ...
 
     @property

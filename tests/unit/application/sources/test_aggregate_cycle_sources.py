@@ -35,7 +35,6 @@ def test_the_volumes_are_grouped_by_asset_and_every_aggregate_of_the_domain_is_a
         AggregatedSource(
             "volumi",
             AGGREGATE,
-            7,
             "BTC",
             {
                 "volume_24h_usd": "400",
