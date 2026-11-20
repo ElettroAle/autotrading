@@ -51,9 +51,12 @@ def test_a_per_asset_source_is_read_for_every_asset_with_the_settings_of_the_flo
 
     use_case.execute(command(INDICATORS_READER, {"lunghezza_serie": 20}))
 
+    # The parameters the flow does not set take the defaults of the catalog.
+    settings = INDICATORS.settings({"lunghezza_serie": 20})
+    assert settings["lunghezza_serie"] == 20
     assert reader.readings == [
-        SourceRequest(CYCLE.flow_id, "BTC", {"lunghezza_serie": 20}, COLLECTED),
-        SourceRequest(CYCLE.flow_id, "ETH", {"lunghezza_serie": 20}, COLLECTED),
+        SourceRequest(CYCLE.flow_id, "BTC", settings, COLLECTED),
+        SourceRequest(CYCLE.flow_id, "ETH", settings, COLLECTED),
     ]
 
 

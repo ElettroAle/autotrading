@@ -28,7 +28,8 @@ BTC_CONTEXT = {"markPx": "74572.0", "midPx": "74697.0", "openInterest": "59.7660
 
 
 def candle(open_ms: int, close: str, minutes: int = 15, **values: str) -> dict[str, Any]:
-    return {"t": open_ms, "T": open_ms + minutes * MINUTE_MS - 1, "c": close, "v": "2.5", "s": "BTC", **values}
+    candle = {"t": open_ms, "T": open_ms + minutes * MINUTE_MS - 1, "c": close, "v": "2.5", "h": "110", "l": "90"}
+    return {**candle, "s": "BTC", **values}
 
 
 @dataclass
@@ -72,13 +73,13 @@ def test_the_market_data_declare_the_adapter_of_indicators_and_pivots_without_co
     )
 
 
-def test_the_candles_are_the_closed_ones_with_close_and_volume() -> None:
+def test_the_candles_are_the_closed_ones_with_close_volume_high_and_low() -> None:
     closed = NOW_MS - 22 * MINUTE_MS
     sdk = FakeSdk(page=[candle(closed, "100.5"), candle(closed + 15 * MINUTE_MS, "101")])
 
     candles = adapter(sdk).candles("BTC", FIFTEEN, 2, NOW)
 
-    assert candles == [Candle(NOW - timedelta(minutes=7), Decimal("100.5"), Decimal("2.5"))]
+    assert candles == [Candle(NOW - timedelta(minutes=7), Decimal("100.5"), Decimal("2.5"), Decimal(110), Decimal(90))]
     assert sdk.calls == [
         ("info", (TESTNET_API_URL, TIMEOUT_SECONDS)),
         ("candles_snapshot", ("BTC", "15m", NOW_MS - 3 * 15 * MINUTE_MS, NOW_MS)),

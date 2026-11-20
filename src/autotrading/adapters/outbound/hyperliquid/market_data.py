@@ -207,7 +207,13 @@ class HyperliquidMarketDataAdapter:
 
 def _candle_of(candle: _Candle) -> Candle:
     closed_at = datetime.fromtimestamp((int(candle["T"]) + 1) / MILLISECONDS, UTC)
-    return Candle(closed_at, Decimal(str(candle["c"])), Decimal(str(candle["v"])))
+    return Candle(
+        closed_at,
+        Decimal(str(candle["c"])),
+        Decimal(str(candle["v"])),
+        Decimal(str(candle["h"])),
+        Decimal(str(candle["l"])),
+    )
 
 
 def _range_of(candle: _Candle) -> DailyRange:
