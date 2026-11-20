@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import Engine, RowMapping, func, select, update
+from sqlalchemy import Engine, RowMapping, func, select, text, update
 
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -218,6 +218,15 @@ def test_the_forecasts_of_a_tenant_are_invisible_to_the_others(database: Engine)
         )
         == []
     )
+
+
+def test_the_forecasts_awaiting_their_actual_price_are_served_by_a_partial_index(database: Engine) -> None:
+    # ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore.
+    query = text("SELECT indexdef FROM pg_indexes WHERE indexname = 'forecasts_awaiting_actual'")
+    with database.connect() as connection:
+        definition = connection.execute(query).scalar_one()
+
+    assert definition.endswith("forecasts USING btree (tenant_id, made_at) WHERE (actual_price IS NULL)")
 
 
 def test_the_timing_of_a_flow_tells_its_anchor_and_its_pause_reason(database: Engine) -> None:

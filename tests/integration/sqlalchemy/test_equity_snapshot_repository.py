@@ -152,7 +152,7 @@ def test_the_daily_reference_is_the_last_equity_up_to_midnight_and_the_peak_the_
     ]:
         equity.record(snapshot(flow_id, planned_at, realized_pnl))
 
-    references = equity.loss_references(flow_id, midnight, midnight - timedelta(days=2))
+    references = equity.loss_references(flow_id, midnight, midnight - timedelta(days=2), midnight + timedelta(hours=3))
 
     assert references.daily == snapshot(flow_id, midnight, "100")
     assert references.peak == snapshot(flow_id, midnight - timedelta(days=1), "200")
@@ -165,7 +165,7 @@ def test_without_equity_before_midnight_the_daily_reference_is_the_first_of_the_
     equity.record(snapshot(flow_id, midnight + timedelta(hours=3), "7"))
     equity.record(snapshot(flow_id, midnight + timedelta(hours=1), "9"))
 
-    references = equity.loss_references(flow_id, midnight, midnight)
+    references = equity.loss_references(flow_id, midnight, midnight, midnight + timedelta(hours=4))
 
     assert references.daily == snapshot(flow_id, midnight + timedelta(hours=1), "9")
 
@@ -174,7 +174,7 @@ def test_a_flow_without_equity_has_no_reference(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
 
     references = SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id).loss_references(
-        flow_id, PLANNED, PLANNED
+        flow_id, PLANNED, PLANNED, PLANNED
     )
 
     assert (references.daily, references.peak) == (None, None)
@@ -186,7 +186,22 @@ def test_the_references_of_a_flow_of_another_tenant_are_not_seen(database: Engin
     SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id).record(snapshot(flow_id, PLANNED))
 
     references = SqlAlchemyEquitySnapshotRepositoryAdapter(database, other_tenant).loss_references(
-        flow_id, PLANNED, PLANNED
+        flow_id, PLANNED, PLANNED, PLANNED
     )
 
     assert (references.daily, references.peak) == (None, None)
+
+
+def test_the_references_end_at_now_holding_the_equity_of_now(database: Engine) -> None:
+    # ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore: every equity read has an upper bound.
+    tenant_id, flow_id = new_flow(database)
+    equity = SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id)
+    midnight = datetime(2026, 11, 16, tzinfo=UTC)
+    now = midnight + timedelta(hours=1)
+    equity.record(snapshot(flow_id, now, "9"))
+    equity.record(snapshot(flow_id, now + timedelta(microseconds=1), "900"))
+
+    references = equity.loss_references(flow_id, midnight, midnight, now)
+
+    assert references.daily == snapshot(flow_id, now, "9")
+    assert references.peak == snapshot(flow_id, now, "9")

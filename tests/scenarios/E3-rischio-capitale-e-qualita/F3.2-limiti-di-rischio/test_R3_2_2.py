@@ -120,7 +120,8 @@ class MaximumLoss:
         openings = InMemoryOpeningsSuspensionAdapter(self.flow_cycles.platform.flows, self.tenant_id)
         status = openings.status(flow.id.value).at(self.now(), flow.configuration.openings_resume)
         equities = InMemoryEquitySnapshotRepositoryAdapter(self.flow_cycles.equity_snapshots, self.tenant_id)
-        references = equities.loss_references(flow.id.value, day_start(self.now()), status.peak_since(FIRST_START))
+        now = self.now()
+        references = equities.loss_references(flow.id.value, day_start(now), status.peak_since(FIRST_START), now)
         return LossGuard.of(flow.configuration, self.value, references).peak
 
     def suspension_notices(self) -> list[str]:

@@ -50,14 +50,14 @@ class RankFlowsUseCase:
 
     def execute(self, command: RankFlowsCommand) -> tuple[FlowRanking, ...]:
         period = StatisticsPeriod.named(command.period, command.since, command.until)
-        window = period.window(self._clock())
-        return ranked_by_return(self._rankings(window))
+        now = self._clock()
+        return ranked_by_return(self._rankings(period.window(now), now))
 
-    def _rankings(self, window: TimeWindow) -> Iterator[FlowRanking]:
+    def _rankings(self, window: TimeWindow, now: datetime) -> Iterator[FlowRanking]:
         for flow in self._flows.list():
             if flow.status in _OUT_OF_RANKING:
                 continue
-            snapshots = self._equity.of_flow(flow.id.value, window)
+            snapshots = self._equity.of_flow(flow.id.value, window.ending_by(now))
             if not snapshots:
                 continue
             changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())

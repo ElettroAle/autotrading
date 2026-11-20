@@ -102,6 +102,15 @@ def test_the_ranking_goes_from_the_highest_return_of_the_whole_life(platform: Pl
     assert (rows[0].return_percent, rows[0].max_drawdown_percent) == (Decimal(20), Decimal(10))
 
 
+def test_the_ranking_of_the_whole_life_reads_the_equity_up_to_now_included(platform: Platform) -> None:
+    # ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore: the read is bounded by the clock.
+    platform.flow("alfa", "300", "330", "900", since=NOW - CYCLE)
+
+    rows = platform.use_case().execute(RankFlowsCommand())
+
+    assert rows[0].return_percent == Decimal(10)
+
+
 def test_the_return_of_a_flow_is_compounded_across_the_changes_of_its_capital(platform: Platform) -> None:
     # ADR rendimento-composto-tra-le-variazioni-di-capitale: an increase of 900 at 1100, then 2100.
     flow = platform.flow("alfa", "1000", "1100", "2100")

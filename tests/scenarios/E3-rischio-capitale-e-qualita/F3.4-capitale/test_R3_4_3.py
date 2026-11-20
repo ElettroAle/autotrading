@@ -201,8 +201,9 @@ def value_moves(returns: Returns, name: str, before: str, after: str) -> None:
 @when(quoted('"{user}" apre la classifica dei flussi e parte un ciclo di "{name}"'))
 def ranking_and_cycle(returns: Returns, user: str, name: str) -> None:
     assert (user, name) == (returns.user, returns.name)
-    # The cycle records the equity of now, the last point the ranking reads.
+    # The cycle records the equity of now, the last point the ranking reads: the user reads it from then on.
     returns.flow_cycles.run(name, NEXT_CYCLE)
+    returns.flow_cycles.platform.now = returns.flow_cycles.clock.now()
     use_cases = returns.flow_cycles.platform.use_cases_of(user)
     returns.ranking = use_cases.rank_flows.execute(RankFlowsCommand())
 
@@ -211,6 +212,7 @@ def ranking_and_cycle(returns: Returns, user: str, name: str) -> None:
 def open_curve(returns: Returns, user: str, name: str) -> None:
     assert (user, name) == (returns.user, returns.name)
     returns.flow_cycles.run(name, NEXT_CYCLE)
+    returns.flow_cycles.platform.now = returns.flow_cycles.clock.now()
     use_cases = returns.flow_cycles.platform.use_cases_of(user)
     returns.curve = use_cases.read_flow_equity.execute(ReadFlowEquityCommand(returns.flow.id.value))
     instants = [snapshot.planned_at for snapshot in returns.curve.snapshots]

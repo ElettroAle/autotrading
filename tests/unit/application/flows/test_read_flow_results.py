@@ -121,6 +121,18 @@ def test_the_gain_in_the_period_reads_only_the_equity_recorded_in_the_period(ben
     assert (results.period_gain, results.period_gain_percent) == (Decimal("0.4"), Decimal("0.40"))
 
 
+def test_the_gain_in_all_reads_the_equity_up_to_now_included(bench: Bench) -> None:
+    # ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore: the read is bounded by the clock.
+    flow = bench.flow()
+    bench.equity_at(flow, 1, "100.5")
+    bench.equity_at(flow, 0, "101")
+    bench.equity_at(flow, -1, "150")
+
+    results = bench.use_case.execute(ReadFlowResultsCommand(flow.id.value))
+
+    assert results.period_gain == Decimal("0.5")
+
+
 def test_the_failed_cycles_are_counted_only_in_the_period(bench: Bench) -> None:
     flow = bench.flow()
     bench.cycle(flow, 10, CycleOutcome.FAILED)
