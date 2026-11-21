@@ -65,7 +65,10 @@ from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
-from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_activity import (
+    FakeAccountActivityAdapter,
+    RememberedReadings,
+)
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.account_transfers import FakeAccountTransfersAdapter
@@ -225,8 +228,10 @@ class Platform:
         )
         self.bot_username: str | None = None
         self.activity_reader = FakeActivityReaderAdapter()
-        # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
-        self.account_activity = FakeAccountActivityAdapter()
+        # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1), with
+        # what its process remembers of each reading: nothing unless a test gives the memory a validity (ADR
+        # cache-delle-letture-del-conto-come-decorator-in-memoria).
+        self.account_activity, self.remembered_readings = FakeAccountActivityAdapter(), RememberedReadings()
         self.account_activity.unread = self.reading_on_exchange
         self.account_transfers = FakeAccountTransfersAdapter()
         # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
@@ -297,6 +302,7 @@ class Platform:
         account_state.reachable = position_closing.reachable = verification.reachable = self.worker_reachable
         on_demand_cycles.reachable = source_trials.reachable = self.worker_reachable
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
+        account_activity = self.remembered_readings.decorate(self.account_activity, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
         flow_positions = CloseFlowPositionUseCase(position_closing)
@@ -334,7 +340,7 @@ class Platform:
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountPorts(accounts, self.account_activity, self.ledger),
+                accounts=FlowAccountPorts(accounts, account_activity, self.ledger),
                 markets=self.markets,
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(sources, source_credentials),
@@ -342,7 +348,7 @@ class Platform:
             flow_positions=flow_positions,
             closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
-            account_activity=self.account_activity,
+            account_activity=account_activity,
             account_transfers=self.account_transfers,
             flow_ledger=self.ledger,
             ledger_recording=FakeLedgerRecordingAdapter(

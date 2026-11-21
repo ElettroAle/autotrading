@@ -1,21 +1,14 @@
 from dataclasses import replace
-from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.adapters.outbound.process_memory.account_activity import (
-    ProcessMemoryAccountActivityAdapter,
-    _AccountActivityStore,
-)
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.domain.errors import AutotradingError
-from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.fakes.account_activity import FakeAccountActivityAdapter
-from tests.support.activity import an_activity
+from autotrading.domain.flows.free_capital import FreeCapital
 
 # The steps of the record and of the consultation of the cycles are shared by R1.7.1, R1.7.3 and R1.4.6.
 from tests.support.record_steps import *  # noqa: F403
@@ -31,38 +24,44 @@ VALIDITY_SECONDS = 10.0
 
 
 class ApiReadings:
-    """The readings of the accounts the API asks for the dashboard, through the decorator its composition mounts.
+    """The account as the dashboard consults it from the API: the use case of its free capital, which reads the account
+    through the memory the composition of the API mounts on the reading.
 
-    An account has one identifier by its name for every user: tenants that ask for the same account still never share
-    its reading, which proves the reading is kept by tenant and not only by account.
+    Every user registers its own account by the name the scenario gives, so "test-1" of two users are two accounts.
     """
 
-    def __init__(self) -> None:
-        self.exchange = FakeAccountActivityAdapter()
-        self.seconds = 1000.0
-        self.store = _AccountActivityStore(VALIDITY_SECONDS, lambda: self.seconds)
-        self.accounts: dict[str, UUID] = {}
-        self.tenants: dict[str, TenantId] = {}
-        self.answers: list[AccountActivity | AutotradingError] = []
+    def __init__(self, records: Records) -> None:
+        self.records = records
+        self.platform = records.platform
+        self.platform.remembered_readings.validity_seconds = VALIDITY_SECONDS
+        self.accounts: dict[str, list[UUID]] = {}
+        self.answers: list[FreeCapital | AutotradingError] = []
+        self.reads: list[UUID] = []
 
-    def account(self, name: str) -> UUID:
-        if name not in self.accounts:
-            self.accounts[name] = uuid4()
-            self.exchange.activities[self.accounts[name]] = an_activity(balance=Decimal(1000 + len(self.accounts)))
-        return self.accounts[name]
+    def account(self, user: str, name: str) -> UUID:
+        account_id = self.records.flow_cycles.account_of(user, name)
+        known = self.accounts.setdefault(name, [])
+        if account_id not in known:
+            known.append(account_id)
+        return account_id
 
     def consult(self, user: str, account: str) -> None:
-        tenant_id = self.tenants.setdefault(user, TenantId.new())
-        reading = ProcessMemoryAccountActivityAdapter(self.exchange, tenant_id, self.store)
+        command = ReadFreeCapitalCommand(self.account(user, account))
+        exchange = self.platform.account_activity
+        before = len(exchange.read)
         try:
-            self.answers.append(reading.execute(self.account(account)))
+            self.answers.append(self.records.use_cases_of(user).read_free_capital.execute(command))
         except AutotradingError as error:
             self.answers.append(error)
+        self.reads.extend(exchange.read[before:])
+
+    def read_count(self, account: str) -> int:
+        return sum(self.reads.count(account_id) for account_id in self.accounts[account])
 
 
 @pytest.fixture
-def readings() -> ApiReadings:
-    return ApiReadings()
+def readings(records: Records) -> ApiReadings:
+    return ApiReadings(records)
 
 
 @given(quoted('che "{user}" ha il flusso "{flow}" in pausa automatica con il motivo "{reason}"'))
@@ -102,30 +101,30 @@ def consults_account(readings: ApiReadings, user: str, account: str) -> None:
     )
 )
 def consults_again(readings: ApiReadings, user: str, account: str, seconds: str) -> None:
-    readings.seconds += int(seconds)
+    readings.platform.remembered_readings.seconds += int(seconds)
     readings.consult(user, account)
 
 
 @given(quoted('che l\'exchange non risponde alla lettura del conto "{account}"'))
 def exchange_silent(readings: ApiReadings, account: str) -> None:
-    readings.account(account)
-    readings.exchange.reachable = False
+    readings.account("anna", account)
+    readings.platform.account_activity.reachable = False
 
 
 @when("l'exchange torna a rispondere")
 def exchange_back(readings: ApiReadings) -> None:
-    readings.exchange.reachable = True
+    readings.platform.account_activity.reachable = True
 
 
 @then(parsers.re(r'^l\'exchange ha letto il conto "(?P<account>[^"]+)" (?P<count>\d+) volt[ae]$'))
 def exchange_read(readings: ApiReadings, account: str, count: str) -> None:
-    assert readings.exchange.read.count(readings.accounts[account]) == int(count)
+    assert readings.read_count(account) == int(count)
 
 
 @then("le due consultazioni riportano la stessa lettura")
 def same_reading(readings: ApiReadings) -> None:
     first, second = readings.answers
-    assert isinstance(first, AccountActivity)
+    assert isinstance(first, FreeCapital)
     assert second == first
 
 
@@ -133,4 +132,4 @@ def same_reading(readings: ApiReadings) -> None:
 def failure_then_reading(readings: ApiReadings) -> None:
     first, second = readings.answers
     assert isinstance(first, FlowExchangeUnavailableError)
-    assert isinstance(second, AccountActivity)
+    assert isinstance(second, FreeCapital)
