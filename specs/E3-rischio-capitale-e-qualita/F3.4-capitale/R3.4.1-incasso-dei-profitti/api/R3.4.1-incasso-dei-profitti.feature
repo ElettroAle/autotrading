@@ -14,7 +14,8 @@ Funzionalità: R3.4.1 Incasso dei profitti
   Un valore indicato deve essere maggiore di 0 e minore del valore complessivo del flusso.
   Se una chiusura fallisce, il comando non libera nulla e riporta le posizioni non chiuse con il motivo.
   Il flusso resta nello stato in cui era: un flusso attivo continua dal ciclo successivo.
-  Ogni chiusura entra nello storico delle posizioni chiuse con il motivo "incasso".
+  Ogni chiusura entra nello storico delle posizioni chiuse con il motivo "incasso". Le sue esecuzioni appartengono al
+  flusso, anche se l'exchange le pubblica quando il suo asset è già passato a un altro flusso (Bug 684).
   La dashboard chiede una conferma che mostra il profitto stimato al valore corrente.
   Fuori ambito: lo storico delle variazioni (R3.4.2); il rendimento dopo l'incasso (R3.4.3); il prelievo
   dall'exchange, che resta un'azione manuale dell'utente sull'exchange (RF-22.06).
@@ -70,3 +71,14 @@ Funzionalità: R3.4.1 Incasso dei profitti
     Quando "anna" sceglie nella dashboard l'incasso dei profitti di "alfa"
     Allora la dashboard chiede conferma con "Chiudere 1 posizione di alfa e liberare circa 120 USDC?"
     E nessuna posizione viene chiusa finché "anna" non conferma
+  Scenario: L'incasso attribuisce la chiusura al flusso anche se l'asset passa a un altro flusso
+    Dato che "alfa" ha valore complessivo 620 USDC, di cui 20 USDC sulla posizione aperta su "BTC"
+    E che "anna" ha sul conto "test-1" anche il flusso attivo "beta" con asset "ETH"
+    E che l'exchange pubblica le esecuzioni della chiusura solo dopo l'incasso
+    Quando "anna" incassa i profitti di "alfa"
+    E "anna" ferma e archivia il flusso "alfa" e aggiunge "BTC" agli asset del flusso "beta"
+    E il flusso "beta" esegue un ciclo che registra le esecuzioni delle chiusure
+    Allora la posizione di "alfa" su "BTC" è chiusa
+    E il registro del flusso "alfa" riporta la chiusura su "BTC" e nessuna posizione aperta
+    E il registro del flusso "beta" non ha una posizione su "BTC"
+    E il flusso "beta" non è in pausa

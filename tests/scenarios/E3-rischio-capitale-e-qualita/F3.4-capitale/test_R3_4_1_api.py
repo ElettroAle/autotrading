@@ -26,6 +26,8 @@ from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.support.activity import READ_AT, a_fill, an_activity
+from tests.support.flow_closing_steps import *  # noqa: F403 - the steps of the closings that reach the ledger late
+from tests.support.flow_closings import FlowClosings
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.lifecycle_steps import hold_position, open_assets
 from tests.support.orders import a_flow_order
@@ -47,6 +49,8 @@ class ClosingsShownOnTheAccount(FakeOrderExchangeAdapter):
     def __init__(self, platform: Platform) -> None:
         super().__init__()
         self.platform = platform
+        # The executions of the closings reach the account only later, after the cash-out has read it (Bug 684).
+        self.executions_late = False
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
         execution = super().place_market_order(access, order)
@@ -63,6 +67,8 @@ class ClosingsShownOnTheAccount(FakeOrderExchangeAdapter):
             self.platform.account_activity.activities[account_id] = replace(
                 reading, balance=reading.balance - fee, positions=remaining
             )
+            if self.executions_late:
+                continue
             closing = a_fill(
                 asset,
                 None,
@@ -143,6 +149,11 @@ def cash_out(platform: Platform) -> CashOut:
     return CashOut(platform)
 
 
+@pytest.fixture
+def flow_closings(platform: Platform) -> FlowClosings:
+    return FlowClosings(platform)
+
+
 @given(quoted('che "{user}" ha sul conto "{account}" il flusso attivo "{name}" con capitale allocato {capital} USDC'))
 def active_flow(cash_out: CashOut, platform: Platform, *, user: str, account: str, name: str, capital: str) -> None:
     account_id = account_id_of(platform, user, account, BALANCE)
@@ -168,6 +179,47 @@ def worth_with_position(cash_out: CashOut, platform: Platform, name: str, value:
     signed = position.size
     platform.ledger.expect(flow.id, asset, signed)
     cash_out.worth(Decimal(value), unrealized)
+
+
+@given(
+    quoted(
+        'che "{name}" ha valore complessivo {value} USDC, di cui {unrealized} USDC sulla posizione aperta su "{asset}"'
+    )
+)
+def worth_partly_on_position(
+    cash_out: CashOut, platform: Platform, name: str, *, value: str, unrealized: str, asset: str
+) -> None:
+    flow, account_id = cash_out.flow_named(name), cash_out.account()
+    hold_position(platform, cash_out.user, "test-1", asset)
+    reading = platform.account_activity.activities[account_id]
+    (position,) = reading.positions
+    platform.account_activity.activities[account_id] = replace(
+        reading, positions=(replace(position, unrealized_pnl=Decimal(unrealized)),)
+    )
+    platform.ledger.expect(flow.id, asset, position.size)
+    cash_out.worth(Decimal(value), Decimal(unrealized))
+
+
+@given(quoted('che "{user}" ha sul conto "{account}" anche il flusso attivo "{name}" con asset "{asset}"'))
+def another_active_flow(platform: Platform, user: str, account: str, name: str, asset: str) -> None:
+    configuration = a_configuration(assets=(asset,))
+    account_id = account_id_of(platform, user, account, BALANCE)
+    flow = a_flow(
+        platform.tenant_of(user),
+        name=name,
+        status=FlowStatus.ACTIVE,
+        account_id=account_id,
+        configuration=configuration,
+    )
+    platform.flows.flows.append(flow)
+    platform.flows.save_version(flow)
+
+
+@given("che l'exchange pubblica le esecuzioni della chiusura solo dopo l'incasso")
+def executions_published_late(platform: Platform, flow_closings: FlowClosings) -> None:
+    assert isinstance(platform.order_exchange, ClosingsShownOnTheAccount)
+    assert platform.order_exchange.observers == [flow_closings.published]
+    platform.order_exchange.executions_late = True
 
 
 @given(quoted('che dopo la chiusura della posizione il valore di "{name}" è {value} USDC'))

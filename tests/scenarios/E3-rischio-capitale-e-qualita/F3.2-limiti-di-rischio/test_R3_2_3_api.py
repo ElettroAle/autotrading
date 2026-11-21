@@ -33,6 +33,8 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.account_repository import InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter
+from tests.support.flow_closing_steps import *  # noqa: F403 - the steps of the closings that reach the ledger late
+from tests.support.flow_closings import FlowClosings
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.lifecycle_steps import hold_position
 from tests.support.orders import a_flow_order
@@ -145,6 +147,11 @@ def platform() -> Platform:
             asset, max_leverage=10, size_decimals=1, mid_price=price, min_order_value=Decimal(10)
         )
     return platform
+
+
+@pytest.fixture
+def flow_closings(platform: Platform) -> FlowClosings:
+    return FlowClosings(platform)
 
 
 @pytest.fixture

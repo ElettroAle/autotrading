@@ -14,18 +14,18 @@ ANNA = UserId("oid-anna")
 
 class RecordingClosing:
     def __init__(self, outcome: OrderOutcome | None = None) -> None:
-        self.requests: list[tuple[UUID, str, UserId]] = []
+        self.requests: list[tuple[UUID, str, UserId, UUID | None]] = []
         self._outcome = outcome
 
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
-        self.requests.append((account_id, coin, user_id))
+    def close(self, account_id: UUID, coin: str, user_id: UserId, flow_id: UUID | None) -> OrderOutcome:
+        self.requests.append((account_id, coin, user_id, flow_id))
         if self._outcome is not None:
             return self._outcome
         return OrderOutcome(uuid4(), OrderStatus.UNKNOWN, coin)
 
 
 class RefusingClosing:
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:  # noqa: ARG002 - no position anywhere
+    def close(self, account_id: UUID, coin: str, user_id: UserId, flow_id: UUID | None) -> OrderOutcome:  # noqa: ARG002 - no position anywhere
         raise NoOpenPositionError(coin)
 
 
@@ -37,12 +37,12 @@ class RecordedHistory:
         self.closings.append((account_id, asset, fill))
 
 
-def test_the_worker_is_asked_to_close_for_the_user_who_asked() -> None:
+def test_the_worker_is_asked_to_close_for_the_user_who_asked_and_for_no_flow() -> None:
     closing, account_id = RecordingClosing(), uuid4()
 
     outcome = ClosePositionUseCase(closing, RecordedHistory()).execute(ClosePositionCommand(account_id, " BTC ", ANNA))
 
-    assert closing.requests == [(account_id, "BTC", ANNA)]
+    assert closing.requests == [(account_id, "BTC", ANNA, None)]
     assert (outcome.status, outcome.coin) == (OrderStatus.UNKNOWN, "BTC")
 
 

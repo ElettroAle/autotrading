@@ -47,6 +47,14 @@ def _ensure_roles(admin: Engine) -> None:
 
 
 def _migrate(database: str, password_file: Path, revision: str = "head") -> None:
+    _as_owner(database, password_file, lambda config: command.upgrade(config, revision))
+
+
+def _downgrade(database: str, password_file: Path, revision: str) -> None:
+    _as_owner(database, password_file, lambda config: command.downgrade(config, revision))
+
+
+def _as_owner(database: str, password_file: Path, migration: Callable[[Config], None]) -> None:
     host, port, _, _ = _server()
     password_file.write_text(TEST_PASSWORD, encoding="utf-8")
     variables = {
@@ -59,7 +67,7 @@ def _migrate(database: str, password_file: Path, revision: str = "head") -> None
     previous = {name: os.environ.get(name) for name in variables}
     os.environ.update(variables)
     try:
-        command.upgrade(Config(str(MIGRATIONS)), revision)
+        migration(Config(str(MIGRATIONS)))
     finally:
         for name, value in previous.items():
             if value is None:
@@ -120,9 +128,10 @@ def migrated_database(workspace: Path) -> Iterator[Engine]:
 
 
 @contextmanager
-def database_migrated_to(workspace: Path, revision: str) -> Iterator[tuple[Engine, Callable[[], None]]]:
+def database_migrated_to(workspace: Path, revision: str) -> Iterator[tuple[Engine, Callable[..., None]]]:
     """Yields an engine connected as the application role to a new database migrated up to the revision, with the
-    function that applies the migrations after it: what a migration does to the data saved before it.
+    function that applies the migrations after it: what a migration does to the data saved before it. Given a revision
+    to go back to, the function then runs the migrations after that one a second time, as a repeated release would.
     """
     host, port, _, _ = _server()
     database = f"autotrading_test_{uuid4().hex[:12]}"
@@ -137,8 +146,11 @@ def database_migrated_to(workspace: Path, revision: str) -> Iterator[tuple[Engin
         ).engine()
         columns = _ColumnsOfTheRevision(application)
 
-        def migrate_the_rest() -> None:
+        def migrate_the_rest(again_from: str | None = None) -> None:
             _migrate(database, workspace / "owner-password")
+            if again_from is not None:
+                _downgrade(database, workspace / "owner-password", again_from)
+                _migrate(database, workspace / "owner-password")
             columns.refresh()
 
         yield application, migrate_the_rest

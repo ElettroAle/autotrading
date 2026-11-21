@@ -32,8 +32,10 @@ OPENING = PositionOpening(TradeSide.LONG, 2, Decimal(50), PositionEnd(Decimal(10
 class ScriptedPositions:
     def __init__(self, answers: dict[str, ClosingAnswer]) -> None:
         self.answers = answers
+        self.asked: list[PositionToClose] = []
 
     def execute(self, position: PositionToClose) -> ClosingAnswer:
+        self.asked.append(position)
         return self.answers[position.asset]
 
 
@@ -104,3 +106,20 @@ def test_the_closings_of_an_emergency_enter_the_history_without_being_told_one_b
 
     assert len(store.positions) == 1
     assert notices.told == []
+
+
+def test_each_closing_carries_the_flow_it_closes_and_the_user_who_asked() -> None:
+    flow = a_flow(TENANT, status=FlowStatus.ACTIVE, account_id=uuid4(), configuration=a_configuration(assets=("BTC",)))
+    positions = ScriptedPositions({"BTC": closed_by(FILL)})
+    ports = ClosingPorts(
+        FakeRunningCycleAdapter(lambda: 0),
+        positions,
+        Openings(),
+        InMemoryClosedPositionRepositoryAdapter(ClosedPositionStore(), TENANT),
+        FakePositionClosedNoticeAdapter(),
+        InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+    )
+
+    CloseFlowPositionsUseCase(ports).execute(CloseFlowPositionsCommand(flow, USER, CloseReason.FLOW_STOP))
+
+    assert positions.asked == [PositionToClose(flow.assigned_account_id, "BTC", USER, flow.id.value)]

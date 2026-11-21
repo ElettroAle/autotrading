@@ -14,10 +14,11 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 class SqlAlchemyPlatformOrdersAdapter:
     """The client order ids of the orders the platform recorded on an account, with their flow (ADR 0044, ADR 0063).
 
-    The orders of the verification procedure and of the manual commands have no flow (ADR 0050); the origin tells
-    the orders of the verification procedure apart, since they belong to no flow (Bug 165, ADR 0075). The stop loss
-    and take profit placed for a flow, removed ones included, are orders of the flow that close its position (R3.1.2,
-    ADR chiusure-per-protezione-nello-storico).
+    The orders of the verification procedure and of the manual commands have no flow (ADR 0050), the closings of a
+    flow at a command of its user carry the flow they close (ADR chiusure-dei-flussi-con-il-flusso-nell-ordine); the
+    origin tells the orders of the verification procedure apart, since they belong to no flow (Bug 165, ADR 0075). The
+    stop loss and take profit placed for a flow, removed ones included, are orders of the flow that close its position
+    (R3.1.2, ADR chiusure-per-protezione-nello-storico).
     """
 
     def __init__(self, engine: Engine, tenant_id: TenantId) -> None:

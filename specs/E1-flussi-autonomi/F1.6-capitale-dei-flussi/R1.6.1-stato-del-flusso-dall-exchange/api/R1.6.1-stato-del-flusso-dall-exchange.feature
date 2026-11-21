@@ -12,8 +12,9 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     dall'exchange a ogni ciclo, solo quelli nuovi, e la piattaforma li registra una sola volta nel proprio
     registro delle operazioni, che conserva l'intero storico anche quando l'exchange non lo mostra più. Un'esecuzione
     o un funding che l'exchange pubblica in ritardo, fino a un'ora dopo il suo istante, entra comunque nel registro.
-  - Un'esecuzione è del flusso il cui ordine l'ha prodotta; un ordine della piattaforma senza flusso (comando
-    manuale, stop) è del flusso che ha l'asset. Senza un ordine della piattaforma sono del flusso dell'asset solo
+  - Un'esecuzione è del flusso il cui ordine l'ha prodotta; le chiusure di stop, incasso ed emergenza sono ordini del
+    flusso che chiudono (Bug 684); un ordine della piattaforma senza flusso (chiusura manuale dalla dashboard) è del
+    flusso che ha l'asset. Senza un ordine della piattaforma sono del flusso dell'asset solo
     la liquidazione e la chiusura esatta della posizione che il flusso si aspetta; ogni altra esecuzione non è di
     nessun flusso. Il funding è del flusso che ha la posizione sull'asset quando è pagato.
   - Per ogni flusso la piattaforma tiene i totali di PnL realizzato, commissioni, funding e posizione attesa per
