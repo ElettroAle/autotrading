@@ -15,6 +15,8 @@ Funzionalità: R3.2.3 Chiusura di emergenza
   con il motivo. Il flusso va in pausa anche se una sua chiusura è fallita.
   Ogni chiusura entra nello storico delle posizioni chiuse con il motivo "chiusura di emergenza". Il comando si
   registra con data, ora, ambito ed esito.
+  Le esecuzioni delle chiusure appartengono al flusso chiuso, anche se il suo asset passa a un altro flusso prima che
+  il registro delle operazioni le legga (Bug 684).
   La dashboard chiede una conferma che nomina l'ambito e il numero di posizioni da chiudere.
   Nella dashboard il comando sta da solo nel riquadro "Zona di emergenza", in fondo alla pagina dei conti e della
   pagina "Generale" delle impostazioni, lontano dagli altri comandi (Bug 545); l'elenco dei flussi, la pagina d'uso
@@ -108,3 +110,12 @@ Funzionalità: R3.2.3 Chiusura di emergenza
     Quando "anna" sceglie la chiusura di emergenza del flusso "alfa" nel riquadro "Zona pericolosa"
     Allora la dashboard chiede conferma con "Chiudere 1 posizione del flusso alfa e metterlo in pausa?"
     E nessuna posizione viene chiusa finché "anna" non conferma
+
+  Scenario: La chiusura di emergenza attribuisce la chiusura al flusso chiuso anche se l'asset passa a un altro flusso
+    Dato che il registro del flusso "alfa" riporta le sue posizioni aperte
+    Quando "anna" lancia la chiusura di emergenza del flusso "alfa"
+    E "anna" ferma e archivia il flusso "alfa" e aggiunge "BTC" agli asset del flusso "beta"
+    E il flusso "beta" esegue un ciclo che registra le esecuzioni delle chiusure
+    Allora il registro del flusso "alfa" riporta la chiusura su "BTC" e nessuna posizione aperta
+    E il registro del flusso "beta" non ha una posizione su "BTC"
+    E il flusso "beta" non è in pausa

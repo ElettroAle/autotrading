@@ -5,6 +5,8 @@ from autotrading.application.flows.change_flow_status import ChangeFlowStatusCom
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen
+from tests.support.flow_closing_steps import *  # noqa: F403 - the steps of the closings that reach the ledger late
+from tests.support.flow_closings import FlowClosings
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.flows import ACCOUNT, scenario_catalog
 from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the life of a flow, shared by the features
@@ -30,6 +32,11 @@ def platform() -> Platform:
     return platform
 
 
+@pytest.fixture
+def flow_closings(platform: Platform) -> FlowClosings:
+    return FlowClosings(platform)
+
+
 @given(quoted('che "{user}" ha il flusso "{name}" attivo con posizioni aperte su "{first}" e "{second}"'))
 def active_flow_with_positions(
     platform: Platform, lifecycle: Lifecycle, user: str, name: str, *, first: str, second: str
@@ -38,6 +45,14 @@ def active_flow_with_positions(
     put_in_status(platform, user, name, FlowStatus.ACTIVE)
     for asset in (first, second):
         hold_position(platform, user, ACCOUNT, asset)
+
+
+@given(quoted('che "{user}" ha sul conto "{account}" anche il flusso attivo "{name}" con asset "{asset}"'))
+def another_active_flow(
+    platform: Platform, lifecycle: Lifecycle, user: str, *, account: str, name: str, asset: str
+) -> None:
+    add_flow(platform, lifecycle, user, name, account=account, assets=(asset,))
+    put_in_status(platform, user, name, FlowStatus.ACTIVE)
 
 
 @given(quoted('che il flusso "{name}" è in pausa'))

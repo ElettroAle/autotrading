@@ -23,6 +23,7 @@ from autotrading.domain.orders.rejection import RejectionReason
 from autotrading.domain.tenancy.user_id import UserId
 
 ACCOUNT = uuid4()
+FLOW = uuid4()
 USER = UserId("oid-anna")
 AT = datetime(2026, 11, 12, 9, 45, tzinfo=UTC)
 
@@ -31,10 +32,10 @@ class ScriptedClosing:
     def __init__(self, outcome: OrderOutcome | None = None, failure: Exception | None = None) -> None:
         self.outcome = outcome
         self.failure = failure
-        self.calls: list[tuple[UUID, str, UserId]] = []
+        self.calls: list[tuple[UUID, str, UserId, UUID | None]] = []
 
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
-        self.calls.append((account_id, coin, user_id))
+    def close(self, account_id: UUID, coin: str, user_id: UserId, flow_id: UUID | None) -> OrderOutcome:
+        self.calls.append((account_id, coin, user_id, flow_id))
         if self.failure is not None:
             raise self.failure
         assert self.outcome is not None
@@ -48,10 +49,11 @@ class PositionAsked:
     account_id: UUID
     asset: str
     user_id: UserId
+    flow_id: UUID
 
 
 def report_of(closing: ScriptedClosing) -> ClosingReport:
-    return CloseFlowPositionUseCase(closing).execute(PositionAsked(ACCOUNT, "BTC", USER))
+    return CloseFlowPositionUseCase(closing).execute(PositionAsked(ACCOUNT, "BTC", USER, FLOW))
 
 
 def test_an_executed_closing_reports_its_fill() -> None:
@@ -68,7 +70,7 @@ def test_an_executed_closing_reports_its_fill() -> None:
 
     report = report_of(closing)
 
-    assert closing.calls == [(ACCOUNT, "BTC", USER)]
+    assert closing.calls == [(ACCOUNT, "BTC", USER, FLOW)]
     assert report == ClosingReport(
         found=True, average_price=Decimal(102000), executed_at=AT, fee=Decimal("0.05"), realized_pnl=Decimal("1.5")
     )

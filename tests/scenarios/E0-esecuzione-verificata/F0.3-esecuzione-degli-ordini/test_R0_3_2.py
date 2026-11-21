@@ -10,11 +10,15 @@ from pytest_bdd import given, scenarios, then, when
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.accounts.credentials import Credentials
+from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import OrderOrigin, OrderSource
 from autotrading.domain.orders.trading_access import TradingAccess
+from tests.support.flow_closing_steps import *  # noqa: F403 - the steps of the closings that reach the ledger late
+from tests.support.flow_closings import FlowClosings
+from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform, registration
 from tests.support.steps import quoted
@@ -60,11 +64,31 @@ def session() -> Session:
     return Session()
 
 
+@pytest.fixture
+def flow_closings(session: Session) -> FlowClosings:
+    return FlowClosings(session.platform)
+
+
 @given(quoted('che "{user}" ha il conto "{account}" su "{exchange}"'))
 def user_has_account(session: Session, user: str, account: str, exchange: str) -> None:
     session.platform.directory.person(user).roles.add("Utente")
     session.credentials[account] = session.platform.accepted_credentials()
     session.platform.register_account(user, registration(account, exchange, session.credentials[account]))
+
+
+@given(quoted('che "{user}" ha sul conto "{account}" il flusso attivo "{name}" con asset "{asset}"'))
+def active_flow(session: Session, user: str, account: str, name: str, asset: str) -> None:
+    platform = session.platform
+    account_id = platform.account_named(user, account).id.value
+    flow = a_flow(
+        platform.tenant_of(user),
+        name=name,
+        status=FlowStatus.ACTIVE,
+        account_id=account_id,
+        configuration=a_configuration(assets=(asset,)),
+    )
+    platform.flows.flows.append(flow)
+    platform.flows.save_version(flow)
 
 
 @given(quoted('che il conto "{account}" ha una posizione long su "{coin}"'))

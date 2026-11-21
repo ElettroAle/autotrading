@@ -3,7 +3,13 @@ from uuid import uuid4
 
 from autotrading.adapters.outbound.sqlalchemy.order_repository import _row_of
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.support.orders import EXECUTED_AT, a_flow_order, a_rejected_order, an_executed_order
+from tests.support.orders import (
+    EXECUTED_AT,
+    a_flow_closing_order,
+    a_flow_order,
+    a_rejected_order,
+    an_executed_order,
+)
 
 
 def test_a_row_carries_request_source_and_execution_read_from_the_exchange() -> None:
@@ -61,3 +67,12 @@ def test_a_row_of_a_flow_order_carries_the_flow_the_cycle_and_the_decision() -> 
         link.cycle_planned_at,
         "BTC",
     )
+
+
+def test_a_row_of_a_closing_of_a_flow_carries_the_flow_it_closes_without_cycle_or_decision() -> None:
+    flow_id = uuid4()
+
+    row = _row_of(a_flow_closing_order(uuid4(), flow_id), TenantId.new())
+
+    assert (row["origin"], row["user_id"], row["reduce_only"]) == ("MANUAL", "oid-anna", True)
+    assert (row["flow_id"], row["cycle_planned_at"], row["decision_asset"]) == (flow_id, None, None)

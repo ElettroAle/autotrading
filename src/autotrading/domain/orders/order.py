@@ -3,6 +3,7 @@ from enum import StrEnum
 from uuid import UUID
 
 from autotrading.domain.orders.client_order_id import ClientOrderId
+from autotrading.domain.orders.errors import CycleOrderClosesFlowError
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.market_order import MarketOrder
@@ -24,11 +25,28 @@ class OrderStatus(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class OrderSource:
-    """Who generated the order: the procedure, a flow with its cycle and decision, or a user with a manual command."""
+    """Who generated the order: the procedure, a flow with its cycle and decision, or a user with a manual command.
+
+    A command that closes the positions of a flow (stop, cash-out, emergency) is the user's and carries the flow it
+    closes, so its executions belong to that flow whatever flow holds the asset later (ADR
+    chiusure-dei-flussi-con-il-flusso-nell-ordine).
+    """
 
     origin: OrderOrigin
     user_id: str | None = None
     flow: FlowLink | None = None
+    closing_flow_id: UUID | None = None
+
+    def __post_init__(self) -> None:
+        if self.flow is not None and self.closing_flow_id is not None:
+            raise CycleOrderClosesFlowError
+
+    @property
+    def flow_id(self) -> UUID | None:
+        """The flow the order belongs to: the one of its cycle, the one it closes, or none."""
+        if self.flow is not None:
+            return self.flow.flow_id
+        return self.closing_flow_id
 
 
 @dataclass(frozen=True, slots=True)

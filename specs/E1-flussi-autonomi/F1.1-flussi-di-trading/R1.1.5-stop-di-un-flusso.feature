@@ -12,6 +12,8 @@ Funzionalità: R1.1.5 Stop di un flusso
   Se la chiusura di una posizione fallisce, il flusso è comunque fermo e l'esito dello stop riporta la posizione
   rimasta aperta con il motivo dell'exchange.
   Un flusso fermo si può avviare di nuovo.
+  Le esecuzioni delle chiusure dello stop appartengono al flusso fermato, anche se il suo asset passa a un altro flusso
+  prima che il registro delle operazioni le legga (Bug 684).
 
   Fuori ambito: la scelta di lasciare aperte le posizioni allo stop, che arriva con le protezioni sull'exchange.
 
@@ -47,3 +49,13 @@ Funzionalità: R1.1.5 Stop di un flusso
     Dato che il flusso "alfa" è fermo
     Quando "anna" avvia il flusso "alfa"
     Allora il flusso "alfa" è nello stato "attivo"
+
+  Scenario: Lo stop attribuisce la chiusura al flusso fermato anche se l'asset passa a un altro flusso
+    Dato che "anna" ha sul conto "test-1" anche il flusso attivo "beta" con asset "SOL"
+    E che il registro del flusso "alfa" riporta le sue posizioni aperte
+    Quando "anna" ferma il flusso "alfa"
+    E "anna" archivia il flusso "alfa" e aggiunge "BTC" agli asset del flusso "beta"
+    E il flusso "beta" esegue un ciclo che registra le esecuzioni delle chiusure
+    Allora il registro del flusso "alfa" riporta le chiusure su "BTC" e "ETH" e nessuna posizione aperta
+    E il registro del flusso "beta" non ha una posizione su "BTC"
+    E il flusso "beta" non è in pausa

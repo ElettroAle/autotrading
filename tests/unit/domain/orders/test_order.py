@@ -2,8 +2,12 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+import pytest
+
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.errors import CycleOrderClosesFlowError
 from autotrading.domain.orders.execution import Execution
+from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderRequest, OrderSource, OrderStatus
 from autotrading.domain.orders.rejection import Rejection, RejectionReason
@@ -54,3 +58,30 @@ def test_the_identifier_of_an_order_is_the_one_sent() -> None:
 
 def test_the_source_names_origin_and_user() -> None:
     assert Order.unknown(REQUEST).request.source == OrderSource(OrderOrigin.MANUAL, "oid-anna")
+
+
+def test_a_closing_of_a_flow_belongs_to_the_flow_it_closes() -> None:
+    flow_id = uuid4()
+
+    source = OrderSource(OrderOrigin.MANUAL, "oid-anna", closing_flow_id=flow_id)
+
+    assert source.flow_id == flow_id
+
+
+def test_an_order_of_a_cycle_belongs_to_the_flow_of_its_cycle() -> None:
+    link = FlowLink(uuid4(), AT, "BTC")
+
+    assert OrderSource(OrderOrigin.FLOW, flow=link).flow_id == link.flow_id
+
+
+def test_a_manual_command_belongs_to_no_flow() -> None:
+    assert OrderSource(OrderOrigin.MANUAL, "oid-anna").flow_id is None
+
+
+def test_an_order_cannot_come_from_a_cycle_and_close_a_flow_at_once() -> None:
+    link = FlowLink(uuid4(), AT, "BTC")
+
+    with pytest.raises(CycleOrderClosesFlowError) as raised:
+        OrderSource(OrderOrigin.FLOW, flow=link, closing_flow_id=uuid4())
+
+    assert str(raised.value) == "un ordine del ciclo non chiude un flusso fuori dal ciclo"

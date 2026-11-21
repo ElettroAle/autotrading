@@ -52,3 +52,10 @@ class ManualOpeningNotAllowedError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("apertura manuale non consentita")
+
+
+class CycleOrderClosesFlowError(DomainError):
+    """An order of a cycle carries its flow in the link to the cycle: it never closes a flow outside of it."""
+
+    def __init__(self) -> None:
+        super().__init__("un ordine del ciclo non chiude un flusso fuori dal ciclo")

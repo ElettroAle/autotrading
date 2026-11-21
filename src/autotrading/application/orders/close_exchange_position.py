@@ -17,7 +17,8 @@ from autotrading.domain.orders.trading_access import TradingAccess
 class CloseExchangePositionCommand:
     account_id: UUID
     coin: str
-    # Who asks and why: a user with a manual command, or the procedure of verification it launched.
+    # Who asks and why: a user with a manual command, for the flow whose position it closes if any, or the procedure of
+    # verification it launched.
     source: OrderSource
 
 

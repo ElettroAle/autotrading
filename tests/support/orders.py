@@ -31,3 +31,11 @@ def a_rejected_order(account_id: UUID) -> Order:
 def a_flow_order(account_id: UUID, flow_id: UUID | None = None) -> Order:
     link = FlowLink(uuid4() if flow_id is None else flow_id, CYCLE_PLANNED_AT, "BTC")
     return Order.executed(a_request(account_id, OrderSource(OrderOrigin.FLOW, flow=link)), EXECUTION)
+
+
+def a_flow_closing_order(account_id: UUID, flow_id: UUID) -> Order:
+    """The closing of a position of a flow at a command of its user (stop, cash-out, emergency): reduce only, for the
+    flow it closes (ADR chiusure-dei-flussi-con-il-flusso-nell-ordine)."""
+    closing = MarketOrder("BTC", Direction.LONG, Decimal("0.0002"), Slippage.default(), reduce_only=True)
+    source = OrderSource(OrderOrigin.MANUAL, "oid-anna", closing_flow_id=flow_id)
+    return Order.executed(OrderRequest(account_id, source, 2, closing), EXECUTION)
