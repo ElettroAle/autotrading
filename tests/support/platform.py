@@ -237,7 +237,10 @@ class Platform:
         # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
         self.protection_exchange = FakeProtectionExchangeAdapter()
         self.protections = ProtectionStore()
-        self.platform_orders = InMemoryPlatformOrdersAdapter(self.protections)
+        # The orders every tenant recorded are those the ledger reads, as the real adapter reads them from the table.
+        self.platform_orders = InMemoryPlatformOrdersAdapter(
+            self.protections, lambda: [order for orders in self.orders.values() for order in orders.orders]
+        )
         self.ledger = InMemoryFlowLedgerAdapter()
         self.now = STARTED_AT
         self.running_cycles = FakeRunningCycleAdapter(lambda: len(self.order_exchange.sent))

@@ -167,13 +167,6 @@ def choose_flow_period(readings: Readings, label: str, flow: str) -> None:
     readings.page_flow = flow
 
 
-@when(quoted('"anna" apre la pagina del flusso "{flow}" da un indirizzo salvato con il periodo "{period}"'))
-def open_saved_address(readings: Readings, flow: str, period: str) -> None:
-    # The value saved before the label changed is still a period the API knows (ADR periodo-di-6-ore-e-dall-inizio).
-    readings.period = StatisticsPeriod.named(period).kind.value
-    readings.page_flow = flow
-
-
 @when(quoted('l\'interfaccia programmatica riceve il periodo "{period}"'))
 def receive_period(readings: Readings, period: str) -> None:
     command = ReadFlowStatisticsCommand(readings.flow_id("alfa"), period)
@@ -223,14 +216,6 @@ def readings_since(readings: Readings, since: str) -> None:
         ListCyclesCommand(flow_id, criteria=CycleFilter(window=readings.list_window()))
     )
     assert sorted(cycle.planned_at for cycle in cycles.cycles) == expected
-
-
-@then("il guadagno nel periodo vale dal primo ciclo del flusso")
-def gain_since_the_first_cycle(readings: Readings) -> None:
-    flow_id = readings.flow_id(readings.page_flow)
-    command = ReadFlowResultsCommand(flow_id, readings.period)
-    results = readings.platform.use_cases_of("anna").read_flow_results.execute(command)
-    assert results.period_gain == (len(readings.planned[readings.page_flow]) - 1) * EQUITY_STEP
 
 
 @then(quoted('l\'indirizzo della pagina porta il periodo "{period}"'))

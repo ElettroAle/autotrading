@@ -139,7 +139,8 @@ class VerificationOpeningPort(VerificationClosingPort, Protocol):
 
 
 class FlowPositionToClosePort(Protocol):
-    """A position a flow asks to close: the whole position of its account on one asset (R1.1.5)."""
+    """A position a flow asks to close: the whole position of its account on one asset (R1.1.5), for the flow that
+    closes it (ADR chiusure-dei-flussi-con-il-flusso-nell-ordine)."""
 
     @property
     def account_id(self) -> UUID: ...
@@ -150,15 +151,21 @@ class FlowPositionToClosePort(Protocol):
     @property
     def user_id(self) -> UserId: ...
 
+    @property
+    def flow_id(self) -> UUID: ...
+
 
 class PositionClosingPort(Protocol):
     """Asks the worker, the only service holding the private key, to close a position of the tenant (ADR 0023).
+
+    The closing order is the user's; it carries the flow it closes when a flow closes its position (stop, cash-out,
+    emergency), none for a manual command (ADR chiusure-dei-flussi-con-il-flusso-nell-ordine).
 
     Raises OrderAccountNotFoundError, NoOpenPositionError, OrderExchangeUnavailableError, and
     OrderWorkerUnavailableError when the worker cannot be reached or answers in an unexpected shape.
     """
 
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome: ...
+    def close(self, account_id: UUID, coin: str, user_id: UserId, flow_id: UUID | None) -> OrderOutcome: ...
 
 
 class OrderRepositoryPort(Protocol):

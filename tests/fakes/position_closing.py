@@ -18,11 +18,8 @@ class FakePositionClosingAdapter:
         self._worker = worker
         self.reachable = True
 
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
+    def close(self, account_id: UUID, coin: str, user_id: UserId, flow_id: UUID | None) -> OrderOutcome:
         if not self.reachable:
             raise OrderWorkerUnavailableError
-        return OrderOutcome.of(
-            self._worker().execute(
-                CloseExchangePositionCommand(account_id, coin, OrderSource(OrderOrigin.MANUAL, user_id.value))
-            )
-        )
+        source = OrderSource(OrderOrigin.MANUAL, user_id.value, closing_flow_id=flow_id)
+        return OrderOutcome.of(self._worker().execute(CloseExchangePositionCommand(account_id, coin, source)))

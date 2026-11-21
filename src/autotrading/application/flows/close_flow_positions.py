@@ -59,9 +59,8 @@ class CloseFlowPositionsUseCase:
         return FlowClosings.of(closing for closing in closings if closing is not None)
 
     def _close(self, flow: Flow, asset: str, command: CloseFlowPositionsCommand) -> PositionClosing | None:
-        closing = _closing_of(
-            asset, self._ports.positions.execute(PositionToClose(flow.assigned_account_id, asset, command.user_id))
-        )
+        position = PositionToClose(flow.assigned_account_id, asset, command.user_id, flow.id.value)
+        closing = _closing_of(asset, self._ports.positions.execute(position))
         if closing is None or closing.fill is None:
             return closing
         self._ports.exit_plans.remove(flow.id, asset)

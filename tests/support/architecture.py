@@ -44,6 +44,7 @@ class Rule(StrEnum):
     SETTINGS_IN_THEIR_FOLDER = "impostazioni-nella-loro-cartella"
     BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS = "bootstrap-configura-solo-con-composizioni"
     NO_EXCLUDED_TESTS = "nessun-test-escluso"
+    SCENARIOS_BY_SYSTEM = "scenari-per-sistema"
 
 
 REMEDIES = {
@@ -113,7 +114,14 @@ REMEDIES = {
     Rule.NO_EXCLUDED_TESTS: (
         "ogni test scritto gira nella pipeline: niente pytest.skip, skipif, xfail, importorskip, niente .skip, .todo, "
         ".fixme, .only nella dashboard, niente @wip nei .feature; la pipeline esclude solo il marker pipeline; un test "
-        "che vuole un file lo legge e fallisce se manca (ADR nessun-test-escluso-o-saltato)"
+        "che vuole un file lo legge e fallisce se manca (ADR nessun-test-escluso-o-saltato); Playwright con "
+        "missingSteps 'fail-on-gen', tags solo 'not @pipeline', nessun grep, grepInvert o testIgnore (ADR "
+        "scenari-per-sistema-sotto-la-user-story)"
+    ),
+    Rule.SCENARIOS_BY_SYSTEM: (
+        "un .feature sta in specs/E<n>-<slug>/F<n>.<m>-<slug>/R<n>.<m>.<k>-<slug>/<sistema>/"
+        "R<n>.<m>.<k>-<slug>.feature, con <sistema> il container che realizza il comportamento: api, worker, "
+        "dashboard o forecaster (ADR scenari-per-sistema-sotto-la-user-story)"
     ),
 }
 
@@ -262,6 +270,20 @@ MARKER_SELECTION = re.compile(r"(?<!\S)-m\s+[\"']([^\"']*)[\"']")
 EXCLUDED_MARKER = re.compile(r"\bnot\s+([A-Za-z_]\w*)")
 EXCLUDING_OPTION = re.compile(r"(?<!\S)(--ignore-glob|--ignore|--deselect|-k)(?=[\s=])")
 DASHBOARD_SKIP = re.compile(r"\b(?:it|test|describe|suite)(?:\.\w+)*?\.(skip|skipIf|runIf|todo|fixme|only)\b")
+# The scenarios of the dashboard: Playwright runs every one of its files, a scenario without steps fails the suite and
+# the only tag left out is @pipeline (ADR scenari-per-sistema-sotto-la-user-story).
+PLAYWRIGHT_CONFIG = "dashboard/playwright.config.ts"
+PLAYWRIGHT_MISSING_STEPS = re.compile(r"\bmissingSteps\s*:\s*['\"]([^'\"]*)['\"]")
+PLAYWRIGHT_TAGS = re.compile(r"\btags\s*:\s*['\"]([^'\"]*)['\"]")
+PLAYWRIGHT_EXCLUDING_OPTION = re.compile(r"\b(grep|grepInvert|testIgnore)\s*:")
+FAILING_MISSING_STEPS = "fail-on-gen"
+PIPELINE_ONLY_TAGS = "not @pipeline"
+SPECS_FOLDER = "specs/"
+SYSTEMS = ("api", "worker", "dashboard", "forecaster")
+FEATURE_PATH = re.compile(
+    r"specs/E(?P<epic>\d+)-[a-z0-9-]+/F(?P=epic)\.(?P<feature>\d+)-[a-z0-9-]+/"
+    r"(?P<story>R(?P=epic)\.(?P=feature)\.\d+-[a-z0-9-]+)/(?:" + "|".join(SYSTEMS) + r")/(?P=story)\.feature"
+)
 SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 ANNOTATION_FIELDS = frozenset({"annotation", "returns"})
 
@@ -857,9 +879,10 @@ def violations_of_file(path: str, text: str, excluded_markers: frozenset[str] = 
         module = SourceModule.parse(path, text)
         return [*_skipped_python_tests(module), *_tests_with_excluded_markers(module, excluded_markers)]
     if path.endswith(".feature"):
-        return list(_work_in_progress_tags(path, text))
-    if path == PIPELINE_TEST_RUN:
-        return list(_pipeline_exclusions(path, text))
+        return [*_work_in_progress_tags(path, text), *_misplaced_feature(path)]
+    runner_configurations = {PIPELINE_TEST_RUN: _pipeline_exclusions, PLAYWRIGHT_CONFIG: _playwright_exclusions}
+    if path in runner_configurations:
+        return list(runner_configurations[path](path, text))
     if path.startswith(DASHBOARD_TEST_FOLDERS) and Path(path).suffix in DASHBOARD_TEST_SUFFIXES:
         return list(_skipped_dashboard_tests(path, text))
     return []
@@ -886,6 +909,7 @@ def pipeline_excluded_markers(action: str) -> frozenset[str]:
 
 def _test_files(root: Path) -> Iterator[Path]:
     yield root / PIPELINE_TEST_RUN
+    yield root / PLAYWRIGHT_CONFIG
     yield from sorted((root / TESTS_FOLDER).rglob("*.py"))
     yield from sorted((root / "specs").rglob("*.feature"))
     for folder in DASHBOARD_TEST_FOLDERS:
@@ -970,6 +994,25 @@ def _pipeline_exclusions(path: str, text: str) -> Iterator[Violation]:
             yield _test_violation(path, marker, number, f"la pipeline esclude il marker {marker}")
         for option in EXCLUDING_OPTION.findall(line):
             yield _test_violation(path, option, number, f"la pipeline esclude test con {option}")
+
+
+def _playwright_exclusions(path: str, text: str) -> Iterator[Violation]:
+    for number, line in enumerate(text.splitlines(), start=1):
+        for value in PLAYWRIGHT_MISSING_STEPS.findall(line):
+            if value != FAILING_MISSING_STEPS:
+                yield _test_violation(
+                    path, f"missingSteps {value}", number, f"missingSteps '{value}' alla riga {number}"
+                )
+        for value in PLAYWRIGHT_TAGS.findall(line):
+            if value.strip() != PIPELINE_ONLY_TAGS:
+                yield _test_violation(path, f"tags {value}", number, f"filtro dei tag '{value}' alla riga {number}")
+        for option in PLAYWRIGHT_EXCLUDING_OPTION.findall(line):
+            yield _test_violation(path, option, number, f"{option} alla riga {number}")
+
+
+def _misplaced_feature(path: str) -> Iterator[Violation]:
+    if path.startswith(SPECS_FOLDER) and not FEATURE_PATH.fullmatch(path):
+        yield Violation(Rule.SCENARIOS_BY_SYSTEM, path, "percorso", 1, f"{path} fuori dalla cartella di un sistema", "")
 
 
 def _skipped_dashboard_tests(path: str, text: str) -> Iterator[Violation]:

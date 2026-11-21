@@ -16,7 +16,14 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.support.accounts import an_account
 from tests.support.flows import a_flow
-from tests.support.orders import CYCLE_PLANNED_AT, EXECUTED_AT, a_flow_order, a_rejected_order, an_executed_order
+from tests.support.orders import (
+    CYCLE_PLANNED_AT,
+    EXECUTED_AT,
+    a_flow_closing_order,
+    a_flow_order,
+    a_rejected_order,
+    an_executed_order,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -77,6 +84,18 @@ def test_an_order_of_a_flow_is_recorded_with_the_flow_the_cycle_and_the_decision
         CYCLE_PLANNED_AT,
         "BTC",
     )
+
+
+def test_a_closing_of_a_flow_is_recorded_with_the_flow_it_closes_and_no_cycle(database: Engine) -> None:
+    tenant_id, account_id = new_account(database)
+    flow = a_flow(tenant_id, name=f"alfa-{uuid4()}", account_id=account_id)
+    SqlAlchemyFlowRepositoryAdapter(database, tenant_id).add(flow)
+
+    SqlAlchemyOrderRepositoryAdapter(database, tenant_id).add(a_flow_closing_order(account_id, flow.id.value))
+
+    (row,) = rows_of(database, tenant_id)
+    assert (row["origin"], row["user_id"], row["reduce_only"]) == ("MANUAL", "oid-anna", True)
+    assert (row["flow_id"], row["cycle_planned_at"], row["decision_asset"]) == (flow.id.value, None, None)
 
 
 def test_an_order_of_a_flow_of_another_tenant_cannot_be_written(database: Engine) -> None:

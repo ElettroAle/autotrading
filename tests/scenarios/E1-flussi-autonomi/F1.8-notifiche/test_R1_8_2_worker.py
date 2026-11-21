@@ -1,0 +1,285 @@
+import json
+import logging
+from dataclasses import replace
+from datetime import timedelta
+from decimal import Decimal
+
+import pytest
+from pytest_bdd import given, scenarios, then, when
+
+from autotrading.application.agent.errors import ModelCreditExhaustedError
+from autotrading.application.flows.list_closed_positions import ListClosedPositionsCommand
+from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
+from autotrading.application.flows.stop_flow import StopFlowCommand
+from autotrading.application.notifications.link_chat import LinkChatCommand
+from autotrading.application.orders.close_position import ClosePositionCommand
+from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.flows.account_reconciliation import AccountReading
+from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.trading_access import TradingAccess
+from tests.fakes.cycles import FakeTransientError
+from tests.support.activity import a_fill, a_position, an_activity
+from tests.support.flow_cycles import FlowCycles
+from tests.support.notifications import chat_named, told_in
+from tests.support.platform import HYPERLIQUID
+from tests.support.steps import quoted
+
+scenarios("E1-flussi-autonomi/F1.8-notifiche/R1.8.2-notifiche-essenziali/worker/R1.8.2-notifiche-essenziali.feature")
+
+# Capital and quota of the flow give a margin of 50 USDC: with leverage 3 the opening is worth 150 USDC.
+CAPITAL = Decimal(1000)
+QUOTA = 0.05
+MID_PRICE = Decimal(100000)
+OPENING_FEE = Decimal("0.07")
+CYCLE = timedelta(minutes=15)
+
+
+@pytest.fixture(name="flow_cycles")
+def flow_cycles_of_the_worker() -> FlowCycles:
+    return FlowCycles()
+
+
+@pytest.fixture
+def notified() -> dict[str, str]:
+    """The text the scenario expects in the notification, read back for the chats that must not receive it."""
+    return {}
+
+
+def link(flow_cycles: FlowCycles, user: str, chat: str) -> None:
+    platform = flow_cycles.platform
+    code = platform.use_cases_of(user).request_link_code.execute().code
+    platform.link_chat().execute(LinkChatCommand(chat_named(chat), code))
+    # The confirmation of the link is R1.8.1: the scenarios read only what the flows notify.
+    platform.messenger.sent.clear()
+
+
+def answer(flow_cycles: FlowCycles, *decisions: dict[str, object]) -> None:
+    flow_cycles.model.text = json.dumps({"decisioni": list(decisions)})
+
+
+def opening(asset: str, leverage: int = 3) -> dict[str, object]:
+    return {
+        "asset": asset,
+        "azione": "apri",
+        "direzione": "long",
+        "quota": QUOTA,
+        "leva": leverage,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
+        "ragionamento": "r",
+    }
+
+
+def access_of(flow_cycles: FlowCycles, flow: str) -> TradingAccess:
+    credentials = flow_cycles.credentials_of(flow)
+    return TradingAccess(HYPERLIQUID, credentials.values)
+
+
+def open_position(flow_cycles: FlowCycles, flow: str, asset: str, leverage: int = 3) -> None:
+    flow_cycles.platform.order_exchange.fill_at = (MID_PRICE, OPENING_FEE)
+    answer(flow_cycles, opening(asset, leverage))
+    flow_cycles.run(flow)
+
+
+# Given
+
+
+@given(quoted('che "{user}" ha la chat "{chat}" collegata e il flusso "{flow}"'))
+def chat_and_flow(flow_cycles: FlowCycles, user: str, chat: str, flow: str) -> None:
+    link(flow_cycles, user, chat)
+    flow_cycles.add_flow(user, flow)
+    flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, allocated_capital=CAPITAL))
+
+
+@given(quoted('che "{user}" ha la chat "{chat}" collegata'))
+def chat_only(flow_cycles: FlowCycles, user: str, chat: str) -> None:
+    link(flow_cycles, user, chat)
+
+
+@given("che Telegram non risponde")
+def telegram_unreachable(flow_cycles: FlowCycles) -> None:
+    flow_cycles.platform.messenger.reachable = False
+
+
+@given(quoted('che "{user}" ha scollegato la chat Telegram'))
+def chat_unlinked(flow_cycles: FlowCycles, user: str) -> None:
+    flow_cycles.platform.use_cases_of(user).unlink_chat.execute()
+
+
+@given(quoted('che il flusso "{flow}" ha una posizione aperta su "{asset}"'))
+def flow_with_open_position(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
+    open_position(flow_cycles, flow, asset)
+    # The opening is notified on its own (see the examples above): the scenario reads only the closing.
+    flow_cycles.platform.messenger.sent.clear()
+
+
+# When: the events of the flow
+
+
+@when(quoted('il flusso "{flow}" apre long su "{asset}" con leva {leverage} e valore {value} USDC'))
+def flow_opens_long(flow_cycles: FlowCycles, flow: str, asset: str, leverage: str, value: str) -> None:
+    open_position(flow_cycles, flow, asset, int(leverage))
+    [order] = flow_cycles.platform.order_exchange.sent
+    assert order.size * MID_PRICE == Decimal(value)
+
+
+@when(quoted('il flusso "{flow}" apre una posizione su "{asset}"'))
+def flow_opens(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
+    open_position(flow_cycles, flow, asset)
+
+
+@when(quoted('il flusso "{flow}" chiude la posizione su "{asset}" con PnL {pnl} USDC'))
+def flow_closes(flow_cycles: FlowCycles, flow: str, asset: str, pnl: str) -> None:
+    exchange = flow_cycles.platform.order_exchange
+    exchange.hold(access_of(flow_cycles, flow), HeldPosition(asset, Direction.LONG, Decimal("0.0015"), 3, Decimal(100)))
+    exchange.realized_on_close = Decimal(pnl.replace(",", "."))
+    answer(flow_cycles, {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "r"})
+    flow_cycles.run(flow)
+
+
+@when(quoted('la posizione su "{asset}" del flusso "{flow}" si chiude per {reason} con PnL {pnl} USDC'))
+def position_closes_for(flow_cycles: FlowCycles, asset: str, flow: str, reason: str, pnl: str) -> None:
+    platform = flow_cycles.platform
+    platform.order_exchange.realized_on_close = Decimal(pnl.replace(",", "."))
+    operating = flow_cycles.flow(flow)
+    owner = flow_cycles.users[flow]
+    user_id = platform.user_id_of(owner)
+    use_cases = platform.use_cases_of(owner)
+    if reason == "decisione dell'agente":
+        answer(flow_cycles, {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "r"})
+        # The opening took the cycle due now: the closing comes with the next one.
+        flow_cycles.clock.current += CYCLE
+        flow_cycles.run(flow)
+    elif reason == "stop del flusso":
+        use_cases.stop_flow.execute(StopFlowCommand(operating.id, user_id))
+    elif reason == "rimozione del conto":
+        use_cases.remove_account_with_flows.execute(
+            RemoveAccountWithFlowsCommand(operating.assigned_account_id, user_id, confirmed=True)
+        )
+    elif reason == "chiusura fuori dalla piattaforma":
+        close_outside(flow_cycles, flow, asset, Decimal(pnl.replace(",", ".")))
+    else:
+        assert reason == "comando manuale", reason
+        use_cases.close_position.execute(ClosePositionCommand(operating.assigned_account_id, asset, user_id))
+
+
+@when(quoted('un ciclo del flusso "{flow}" fallisce con il messaggio "{message}"'))
+def cycle_fails(flow_cycles: FlowCycles, flow: str, message: str) -> None:
+    flow_cycles.model.failure = FakeTransientError(message)
+    flow_cycles.run(flow)
+
+
+@when(quoted('l\'exchange rifiuta un ordine del flusso "{flow}" con "{message}"'))
+def order_rejected(flow_cycles: FlowCycles, flow: str, message: str) -> None:
+    flow_cycles.platform.order_exchange.rejection = message
+    open_position(flow_cycles, flow, "BTC")
+
+
+@when(quoted('il flusso "{flow}" va in pausa per "{reason}"'))
+def flow_paused(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
+    error = ModelCreditExhaustedError(ProviderName("openrouter"))
+    assert str(error) == reason
+    flow_cycles.model.failure = error
+    flow_cycles.run(flow)
+
+
+@when(quoted('sul conto di "{flow}" compare una posizione non attribuibile su "{asset}"'))
+def unattributable_position(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
+    address = flow_cycles.credentials_of(flow).value("account_address")
+    flow_cycles.platform.activity_reader.activities[address] = an_activity(positions=(a_position(asset),))
+    flow_cycles.run(flow)
+
+
+# Then
+
+
+@then(quoted('la chat "{chat}" riceve una notifica "{title}" con le righe "{values}"'))
+def chat_receives(flow_cycles: FlowCycles, notified: dict[str, str], chat: str, title: str, values: str) -> None:
+    notified["title"] = title
+    received = flow_cycles.platform.messenger.received_by(chat_named(chat))
+    assert told_in(received, title, values), received
+
+
+@then(quoted('la chat "{chat}" riceve una sola notifica "{title}" con le righe "{values}"'))
+def chat_receives_once(flow_cycles: FlowCycles, chat: str, title: str, values: str) -> None:
+    received = flow_cycles.platform.messenger.received_by(chat_named(chat))
+    closings = [message for message in received if "chiusa" in message.splitlines()[0]]
+    assert len(closings) == 1, received
+    assert told_in(closings, title, values), closings
+
+
+@then(quoted('lo storico del flusso "{flow}" contiene la posizione su "{asset}" con PnL {pnl} USDC'))
+def history_with_pnl(flow_cycles: FlowCycles, flow: str, asset: str, pnl: str) -> None:
+    operating = flow_cycles.flow(flow)
+    use_cases = flow_cycles.platform.use_cases_of(flow_cycles.users[flow])
+    [position] = use_cases.list_closed_positions.execute(ListClosedPositionsCommand(operating.id.value)).positions
+    assert (position.asset, position.pnl) == (asset, Decimal(pnl.replace(",", ".")))
+
+
+@then(quoted('la chat "{chat}" non riceve la notifica'))
+def chat_does_not_receive(flow_cycles: FlowCycles, notified: dict[str, str], chat: str) -> None:
+    received = flow_cycles.platform.messenger.received_by(chat_named(chat))
+    assert not any(notified["title"] in message for message in received)
+    assert received == []
+
+
+@then(quoted('il ciclo del flusso "{flow}" si conclude'))
+def cycle_completes(flow_cycles: FlowCycles, flow: str) -> None:
+    assert flow_cycles.last_record(flow).outcome is CycleOutcome.COMPLETED
+    assert flow_cycles.platform.order_exchange.executions
+
+
+@then("l'invio fallito della notifica è registrato")
+def failed_sending_recorded(caplog: pytest.LogCaptureFixture) -> None:
+    assert [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "autotrading.notifications" and record.levelno == logging.WARNING
+    ] == ["invio della notifica fallito"]
+
+
+@then("nessuna notifica viene inviata")
+def nothing_sent(flow_cycles: FlowCycles) -> None:
+    assert flow_cycles.platform.messenger.sent == []
+
+
+@given(quoted('che l\'exchange rifiuta le credenziali del conto del flusso "{flow}" perché "{reason}"'))
+def credentials_refused(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
+    flow_cycles.platform.hyperliquid.revoke(flow_cycles.credentials_of(flow), reason)
+
+
+@when(quoted('sul conto di "{flow}" compare un\'esecuzione non attribuibile su "{asset}"'))
+def unattributable_fill(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
+    # The fills of an account are reconciled from its second reading on: the first cycle reads it once.
+    flow_cycles.run(flow)
+    flow_cycles.clock.current += CYCLE
+    address = flow_cycles.credentials_of(flow).value("account_address")
+    manual = a_fill(asset, None, fill_id="manuale", executed_at=flow_cycles.clock.now() - timedelta(minutes=1))
+    flow_cycles.platform.activity_reader.executions.setdefault(address, []).append(manual)
+    flow_cycles.run(flow)
+
+
+def close_outside(flow_cycles: FlowCycles, flow: str, asset: str, pnl: Decimal) -> None:
+    """The position the cycle opened is gone from the exchange at the next reading, sold outside the platform."""
+    platform, operating = flow_cycles.platform, flow_cycles.flow(flow)
+    address = flow_cycles.credentials_of(flow).value("account_address")
+    open_assets = {operating.id: frozenset({asset})}
+    platform.readings.save_reading(AccountReading(operating.assigned_account_id, flow_cycles.clock.now(), open_assets))
+    flow_cycles.clock.current += CYCLE
+    sold_at = flow_cycles.clock.now() - timedelta(minutes=1)
+    sale = a_fill(asset, None, realized_pnl=pnl, fill_id="fuori", executed_at=sold_at)
+    platform.activity_reader.executions.setdefault(address, []).append(sale)
+    answer(flow_cycles)
+    flow_cycles.run(flow)
+
+
+@then(quoted('nessuna notifica della chat "{chat}" contiene le credenziali del conto del flusso "{flow}"'))
+def notifications_without_credentials(flow_cycles: FlowCycles, chat: str, flow: str) -> None:
+    received = flow_cycles.platform.messenger.received_by(chat_named(chat))
+    secrets = [value for value in flow_cycles.credentials_of(flow).values.values() if value]
+    assert received
+    assert [message for message in received if any(secret in message for secret in secrets)] == []

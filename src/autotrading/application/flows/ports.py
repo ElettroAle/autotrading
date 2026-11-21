@@ -206,11 +206,16 @@ class AccountRemovalPorts:
 
 @dataclass(frozen=True, slots=True)
 class PositionToClose:
-    """The position of a flow to close: the whole position of its account on one of its assets (R1.1.2)."""
+    """The position of a flow to close: the whole position of its account on one of its assets (R1.1.2).
+
+    The closing order carries the flow, so its executions are of the flow whatever flow holds the asset when the ledger
+    records them (ADR chiusure-dei-flussi-con-il-flusso-nell-ordine).
+    """
 
     account_id: UUID
     asset: str
     user_id: UserId
+    flow_id: UUID
 
 
 class ClosingAnswerPort(Protocol):

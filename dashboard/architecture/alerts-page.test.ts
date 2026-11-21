@@ -64,7 +64,9 @@ const redirectViolations = (route: SourceFile): string[] => [
     : ['non filtra gli avvisi del conto con tutti gli stati']),
 ];
 
-const F6_2_FEATURES = "'../specs/E6-piattaforma-e-operativita/F6.2-avvisi-e-scadenze/*.feature'";
+// The alerts of F6.2 have their scenarios in the files of the system dashboard (ADR
+// scenari-per-sistema-sotto-la-user-story).
+const DASHBOARD_FEATURES = "'../specs/**/dashboard/*.feature'";
 
 describe('ADR-pagina-avvisi-nella-dashboard: the views of the alerts on the shared components', () => {
   it('is red when a view builds its own table or window', () => {
@@ -119,6 +121,6 @@ describe('ADR-pagina-avvisi-nella-dashboard: the alarms of an account are its al
   });
 
   it('runs the scenarios of the alerts on the dashboard', () => {
-    expect(read(PLAYWRIGHT).source).toContain(F6_2_FEATURES);
+    expect(read(PLAYWRIGHT).source).toContain(DASHBOARD_FEATURES);
   });
 });

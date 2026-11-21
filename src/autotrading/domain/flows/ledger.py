@@ -165,7 +165,7 @@ class AccountLedger:
     """The new executions and funding of an account, each given to the flow it belongs to (ADR 0063), and the
     movements of its balance, which belong to no flow (ADR movimenti-del-conto-nel-registro-con-cursore).
 
-    An order of the platform belongs to its flow; one sent for no flow (a manual command, a stop) belongs to the flow
+    An order of the platform belongs to its flow; one sent for no flow (a manual command) belongs to the flow
     that owns the asset. Without an order of the platform, a liquidation and a closing of exactly the position the
     flow expects belong to that flow; anything else belongs to no flow.
     """

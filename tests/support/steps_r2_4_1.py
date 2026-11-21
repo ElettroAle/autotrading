@@ -1,0 +1,242 @@
+from dataclasses import replace
+from datetime import timedelta
+from http import HTTPStatus
+
+import pytest
+from pytest_bdd import given, then, when
+
+from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
+from autotrading.application.flows.errors import FlowNotFoundError
+from autotrading.application.flows.modify_flow import ModifyFlowCommand
+from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
+from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.free_capital import FreeCapital
+from tests.support.api_session import ApiSession
+from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, shared by the features
+from tests.support.draft_steps import Draft
+from tests.support.flow_cycles import FlowCycles
+from tests.support.flow_steps import provider_key_registered, valid_command
+from tests.support.flows import a_configuration, a_flow, account_id_of
+from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the life of a flow, shared by the features
+from tests.support.lifecycle_steps import Lifecycle, attempt, flow_named
+from tests.support.platform import Platform
+from tests.support.source_selections import a_source_request
+from tests.support.steps import quoted
+
+
+class Duplication:
+    """The free capital of an account before time passed, and the draft the user opened."""
+
+    def __init__(self) -> None:
+        self.free_capital: FreeCapital | None = None
+        self.opened: Flow | None = None
+        # What the programmatic interface answered to the duplication.
+        self.answer: dict[str, object] = {}
+
+
+@pytest.fixture
+def duplication() -> Duplication:
+    return Duplication()
+
+
+@pytest.fixture(name="flow_cycles")
+def flow_cycles_of_the_worker() -> FlowCycles:
+    return FlowCycles()
+
+
+@pytest.fixture
+def platform(flow_cycles: FlowCycles) -> Platform:
+    return flow_cycles.platform
+
+
+def free_capital_of(platform: Platform, user: str, account: str) -> FreeCapital:
+    command = ReadFreeCapitalCommand(account_id_of(platform, user, account))
+    return platform.use_cases_of(user).read_free_capital.execute(command)
+
+
+def duplicate(platform: Platform, lifecycle: Lifecycle, draft: Draft, user: str, name: str) -> None:
+    flow_id = flow_named(platform, lifecycle.user, name).id
+
+    def duplicated() -> None:
+        draft.name = platform.use_cases_of(user).duplicate_flow.execute(DuplicateFlowCommand(flow_id)).name.value
+
+    attempt(lifecycle, duplicated)
+
+
+@given(
+    quoted(
+        'che "{user}" ha il flusso "{name}" sul conto "{account}" con asset "{asset}", fonti "{source}" peso {weight} '
+        'e modello "{model}"'
+    )
+)
+def flow_with_strategy(
+    platform: Platform,
+    lifecycle: Lifecycle,
+    user: str,
+    name: str,
+    *,
+    account: str,
+    asset: str,
+    source: str,
+    weight: str,
+    model: str,
+) -> None:
+    lifecycle.user = user
+    provider_key_registered(platform, user, model.partition("/")[0])
+    command = replace(
+        valid_command(platform, user, name),
+        account_id=account_id_of(platform, user, account),
+        assets=(asset,),
+        model=model,
+        sources=(a_source_request(source, int(weight)),),
+    )
+    platform.use_cases_of(user).create_flow.execute(command)
+
+
+@given(quoted('che "{user}" ha anche il conto "{account}"'))
+def other_account(platform: Platform, user: str, account: str) -> None:
+    account_id_of(platform, user, account)
+
+
+@given(quoted('che "{user}" ha duplicato il flusso "{name}"'))
+@when(quoted('"{user}" duplica il flusso "{name}"'))
+def duplicate_flow(platform: Platform, lifecycle: Lifecycle, draft: Draft, user: str, name: str) -> None:
+    duplicate(platform, lifecycle, draft, user, name)
+    assert lifecycle.error is None
+
+
+@when(quoted('"{user}" chiede di duplicare il flusso "{name}"'))
+def ask_duplicate(platform: Platform, lifecycle: Lifecycle, draft: Draft, user: str, name: str) -> None:
+    duplicate(platform, lifecycle, draft, user, name)
+
+
+@then(quoted('esiste il flusso "{name}" nello stato "{status}" alla versione {version}'))
+def copy_exists(
+    platform: Platform, lifecycle: Lifecycle, draft: Draft, *, name: str, status: str, version: str
+) -> None:
+    copy = flow_named(platform, lifecycle.user, name)
+    assert (draft.name, copy.status.value, copy.configuration.version) == (name, status, int(version))
+
+
+@then(quoted('ha fonti "{source}" peso {weight} e modello "{model}"'))
+def copy_strategy(
+    platform: Platform, lifecycle: Lifecycle, draft: Draft, source: str, *, weight: str, model: str
+) -> None:
+    configuration = flow_named(platform, lifecycle.user, draft.name).configuration
+    original = flow_named(platform, lifecycle.user, draft.name.removesuffix(" (copia)")).configuration
+    assert [(each.name, adapter.weight) for each in configuration.sources for adapter in each.adapters] == [
+        (source, int(weight))
+    ]
+    assert configuration.sources == original.sources
+    assert configuration.model == original.model
+    assert configuration.model.name == model
+    assert (configuration.instructions, configuration.risk_limits, configuration.cycle_interval) == (
+        original.instructions,
+        original.risk_limits,
+        original.cycle_interval,
+    )
+
+
+@then(quoted('ha il conto "{account}" e il capitale allocato del flusso "{original}"'))
+def copy_assignment(platform: Platform, lifecycle: Lifecycle, draft: Draft, account: str, original: str) -> None:
+    copy = flow_named(platform, lifecycle.user, draft.name)
+    assert copy.account_id == account_id_of(platform, lifecycle.user, account)
+    capital = flow_named(platform, lifecycle.user, original).configuration.allocated_capital
+    assert copy.configuration.allocated_capital == capital
+
+
+@then("non ha asset")
+def copy_without_assets(platform: Platform, lifecycle: Lifecycle, draft: Draft) -> None:
+    assert flow_named(platform, lifecycle.user, draft.name).configuration.assets == ()
+
+
+@when(quoted('"{user}" sceglie per il flusso "{name}" l\'asset "{asset}"'))
+def choose_asset(platform: Platform, lifecycle: Lifecycle, user: str, name: str, asset: str) -> None:
+    command = ModifyFlowCommand(flow_named(platform, user, name).id, assets=(asset,))
+    attempt(lifecycle, lambda: platform.use_cases_of(user).modify_flow.execute(command))
+    assert lifecycle.error is None
+
+
+@when(quoted('passa un intervallo intero del flusso "{name}"'))
+def interval_passes(
+    flow_cycles: FlowCycles, platform: Platform, lifecycle: Lifecycle, duplication: Duplication, name: str
+) -> None:
+    flow = flow_named(platform, lifecycle.user, name)
+    duplication.free_capital = free_capital_of(platform, lifecycle.user, "principale")
+    flow_cycles.plan_round()
+    flow_cycles.clock.current = flow_cycles.clock.now() + timedelta(minutes=flow.configuration.cycle_interval.minutes)
+    flow_cycles.plan_round()
+
+
+@then(quoted('il flusso "{name}" non ha cicli'))
+def no_cycles(flow_cycles: FlowCycles, platform: Platform, lifecycle: Lifecycle, name: str) -> None:
+    flow_id = flow_named(platform, lifecycle.user, name).id.value
+    assert [record for record in flow_cycles.records.records if record.flow_id == flow_id] == []
+
+
+@then(quoted('il capitale libero del conto "{account}" non cambia'))
+def free_capital_unchanged(platform: Platform, lifecycle: Lifecycle, duplication: Duplication, account: str) -> None:
+    assert duplication.free_capital is not None
+    assert free_capital_of(platform, lifecycle.user, account) == duplication.free_capital
+
+
+@then(quoted('l\'avvio è rifiutato con il motivo "{reason}"'))
+def start_refused(lifecycle: Lifecycle, reason: str) -> None:
+    assert str(lifecycle.error) == reason
+
+
+@then(quoted('il flusso "{name}" resta nello stato "{status}"'))
+def status_kept(platform: Platform, lifecycle: Lifecycle, name: str, status: str) -> None:
+    assert flow_named(platform, lifecycle.user, name).status.value == status
+
+
+@then("la richiesta è rifiutata come flusso inesistente")
+def request_refused_as_missing(lifecycle: Lifecycle) -> None:
+    assert isinstance(lifecycle.error, FlowNotFoundError)
+
+
+def listed(parts: tuple[str, ...]) -> str:
+    """The parts as the dashboard lists them: «conto, capitale allocato e asset»."""
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} e {parts[-1]}"
+
+
+@when(quoted('"{user}" apre la bozza "{name}"'))
+def open_draft(platform: Platform, duplication: Duplication, user: str, name: str) -> None:
+    duplication.opened = flow_named(platform, user, name)
+
+
+@then(quoted('Avvia è disattivato con accanto "{text}" e il rimando "{link}"'))
+def start_disabled(duplication: Duplication, text: str, link: str) -> None:
+    # playwright-bdd runs the page (Bug 560); here the same scenario proves that the API gives it what it shows: what
+    # the draft lacks, which disables Avvia and fills the text, on a draft whose configuration the link opens.
+    draft = duplication.opened
+    assert draft is not None
+    assert draft.missing_before_start != ()
+    assert text == f"Per avviarla manca: {listed(draft.missing_before_start)}"
+    assert (draft.status, link) == (FlowStatus.DRAFT, "Configura")
+
+
+@given(quoted('che "{user}" ha la bozza "{name}" senza conto, capitale allocato né asset'))
+def bare_draft(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
+    lifecycle.user = user
+    configuration = replace(a_configuration(), allocated_capital=None, assets=())
+    draft = a_flow(platform.tenant_of(user), name=name, status=FlowStatus.DRAFT, configuration=configuration)
+    platform.flows.flows.append(replace(draft, account_id=None))
+
+
+@when(quoted('"{user}" chiede all\'interfaccia programmatica di duplicare il flusso "{name}"'))
+def duplicate_through_the_api(  # noqa: PLR0917 - one argument per fixture and value of the step
+    platform: Platform, lifecycle: Lifecycle, draft: Draft, duplication: Duplication, user: str, name: str
+) -> None:
+    flow_id = flow_named(platform, lifecycle.user, name).id.value
+    response = ApiSession(platform).post_as(user, f"/flows/{flow_id}/duplicate")
+    assert response.status_code == HTTPStatus.CREATED, response.text
+    duplication.answer = response.json()
+    draft.name = str(duplication.answer["name"])
+
+
+@then(quoted('la risposta riporta il flusso "{name}" nello stato "{status}" alla versione {version}'))
+def api_answers_copy(duplication: Duplication, name: str, status: str, version: str) -> None:
+    answer = duplication.answer
+    assert (answer["name"], answer["status"], answer["version"]) == (name, status, int(version))
