@@ -16,6 +16,7 @@ from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.recorded_decision import DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.trade_side import TradeSide
+from tests.support.api_session import ApiSession
 from tests.support.flows import a_flow
 from tests.support.platform import Platform
 from tests.support.steps import quoted
@@ -45,6 +46,7 @@ class LastDecisions:
     seen: DecidedCycle | None = None
     opened_by: str = ""
     opened_flow: str = ""
+    answered: dict[str, object] = field(default_factory=dict)
 
     def flow(self, name: str) -> Flow:
         if name not in self.flows:
@@ -123,6 +125,21 @@ def open_overview(decisions: LastDecisions, user: str, flow: str) -> None:
     decisions.open_overview(user, flow)
 
 
+@when(quoted('"{user}" sceglie il periodo "{period}" nella Panoramica del flusso "{flow}"'))
+def choose_period_on_overview(decisions: LastDecisions, user: str, period: str, flow: str) -> None:
+    # The last decision is read without the period: the API of the panel takes none (R6.5.4).
+    assert period
+    decisions.open_overview(user, flow)
+
+
+@when(quoted('"{user}" chiede l\'ultima decisione del flusso "{flow}" all\'interfaccia programmatica'))
+def ask_the_api(decisions: LastDecisions, user: str, flow: str) -> None:
+    flow_id = decisions.flow(flow).id.value
+    response = ApiSession(decisions.platform).get_as(user, f"/flows/{flow_id}/decisions/latest")
+    assert response.status_code == 200
+    decisions.answered = response.json()
+
+
 # Then
 
 
@@ -155,6 +172,35 @@ def link_to_cycle_detail(decisions: LastDecisions, time: str) -> None:
         ReadCycleCommand(flow_id, shown.planned_at)
     )
     assert detail.planned_at == at(time)
+
+
+@then(quoted('il riquadro avvisa "{note}" e mostra la decisione delle {time}'))
+def decision_whatever_the_period(decisions: LastDecisions, note: str, time: str) -> None:
+    # The dashboard writes the note above the decision the API answers whatever the period.
+    assert note == "indipendente dal periodo"
+    assert decisions.shown().planned_at == at(time)
+
+
+@then(
+    parsers.re(
+        r"^la risposta ha la decisione delle (?P<time>\d\d:\d\d) per (?P<asset>\w+) \"(?P<action>[^\"]+)\" "
+        r"\"(?P<direction>[^\"]+)\" con confidenza (?P<confidence>\d+)$"
+    )
+)
+def api_answers_decision(
+    decisions: LastDecisions, *, time: str, asset: str, action: str, direction: str, confidence: str
+) -> None:
+    answered = decisions.answered
+    assert answered["planned_at"] == at(time).isoformat().replace("+00:00", "Z")
+    assert answered["decisions"] == [
+        {
+            "asset": asset,
+            "action": action,
+            "direction": direction,
+            "confidence": int(confidence),
+            "reasoning": REASONING,
+        }
+    ]
 
 
 @then(quoted("vede ancora la decisione del ciclo delle {time}"))

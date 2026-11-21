@@ -45,3 +45,7 @@ Funzionalità: R4.1.1 Fonti con adapter dichiarati
   Scenario: Parametro dell'adapter fuori dai valori ammessi
     Quando "anna" imposta un parametro dell'adapter "RSS" a un valore non ammesso
     Allora la configurazione è rifiutata con il motivo che nomina il parametro e i valori ammessi
+
+  Scenario: Il modulo di un adapter nasce dalla sua dichiarazione
+    Quando "anna" sceglie nel flusso "alfa" l'adapter "RSS" della fonte "notizie"
+    Allora il modulo dell'adapter ha il peso e un campo per ogni parametro dichiarato, con i limiti e il valore predefinito

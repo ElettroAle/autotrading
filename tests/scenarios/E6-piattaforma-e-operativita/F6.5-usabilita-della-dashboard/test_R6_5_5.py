@@ -121,6 +121,20 @@ def flow_with_completed_cycles(history: DecisionHistory, user: str, flow: str) -
     history.user, history.flow_name = user, flow
 
 
+@given(quoted('che il flusso "{flow}" ha altri {count} cicli conclusi nell\'ultimo giorno su BTC ed ETH'))
+def more_cycles_of_the_last_day(history: DecisionHistory, flow: str, count: str) -> None:
+    owned = history.flows[flow]
+    newest = max(cycle.planned_at for cycle in history.recorded)
+    # One an hour after the newest of the week, before the cycle of the day before: the oldest stay on the last page.
+    for hour in range(1, int(count) + 1):
+        history.record(
+            owned,
+            newest - timedelta(hours=hour),
+            a_decision("BTC", DecisionAction.HOLD, None, 40),
+            a_decision("ETH", DecisionAction.HOLD, None, 40),
+        )
+
+
 # When
 
 
@@ -134,6 +148,20 @@ def open_history(history: DecisionHistory, user: str, flow: str) -> None:
 def filter_history(history: DecisionHistory, user: str, asset: str, action: str) -> None:
     history.user = user
     history.open_history(DecisionFilter.named(asset=asset, action=action))
+
+
+@when(quoted('"{user}" filtra lo storico per direzione "{direction}"'))
+def filter_by_direction(history: DecisionHistory, user: str, direction: str) -> None:
+    history.user = user
+    history.open_history(DecisionFilter.named(direction=direction))
+
+
+@when(quoted('"{user}" apre la seconda pagina dello storico delle decisioni'))
+def open_second_page(history: DecisionHistory, user: str) -> None:
+    history.user = user
+    flow = history.flows[history.flow_name]
+    command = ListDecisionsCommand(flow.id.value, 2, DecisionFilter(), StatisticsPeriod.named("all"))
+    history.seen = history.platform.use_cases_of(user).list_decisions.execute(command)
 
 
 @when(quoted('"{user}" sceglie il periodo "{period}"'))
@@ -192,6 +220,36 @@ def only_openings_on(history: DecisionHistory, asset: str) -> None:
     ]
     assert [(entry.planned_at, entry.decision) for entry in shown] == sorted(expected, key=lambda each: each[0])[::-1]
     assert len(shown) == len(expected) > 0
+
+
+@then(quoted("vede solo le decisioni di aprire {direction}"))
+def only_openings_towards(history: DecisionHistory, direction: str) -> None:
+    shown = history.shown()
+    expected = [
+        (cycle.planned_at, decision)
+        for cycle in history.recorded
+        for decision in cycle.decisions
+        if decision.direction is TradeSide(direction)
+    ]
+    assert sorted(((entry.planned_at, entry.decision) for entry in shown), key=lambda each: each[0]) == sorted(
+        expected, key=lambda each: each[0]
+    )
+    assert {entry.decision.action for entry in shown} == {DecisionAction.OPEN}
+    assert len(shown) == len(expected) > 0
+
+
+@then(quoted("vede le {count} decisioni più vecchie, dalla più recente"))
+def oldest_on_the_second_page(history: DecisionHistory, count: str) -> None:
+    assert history.seen is not None
+    every = sorted(
+        ((cycle.planned_at, decision.asset) for cycle in history.recorded for decision in cycle.decisions),
+        key=lambda each: each[0],
+        reverse=True,
+    )
+    shown = [(entry.planned_at, entry.decision.asset) for entry in history.seen.decisions]
+    assert [planned_at for planned_at, _ in shown] == [planned_at for planned_at, _ in every[-int(count) :]]
+    assert sorted(shown) == sorted(every[-int(count) :])
+    assert (history.seen.number, history.seen.has_next, history.seen.total) == (2, False, len(every))
 
 
 @then("lo storico mostra solo le decisioni degli ultimi 7 giorni")

@@ -23,3 +23,8 @@ Funzionalità: R6.4.5 Schede riconoscibili
     Dato uno schermo largo 360 pixel
     Quando "anna" apre la pagina del flusso
     Allora la barra delle schede sta su una riga e la pagina non scorre in orizzontale
+
+  Scenario: Schede selezionabili da tastiera
+    Quando "anna" apre lo storico
+    E sceglie con la freccia a destra la scheda dopo "Cicli"
+    Allora la scheda "Posizioni chiuse" è scelta e ha il fuoco

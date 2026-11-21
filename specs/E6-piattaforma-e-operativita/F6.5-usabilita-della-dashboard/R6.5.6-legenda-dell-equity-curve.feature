@@ -31,3 +31,8 @@ Funzionalità: R6.5.6 Legenda dell'equity curve del flusso
     Dato che "alfa" ha un ciclo fallito e una variazione di capitale nel periodo mostrato
     Quando "anna" apre la pagina del flusso "alfa" su un telefono
     Allora tutte le voci della legenda sono visibili senza scorrimento orizzontale
+
+  Scenario: Legenda del confronto delle equity curve
+    Dato che "anna" ha anche il flusso attivo "beta" con cicli nel periodo mostrato
+    Quando "anna" sceglie "alfa" e "beta" nella classifica del periodo "30 giorni" e apre il confronto
+    Allora sotto il grafico del confronto la legenda condivisa mostra "alfa" e "beta", ciascuno col segno della sua curva

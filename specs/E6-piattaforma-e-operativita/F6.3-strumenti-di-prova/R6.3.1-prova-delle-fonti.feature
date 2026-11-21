@@ -31,3 +31,14 @@ Funzionalità: R6.3.1 Prova delle fonti
     Dato che "anna" ha il flusso "alfa" con la fonte "indicatori"
     Quando "anna" prova la fonte "indicatori"
     Allora i cicli del flusso "alfa" non registrano valori della prova
+
+  Scenario: Prova di un adapter con le credenziali del tenant
+    Dato che "anna" ha configurato la chiave dell'adapter "LunarCrush" della fonte "sentiment"
+    Quando "anna" prova l'adapter "LunarCrush" della fonte "sentiment"
+    Allora vede l'esito "riuscita" letto con la chiave di "anna"
+
+  Scenario: Prova fallita per un errore permanente
+    Dato che "anna" ha configurato la chiave dell'adapter "LunarCrush" della fonte "sentiment"
+    E che il fornitore di "LunarCrush" rifiuta la chiave
+    Quando "anna" prova l'adapter "LunarCrush" della fonte "sentiment"
+    Allora vede l'esito "errore" con il motivo "credenziali rifiutate dal fornitore: LunarCrush" e l'indicazione "permanente"

@@ -30,6 +30,17 @@ Funzionalità: R6.2.1 Campanello delle notifiche
     Quando la piattaforma genera una notifica per "anna"
     Allora la notifica compare nel campanello
 
+  Scenario: Notifica con l'invio Telegram fallito
+    Dato che "anna" ha collegato Telegram
+    E che Telegram non risponde
+    Quando la piattaforma genera una notifica per "anna"
+    Allora la notifica compare nel campanello senza il messaggio Telegram
+
+  Scenario: Notifiche conservate 90 giorni
+    Dato che "anna" ha ricevuto la notifica "vecchia" 91 giorni fa e la notifica "recente" 89 giorni fa
+    Quando la piattaforma genera una notifica per "anna"
+    Allora il campanello contiene la notifica "recente" e la nuova, non la notifica "vecchia"
+
   Scenario: Tutte lette
     Dato che "anna" ha 3 notifiche non lette
     Quando "anna" le segna tutte come lette

@@ -14,10 +14,12 @@ from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.notifications.list_inbox_notifications import ListInboxNotificationsCommand
 from autotrading.application.notifications.mark_notification_read import MarkNotificationReadCommand
 from autotrading.domain.notifications.inbox_notification import InboxNotification
+from autotrading.domain.notifications.linked_chat import LinkedChat
 from autotrading.domain.notifications.notification import Notification, NotificationLine
 from autotrading.domain.notifications.notification_event import NotificationEvent
 from autotrading.domain.notifications.notification_target import TargetKind
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.notifications import chat_named
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
@@ -109,6 +111,33 @@ def other_user_notification(bell: Bell, user: str) -> None:
     bell.told = theirs.title
 
 
+@given(quoted('che "{user}" ha collegato Telegram'))
+def telegram_linked(bell: Bell, user: str) -> None:
+    tenant_id = bell.tenant(user)
+    bell.platform.chats[tenant_id] = LinkedChat(tenant_id, chat_named(user))
+
+
+@given("che Telegram non risponde")
+def telegram_unreachable(bell: Bell) -> None:
+    bell.platform.messenger.reachable = False
+
+
+@given(
+    quoted(
+        'che "{user}" ha ricevuto la notifica "{old}" {old_days} giorni fa '
+        'e la notifica "{recent}" {recent_days} giorni fa'
+    )
+)
+def aged_notifications(  # noqa: PLR0917 - one argument per value of the step
+    bell: Bell, user: str, old: str, old_days: str, recent: str, recent_days: str
+) -> None:
+    now = bell.platform.worker_clock.current
+    for flow, days in ((old, old_days), (recent, recent_days)):
+        bell.platform.worker_clock.current = now - timedelta(days=int(days))
+        bell.notify_cycle_failed(flow, user)
+    bell.platform.worker_clock.current = now
+
+
 # When
 
 
@@ -164,6 +193,20 @@ def notification_in_bell(bell: Bell) -> None:
     assert bell.platform.outbox.messages == []
     assert [notification.title for notification in bell.all_notifications()] == [bell.told]
     assert bell.unread_count() == 1
+
+
+@then("la notifica compare nel campanello senza il messaggio Telegram")
+def notification_in_bell_without_message(bell: Bell) -> None:
+    assert bell.platform.messenger.sent == []
+    assert [notification.title for notification in bell.all_notifications()] == [bell.told]
+    assert bell.unread_count() == 1
+
+
+@then(quoted('il campanello contiene la notifica "{recent}" e la nuova, non la notifica "{old}"'))
+def kept_for_retention(bell: Bell, recent: str, old: str) -> None:
+    titles = [notification.title for notification in bell.all_notifications()]
+    assert titles == [bell.told, f"{recent}: ciclo fallito"]
+    assert f"{old}: ciclo fallito" not in titles
 
 
 @then("il campanello non mostra alcun numero")

@@ -4,21 +4,26 @@ build of the dashboard (ADR pagina-fonti-con-la-prova); here being on the page i
 trial without an asset named takes the first asset the exchange trades, as the page proposes it.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.application.sources.configure_source_adapter import ConfigureSourceAdapterCommand
+from autotrading.application.sources.errors import SourceCredentialsRejectedError
 from autotrading.application.sources.request_source_trial import RequestSourceTrialCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_trial import SourceTrial, TrialOutcome
 from tests.fakes.market_data import FakeMarketDataAdapter
-from tests.fakes.sources import FakeNewsAdapter
+from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.flows import a_configuration, a_flow
 from tests.support.platform import Platform
+from tests.support.source_keys import API_KEY
 from tests.support.source_selections import a_source, adapter_of
 from tests.support.steps import quoted
 
@@ -28,6 +33,26 @@ OUTCOMES = {"riuscita": TrialOutcome.SUCCEEDED, "errore": TrialOutcome.FAILED}
 PERMANENCE = {"transitorio": False, "permanente": True}
 # Beyond the series length every adapter of the indicators admits (R1.3.3).
 OUT_OF_RANGE = 51
+KEY_OF_ANNA = "K-LUNAR-ANNA"
+
+
+class CredentialsRefusedAnswer(Exception):  # noqa: N818 - the error the library of the provider raises, not a project error
+    """What the client of a provider raises when it refuses the credentials: the code the base error reads in the
+    cause (ADR permanenza-decisa-dall-errore-base).
+    """
+
+    status_code = 401
+
+
+@dataclass
+class FakeRefusingSentimentAdapter(FakeSentimentAdapter):
+    """A paid adapter of the sentiment whose provider answers its refusal with its code, as a real client does."""
+
+    def read_index(self, credentials: Mapping[str, str]) -> SentimentIndex:
+        if not self.rejects_credentials:
+            return super().read_index(credentials)
+        self.received.append(credentials)
+        raise SourceCredentialsRejectedError(self.name) from CredentialsRefusedAnswer()
 
 
 @dataclass
@@ -39,6 +64,7 @@ class Page:
     trial: SourceTrial | None = None
     refusal: AutotradingError | None = None
     flows: dict[str, Flow] = field(default_factory=dict)
+    paid: FakeRefusingSentimentAdapter | None = None
 
     @property
     def tried(self) -> SourceTrial:
@@ -99,6 +125,32 @@ def flow_with_source(platform: Platform, page: Page, user: str, name: str, sourc
     page.flows[name] = flow
 
 
+@given(quoted('che "{user}" ha configurato la chiave dell\'adapter "{adapter}" della fonte "{source}"'))
+def paid_adapter_configured(platform: Platform, page: Page, user: str, adapter: str, source: str) -> None:
+    page.paid = FakeRefusingSentimentAdapter(adapter, configuration_fields=(API_KEY,))
+    systems = platform.source_systems
+    platform.source_systems = replace(systems, sentiments=(*systems.sentiments, page.paid))
+    command = ConfigureSourceAdapterCommand(adapter, {API_KEY.name: KEY_OF_ANNA})
+    platform.use_cases_of(user).configure_source_adapter.execute(command)
+    assert source == "sentiment"
+
+
+@given(quoted('che il fornitore di "{adapter}" rifiuta la chiave'))
+def provider_refuses(page: Page, adapter: str) -> None:
+    assert page.paid is not None
+    assert page.paid.name == adapter
+    page.paid.rejects_credentials = True
+
+
+@when(quoted('"{user}" prova l\'adapter "{adapter}" della fonte "{source}"'))
+def try_adapter(platform: Platform, page: Page, user: str, adapter: str, source: str) -> None:
+    command = RequestSourceTrialCommand(source, adapter, None, {})
+    try:
+        page.trial = platform.use_cases_of(user).request_source_trial.execute(command)
+    except AutotradingError as error:
+        page.refusal = error
+
+
 @when(quoted('"{user}" prova la fonte "{source}" per l\'asset "{asset}" con i parametri predefiniti'))
 def try_with_defaults(platform: Platform, page: Page, source: str, asset: str) -> None:
     try_source(platform, page, source, asset)
@@ -121,6 +173,21 @@ def sees_the_values(page: Page, outcome: str) -> None:
     assert [value.values["prezzo"] for value in trial.values] == ["100"]
     assert trial.data_at == trial.values[0].reference_at
     assert trial.response_milliseconds == 180
+
+
+@then(quoted('vede l\'esito "{outcome}" letto con la chiave di "{user}"'))
+def sees_reading_with_key(page: Page, outcome: str, user: str) -> None:
+    assert page.tried.outcome is OUTCOMES[outcome]
+    assert page.tried.values
+    assert page.paid is not None
+    assert page.paid.received == [{API_KEY.name: KEY_OF_ANNA}]
+    assert user == page.user
+
+
+@then(quoted('vede l\'esito "{outcome}" con il motivo "{reason}" e l\'indicazione "{permanence}"'))
+def sees_the_reason(page: Page, outcome: str, reason: str, permanence: str) -> None:
+    trial = page.tried
+    assert (trial.outcome, trial.reason, trial.permanent) == (OUTCOMES[outcome], reason, PERMANENCE[permanence])
 
 
 @then(quoted('vede l\'esito "{outcome}" con il motivo e l\'indicazione "{permanence}"'))

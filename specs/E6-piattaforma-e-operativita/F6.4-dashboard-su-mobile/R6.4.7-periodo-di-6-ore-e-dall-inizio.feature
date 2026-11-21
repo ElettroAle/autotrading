@@ -28,3 +28,8 @@ Funzionalità: R6.4.7 Periodo di 6 ore e «Dall'inizio»
   Scenario: Classifica sulle ultime 6 ore
     Quando "anna" sceglie il periodo "6 ore" nella classifica dei flussi
     Allora il rendimento di ogni flusso è calcolato sulle ultime 6 ore
+
+  Scenario: Un indirizzo salvato con il periodo dall'inizio continua ad aprirsi
+    Quando "anna" apre la pagina del flusso "alfa" da un indirizzo salvato con il periodo "all"
+    Allora il periodo scelto è "Dall'inizio"
+    E il guadagno nel periodo vale dal primo ciclo del flusso

@@ -27,6 +27,7 @@ class Sources:
     catalog: SourceCatalog | None = None
     saved: tuple[int, dict[str, object]] | None = None
     refused_parameter: dict[str, int] = field(default_factory=dict)
+    chosen: tuple[str, str] = ("", "")
 
     def listed(self) -> SourceCatalog:
         assert self.catalog is not None
@@ -213,3 +214,29 @@ def parameter_out_of_range(
 @then("la configurazione è rifiutata con il motivo che nomina il parametro e i valori ammessi")
 def refused_naming_parameter(lifecycle: Lifecycle) -> None:
     assert str(lifecycle.error) == "parametro fuori dai valori ammessi: numero notizie, da 1 a 50"
+
+
+@when(quoted('"{user}" sceglie nel flusso "{flow}" l\'adapter "{adapter}" della fonte "{source}"'))
+def choose_adapter(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles, sources: Sources, user: str, flow: str, adapter: str, source: str
+) -> None:
+    # The editor of the flow builds the form of the adapter from the catalog the API lists (ADR 0131).
+    assert flow_cycles.flow(flow).name.value == flow
+    sources.catalog = flow_cycles.platform.use_cases_of(user).list_sources.execute()
+    sources.chosen = (source, adapter)
+
+
+@then(
+    "il modulo dell'adapter ha il peso e un campo per ogni parametro dichiarato, con i limiti e il valore predefinito"
+)
+def form_from_declaration(sources: Sources) -> None:
+    source, adapter = sources.chosen
+    offered = sources.listed().find(source)
+    parameters = offered.parameters_of(adapter)
+    assert parameters
+    assert NEWS_COUNT in [parameter.key for parameter in parameters]
+    assert all(
+        parameter.label and parameter.minimum <= parameter.default <= parameter.maximum for parameter in parameters
+    )
+    # A field left empty in the form saves the default the adapter declares.
+    assert offered.settings(adapter, {}) == {parameter.key: parameter.default for parameter in parameters}

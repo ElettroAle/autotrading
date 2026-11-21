@@ -36,6 +36,15 @@ SNAPSHOT = VolumeSnapshot(
     (BookLevel(Decimal(100500), Decimal(6)), BookLevel(Decimal(102000), Decimal(50))),
 )
 
+# Balanced: as many aggressive buys as sells, as many bids as asks within 1% of the price.
+SECOND_SNAPSHOT = VolumeSnapshot(
+    Decimal(500_000_000),
+    Decimal(1_000_000),
+    Decimal(1_000_000),
+    (BookLevel(Decimal(99500), Decimal(6)),),
+    (BookLevel(Decimal(100500), Decimal(6)),),
+)
+
 
 @dataclass
 class VolumeCycles:
@@ -73,6 +82,10 @@ def with_asset(asset: str) -> Callable[[FlowConfiguration], FlowConfiguration]:
     return change
 
 
+def number(text: str) -> str:
+    return text.replace(",", ".")
+
+
 # Given
 
 
@@ -92,6 +105,22 @@ def flow_with_volumes_source(volumes: VolumeCycles, flow: str, asset: str, sourc
 def flow_with_unlisted_asset(volumes: VolumeCycles, flow: str, adapter: str) -> None:
     assert adapter == volumes.adapter().name
     volumes.cycles.reconfigure(flow, with_asset(UNLISTED))
+
+
+@given(quoted('che il flusso "{flow}" ha anche l\'adapter "{adapter}" della fonte "{source}"'))
+def second_exchange(volumes: VolumeCycles, flow: str, adapter: str, source: str) -> None:
+    assert source == VOLUMES
+    cycles = volumes.cycles
+    [asset] = cycles.flow(flow).configuration.assets
+    cycles.volumes[adapter] = FakeVolumesAdapter(adapter, published={asset: SECOND_SNAPSHOT})
+    cycles.platform.source_systems = cycles.systems()
+
+    def with_second(configuration: FlowConfiguration) -> FlowConfiguration:
+        [selection] = configuration.sources
+        adapters = (*selection.adapters, AdapterSelection(adapter, DEFAULT_WEIGHT, {}))
+        return replace(configuration, sources=(replace(selection, adapters=adapters),))
+
+    cycles.reconfigure(flow, with_second)
 
 
 @given(quoted("che {adapter} non risponde"))
@@ -131,6 +160,35 @@ def volumes_in_context(volumes: VolumeCycles, asset: str, adapter: str) -> None:
     ]
     # The aggressive trades are those of the interval of the cycle of the flow.
     assert volumes.adapter().asked == [VolumesAsked(asset, CYCLE_MINUTES)]
+
+
+def adapters_in_context(volumes: VolumeCycles, asset: str) -> dict[str, dict[str, str]]:
+    entries = volumes.cycles.context()["fonti"]
+    assert isinstance(entries, list)
+    return {
+        entry["adapter"]: entry["valori"] for entry in entries if entry["fonte"] == VOLUMES and entry["asset"] == asset
+    }
+
+
+@then(quoted('il contesto contiene per "{asset}" i dati di "{first}" e di "{second}"'))
+def both_exchanges_in_context(volumes: VolumeCycles, asset: str, first: str, second: str) -> None:
+    by_adapter = adapters_in_context(volumes, asset)
+    assert by_adapter[first]["volume_24h_usd"] == "1500000000"
+    assert by_adapter[second]["volume_24h_usd"] == "500000000"
+
+
+@then(
+    quoted(
+        'il contesto contiene per "{asset}" l\'aggregato con volume 24 ore {volume}, rapporto taker buy/sell {ratio} '
+        "e squilibrio dell'order book {imbalance}"
+    )
+)
+def aggregate_in_context(volumes: VolumeCycles, asset: str, volume: str, ratio: str, imbalance: str) -> None:
+    assert adapters_in_context(volumes, asset)["aggregato"] == {
+        "volume_24h_usd": volume,
+        "rapporto_taker_buy_sell": number(ratio),
+        "squilibrio_order_book_1_percento": number(imbalance),
+    }
 
 
 @then(quoted('il contesto dice per quell\'asset "{note}"'))

@@ -250,7 +250,84 @@ CASES_OF_E3 = {
         "Prezzo effettivo letto dall'exchange da cui viene la previsione",
     ),
 }
-CASES = {**CASES_OF_E0, **CASES_OF_E1, **CASES_OF_E2, **CASES_OF_E3}
+# Task 678: the cases of E4, E5 and E6.
+E4 = "E4-replay-e-analisi"
+CASES_OF_E4 = {
+    f"{E4}/F4.1-fonti-ad-adapter-configurabili/R4.1.1-fonti-con-adapter-dichiarati.feature": (
+        "Il modulo di un adapter nasce dalla sua dichiarazione",
+    ),
+    f"{E4}/F4.1-fonti-ad-adapter-configurabili/R4.1.2-credenziali-degli-adapter-delle-fonti.feature": (
+        "Un solo avviso per la credenziale rifiutata",
+    ),
+}
+E5 = "E5-evoluzioni"
+CASES_OF_E5 = {
+    f"{E5}/F5.1-nuove-fonti/R5.1.2-volumi-e-order-book.feature": ("Più exchange con l'aggregato pesato sui volumi",),
+    f"{E5}/F5.1-nuove-fonti/R5.1.5-forecast-su-orizzonti-lunghi.feature": (
+        "Previsione a 1 settimana",
+        "Storico giornaliero più corto della profondità richiesta",
+        "Previsione lunga nella valutazione del forecast",
+    ),
+}
+E6 = "E6-piattaforma-e-operativita"
+CASES_OF_E6 = {
+    f"{E6}/F6.2-avvisi-e-scadenze/R6.2.1-campanello-delle-notifiche.feature": (
+        "Notifica con l'invio Telegram fallito",
+        "Notifiche conservate 90 giorni",
+    ),
+    f"{E6}/F6.2-avvisi-e-scadenze/R6.2.2-avviso-di-scadenza-delle-chiavi.feature": ("Una nuova data azzera le soglie",),
+    f"{E6}/F6.2-avvisi-e-scadenze/R6.2.3-centro-degli-avvisi.feature": (
+        "Avviso della posizione estranea risolto quando la posizione non c'è più",
+        "Avviso del flusso risolto quando il flusso finisce",
+        "Avviso della chiave risolto quando la chiave è rimossa",
+        "Filtri per gravità e tipo di risorsa",
+        "Filtro per periodo",
+        "Avvisi risolti conservati 90 giorni",
+        "Movimenti non spiegati nel riquadro del conto",
+    ),
+    f"{E6}/F6.3-strumenti-di-prova/R6.3.1-prova-delle-fonti.feature": (
+        "Prova di un adapter con le credenziali del tenant",
+        "Prova fallita per un errore permanente",
+    ),
+    f"{E6}/F6.4-dashboard-su-mobile/R6.4.1-dashboard-leggibile-su-mobile.feature": (
+        "Avviso della rete senza parole ripetute",
+        "Elenco dei flussi senza legenda degli esiti",
+    ),
+    f"{E6}/F6.4-dashboard-su-mobile/R6.4.3-pagina-del-flusso-a-schede-con-periodo-comune.feature": (
+        "Tornare indietro conserva periodo, intervallo e scheda",
+        "Cicli conclusi senza segni sull'equity curve",
+        "Barra delle schede intera e visibile su schermo stretto",
+    ),
+    f"{E6}/F6.4-dashboard-su-mobile/R6.4.4-tabelle-leggibili-e-filtrabili.feature": (
+        "Tabella con la prima colonna fissa su schermo largo",
+        "Righe come schede su schermo stretto",
+    ),
+    f"{E6}/F6.4-dashboard-su-mobile/R6.4.5-schede-riconoscibili.feature": ("Schede selezionabili da tastiera",),
+    f"{E6}/F6.4-dashboard-su-mobile/R6.4.7-periodo-di-6-ore-e-dall-inizio.feature": (
+        "Un indirizzo salvato con il periodo dall'inizio continua ad aprirsi",
+    ),
+    f"{E6}/F6.4-dashboard-su-mobile/R6.4.8-prossima-esecuzione-nella-panoramica.feature": ("Flusso fermo",),
+    f"{E6}/F6.5-usabilita-della-dashboard/R6.5.4-ultima-decisione-nella-panoramica.feature": (
+        "Ultima decisione a prescindere dal periodo",
+        "Ultima decisione dall'interfaccia programmatica",
+    ),
+    f"{E6}/F6.5-usabilita-della-dashboard/R6.5.5-storico-delle-decisioni.feature": (
+        "Filtro per direzione",
+        "Storico a pagine",
+    ),
+    f"{E6}/F6.5-usabilita-della-dashboard/R6.5.6-legenda-dell-equity-curve.feature": (
+        "Legenda del confronto delle equity curve",
+    ),
+}
+CASES = {
+    **CASES_OF_E0,
+    **CASES_OF_E1,
+    **CASES_OF_E2,
+    **CASES_OF_E3,
+    **CASES_OF_E4,
+    **CASES_OF_E5,
+    **CASES_OF_E6,
+}
 # The epics whose features the scenario modules of pytest-bdd bind; those of the dashboard bind its Playwright
 # scenarios (ADR 0116).
 EPICS_BOUND_BY_PYTEST = (E0, E1)

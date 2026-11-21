@@ -89,3 +89,56 @@ Funzionalità: R6.2.3 Centro degli avvisi
     Dato che "bruno" ha un avviso aperto
     Quando "anna" apre la pagina Avvisi
     Allora l'avviso di "bruno" non compare
+
+  Scenario: Avviso della posizione estranea risolto quando la posizione non c'è più
+    Dato che sul conto "test-1" è aperto l'avviso di una posizione su un asset di nessun flusso
+    Quando il flusso "alfa" esegue un ciclo senza più quella posizione sul conto
+    Allora l'avviso della posizione è risolto
+
+  Schema dello scenario: Avviso del flusso risolto quando il flusso finisce
+    Dato che il flusso "alfa" è in pausa automatica con un avviso aperto
+    Quando "anna" <comando> il flusso "alfa"
+    Allora l'avviso del flusso "alfa" è risolto
+
+    Esempi:
+      | comando          |
+      | ferma            |
+      | ferma e archivia |
+
+  Scenario: Avviso della chiave risolto quando la chiave è rimossa
+    Dato che la chiave "openrouter" scade tra 20 giorni con un avviso aperto
+    Quando "anna" ferma il flusso "alfa" e rimuove la chiave "openrouter"
+    E la piattaforma controlla le scadenze
+    Allora l'avviso della chiave "openrouter" è risolto
+
+  Schema dello scenario: Filtri per gravità e tipo di risorsa
+    Dato che sul conto "test-1" è aperto un allarme di riconciliazione
+    E che sul conto "test-1" è aperto l'avviso di un'esecuzione senza identificativo della piattaforma
+    E che il flusso "alfa" è in pausa automatica
+    Quando "anna" filtra gli avvisi per <filtro> "<valore>"
+    Allora vede gli avvisi "<avvisi>"
+
+    Esempi:
+      | filtro          | valore     | avvisi                                                       |
+      | gravità         | attenzione | esecuzione senza identificativo                              |
+      | gravità         | critica    | allarme di riconciliazione, pausa automatica                 |
+      | tipo di risorsa | flusso     | pausa automatica                                             |
+      | tipo di risorsa | conto      | allarme di riconciliazione, esecuzione senza identificativo |
+
+  Scenario: Filtro per periodo
+    Dato che il 17/11/2026 sul conto "test-1" si è aperto un allarme di riconciliazione
+    E che il 19/11/2026 il flusso "alfa" è andato in pausa automatica
+    Quando "anna" filtra gli avvisi aperti dal 18/11/2026 al 20/11/2026
+    Allora vede gli avvisi "pausa automatica"
+
+  Scenario: Avvisi risolti conservati 90 giorni
+    Dato che l'allarme di riconciliazione del conto "test-1" si è risolto 91 giorni fa
+    E che la pausa automatica del flusso "alfa" si è risolta 89 giorni fa
+    Quando sul conto "test-1" si apre un nuovo allarme di riconciliazione
+    Allora "anna" vede l'avviso aperto "allarme di riconciliazione" e quello risolto "pausa automatica"
+
+  Scenario: Movimenti non spiegati nel riquadro del conto
+    Dato che il saldo del conto "test-1" si discosta da quello atteso entro la soglia
+    Quando il flusso "alfa" esegue un ciclo
+    E "anna" apre i movimenti non spiegati del conto "test-1"
+    Allora vede la variazione del saldo di 5 con il totale netto delle variazioni 5

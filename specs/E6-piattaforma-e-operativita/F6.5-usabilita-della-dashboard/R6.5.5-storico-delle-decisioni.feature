@@ -30,3 +30,12 @@ Funzionalità: R6.5.5 Storico delle decisioni
   Scenario: Dal dettaglio al ciclo
     Quando "anna" sceglie una riga dello storico
     Allora apre il dettaglio del ciclo di quella decisione
+
+  Scenario: Filtro per direzione
+    Quando "anna" filtra lo storico per direzione "short"
+    Allora vede solo le decisioni di aprire short
+
+  Scenario: Storico a pagine
+    Dato che il flusso "alfa" ha altri 21 cicli conclusi nell'ultimo giorno su BTC ed ETH
+    Quando "anna" apre la seconda pagina dello storico delle decisioni
+    Allora vede le 8 decisioni più vecchie, dalla più recente
