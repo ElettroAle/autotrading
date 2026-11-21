@@ -15,6 +15,9 @@ Funzionalità: R1.6.3 Registro delle operazioni
   - Le operazioni di un conto si consultano in due modi: solo quelle che non sono di nessun flusso, oppure tutte,
     di tutti i flussi del conto e di nessun flusso.
   Ogni operazione indica il suo flusso, oppure "nessun flusso".
+  Le esecuzioni delle chiusure di stop, incasso ed emergenza registrate con un altro flusso prima della correzione del
+  Bug 684 tornano al flusso chiuso con l'aggiornamento della piattaforma, e i totali di entrambi i flussi si ricalcolano;
+  la chiusura manuale dalla dashboard resta del flusso che ha l'asset.
 
   Fuori ambito: altri formati di esportazione, totali per asset.
 
@@ -62,3 +65,14 @@ Funzionalità: R1.6.3 Registro delle operazioni
     E che sul conto "test-1" ci sono acquisti fuori dalla piattaforma su "SOL" alle 10:20
     Quando "anna" esporta tutte le operazioni del conto "test-1"
     Allora l'esportazione contiene l'operazione delle 10:00 di "alfa" e delle 10:20 di "nessun flusso", in quest'ordine
+
+  @pipeline
+  Scenario: Le chiusure di un flusso registrate con un altro flusso tornano al flusso chiuso
+    Dato che "anna" ha fermato il flusso "alfa" con una posizione aperta su "BTC" e lo ha archiviato
+    E che "BTC" è passato al flusso "beta" prima che il registro leggesse le esecuzioni della chiusura
+    E che il registro ha attribuito le esecuzioni della chiusura al flusso "beta"
+    Quando la piattaforma viene aggiornata alla versione che ripara le chiusure dei flussi
+    Allora le esecuzioni della chiusura sono del flusso "alfa"
+    E il registro del flusso "alfa" non ha una posizione su "BTC"
+    E il registro del flusso "beta" non ha una posizione su "BTC"
+    E un nuovo aggiornamento non cambia nulla
