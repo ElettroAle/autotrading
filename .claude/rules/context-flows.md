@@ -98,12 +98,15 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
 - `ModelSettingsPort`, `SourceSettingsPort`: modello e fonti con i parametri risolti, dai contesti `agent` e
   `sources`; un rifiuto arriva come `InvalidFlowSettingError` con il motivo del contesto che lo dà.
 - `MarketsPort`: asset negoziabili ora sull'exchange, per nome dell'exchange.
-- `AccountActivityPort`: ciò che l'exchange mostra del conto ora (posizioni con margine, movimenti del saldo),
-  letto dal `worker` e chiesto dall'API via HTTP interno (ADR 0044, ADR 0063).
-- `AccountExecutionsPort`: esecuzioni e funding del conto da un istante, con l'indicazione se la finestra è completa,
-  letti dal `worker` (ADR 0063).
+- `AccountActivityPort`: ciò che l'exchange mostra del conto ora (posizioni con margine), letto dal `worker` e
+  chiesto dall'API via HTTP interno (ADR 0044, ADR 0063); nell'API la lettura passa dalla cache nella memoria del
+  processo (ADR cache-delle-letture-del-conto-come-decorator-in-memoria).
+- `AccountExecutionsPort`: esecuzioni, funding e movimenti del saldo (depositi, prelievi, trasferimenti) del conto da
+  un istante, con l'indicazione se la finestra è completa, letti dal `worker` (ADR 0063, ADR
+  movimenti-del-conto-nel-registro-con-cursore).
 - `FlowLedgerPort`: cursore del conto, chiavi già registrate, scrittura delle righe nuove con i totali nella stessa
-  transazione, totali dei flussi (ADR 0063).
+  transazione, totali dei flussi (ADR 0063), righe registrate dopo un istante per il saldo atteso della
+  riconciliazione (ADR saldo-atteso-dalle-righe-del-registro-dopo-la-lettura-precedente).
 - `FlowOperationsPort`: storico delle operazioni di un flusso o di un conto (solo fuori da ogni flusso, o tutte), con
   il nome del flusso su ogni riga: pagine di 50 per keyset dalla più recente con i totali del filtro in una sola query
   aggregata, ed esportazione dalla più vecchia letta in streaming; filtri per asset e periodo (ADR 0074, ADR 0080).
