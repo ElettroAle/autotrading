@@ -13,24 +13,14 @@ const PORT = 4173;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 
 // The scenarios of the dashboard run on the .feature files of specs/, as pytest-bdd does for Python (ADR 0116).
+// Only the files of the system dashboard: every scenario in them has its steps here, and one without steps fails the
+// generation instead of being skipped (ADR scenari-per-sistema-sotto-la-user-story).
 const testDir = defineBddConfig({
-  // The alerts (F6.2), the trial of the sources (F6.3), the dashboard on a phone (F6.4), its usability (F6.5) and what
-  // the requirements of E3 show in it run with the scenarios of E2, on the same build and fakes.
-  features: [
-    '../specs/E2-dashboard-e-confronto/**/*.feature',
-    '../specs/E3-rischio-capitale-e-qualita/**/*.feature',
-    '../specs/E4-replay-e-analisi/F4.1-fonti-ad-adapter-configurabili/*.feature',
-    '../specs/E6-piattaforma-e-operativita/F6.2-avvisi-e-scadenze/*.feature',
-    '../specs/E6-piattaforma-e-operativita/F6.3-strumenti-di-prova/*.feature',
-    '../specs/E6-piattaforma-e-operativita/F6.4-dashboard-su-mobile/*.feature',
-    '../specs/E6-piattaforma-e-operativita/F6.5-usabilita-della-dashboard/*.feature',
-  ],
+  features: ['../specs/**/dashboard/*.feature'],
   featuresRoot: '../specs',
   steps: ['e2e/support/fixtures.ts', 'e2e/support/**/*.steps.ts', 'e2e/scenarios/**/*.steps.ts'],
   tags: 'not @pipeline',
-  // A scenario of what the worker does (the equity a cycle records) has no step here: pytest-bdd runs it on the use
-  // cases, and the coverage of the scenarios reads both reports (ADR 0116).
-  missingSteps: 'skip-scenario',
+  missingSteps: 'fail-on-gen',
 });
 
 export default defineConfig({

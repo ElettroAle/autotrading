@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +11,7 @@ from gherkin.token_scanner import TokenScanner
 from tools.errors import PipelineError
 
 EXCLUDED_TAGS = frozenset({"@pipeline"})
+PATH_SEPARATOR = re.compile(r"[\\/]")
 
 
 class InvalidFeatureError(PipelineError):
@@ -20,9 +22,22 @@ class InvalidFeatureError(PipelineError):
 
 @dataclass(frozen=True, slots=True)
 class ExpectedScenario:
-    feature: str
+    """A scenario to pass, in the file of its system: «<sistema>/<R-slug>.feature» (ADR
+    scenari-per-sistema-sotto-la-user-story)."""
+
+    file: str
     scenario: str
     runs: int
+
+    @property
+    def system(self) -> str:
+        return self.file.split("/")[0]
+
+
+def scenario_file(path: str) -> str:
+    """The folder of the system and the name of the file: pytest-bdd and Playwright name the same file from different
+    roots, and the name of the file is the requirement, so the two parts identify it."""
+    return "/".join(PATH_SEPARATOR.split(path)[-2:])
 
 
 def feature_files(root: Path) -> list[Path]:
@@ -38,17 +53,24 @@ def parse_feature(path: Path) -> dict[str, Any]:
 
 
 def expected_scenarios(root: Path) -> list[ExpectedScenario]:
-    return [scenario for path in feature_files(root) for scenario in _expected_in(parse_feature(path))]
+    return [
+        scenario
+        for path in feature_files(root)
+        for scenario in _expected_in(scenario_file(path.as_posix()), parse_feature(path))
+    ]
 
 
-def _expected_in(feature: dict[str, Any]) -> Iterator[ExpectedScenario]:
-    if _is_excluded(feature):
+def _expected_in(file: str, node: dict[str, Any]) -> Iterator[ExpectedScenario]:
+    if _is_excluded(node):
         return
-    for child in feature["children"]:
+    for child in node["children"]:
+        rule = child.get("rule")
+        if rule is not None:
+            yield from _expected_in(file, rule)
         scenario = child.get("scenario")
         if scenario is None or _is_excluded(scenario):
             continue
-        yield ExpectedScenario(feature["name"], scenario["name"], _runs(scenario))
+        yield ExpectedScenario(file, scenario["name"], _runs(scenario))
 
 
 def _is_excluded(node: dict[str, Any]) -> bool:

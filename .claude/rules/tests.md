@@ -19,7 +19,7 @@ tests/
     bootstrap/test_bootstrap.py                   composition root
     tools/test_<modulo>.py                        script della pipeline
   integration/<tecnologia>/test_<adapter>.py      adapter contro la tecnologia vera
-  scenarios/<E..>/<F..>/test_<Rx_y_z>.py          scenari di specs/ con pytest-bdd
+  scenarios/<E..>/<F..>/test_<Rx_y_z>_<sistema>.py  scenari di specs/ di api, worker e forecaster con pytest-bdd
   fakes/<nome_porta>.py                           Fake*/InMemory*Adapter, uno per porta
   support/<modulo>.py                             aiuti condivisi dai test che non sono finti di porte
 ```
@@ -28,9 +28,14 @@ tests/
 
 - **Unit test per ogni tipo di produzione** che nasce o cambia, sui comportamenti e sui casi limite.
   Uno scenario che attraversa un tipo non lo copre.
-- **Scenari**: un modulo per file `.feature`, che lo lega con `scenarios(...)`; `bdd_features_base_dir`
-  punta a `specs/`. Eseguiti sui casi d'uso costruiti con gli adapter finti. Ogni `Allora` e ogni `E`
-  ha una propria asserzione.
+- **Scenari**: un modulo per file `.feature` dei sistemi `api`, `worker` e `forecaster`,
+  `tests/scenarios/<E>/<F>/test_<R>_<sistema>.py` (punti del requisito sostituiti da `_`), che lo lega con
+  `scenarios(...)`; `bdd_features_base_dir` punta a `specs/`. Eseguiti sui casi d'uso costruiti con gli adapter finti.
+  I passi che due file della stessa User Story condividono stanno in `tests/support/`. I file `dashboard` li esegue
+  Playwright (`.claude/rules/tech-dashboard.md`). Ogni `Allora` e ogni `E` ha una propria asserzione.
+- **Copertura degli scenari per sistema** (`tools/scenario_coverage.py`): ogni scenario non `@pipeline` dei file
+  `dashboard` superato nel report di Playwright, di ogni altro sistema nel report di pytest-bdd, al 100%; uno scenario
+  superato solo dal runner dell'altro sistema non conta (ADR scenari-per-sistema-sotto-la-user-story).
 - **Tag degli scenari**: solo `@pipeline` (provato da una run reale della pipeline) diventa marker
   pytest ed è escluso dalla suite e dalla copertura degli scenari; gli altri tag (`@R0.5.1`) sono
   tracciabilità e non diventano marker (`tests/scenarios/conftest.py`). `@wip` non esiste: un requisito
@@ -41,7 +46,8 @@ tests/
   eseguono i test mirati.
 - **Nessun test escluso o saltato** (ADR nessun-test-escluso-o-saltato): nessun `pytest.skip`,
   `skipif`, `xfail`, `importorskip` né `mark.skip`; nei test della dashboard nessun `.skip`, `.todo`,
-  `.fixme` né `.only`. La pipeline (`.github/actions/pytest-run/action.yml`) esclude solo il marker
+  `.fixme` né `.only`; Playwright con `missingSteps: 'fail-on-gen'`, `tags: 'not @pipeline'` e nessun `grep`,
+  `grepInvert` né `testIgnore`. La pipeline (`.github/actions/pytest-run/action.yml`) esclude solo il marker
   `pipeline`. Un test che vuole un file di credenziali lo legge e fallisce se manca. Unica eccezione
   nota il marker `testnet_credentials` dei test che mandano ordini sulla testnet, voci di
   `known_violations.py` col Bug 643 finché il segreto delle credenziali non esiste.

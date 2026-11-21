@@ -112,15 +112,16 @@ dal client di `src/lib/api-client.ts`.
 
 - Unit test con Vitest + Testing Library accanto al modulo (`<modulo>.test.ts(x)`); l'API e l'identity provider sono i
   finti MSW di `src/testing/mocks`, che tengono lo stato della piattaforma finta (`fakePlatform`). MSAL è quello vero.
-- Scenari: i `.feature` dei requisiti della dashboard, elencati in `features` di `dashboard/playwright.config.ts` (oggi
-  `specs/E2-*`, `specs/E3-*`, `specs/E6-*/F6.4-*` e `specs/E6-*/F6.5-*`), eseguiti da `playwright-bdd` sulla build servita da `server/`, con il browser
-  instradato agli stessi finti MSW. Passi in `e2e/scenarios/<epic>/<feature>/<requisito>.steps.ts`, in kebab-case;
+- Scenari: i soli `.feature` del sistema dashboard, `specs/**/dashboard/*.feature` in `features` di
+  `dashboard/playwright.config.ts`, con `missingSteps: 'fail-on-gen'` (uno scenario senza passi fa fallire la suite) e
+  il solo filtro `not @pipeline` (ADR scenari-per-sistema-sotto-la-user-story), eseguiti da `playwright-bdd` sulla build
+  servita da `server/`, con il browser instradato agli stessi finti MSW. Passi in `e2e/scenarios/<epic>/<feature>/<requisito>.steps.ts`, in kebab-case;
   passi condivisi e fixture in `e2e/support/`. Ogni `Allora` e ogni `E` ha la propria asserzione.
 - L'identity provider finto tiene la sessione dopo un accesso: finché è viva un accesso non chiede le credenziali, quando
   è finita mostra la pagina delle credenziali; rifiuta il refresh token scaduto con `invalid_grant` (ADR
   prove-dell-accesso-che-dura).
 - Ogni prova si vede rossa prima di diventare verde. Copertura di righe e rami oltre il 90% (`vitest --coverage`),
-  scenari al 100% (`tools/scenario_coverage.py` legge `dashboard/reports/cucumber.json`).
+  scenari al 100% (`tools/scenario_coverage.py` conta i file `dashboard` solo da `dashboard/reports/cucumber.json`).
 - Ogni test dà lo stesso esito a ogni esecuzione, in qualunque ordine e con qualunque carico (ADR
   test-della-dashboard-deterministici): un test che usa TanStack Query passa da `src/testing/test-utils.tsx` o crea il
   client con `queryConfig`, mai un `new QueryClient()` nudo (regola `no-restricted-syntax` di `eslint.architecture.js`);

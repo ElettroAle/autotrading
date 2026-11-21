@@ -1,0 +1,473 @@
+import json
+import re
+from dataclasses import replace
+from datetime import datetime, timedelta
+from decimal import Decimal
+from uuid import UUID, uuid4
+
+import pytest
+from pytest_bdd import given, then, when
+
+from autotrading.application.flows.list_account_operations import (
+    ListAccountOperationsCommand,
+    ListAccountOperationsUseCase,
+)
+from autotrading.application.flows.list_flow_operations import ListFlowOperationsCommand, ListFlowOperationsUseCase
+from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.flow_return import FlowReturn
+from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.ledger import ExecutionKind, FlowTotals
+from autotrading.domain.flows.operations import FUNDING, AccountScope, OperationsPage, OperationsQuery
+from autotrading.domain.flows.risk_limits import RiskLimits
+from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
+from tests.fakes.flow_repository import InMemoryFlowRepositoryAdapter
+from tests.support.activity import READ_AT, a_fill, a_payment, a_position
+from tests.support.attribution import TENANT, AttributionBench, amount, step
+from tests.support.flow_cycles import FlowCycles
+
+
+@pytest.fixture
+def bench() -> AttributionBench:
+    return AttributionBench()
+
+
+@pytest.fixture(name="flow_cycles")
+def flow_cycles_of_the_worker() -> FlowCycles:
+    """The same flows run by the worker: the cycle must see the state the user consults (Bug 153)."""
+    return FlowCycles()
+
+
+OPENED_AT = READ_AT - timedelta(minutes=10)
+FUNDED_AT = READ_AT + timedelta(minutes=1)
+
+
+def fills_of(bench: AttributionBench, flow: str, realized_pnl: Decimal, fee: Decimal) -> None:
+    order, owner = uuid4(), bench.flow(flow)
+    bench.orders.add(order, owner.assigned_account_id, owner.id)
+    fill = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee, fill_id=str(order))
+    bench.extend(owner.assigned_account_id, fills=(fill,))
+    bench.record_executions(owner.assigned_account_id)
+
+
+def cycle_fills_of(flow_cycles: FlowCycles, flow: str, realized_pnl: Decimal, fee: Decimal) -> None:
+    order, owner = uuid4(), flow_cycles.flow(flow)
+    platform = flow_cycles.platform
+    platform.platform_orders.add(order, owner.assigned_account_id, owner.id)
+    address = flow_cycles.credentials_of(flow).value("account_address")
+    # An opening and its closing: the position the flow expects is the one the exchange shows, none (ADR 0064).
+    opening = a_fill("BTC", order, fill_id=f"{order}-1", executed_at=OPENED_AT)
+    closing = a_fill("BTC", order, realized_pnl=realized_pnl, fee=fee, fill_id=f"{order}-2", size=Decimal(-1))
+    platform.activity_reader.executions.setdefault(address, []).extend((opening, closing))
+
+
+def add_cycle_flow(flow_cycles: FlowCycles, name: str, asset: str, capital: Decimal) -> None:
+    flow_cycles.add_flow("anna", name, assets=(asset,))
+    # The whole capital may go in one operation: the scenarios measure the liquidity, not the exposure (R1.5.2).
+    limits = RiskLimits(5, Decimal(100))
+    flow_cycles.reconfigure(
+        name, lambda configuration: replace(configuration, allocated_capital=capital, risk_limits=limits)
+    )
+
+
+@given(
+    step(
+        r'che "anna" ha il conto "{account}" con i flussi "alfa" \(asset "BTC", capitale allocato {a} USDC\)'
+        r' e "beta" \(asset "ETH", capitale allocato {b} USDC\)'
+    )
+)
+def two_flows(bench: AttributionBench, flow_cycles: FlowCycles, account: str, a: str, b: str) -> None:
+    bench.add_flow(account, "alfa", ("BTC",), amount(a))
+    bench.add_flow(account, "beta", ("ETH",), amount(b))
+    add_cycle_flow(flow_cycles, "alfa", "BTC", amount(a))
+    add_cycle_flow(flow_cycles, "beta", "ETH", amount(b))
+
+
+@given(step(r'che sull\'exchange il conto "{account}" ha posizioni aperte su "{asset}" e su "{other}"'))
+def open_positions(bench: AttributionBench, account: str, asset: str, other: str) -> None:
+    bench.extend(bench.account(account), positions=(a_position(asset), a_position(other)))
+
+
+@given(step(r'che le esecuzioni del flusso "{flow}" hanno PnL realizzato {a} USDC e commissioni {b} USDC'))
+def fills_with_fees(bench: AttributionBench, flow_cycles: FlowCycles, flow: str, a: str, b: str) -> None:
+    fills_of(bench, flow, amount(a), amount(b))
+    cycle_fills_of(flow_cycles, flow, amount(a), amount(b))
+
+
+@given(step(r'che l\'exchange non mostra più le esecuzioni del conto "{account}"'))
+def exchange_forgets(bench: AttributionBench, account: str) -> None:
+    bench.exchange.executions[bench.account(account)] = []
+    bench.record_executions(bench.account(account))
+
+
+@given(step(r'che il ciclo successivo legge di nuovo le stesse esecuzioni del conto "{account}"'))
+def read_again(bench: AttributionBench, account: str) -> None:
+    bench.record_executions(bench.account(account))
+
+
+@given(
+    step(
+        "che l'exchange pubblica in ritardo un'esecuzione del flusso \"{flow}\" avvenuta (?P<minutes>\\d+) minuti "
+        "prima con PnL realizzato {a} USDC"
+    )
+)
+def published_late(bench: AttributionBench, flow: str, minutes: str, a: str) -> None:
+    order, owner = uuid4(), bench.flow(flow)
+    bench.orders.add(order, owner.assigned_account_id, owner.id)
+    executed_at = READ_AT - timedelta(minutes=int(minutes))
+    late = a_fill("BTC", order, realized_pnl=amount(a), fill_id="in-ritardo", executed_at=executed_at)
+    bench.extend(owner.assigned_account_id, fills=(late,))
+    bench.record_executions(owner.assigned_account_id)
+
+
+@given(step(r'che il flusso "{flow}" ha aperto {a} "{asset}" con i propri ordini'))
+def opened_by_flow(bench: AttributionBench, flow: str, a: str, asset: str) -> None:
+    order, owner = uuid4(), bench.flow(flow)
+    bench.orders.add(order, owner.assigned_account_id, owner.id)
+    opening = a_fill(asset, order, size=amount(a), fill_id="apertura", executed_at=OPENED_AT)
+    bench.extend(owner.assigned_account_id, fills=(opening,))
+    bench.record_executions(owner.assigned_account_id)
+
+
+def held_by_owner(bench: AttributionBench, asset: str) -> tuple[UUID, Decimal]:
+    (owner,) = (flow for flow in bench.store.flows if asset in flow.configuration.assets)
+    totals = bench.ledger.totals.get(owner.id) or FlowTotals(owner.id)
+    return owner.assigned_account_id, totals.expected(asset)
+
+
+@given(step(r'che l\'exchange liquida la posizione "{asset}" con PnL realizzato {a} USDC'))
+def liquidated(bench: AttributionBench, asset: str, a: str) -> None:
+    account_id, held = held_by_owner(bench, asset)
+    liquidation = a_fill(
+        asset, None, size=-held, start_position=held, realized_pnl=amount(a), liquidation=True, fill_id="liquidazione"
+    )
+    bench.extend(account_id, fills=(liquidation,))
+    bench.record_executions(account_id)
+
+
+@given(step(r'che sull\'exchange una vendita di {a} "{asset}" fuori dalla piattaforma realizza PnL {b} USDC'))
+def sold_outside(bench: AttributionBench, a: str, asset: str, b: str) -> None:
+    account_id, held = held_by_owner(bench, asset)
+    sale = a_fill(asset, None, size=-amount(a), start_position=held, realized_pnl=amount(b), fill_id="fuori")
+    bench.extend(account_id, fills=(sale,))
+    bench.record_executions(account_id)
+
+
+@given(step(r'che sull\'exchange la posizione "{asset}" paga un funding di {a} USDC'))
+def funding_paid(bench: AttributionBench, asset: str, a: str) -> None:
+    account_id, _ = held_by_owner(bench, asset)
+    bench.exchange.funding.setdefault(account_id, []).append(a_payment(asset, amount(a), paid_at=FUNDED_AT))
+    bench.record_executions(account_id)
+
+
+@given(step(r'che il registro del conto "{account}" è aggiornato a un ciclo precedente'))
+def ledger_of_previous_cycle(flow_cycles: FlowCycles, account: str) -> None:
+    account_id = flow_cycles.account_of("anna", account)
+    flow_cycles.platform.ledger.cursors[account_id] = flow_cycles.clock.now() - timedelta(minutes=15)
+
+
+@given(step(r'che dall\'ultimo ciclo il conto "{account}" ha più esecuzioni di quante l\'exchange ne conservi'))
+def more_than_kept(flow_cycles: FlowCycles) -> None:
+    flow_cycles.platform.activity_reader.complete = False
+
+
+@given(step(r'che sull\'exchange il margine libero del conto "{account}" è {a} USDC'))
+def free_margin(flow_cycles: FlowCycles, account: str, a: str) -> None:
+    flow_cycles.platform.hyperliquid.set_available_margin(flow_cycles.credentials_of("alfa", account), amount(a))
+
+
+@given(step(r'che le esecuzioni del flusso "{flow}" hanno PnL realizzato {a} USDC'))
+def fills_without_fees(bench: AttributionBench, flow: str, a: str) -> None:
+    fills_of(bench, flow, amount(a), Decimal(0))
+
+
+@given(step(r'che il flusso "{flow}" ha {a} USDC impegnati come margine in posizioni aperte'))
+def committed_margin(bench: AttributionBench, flow: str, a: str) -> None:
+    owner = bench.flow(flow)
+    bench.extend(owner.assigned_account_id, positions=(a_position(owner.configuration.assets[0], margin=amount(a)),))
+
+
+@given(
+    step(
+        r'che il flusso "{flow}" ha liquidità disponibile {a} USDC e una posizione con margine {b} USDC'
+        r" e PnL non realizzato {c} USDC"
+    )
+)
+def liquidity_and_position(bench: AttributionBench, flow: str, a: str, b: str, c: str) -> None:
+    owner, margin = bench.flow(flow), amount(b)
+    bench.extend(
+        owner.assigned_account_id,
+        positions=(a_position(owner.configuration.assets[0], margin=margin, unrealized_pnl=amount(c)),),
+    )
+    # The liquidity the step names comes from the executions of the flow: capital, plus their PnL, less the margin.
+    fills_of(bench, flow, amount(a) - owner.configuration.assigned_capital + margin, Decimal(0))
+
+
+@given(
+    step(
+        r'che "anna" ha il conto "{account}" con saldo {a} USDC e il solo flusso "{flow}"'
+        r" con capitale allocato {b} USDC e nessuna operazione"
+    )
+)
+def single_flow(bench: AttributionBench, account: str, a: str, flow: str, b: str) -> None:
+    bench.account(account, amount(a))
+    bench.add_flow(account, flow, ("SOL",), amount(b))
+
+
+@when(
+    step(
+        r'parte un ciclo del flusso "{flow}" in cui l\'agente apre "{asset}"'
+        r" con quota {a} e leva (?P<leverage>[0-9]+)"
+    )
+)
+def cycle_opens(flow_cycles: FlowCycles, flow: str, asset: str, a: str, leverage: str) -> None:
+    opening = {
+        "asset": asset,
+        "azione": "apri",
+        "direzione": "long",
+        "quota": float(amount(a)),
+        "leva": int(leverage),
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
+        "ragionamento": "r",
+    }
+    flow_cycles.model.text = json.dumps({"decisioni": [opening]})
+    flow_cycles.run(flow)
+
+
+@when(step(r'"anna" consulta lo stato del flusso "{flow}"'))
+def consult(bench: AttributionBench, flow: str) -> None:
+    bench.consult(flow)
+
+
+@then(step(r'il flusso "{flow}" ha la sola posizione su "{asset}"'))
+def only_position(bench: AttributionBench, asset: str) -> None:
+    assert [position.asset for position in bench.consulted().positions] == [asset]
+
+
+@then(step(r'il flusso "{flow}" ha liquidità disponibile {a} USDC'))
+def liquidity(bench: AttributionBench, a: str) -> None:
+    assert bench.consulted().available_liquidity == amount(a)
+
+
+@then(step(r'il flusso "{flow}" ha valore complessivo {a} USDC'))
+def total_value(bench: AttributionBench, a: str) -> None:
+    assert bench.consulted().total_value == amount(a)
+
+
+@then(step(r'il flusso "{flow}" ha rendimento dall\'avvio del {a}%'))
+def return_since_start(bench: AttributionBench, a: str) -> None:
+    assert FlowReturn.of(bench.consulted()).percent == amount(a)
+
+
+@then(
+    step(r'il flusso "{flow}" ha liquidità disponibile {a} USDC, uguale al margine disponibile del conto "{account}"')
+)
+def liquidity_equal_to_account(bench: AttributionBench, a: str, account: str) -> None:
+    liquidity = bench.consulted().available_liquidity
+    assert liquidity == amount(a)
+    assert liquidity == bench.activity_of(bench.account(account)).available_margin
+
+
+@then(
+    step(
+        r'l\'agente riceve per il flusso "{flow}" liquidità disponibile {a} USDC, valore complessivo {b} USDC'
+        r" e rendimento dall'avvio del {c}%"
+    )
+)
+def agent_receives_state(flow_cycles: FlowCycles, a: str, b: str, c: str) -> None:
+    state = flow_state_in_context(flow_cycles)
+    assert Decimal(state["liquidita_disponibile"]) == amount(a)
+    assert Decimal(state["valore_complessivo"]) == amount(b)
+    assert Decimal(state["rendimento_dall_avvio_percento"]) == amount(c)
+
+
+@then(step(r'l\'agente riceve per il flusso "{flow}" liquidità disponibile {a} USDC'))
+def agent_receives_liquidity(flow_cycles: FlowCycles, a: str) -> None:
+    assert Decimal(flow_state_in_context(flow_cycles)["liquidita_disponibile"]) == amount(a)
+
+
+@then(step(r'l\'apertura del flusso "{flow}" è bloccata con il motivo "(?P<reason>[^"]+)"'))
+def opening_blocked(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
+    assert flow_cycles.platform.order_exchange.sent == []
+    assert reason in str(flow_cycles.last_record(flow).documents)
+
+
+@then(step(r'l\'apertura del flusso "{flow}" è approvata per un valore di {a} USDC'))
+def opening_approved(flow_cycles: FlowCycles, flow: str, a: str) -> None:
+    documents = flow_cycles.last_record(flow).documents
+    [risk] = [document.content for document in documents if document.step is CycleStep.RISK_CHECK]
+    outcomes = risk["esiti"]
+    assert isinstance(outcomes, list)
+    [outcome] = outcomes
+    assert (outcome["tipo"], Decimal(outcome["value"])) == ("ApprovedOpening", amount(a))
+
+
+@when(step(r'si ricalcolano dallo storico i totali del flusso "{flow}"'))
+def recompute(bench: AttributionBench, flow: str) -> None:
+    bench.recomputed = bench.ledger.recomputed(bench.flow(flow).id)
+
+
+@then(step(r'i totali ricalcolati del flusso "{flow}" coincidono con quelli che legge il ciclo'))
+def recomputed_equal(bench: AttributionBench, flow: str) -> None:
+    owner = bench.flow(flow)
+    assert bench.recomputed == bench.ledger.totals_of((owner.id,))[owner.id]
+    assert bench.recomputed.funding != Decimal(0)
+
+
+@then("nessun ordine è inviato")
+def no_order(flow_cycles: FlowCycles) -> None:
+    assert flow_cycles.platform.order_exchange.sent == []
+
+
+@then(step(r'i flussi "alfa" e "beta" sono in pausa con il motivo "{reason}"'))
+def both_paused(flow_cycles: FlowCycles, reason: str) -> None:
+    store = flow_cycles.platform.flows
+    for name in ("alfa", "beta"):
+        flow = flow_cycles.flow(name)
+        assert (flow.status, store.pause_reasons[flow.id]) == (FlowStatus.PAUSED, reason)
+
+
+def flow_state_in_context(flow_cycles: FlowCycles) -> dict[str, str]:
+    state = flow_cycles.context()["stato_del_flusso"]
+    assert isinstance(state, dict)
+    return state
+
+
+CLOCK = r"(?P<{}>[0-9]{{2}}:[0-9]{{2}})"
+CLOCKS = re.compile(r"[0-9]{2}:[0-9]{2}")
+PURCHASES = re.compile(r'su "([^"]+)" alle ([0-9]{2}:[0-9]{2})')
+TODAY = READ_AT.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def at(clock: str) -> datetime:
+    hours, minutes = clock.split(":")
+    return TODAY + timedelta(hours=int(hours), minutes=int(minutes))
+
+
+def clock(name: str) -> str:
+    return CLOCK.format(name)
+
+
+def operations_of(bench: AttributionBench) -> InMemoryFlowOperationsAdapter:
+    return InMemoryFlowOperationsAdapter(bench.ledger, bench.accounts.values)
+
+
+def record_flow_fills(bench: AttributionBench, flow: str, asset: str, instants: list[datetime]) -> None:
+    owner = bench.flow(flow)
+    fills = []
+    for number, instant in enumerate(instants):
+        order = uuid4()
+        bench.orders.add(order, owner.assigned_account_id, owner.id)
+        fills.append(a_fill(asset, order, executed_at=instant, fill_id=f"{flow}-{number}"))
+    bench.extend(owner.assigned_account_id, fills=tuple(fills))
+    bench.record_executions(owner.assigned_account_id)
+
+
+def flow_operations(bench: AttributionBench) -> ListFlowOperationsUseCase:
+    return ListFlowOperationsUseCase(InMemoryFlowRepositoryAdapter(bench.store, TENANT), operations_of(bench))
+
+
+@pytest.fixture
+def pages() -> list[OperationsPage]:
+    return []
+
+
+@given(step(r'che il flusso "{flow}" ha {a} esecuzioni registrate su "{asset}", una al minuto'))
+def many_fills(bench: AttributionBench, flow: str, a: str, asset: str) -> None:
+    record_flow_fills(bench, flow, asset, [at("09:00") + timedelta(minutes=minute) for minute in range(int(a))])
+
+
+@given(step(r'che il flusso "{flow}" ha esecuzioni registrate su "{asset}" (?P<clocks>alle .+)'))
+def fills_at(bench: AttributionBench, flow: str, asset: str, clocks: str) -> None:
+    record_flow_fills(bench, flow, asset, [at(found) for found in CLOCKS.findall(clocks)])
+
+
+@given(step(r'che il flusso "{flow}" ha ricevuto un funding di {a} USDC su "{asset}" alle ' + clock("paid")))
+def funding_at(bench: AttributionBench, flow: str, a: str, asset: str, paid: str) -> None:
+    account_id = bench.flow(flow).assigned_account_id
+    bench.exchange.funding.setdefault(account_id, []).append(a_payment(asset, amount(a), paid_at=at(paid)))
+    bench.record_executions(account_id)
+
+
+@given(step(r'che sul conto "{account}" ci sono acquisti fuori dalla piattaforma (?P<purchases>su .+)'))
+def outside_purchases(bench: AttributionBench, account: str, purchases: str) -> None:
+    account_id = bench.account(account)
+    fills = tuple(
+        a_fill(asset, None, executed_at=at(instant), fill_id=f"fuori-{number}")
+        for number, (asset, instant) in enumerate(PURCHASES.findall(purchases))
+    )
+    bench.extend(account_id, fills=fills)
+    bench.record_executions(account_id)
+
+
+@when(step(r'"anna" consulta le operazioni del flusso "{flow}"'))
+def consult_operations(bench: AttributionBench, pages: list[OperationsPage], flow: str) -> None:
+    flow_id = bench.flow(flow).id.value
+    first = flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, OperationsQuery())).page
+    pages.append(first)
+    if first.next is not None:
+        following = OperationsQuery(after=first.next)
+        pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(flow_id, following)).page)
+
+
+@when(step(r'"anna" consulta le operazioni del flusso "{flow}" dalle ' + clock("since") + " alle " + clock("until")))
+def consult_period(bench: AttributionBench, pages: list[OperationsPage], flow: str, since: str, until: str) -> None:
+    query = OperationsQuery(since=at(since), until=at(until))
+    pages.append(flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow(flow).id.value, query)).page)
+
+
+@when(step(r'"anna" consulta le operazioni del conto "{account}" senza flusso sull\'asset "{asset}"'))
+def consult_account(bench: AttributionBench, pages: list[OperationsPage], account: str, asset: str) -> None:
+    use_case = ListAccountOperationsUseCase(operations_of(bench))
+    command = ListAccountOperationsCommand(
+        bench.account(account), OperationsQuery(asset=asset), AccountScope.UNATTRIBUTED
+    )
+    pages.append(use_case.execute(command).page)
+
+
+@then(step(r"vede {a} operazioni, dalla più recente"))
+def first_page(pages: list[OperationsPage], a: str) -> None:
+    instants = [operation.occurred_at for operation in pages[0].operations]
+    assert len(instants) == int(a)
+    assert instants == sorted(instants, reverse=True)
+    assert instants[0] == at("09:59")
+
+
+@then(step(r"la pagina successiva contiene le {a} operazioni più vecchie e nessun'altra pagina"))
+def second_page(pages: list[OperationsPage], a: str) -> None:
+    second = pages[1]
+    expected = [at("09:00") + timedelta(minutes=minute) for minute in reversed(range(int(a)))]
+    assert [operation.occurred_at for operation in second.operations] == expected
+    assert second.next is None
+
+
+@then(step(r"vede le esecuzioni delle " + clock("later") + " e delle " + clock("earlier") + ", in quest'ordine"))
+def executions_newest_first(pages: list[OperationsPage], later: str, earlier: str) -> None:
+    rows = [(operation.kind, operation.occurred_at) for operation in pages[0].operations]
+    assert rows == [(ExecutionKind.FLOW_ORDER.value, at(later)), (ExecutionKind.FLOW_ORDER.value, at(earlier))]
+
+
+@then(
+    step(
+        r"consultando dalle "
+        + clock("since")
+        + " alle "
+        + clock("until")
+        + " vede per primo il funding delle "
+        + clock("paid")
+    )
+)
+def funding_first(bench: AttributionBench, since: str, until: str, paid: str) -> None:
+    query = OperationsQuery(since=at(since), until=at(until))
+    page = flow_operations(bench).execute(ListFlowOperationsCommand(bench.flow("alfa").id.value, query)).page
+    first = page.operations[0]
+    assert (first.kind, first.occurred_at, first.funding, first.size) == (FUNDING, at(paid), Decimal(2), None)
+    assert len(page.operations) == 3
+
+
+@then(step(r'vede solo l\'acquisto su "{asset}" delle ' + clock("bought")))
+def only_purchase(pages: list[OperationsPage], asset: str, bought: str) -> None:
+    rows = [(operation.asset, operation.occurred_at, operation.size) for operation in pages[0].operations]
+    assert rows == [(asset, at(bought), Decimal(1))]
