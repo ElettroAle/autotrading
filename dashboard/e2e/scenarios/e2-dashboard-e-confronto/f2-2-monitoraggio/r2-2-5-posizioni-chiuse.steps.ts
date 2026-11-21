@@ -3,6 +3,7 @@ import { expect } from '@playwright/test';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { aClosedPosition } from '@/testing/mocks/positions';
 import { formatAmount, formatSignedAmount } from '@/utils/format-amount';
+import { formatInstant } from '@/utils/format-instant';
 
 import { Given, Then, When } from '../../../support/fixtures';
 
@@ -85,5 +86,55 @@ Then(
   async ({ dashboard }, count: number) => {
     await expect(dashboard.closedPositionRows()).toHaveCount(count);
     await expect(dashboard.nextPage()).toBeVisible();
+  },
+);
+
+Then(
+  'la prima riga mostra direzione {word}, gli istanti di apertura e di chiusura, commissioni {amount} USDC e motivo {string}',
+  async ({ dashboard }, side: string, fees: string, reason: string) => {
+    const first = dashboard.closedPositionRows().first();
+    const openedAt = new Date(LAST_CLOSE.getTime() - HOUR).toISOString();
+    await expect(dashboard.cell(first, 'Direzione')).toContainText(side);
+    await expect(dashboard.cell(first, 'Aperta il')).toHaveText(
+      `Aperta il${formatInstant(openedAt)}`,
+    );
+    await expect(dashboard.cell(first, 'Chiusa il')).toHaveText(
+      `Chiusa il${formatInstant(LAST_CLOSE.toISOString())}`,
+    );
+    await expect(dashboard.cell(first, 'Commissioni')).toHaveText(
+      `Commissioni${formatAmount(fees)} USDC`,
+    );
+    await expect(dashboard.cell(first, 'Motivo')).toHaveText(`Motivo${reason}`);
+  },
+);
+
+// The currency comes with the state of the flow, read on the exchange: without it the amounts have no unit (Bug 246).
+Given(
+  "che l'exchange del conto del flusso {string} non risponde",
+  async ({ page }, flow: string) => {
+    // The flow is the only one of the scenario, and it is given to the user only when she opens it.
+    expect(flow).toBe('alfa');
+    await page.route('**/flows/*/state*', (route) =>
+      route.fulfill({
+        status: 503,
+        contentType: 'application/problem+json',
+        body: JSON.stringify({
+          title: 'Service Unavailable',
+          status: 503,
+          detail: 'exchange non raggiungibile',
+        }),
+      }),
+    );
+  },
+);
+
+Then(
+  'la prima riga mostra PnL {amount} e commissioni {amount} senza valuta',
+  async ({ dashboard }, pnl: string, fees: string) => {
+    const first = dashboard.closedPositionRows().first();
+    await expect(dashboard.cell(first, 'PnL')).toHaveText(`PnL${formatSignedAmount(pnl)}`);
+    await expect(dashboard.cell(first, 'Commissioni')).toHaveText(
+      `Commissioni${formatAmount(fees)}`,
+    );
   },
 );

@@ -174,6 +174,13 @@ def nearest_support(flow_cycles: FlowCycles, asset: str, level: str, percent: st
     assert (values["supporto_vicino"], number(values["distanza_supporto_percentuale"])) == (level, number(percent))
 
 
+@then(quoted('il contesto indica per "{asset}" nessun supporto sotto il prezzo'))
+def no_support(flow_cycles: FlowCycles, asset: str) -> None:
+    values = pivots_of(flow_cycles, asset)
+    assert values["supporto_vicino"] == "nessun supporto sotto il prezzo"
+    assert "distanza_supporto_percentuale" not in values
+
+
 @then(quoted('il contesto indica per "{asset}" nessuna resistenza sopra il prezzo'))
 def no_resistance(flow_cycles: FlowCycles, asset: str) -> None:
     values = pivots_of(flow_cycles, asset)

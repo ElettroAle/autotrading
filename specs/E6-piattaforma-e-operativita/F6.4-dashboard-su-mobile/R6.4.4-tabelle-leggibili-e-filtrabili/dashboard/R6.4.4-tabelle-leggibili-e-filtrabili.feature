@@ -47,3 +47,13 @@ Funzionalità: R6.4.4 Tabelle leggibili e filtrabili
     Dato che "anna" ha filtrato le posizioni chiuse sulle short
     Quando ricarica la pagina
     Allora il filtro sulle short è ancora attivo
+
+  Scenario: Tabella con la prima colonna fissa su schermo largo
+    Dato che il flusso "alfa" ha 38 cicli conclusi e 2 falliti
+    Quando "anna" apre i cicli del flusso su uno schermo largo 1280 pixel
+    Allora la tabella scorre al proprio interno con la prima colonna fissa
+
+  Scenario: Righe come schede su schermo stretto
+    Dato che il flusso "alfa" ha 38 cicli conclusi e 2 falliti
+    Quando "anna" apre i cicli del flusso su uno schermo largo 360 pixel
+    Allora ogni riga della tabella è una scheda con l'etichetta di ogni valore

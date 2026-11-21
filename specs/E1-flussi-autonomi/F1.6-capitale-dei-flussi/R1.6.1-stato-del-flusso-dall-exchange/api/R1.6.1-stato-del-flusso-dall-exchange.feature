@@ -95,6 +95,11 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     Quando "anna" consulta lo stato del flusso "alfa"
     Allora il flusso "alfa" ha liquidità disponibile 420 USDC
 
+  Scenario: Un ordine della piattaforma senza flusso è del flusso che ha l'asset
+    Dato che un ordine della piattaforma senza flusso, come un comando manuale o uno stop, esegue su "BTC" una vendita con PnL realizzato -20 USDC
+    Quando "anna" consulta lo stato del flusso "alfa"
+    Allora il flusso "alfa" ha liquidità disponibile 480 USDC
+
   Schema dello scenario: Solo la chiusura esatta della posizione del flusso fuori dalla piattaforma è del flusso
     Dato che il flusso "alfa" ha aperto 2 "BTC" con i propri ordini
     E che sull'exchange una vendita di <quantità> "BTC" fuori dalla piattaforma realizza PnL <pnl> USDC

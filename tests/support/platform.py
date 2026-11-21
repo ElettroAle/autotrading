@@ -65,7 +65,10 @@ from autotrading.domain.notifications.chat_id import ChatId
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
-from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_activity import (
+    FakeAccountActivityAdapter,
+    RememberedReadings,
+)
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.account_state import FakeAccountStateAdapter
 from tests.fakes.account_transfers import FakeAccountTransfersAdapter
@@ -161,6 +164,7 @@ from tests.support.directory import Directory
 from tests.support.mail_servers import MailServers
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.notifications import notification_inbox, notification_routes
+from tests.support.openings import OpeningRegister
 from tests.support.procedure_orders import procedure_orders
 from tests.support.source_selections import platform_systems
 
@@ -182,6 +186,7 @@ class Platform:
     inbox: InboxStore
     key_vault: ProviderKeyVault
     source_vault: SourceSecretsVault
+    issued: list[Credentials]
 
     def __init__(self) -> None:
         self.directory = Directory()
@@ -223,8 +228,10 @@ class Platform:
         )
         self.bot_username: str | None = None
         self.activity_reader = FakeActivityReaderAdapter()
-        # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1).
-        self.account_activity = FakeAccountActivityAdapter()
+        # What the API reads of the accounts through the worker, and the orders the platform recorded (R1.6.1), with
+        # what its process remembers of each reading: nothing unless a test gives the memory a validity (ADR
+        # cache-delle-letture-del-conto-come-decorator-in-memoria).
+        self.account_activity, self.remembered_readings = FakeAccountActivityAdapter(), RememberedReadings()
         self.account_activity.unread = self.reading_on_exchange
         self.account_transfers = FakeAccountTransfersAdapter()
         # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
@@ -245,8 +252,14 @@ class Platform:
         # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
-        # The cycles the worker runs on request, with its clock: none until a scenario composes them (FlowCycles).
-        self.worker_clock = FakeClockAdapter(STARTED_AT)
+        # The cycles the worker runs on request, with its clock: none until a scenario composes them (FlowCycles). The
+        # openings of credentials and keys the worker records, at the instant of its clock, which the register reads
+        # without moving it (Bug 179); and the credentials the exchange issued, which the register never holds.
+        self.worker_clock, self.openings, self.issued = (
+            FakeClockAdapter(STARTED_AT),
+            OpeningRegister(lambda: self.worker_clock.current),
+            [],
+        )
         self.cycle_run_of: Callable[[TenantId], CycleRun] = no_cycle_run_of
         # The emergency closings of every tenant, as their record keeps them (R3.2.3).
         self.emergency_closings: list[EmergencyClosing] = []
@@ -274,6 +287,7 @@ class Platform:
     def accepted_credentials(self) -> Credentials:
         credentials = new_credentials()
         self.hyperliquid.accept(credentials)
+        self.issued.append(credentials)
         return credentials
 
     def register_account(self, user: str, command: RegisterAccountCommand) -> AccountRegistration:
@@ -291,6 +305,7 @@ class Platform:
         account_state.reachable = position_closing.reachable = verification.reachable = self.worker_reachable
         on_demand_cycles.reachable = source_trials.reachable = self.worker_reachable
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
+        account_activity = self.remembered_readings.decorate(self.account_activity, tenant_id)
         provider_keys = InMemoryProviderKeyRepositoryAdapter(self.provider_keys, tenant_id)
         flows = InMemoryFlowRepositoryAdapter(self.flows, tenant_id)
         flow_positions = CloseFlowPositionUseCase(position_closing)
@@ -328,7 +343,7 @@ class Platform:
             flows=flows,
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
-                accounts=FlowAccountPorts(accounts, self.account_activity, self.ledger),
+                accounts=FlowAccountPorts(accounts, account_activity, self.ledger),
                 markets=self.markets,
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(sources, source_credentials),
@@ -336,7 +351,7 @@ class Platform:
             flow_positions=flow_positions,
             closing_ports=closing_ports,
             account_removal=AccountRemovalPorts(account_state, accounts),
-            account_activity=self.account_activity,
+            account_activity=account_activity,
             account_transfers=self.account_transfers,
             flow_ledger=self.ledger,
             ledger_recording=FakeLedgerRecordingAdapter(
@@ -416,7 +431,7 @@ class Platform:
     def worker_for(self, tenant_id: TenantId) -> WorkerUseCases:
         """What the worker builds for a request of the API, with the opener only it holds."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
-        opener = FakeCredentialOpenerAdapter(self.vault)
+        opener = self.credential_opener()
         access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
@@ -498,7 +513,7 @@ class Platform:
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
         """What the worker runs after every closing: the protections of the position leave the exchange (R3.1.2)."""
         access = OpenTradingAccessUseCase(
-            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), FakeCredentialOpenerAdapter(self.vault)
+            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), self.credential_opener()
         )
         protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
         return CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
@@ -537,6 +552,12 @@ class Platform:
 
     def sealer_of(self, tenant_id: TenantId) -> FakeCredentialSealerAdapter:
         return FakeCredentialSealerAdapter(tenant_id, self.vault)
+
+    def credential_opener(self) -> FakeCredentialOpenerAdapter:
+        """What the worker opens the credentials of the accounts with: the fake opener of the fake sealer, writing the
+        register of the openings on the clock of the worker (Bug 179).
+        """
+        return FakeCredentialOpenerAdapter(self.vault, self.openings)
 
     def uses_credentials(self, account: Account, credentials: Credentials) -> bool:
         """The fake seal is deterministic: sealing the same credentials again gives the saved text."""

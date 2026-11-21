@@ -26,3 +26,16 @@ Funzionalità: R3.2.1 Esposizione complessiva massima
       | valore |
       | 0      |
       | 1001   |
+
+  Schema dello scenario: Limite complessivo sul valore fuori dall'intervallo
+    Quando "anna" imposta l'esposizione complessiva massima del valore di "alfa" a <valore>%
+    Allora la modifica viene rifiutata con "l'esposizione complessiva massima va da 0,1 a 1000"
+
+    Esempi:
+      | valore |
+      | 0      |
+      | 1001   |
+
+  Scenario: La modifica dei limiti complessivi crea una versione
+    Quando "anna" imposta l'esposizione complessiva massima del margine di "alfa" a 40%
+    Allora la configurazione di "alfa" passa alla versione 2 con esposizione complessiva massima del margine 40%

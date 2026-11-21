@@ -103,6 +103,17 @@ def opens_sources_section(keys: SourceKeys, user: str) -> None:
     keys.seen = keys.section(user)
 
 
+@given(quoted('che nel ciclo il fornitore ha rifiutato la chiave e "{user}" ne ha ricevuto l\'avviso'))
+def refused_and_told(keys: SourceKeys, user: str) -> None:
+    provider_refuses(keys)
+    assert len(rejection_notices(keys, user)) == 1
+
+
+@when("nel ciclo successivo il fornitore rifiuta ancora la chiave")
+def provider_refuses_again(keys: SourceKeys) -> None:
+    keys.cycles.run("alfa", "10:15")
+
+
 @when("nel ciclo il fornitore rifiuta la chiave")
 def provider_refuses(keys: SourceKeys) -> None:
     keys.adapter().rejects_credentials = True
@@ -157,6 +168,21 @@ def absent_in_cycle(keys: SourceKeys, adapter: str) -> None:
     )
     assert keys.adapter().received[-1] == {API_KEY.name: TYPED_KEY}
     assert keys.summary("anna", adapter).rejected
+
+
+def rejection_notices(keys: SourceKeys, user: str) -> list[str]:
+    heading = f"adapter {keys.adapter().name}: credenziali rifiutate dal fornitore"
+    received = keys.cycles.platform.messenger.received_by(chat_named(user))
+    return [text for text in received if heading in text.splitlines()[0]]
+
+
+@then(quoted('"{user}" non riceve un altro avviso per l\'adapter "{adapter}"'))
+def no_other_notice(keys: SourceKeys, user: str, adapter: str) -> None:
+    assert adapter == keys.adapter().name
+    assert len(rejection_notices(keys, user)) == 1
+    heading = f"adapter {adapter}: credenziali rifiutate dal fornitore"
+    page = keys.cycles.platform.use_cases_of(user).list_inbox_notifications.execute(ListInboxNotificationsCommand())
+    assert [notification.title for notification in page.notifications].count(heading) == 1
 
 
 @then(quoted('"{user}" riceve un avviso'))

@@ -1,4 +1,6 @@
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 import httpx2
 import pytest
@@ -6,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.adapters.inbound.api.app import HealthReport, create_api
+from autotrading.adapters.inbound.api.app import LOGIN_SCHEME, HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
@@ -137,3 +139,33 @@ def no_tenant(name: str, directory: Directory, tenants: InMemoryTenantRepository
 @then("la richiesta senza identità è respinta come non autenticata")
 def rejected_as_unauthenticated(anonymous_responses: dict[str, int]) -> None:
     assert anonymous_responses == dict.fromkeys(anonymous_responses, 401)
+
+
+@dataclass(frozen=True, slots=True)
+class InteractiveDocumentation:
+    """What a person reaches from the documentation page: the page and the login it offers (Bug 164)."""
+
+    page: str
+    login_flows: dict[str, Any]
+
+
+@when("una persona apre la documentazione interattiva della piattaforma", target_fixture="documentation")
+def documentation_opened(api: FastAPI) -> InteractiveDocumentation:
+    client = TestClient(api)
+    page: httpx2.Response = client.get("/docs")
+    assert page.status_code == 200
+    document: httpx2.Response = client.get(api.openapi_url or "")
+    flows: dict[str, Any] = document.json()["components"]["securitySchemes"][LOGIN_SCHEME]["flows"]
+    return InteractiveDocumentation(page.text, flows)
+
+
+@then("la documentazione offre l'accesso con il codice di autorizzazione protetto da PKCE")
+def offers_authorization_code_with_pkce(documentation: InteractiveDocumentation) -> None:
+    assert list(documentation.login_flows) == ["authorizationCode"]
+    assert '"usePkceWithAuthorizationCodeGrant": true' in documentation.page
+
+
+@then("la documentazione non offre il flusso implicito")
+def does_not_offer_implicit_flow(documentation: InteractiveDocumentation) -> None:
+    assert "implicit" not in documentation.login_flows
+    assert "implicit" not in documentation.page.lower()

@@ -36,3 +36,10 @@ Funzionalità: R1.5.4 Apertura sotto l'importo minimo dell'exchange
     E che l'agente decide un'apertura su "BTC" di valore 6 USDC
     Quando il rischio controlla la decisione
     Allora la decisione su "BTC" è bloccata con il motivo "minimo dell'exchange oltre il limite di esposizione"
+
+  Scenario: Minimo oltre la liquidità del flusso
+    Dato che il flusso "alfa" ha l'opzione "porta al minimo" attivata e liquidità disponibile 8 USDC
+    E che l'agente decide un'apertura su "BTC" di valore 6 USDC
+    Quando il rischio controlla la decisione
+    Allora la decisione su "BTC" è bloccata con il motivo "liquidità del flusso insufficiente: 8 USDC"
+    E il ciclo non invia ordini su "BTC"

@@ -249,3 +249,44 @@ Then('il filtro sulle short è ancora attivo', async ({ dashboard }) => {
     /short$/,
   );
 });
+
+When(
+  '{string} apre i cicli del flusso su uno schermo largo {int} pixel',
+  async ({ dashboard, memory }, account: string, width: number) => {
+    await dashboard.page.setViewportSize({ width, height: SCREEN_HEIGHT });
+    await openAs(dashboard, memory, account, () => dashboard.openCyclesOf(memory.flow));
+    await expect(dashboard.cycleRows()).toHaveCount(memory.cycles.length);
+  },
+);
+
+/** The frame the table scrolls in: the region with the name of the table around it. */
+const frameOf = (dashboard: DashboardPages): Locator =>
+  dashboard.cycleRows().first().locator('xpath=ancestor::div[@role="region"][1]');
+
+const styleOf = (
+  locator: Locator,
+  property: 'overflowX' | 'position' | 'display',
+): Promise<string> =>
+  locator.evaluate((element, name) => getComputedStyle(element)[name], property);
+
+Then('la tabella scorre al proprio interno con la prima colonna fissa', async ({ dashboard }) => {
+  expect(await styleOf(frameOf(dashboard), 'overflowX')).toBe('auto');
+  const first = dashboard.cycleRows().first().locator('td').first();
+  expect(await styleOf(first, 'position')).toBe('sticky');
+  expect(await styleOf(dashboard.cycleRows().first().locator('td').nth(1), 'position')).not.toBe(
+    'sticky',
+  );
+  expect(await dashboard.horizontalOverflow()).toBeLessThanOrEqual(0);
+});
+
+Then(
+  "ogni riga della tabella è una scheda con l'etichetta di ogni valore",
+  async ({ dashboard }) => {
+    const row = dashboard.cycleRows().first();
+    expect(await styleOf(row, 'display')).toBe('block');
+    await expect(dashboard.page.getByRole('columnheader').first()).toBeHidden();
+    await expect(row.getByText('Esito', { exact: true })).toBeVisible();
+    await expect(row.getByText('Decisioni', { exact: true })).toBeVisible();
+    expect(await dashboard.horizontalOverflow()).toBeLessThanOrEqual(0);
+  },
+);

@@ -151,3 +151,21 @@ Then('il riquadro dice {string}', async ({ dashboard }, text: string) => {
   await expect(panel(dashboard)).toContainText(text);
   await expect(panel(dashboard).getByRole('link')).toHaveCount(0);
 });
+
+When(
+  '{string} sceglie il periodo {string} nella Panoramica del flusso {string}',
+  async ({ dashboard, memory }, account: string, period: string, flow: string) => {
+    memory.flow = flow;
+    await dashboard.openFlowAs(account, flow);
+    await dashboard.period().selectOption({ label: period });
+    await expect(dashboard.period().locator('option:checked')).toHaveText(period);
+  },
+);
+
+Then(
+  'il riquadro avvisa {string} e mostra la decisione delle {word}',
+  async ({ dashboard }, note: string, time: string) => {
+    await expect(panel(dashboard)).toContainText(note);
+    await expect(cycleLink(dashboard, time)).toBeVisible();
+  },
+);

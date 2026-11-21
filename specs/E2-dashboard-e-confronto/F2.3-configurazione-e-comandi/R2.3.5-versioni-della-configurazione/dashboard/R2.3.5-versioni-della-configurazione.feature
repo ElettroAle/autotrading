@@ -25,3 +25,13 @@ Funzionalità: R2.3.5 Versioni della configurazione a confronto
   Scenario: Nessuna differenza
     Quando "anna" confronta la versione 3 con sé stessa
     Allora la dashboard mostra "Nessuna differenza"
+
+  Scenario: Confronto del system prompt cambiato
+    Dato che nella versione 3 del flusso "alfa" il system prompt diventa "Sei un trader prudente. / Opera solo in tendenza."
+    Quando "anna" confronta le versioni 2 e 3
+    Allora la riga del system prompt è evidenziata, da "predefinito" al testo "Sei un trader prudente. / Opera solo in tendenza." con gli a capo
+
+  Scenario: La riga del system prompt c'è anche quando non cambia
+    Dato che nelle versioni 2 e 3 del flusso "alfa" il system prompt è "Sei un trader prudente. / Opera solo in tendenza."
+    Quando "anna" confronta le versioni 2 e 3
+    Allora la riga del system prompt mostra "Sei un trader prudente. / Opera solo in tendenza." in entrambe le versioni, senza evidenza

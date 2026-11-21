@@ -46,3 +46,9 @@ Funzionalità: R2.3.4 Comandi dei flussi dalla dashboard
     Dato che il flusso "epsilon" è assegnato a un conto su un exchange configurato sulla rete di test
     Quando "anna" avvia il flusso "epsilon"
     Allora il flusso "epsilon" è nello stato "attivo" senza conferma
+
+  Scenario: Archiviazione con conferma
+    Dato che "anna" ha anche il flusso "zeta" fermo
+    Quando "anna" chiede l'archiviazione del flusso "zeta"
+    Allora la conferma dice che un flusso fermo non ha posizioni aperte da gestire
+    E dopo la conferma il flusso "zeta" non è più tra i flussi in uso

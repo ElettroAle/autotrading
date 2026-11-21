@@ -30,6 +30,11 @@ Funzionalità: R6.2.2 Avviso di scadenza delle chiavi
     Allora l'avviso nelle pagine Chiavi e Conti sparisce
     E "anna" riceverà di nuovo gli avvisi a 30, 7 e 1 giorno dalla nuova scadenza
 
+  Scenario: Una nuova data azzera le soglie
+    Dato che la chiave "openrouter" scade tra 5 giorni e "anna" ha ricevuto l'avviso a 7 giorni
+    Quando "anna" indica per la chiave "openrouter" la scadenza 15 marzo 2027
+    Allora "anna" riceverà di nuovo gli avvisi a 30, 7 e 1 giorno dalla nuova scadenza
+
   Scenario: Scadenza sconosciuta
     Dato che la chiave di un adapter di fonte non ha una data di scadenza
     Quando "anna" apre la pagina Chiavi

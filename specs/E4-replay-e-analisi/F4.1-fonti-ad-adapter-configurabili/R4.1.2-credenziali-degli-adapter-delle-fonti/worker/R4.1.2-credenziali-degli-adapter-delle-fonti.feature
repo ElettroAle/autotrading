@@ -26,3 +26,10 @@ Funzionalità: R4.1.2 Credenziali degli adapter delle fonti
     Quando nel ciclo il fornitore rifiuta la chiave
     Allora l'adapter "LunarCrush" è assente nel contesto del ciclo con il motivo
     E "anna" riceve un avviso
+
+  Scenario: Un solo avviso per la credenziale rifiutata
+    Dato che il flusso "alfa" usa l'adapter "LunarCrush"
+    E che nel ciclo il fornitore ha rifiutato la chiave e "anna" ne ha ricevuto l'avviso
+    Quando nel ciclo successivo il fornitore rifiuta ancora la chiave
+    Allora "anna" non riceve un altro avviso per l'adapter "LunarCrush"
+    E l'adapter "LunarCrush" è assente nel contesto del ciclo con il motivo

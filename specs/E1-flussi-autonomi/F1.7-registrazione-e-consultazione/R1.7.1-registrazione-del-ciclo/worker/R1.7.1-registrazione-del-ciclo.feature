@@ -26,6 +26,7 @@ Funzionalità: R1.7.1 Registrazione completa del ciclo
       | istante previsto e istante effettivo      |
       | esito concluso                            |
       | versione di configurazione 3              |
+      | fornitore IA openrouter                   |
       | modello openrouter/deepseek-chat          |
       | pesi delle fonti                          |
       | dati raccolti                             |
@@ -36,6 +37,15 @@ Funzionalità: R1.7.1 Registrazione completa del ciclo
       | ordine su BTC con il suo esito reale      |
       | costo della chiamata al modello           |
       | istantanea dello stato del flusso         |
+
+  Scenario: Fonte assente nel ciclo registrato
+    Dato che il flusso "alfa" usa la fonte "notizie", che non risponde
+    Quando il flusso "alfa" esegue un ciclo concluso con un'apertura su "BTC"
+    Allora il ciclo registrato contiene la fonte "notizie" come assente, con il motivo
+
+  Scenario: Le credenziali del conto non compaiono nella registrazione
+    Quando il flusso "alfa" esegue un ciclo concluso con un'apertura su "BTC"
+    Allora il ciclo registrato non contiene le credenziali del conto del flusso "alfa"
 
   Scenario: Ciclo fallito registrato fino all'errore
     Dato che il fornitore IA non risponde

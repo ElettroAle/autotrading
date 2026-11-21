@@ -8,8 +8,10 @@ from autotrading.application.flows.change_flow_status import ChangeFlowStatusCom
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_status import FlowStatus
+from tests.support.activity import an_activity
 from tests.support.flow_cycles import ACCOUNT, FlowCycles
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
+from tests.support.flows import account_id_of
 from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the life of a flow, shared by the features
 from tests.support.lifecycle_steps import (
     Lifecycle,
@@ -52,6 +54,18 @@ def run_command(platform: Platform, lifecycle: Lifecycle, user: str, name: str, 
 @then(quoted('il comando è rifiutato con il motivo "{reason}"'))
 def command_refused(lifecycle: Lifecycle, reason: str) -> None:
     assert str(lifecycle.error) == reason
+
+
+@given(quoted('che il flusso "{name}" è fermo con capitale allocato {capital} USDC'))
+def stopped_with_capital(platform: Platform, lifecycle: Lifecycle, name: str, capital: str) -> None:
+    flow = flow_named(platform, lifecycle.user, name)
+    assert (flow.status, flow.configuration.allocated_capital) == (FlowStatus.STOPPED, Decimal(capital))
+
+
+@given(quoted('che il saldo del conto "{account}" letto ora è {balance} USDC'))
+def balance_read_now(platform: Platform, lifecycle: Lifecycle, account: str, balance: str) -> None:
+    account_id = account_id_of(platform, lifecycle.user, account)
+    platform.account_activity.activities[account_id] = an_activity(balance=Decimal(balance))
 
 
 @when(quoted('"{user}" avvia il flusso "{name}"'))

@@ -50,3 +50,13 @@ Funzionalità: R3.5.1 Eventi notificabili completi
     Dato che l'invio delle notifiche alla chat "chat-anna" fallisce
     Quando il rischio riduce un'apertura di "alfa" su "BTC"
     Allora il ciclo di "alfa" si conclude ed esegue l'apertura ridotta
+  Schema dello scenario: Le notifiche dei nuovi eventi non contengono credenziali
+    Quando <evento>
+    Allora la chat "chat-anna" riceve una notifica "<titolo>" con le righe "<righe>"
+    E nessuna notifica della chat "chat-anna" contiene le credenziali del conto del flusso "alfa"
+    Esempi:
+      | evento                                                                                     | titolo                               | righe                                          |
+      | l'exchange esegue lo stop loss di "alfa" su "BTC" con PnL -5,10 USDC                       | 🛑 alfa: chiusa per stop loss         | Asset: BTC; PnL: -5,10 USDC                    |
+      | l'exchange liquida la posizione di "alfa" su "BTC" con PnL -48,25 USDC                     | 🔻 alfa: posizione liquidata          | Asset: BTC; PnL: -48,25 USDC                   |
+      | sul conto "test-1" si apre un allarme di riconciliazione con saldo 980 invece di 1000 USDC | 🚨 test-1: allarme di riconciliazione | Saldo letto: 980 USDC; Saldo atteso: 1000 USDC |
+      | "anna" lancia la chiusura di emergenza del flusso "alfa" con 1 posizione chiusa            | 🚨 chiusura di emergenza: eseguita    | Posizioni chiuse: 1; Flussi in pausa: alfa     |

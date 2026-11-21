@@ -94,3 +94,18 @@ Then(
     await expect(dashboard.flowName()).toHaveText(flow);
   },
 );
+
+// The tenant of a first access is born empty on the API (R0.1.2): the dashboard opens on it without an error.
+Given(
+  'che {string} ha il ruolo Utente e non ha mai usato la piattaforma',
+  async ({}, account: string) => {
+    fakePlatform.addUser(account, { hasUserRole: true });
+  },
+);
+
+Then('vede la pagina iniziale senza flussi', async ({ dashboard }) => {
+  await expect(dashboard.pageHeading()).toHaveText('I tuoi flussi');
+  await expect(dashboard.page.getByText('Non hai ancora flussi.')).toBeVisible();
+  await expect(dashboard.page.getByRole('alert')).toHaveCount(0);
+  await expect(dashboard.flows()).toHaveCount(0);
+});

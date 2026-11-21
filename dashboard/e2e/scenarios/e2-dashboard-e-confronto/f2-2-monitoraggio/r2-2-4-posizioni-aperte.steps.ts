@@ -57,3 +57,28 @@ Then(
     await expect(dashboard.cell(row, 'PnL')).toContainText(`${formatSignedAmount(pnl)} USDC`);
   },
 );
+
+Given(
+  'che la posizione su {string} del flusso {string} impegna {int} USDC di margine',
+  async ({}, asset: string, flow: string, margin: number) => {
+    fakePlatform.holdPositions(flow, [
+      anOpenPosition({
+        asset,
+        size: '0.01',
+        leverage: '3',
+        entryPrice: '60000',
+        pnl: '12',
+        margin: String(margin),
+      }),
+    ]);
+  },
+);
+
+Then(
+  'la posizione su {string} mostra PnL {amount} USDC e {percent}',
+  async ({ dashboard }, asset: string, pnl: string, percent: string) => {
+    const row = dashboard.openPositionRows().filter({ hasText: asset });
+    await expect(dashboard.cell(row, 'PnL')).toContainText(`${formatSignedAmount(pnl)} USDC`);
+    await expect(dashboard.cell(row, 'PnL %')).toHaveText(`PnL %${percent}`);
+  },
+);
