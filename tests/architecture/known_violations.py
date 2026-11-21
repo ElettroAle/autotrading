@@ -39,4 +39,5 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
         "tests/integration/hyperliquid/test_protections_testnet.py:"
         "test_the_protections_of_the_whole_position_are_placed_read_and_cancelled": 643,
     },
+    Rule.SCENARIOS_BY_SYSTEM: {},
 }

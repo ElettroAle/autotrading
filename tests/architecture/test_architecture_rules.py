@@ -16,6 +16,8 @@ from tests.support.architecture import (
 # The rule on the tests reads files of the whole repository, the other rules the modules of src/autotrading.
 REPOSITORY_FOLDERS = ("tests/", "specs/", "dashboard/", ".github/")
 PIPELINE_TEST_RUN = ".github/actions/pytest-run/action.yml"
+PLAYWRIGHT_CONFIG = "dashboard/playwright.config.ts"
+STORY = "specs/E0-x/F0.1-x/R0.1.2-x"
 CREDENTIALS_MARKER = frozenset({"testnet_credentials"})
 
 
@@ -236,10 +238,10 @@ VIOLATING = [
         "@pytest.mark.testnet_credentials\nclass TestA:\n    def test_b(self): ...\n",
         CREDENTIALS_MARKER,
     ),
-    Case(Rule.NO_EXCLUDED_TESTS, "specs/E0-x/F0.1-x/R0.1.2-x.feature", "@R0.1.2 @wip\nFunzionalità: X\n"),
+    Case(Rule.NO_EXCLUDED_TESTS, f"{STORY}/api/R0.1.2-x.feature", "@R0.1.2 @wip\nFunzionalità: X\n"),
     Case(
         Rule.NO_EXCLUDED_TESTS,
-        "specs/E0-x/F0.1-x/R0.1.2-x.feature",
+        f"{STORY}/api/R0.1.2-x.feature",
         "# language: it\nFunzionalità: X\n\n  @wip\n  Scenario: Y\n    Allora va\n",
     ),
     Case(Rule.NO_EXCLUDED_TESTS, PIPELINE_TEST_RUN, 'run: uv run pytest -m "not pipeline and not sources"\n'),
@@ -252,6 +254,21 @@ VIOLATING = [
     Case(Rule.NO_EXCLUDED_TESTS, "dashboard/src/features/x/y.test.tsx", "it.skipIf(slow)('a', () => {});\n"),
     Case(Rule.NO_EXCLUDED_TESTS, "dashboard/e2e/layout/a.spec.ts", "test.fixme('x', async () => {});\n"),
     Case(Rule.NO_EXCLUDED_TESTS, "dashboard/e2e/layout/a.spec.ts", "test.describe.skip('x', () => {});\n"),
+    # ADR-scenari-per-sistema-sotto-la-user-story: the options of the runners that skip or leave out scenarios, and the
+    # path of a .feature in the folder of its system under the folder of the user story.
+    Case(Rule.NO_EXCLUDED_TESTS, PLAYWRIGHT_CONFIG, "  missingSteps: 'skip-scenario',\n"),
+    Case(Rule.NO_EXCLUDED_TESTS, PLAYWRIGHT_CONFIG, '  missingSteps: "fail-on-run",\n'),
+    Case(Rule.NO_EXCLUDED_TESTS, PLAYWRIGHT_CONFIG, "  tags: 'not @pipeline and not @slow',\n"),
+    Case(Rule.NO_EXCLUDED_TESTS, PLAYWRIGHT_CONFIG, "  tags: '@dashboard',\n"),
+    Case(Rule.NO_EXCLUDED_TESTS, PLAYWRIGHT_CONFIG, "  grepInvert: /@slow/,\n"),
+    Case(Rule.NO_EXCLUDED_TESTS, PLAYWRIGHT_CONFIG, "  testIgnore: '**/flaky/**',\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, "specs/E0-x/F0.1-x/R0.1.2-x.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, f"{STORY}/R0.1.2-x.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, f"{STORY}/web/R0.1.2-x.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, f"{STORY}/api/R0.1.3-y.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, f"{STORY}/api/pagina/R0.1.2-x.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, "specs/E0-x/F0.2-x/R0.1.2-x/api/R0.1.2-x.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, "specs/E1-x/F0.1-x/R0.1.2-x/api/R0.1.2-x.feature", "Funzionalità: X\n"),
 ]
 
 CLEAN = [
@@ -354,7 +371,7 @@ CLEAN = [
     ),
     Case(
         Rule.NO_EXCLUDED_TESTS,
-        "specs/E4-x/F4.1-x/R4.1.2-x.feature",
+        "specs/E4-x/F4.1-x/R4.1.2-x/worker/R4.1.2-x.feature",
         "# language: it\nFunzionalità: X\n  oggi @wip perché manca\n\n  @pipeline\n  Scenario: Y\n    Allora va\n",
     ),
     Case(Rule.NO_EXCLUDED_TESTS, PIPELINE_TEST_RUN, 'run: uv run pytest --cov -m "not pipeline"\n'),
@@ -363,6 +380,14 @@ CLEAN = [
         "dashboard/src/features/x/y.test.tsx",
         "it('says a skipped cycle never started', () => {});\nconst skipped = test.step('a');\n",
     ),
+    Case(
+        Rule.NO_EXCLUDED_TESTS,
+        PLAYWRIGHT_CONFIG,
+        "  features: ['../specs/**/dashboard/*.feature'],\n  tags: 'not @pipeline',\n  missingSteps: 'fail-on-gen',\n",
+    ),
+    Case(Rule.SCENARIOS_BY_SYSTEM, f"{STORY}/dashboard/R0.1.2-x.feature", "Funzionalità: X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, "specs/E10-y/F10.12-y/R10.12.3-y-2/forecaster/R10.12.3-y-2.feature", "X\n"),
+    Case(Rule.SCENARIOS_BY_SYSTEM, "specs/E0-x/F0.1-x/R0.1.2-x/worker/R0.1.2-x.feature", "X\n"),
 ]
 
 

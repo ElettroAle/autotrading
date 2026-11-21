@@ -5,7 +5,15 @@ paths:
 
 # Specifiche Gherkin
 
-- Percorso: `specs/E<n>-<slug>/F<n>.<m>-<slug>/R<n>.<m>.<k>-<slug>.feature`.
+- Percorso: `specs/E<n>-<slug>/F<n>.<m>-<slug>/R<n>.<m>.<k>-<slug>/<sistema>/R<n>.<m>.<k>-<slug>.feature`, con
+  `<sistema>` fra `api`, `worker`, `dashboard` e `forecaster`: una cartella per sistema sotto la cartella della User
+  Story, almeno un file per User Story, nessun `.feature` fuori da una cartella di sistema (ADR
+  scenari-per-sistema-sotto-la-user-story, verificata da `tests/architecture/`).
+- Sistema di uno scenario: il container che realizza il comportamento. Uno scenario sui casi d'uso sta nel sistema
+  la cui composition monta il caso d'uso (`api` o `worker`), uno scenario della pagina in `dashboard`, uno del servizio
+  di previsione in `forecaster`. Uno scenario sta in un solo file e lo esegue un solo runner.
+- Ogni file della User Story ripete `# language: it`, il tag, la `Funzionalità` e la narrativa; sulla board gli AC
+  sono gli scenari di ogni sistema, sotto il nome del sistema.
 - `# language: it` in prima riga; tag `@R<n>.<m>.<k>`; `Funzionalità: R<n>.<m>.<k> <titolo>`.
 - Narrativa `Come` / `Voglio` / `Perché`, poi note e `Fuori ambito:`. Le descrizioni di Epic e Feature
   stanno sulla board, non in file.
