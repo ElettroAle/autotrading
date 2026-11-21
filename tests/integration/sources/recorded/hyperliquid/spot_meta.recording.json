@@ -1,0 +1,12 @@
+{
+  "origin": "live",
+  "recorded_at": "2026-11-21T20:09:09Z",
+  "method": "POST",
+  "url": "https://api.hyperliquid-testnet.xyz/info",
+  "request_body": {
+    "type": "spotMeta"
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "answer": "spot_meta.json"
+}

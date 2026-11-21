@@ -1,0 +1,10 @@
+{
+  "origin": "composed: Hyperliquid answers 429 above the limits of https://hyperliquid.gitbook.io/hyperliquid-docs/for-developers/api/rate-limits-and-user-limits and documents no error body; only the status is translated",
+  "recorded_at": "2026-11-21T20:09:09Z",
+  "method": "POST",
+  "url": "https://api.hyperliquid-testnet.xyz/info",
+  "request_body": null,
+  "status": 429,
+  "content_type": "text/plain",
+  "answer": "rate_limited_429.txt"
+}
