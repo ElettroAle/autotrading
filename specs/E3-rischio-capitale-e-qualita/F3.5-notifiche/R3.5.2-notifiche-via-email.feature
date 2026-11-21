@@ -65,3 +65,13 @@ Funzionalità: R3.5.2 Notifiche via email
     Dato che "bruno" ha indicato l'indirizzo "bruno@example.com"
     Quando il flusso "alfa" di "anna" va in pausa
     Allora "bruno@example.com" non riceve l'email
+  Scenario: Un invio fallito si ritenta
+    Dato che "anna" ha indicato l'indirizzo "anna@example.com" e il server di posta rifiuta gli invii
+    E che un ciclo di "alfa" ha prodotto una notifica destinata all'email
+    Quando il server di posta torna ad accettare gli invii e arriva il nuovo tentativo
+    Allora "anna@example.com" riceve un'email con oggetto "🟢 alfa: posizione aperta"
+  Scenario: Un'email non contiene mai credenziali
+    Dato che "anna" ha indicato l'indirizzo "anna@example.com"
+    Quando il flusso "alfa" va in pausa per "credito esaurito"
+    Allora "anna@example.com" riceve l'email
+    E nessuna email di "anna@example.com" contiene le credenziali del conto di "alfa" né la password del server di posta

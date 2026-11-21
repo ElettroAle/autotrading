@@ -148,9 +148,16 @@ CASES_OF_E2 = {
         "Rendimento in pareggio in grigio",
     ),
     f"{E2}/F2.2-monitoraggio/R2.2.4-posizioni-aperte.feature": ("PnL corrente anche in percentuale del margine",),
+    # Task 677: the statistics and the duplication also from the programmatic interface.
+    f"{E2}/F2.2-monitoraggio/R2.2.6-statistiche-del-flusso.feature": ("Statistiche dall'interfaccia programmatica",),
     f"{E2}/F2.2-monitoraggio/R2.2.5-posizioni-chiuse.feature": (
         "Direzione, istanti, commissioni e motivo della chiusura",
         "Importi senza valuta se la valuta del conto non è disponibile",
+    ),
+    # Task 677: Bug 616, the compact list of the accounts and the page of an account in tabs.
+    f"{E2}/F2.3-configurazione-e-comandi/R2.3.1-conti-dalla-dashboard.feature": (
+        "Elenco compatto dei conti",
+        "Pagina del conto a schede",
     ),
     f"{E2}/F2.3-configurazione-e-comandi/R2.3.4-comandi-dei-flussi-dalla-dashboard.feature": (
         "Archiviazione con conferma",
@@ -165,6 +172,7 @@ CASES_OF_E2 = {
     ),
     f"{E2}/F2.4-confronto-tra-flussi/R2.4.1-duplicazione-di-un-flusso.feature": (
         "L'avvio di una bozza verifica anche conto e capitale",
+        "Duplicazione dall'interfaccia programmatica",
     ),
     f"{E2}/F2.4-confronto-tra-flussi/R2.4.2-classifica-dei-flussi.feature": (
         "PnL, commissioni, win rate, operazioni e costo del modello nella classifica",
@@ -179,6 +187,7 @@ E3 = "E3-rischio-capitale-e-qualita"
 CASES_OF_E3 = {
     f"{E3}/F3.1-piano-di-uscita-e-protezione/R3.1.2-stop-loss-e-take-profit-sull-exchange.feature": (
         "La modifica dei predefiniti vale per le aperture successive",
+        "I flussi già esistenti ricevono lo stop loss predefinito",
     ),
     f"{E3}/F3.1-piano-di-uscita-e-protezione/R3.1.3-aggiornamento-di-stop-e-obiettivo.feature": (
         "Nuova condizione di invalidazione",
@@ -195,6 +204,50 @@ CASES_OF_E3 = {
         "Il limite complessivo si applica dopo quello per operazione",
         "Limite complessivo sul valore fuori dall'intervallo",
         "La modifica dei limiti complessivi crea una versione",
+    ),
+    f"{E3}/F3.2-limiti-di-rischio/R3.2.2-perdita-massima-del-flusso.feature": (
+        "Un aumento del capitale non è un guadagno",
+        "Aggiornamento del piano deciso durante la sospensione",
+        "Con ripresa il giorno dopo l'utente conferma prima",
+        "La modifica di una soglia crea una versione",
+        "La modifica della ripresa crea una versione",
+    ),
+    f"{E3}/F3.2-limiti-di-rischio/R3.2.3-chiusura-di-emergenza.feature": (
+        "Flussi fermi o archiviati non toccati",
+        "Il comando si registra con data, ora, ambito ed esito",
+    ),
+    f"{E3}/F3.3-riconciliazione/R3.3.1-allarme-sul-saldo-non-spiegato.feature": (
+        "Aggiornamento del piano deciso durante l'allarme",
+        "La conferma si registra con data e ora",
+    ),
+    f"{E3}/F3.4-capitale/R3.4.2-storico-delle-variazioni-di-capitale.feature": (
+        "Storico a pagine dalla variazione più recente",
+    ),
+    f"{E3}/F3.4-capitale/R3.4.3-rendimento-corretto-dopo-incassi-e-variazioni.feature": (
+        "Il riepilogo del flusso usa lo stesso rendimento",
+    ),
+    f"{E3}/F3.5-notifiche/R3.5.1-eventi-notificabili-completi.feature": (
+        "Le notifiche dei nuovi eventi non contengono credenziali",
+    ),
+    f"{E3}/F3.5-notifiche/R3.5.2-notifiche-via-email.feature": (
+        "Un invio fallito si ritenta",
+        "Un'email non contiene mai credenziali",
+    ),
+    f"{E3}/F3.5-notifiche/R3.5.3-scelta-dei-canali-delle-notifiche.feature": (
+        "Un canale non collegato non riceve la notifica",
+        "Il campanello riceve ogni notifica qualunque sia la scelta",
+    ),
+    f"{E3}/F3.5-notifiche/R3.5.4-notifiche-leggibili-con-icone-e-stato-del-flusso.feature": (
+        "Allarme del conto senza stato del flusso",
+    ),
+    f"{E3}/F3.5-notifiche/R3.5.5-server-di-posta-dell-utente.feature": (
+        "Senza mittente l'email parte a nome dell'utente",
+        "Le notifiche email partono dal server del tenant della notifica",
+        "La pagina Notifiche si apre su Canali senza canali collegati",
+        "La pagina Notifiche si apre su Preferenze con un canale collegato",
+    ),
+    f"{E3}/F3.6-qualita-delle-previsioni/R3.6.1-errore-medio-della-previsione.feature": (
+        "Prezzo effettivo letto dall'exchange da cui viene la previsione",
     ),
 }
 CASES = {**CASES_OF_E0, **CASES_OF_E1, **CASES_OF_E2, **CASES_OF_E3}

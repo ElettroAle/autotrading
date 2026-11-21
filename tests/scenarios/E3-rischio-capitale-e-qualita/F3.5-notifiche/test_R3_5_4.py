@@ -18,6 +18,7 @@ from autotrading.application.notifications.notify_flow_event import NotifyFlowEv
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_position_closed import NotifyPositionClosedUseCase
 from autotrading.application.notifications.notify_position_opened import NotifyPositionOpenedUseCase
+from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
 from autotrading.application.notifications.ports import NotificationRoutes
 from autotrading.application.notifications.send_linked_chat_test_notification import (
     SendLinkedChatTestNotificationUseCase,
@@ -231,5 +232,19 @@ def icon_and_title_without_status(notices: Notices) -> None:
     assert icon
     assert not icon.isalnum()
     assert heading == "AutoTrading: prova delle notifiche"
+    assert not any(line.startswith("Flusso:") for line in body), body
+    assert notices.flow_status.asked == []
+
+
+@when(quoted('sul conto "{account}" si apre un allarme di riconciliazione'))
+def account_alarm(notices: Notices, account: str) -> None:
+    use_case = NotifyReconciliationAlarmUseCase(notices.notify, notices.alerts, CURRENCY)
+    use_case.execute(uuid4(), account, Decimal(980), Decimal(1000))
+
+
+@then("la notifica non ha lo stato del flusso")
+def without_flow_status(notices: Notices) -> None:
+    _, *body = notices.last_message()
+    assert body
     assert not any(line.startswith("Flusso:") for line in body), body
     assert notices.flow_status.asked == []

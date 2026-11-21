@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import Decimal
+from http import HTTPStatus
 
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -12,6 +13,7 @@ from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_statistics import FlowStatistics
 from autotrading.domain.flows.trade_side import TradeSide
+from tests.support.api_session import ApiSession
 from tests.support.flows import a_flow
 from tests.support.platform import Platform
 from tests.support.steps import quoted
@@ -56,7 +58,7 @@ class Statistics:
         return self.histories.setdefault(flow, FlowHistory())
 
     def open(self, user: str, flow: str, period: str = "all") -> None:
-        created = self._flow_of(user, flow)
+        created = self.flow_of(user, flow)
         command = ReadFlowStatisticsCommand(created.id.value, period)
         self.seen = self.platform.use_cases_of(user).read_flow_statistics.execute(command)
 
@@ -64,7 +66,7 @@ class Statistics:
         assert self.seen is not None
         return self.seen
 
-    def _flow_of(self, user: str, name: str) -> Flow:
+    def flow_of(self, user: str, name: str) -> Flow:
         """The flow of the user, with the positions and the model calls the scenario gave it."""
         created = a_flow(self.platform.tenant_of(user), name=name)
         self.platform.flows.flows.append(created)
@@ -96,6 +98,12 @@ class Statistics:
 @pytest.fixture
 def statistics() -> Statistics:
     return Statistics()
+
+
+@pytest.fixture
+def answers() -> list[dict[str, object]]:
+    """What the programmatic interface answered."""
+    return []
 
 
 @given(
@@ -198,3 +206,27 @@ def sees_no_operations(statistics: Statistics, operations: str) -> None:
     seen = statistics.statistics()
     assert seen.operations == int(operations)
     assert seen.win_rate_percent is None
+
+
+@when(quoted('"{user}" chiede all\'interfaccia programmatica le statistiche del flusso "{flow}"'))
+def ask_statistics_to_the_api(statistics: Statistics, answers: list[dict[str, object]], user: str, flow: str) -> None:
+    created = statistics.flow_of(user, flow)
+    response = ApiSession(statistics.platform).get_as(user, f"/flows/{created.id.value}/statistics")
+    assert response.status_code == HTTPStatus.OK, response.text
+    answers.append(response.json())
+
+
+@then(
+    parsers.re(
+        r"^la risposta riporta (?P<won>\d+) vinte, (?P<lost>\d+) perse, win rate (?P<rate>[\d,]+)%, commissioni "
+        r"(?P<fees>[\d,]+) USDC, (?P<operations>\d+) operazioni e costo del modello (?P<cost>[\d,]+) USD$"
+    )
+)
+def api_answers(  # noqa: PLR0917 - one argument per value of the step
+    answers: list[dict[str, object]], won: str, lost: str, rate: str, fees: str, operations: str, cost: str
+) -> None:
+    [answer] = answers
+    assert (answer["won"], answer["lost"], answer["operations"]) == (int(won), int(lost), int(operations))
+    assert Decimal(str(answer["win_rate_percent"])) == amount(rate)
+    assert Decimal(str(answer["total_fees"])) == amount(fees)
+    assert Decimal(str(answer["model_cost_usd"])) == amount(cost)

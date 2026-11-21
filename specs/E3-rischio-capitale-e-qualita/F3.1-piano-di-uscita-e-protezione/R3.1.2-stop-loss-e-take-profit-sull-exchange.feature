@@ -111,3 +111,10 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
     Dato che "anna" ha impostato lo stop loss predefinito di "alfa" a 3%
     Quando "alfa" apre long su "BTC" al prezzo d'ingresso 60000 senza piano di uscita
     Allora sull'exchange c'è un ordine di stop loss a 58200 sull'intera posizione di "alfa" su "BTC"
+
+  @pipeline
+  Scenario: I flussi già esistenti ricevono lo stop loss predefinito
+    Dato che "anna" aveva il flusso "alfa" salvato prima degli stop loss predefiniti
+    Quando la piattaforma passa alla versione con gli stop loss predefiniti
+    Allora "alfa" ha lo stop loss predefinito 5% e nessun take profit predefinito
+    E la configurazione di "alfa" resta alla stessa versione

@@ -3,16 +3,21 @@ of the API and of the worker with the fake adapters (ADR server-di-posta-per-ten
 invio-dal-server-di-posta-del-tenant).
 """
 
+from uuid import uuid4
+
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.adapters.inbound.api.mail_server import MailServerResponse
 from autotrading.adapters.inbound.api.notification_channels import NotificationChannelsResponse
+from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelCommand
 from autotrading.application.notifications.set_mail_server import SetMailServerCommand
 from autotrading.application.notifications.set_notification_email import SetNotificationEmailCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.notifications.mail_security import MailSecurity
 from autotrading.domain.notifications.notification import Notification
+from autotrading.domain.notifications.notification_channel import NotificationChannel
+from autotrading.domain.notifications.notification_event import NotificationEvent
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
@@ -20,6 +25,8 @@ scenarios("E3-rischio-capitale-e-qualita/F3.5-notifiche/R3.5.5-server-di-posta-d
 
 PASSWORD = "password-per-le-app"  # noqa: S105 - the password of a fake mail server
 SUBMISSION_PORT = 587
+# The tabs of the page of the notifications: the choice of the channels by default, the channels while none is linked.
+PREFERENCES, CHANNELS = "Preferenze", "Canali"
 
 
 @pytest.fixture
@@ -63,6 +70,14 @@ def channel_warnings(platform: Platform, user: str) -> list[str]:
     return NotificationChannelsResponse.of(channels).warnings
 
 
+def linked_channels(platform: Platform, user: str) -> list[str]:
+    """The channels the API answers as linked: a chat, or an address with a mail server (R3.5.5)."""
+    use_cases = platform.use_cases_of(user)
+    chat = use_cases.get_linked_chat.execute()
+    email = use_cases.get_notification_email.execute().address is not None and server_shown(platform, user) is not None
+    return [name for name, linked in (("Telegram", chat is not None), ("Email", email)) if linked]
+
+
 def send_test(platform: Platform, outcome: dict[str, object], user: str) -> None:
     try:
         platform.use_cases_of(user).request_test_email.execute()
@@ -81,6 +96,17 @@ def address_indicated(platform: Platform, user: str, address: str) -> None:
 @given(quoted('che "{user}" ha salvato il server di posta "{host}"'))
 def server_saved(platform: Platform, user: str, host: str) -> None:
     save_server(platform, user, host)
+
+
+@given(quoted('che "{user}" ha salvato il server di posta "{host}" senza mittente'))
+def server_saved_without_sender(platform: Platform, user: str, host: str) -> None:
+    # The command leaves the sender empty, as the form of the dashboard does when the user writes none.
+    save_server(platform, user, host)
+
+
+@given(quoted('che "{user}" non ha collegato alcun canale'))
+def nothing_linked(platform: Platform, user: str) -> None:
+    assert not linked_channels(platform, user)
 
 
 @given("che il server di posta rifiuta l'accesso")
@@ -113,6 +139,19 @@ def user_changes_port(platform: Platform, outcome: dict[str, object], user: str,
     server = server_shown(platform, user)
     assert server is not None
     save_server(platform, user, server.host, port=int(port), security=MailSecurity(security), password=None)
+
+
+@when(quoted('un ciclo di un flusso di "{user}" fallisce con il canale email scelto'))
+def cycle_of_user_fails(platform: Platform, user: str) -> None:
+    channels = frozenset({NotificationChannel.EMAIL})
+    choose = ChooseNotificationChannelCommand(NotificationEvent.CYCLE_FAILED, channels)
+    platform.use_cases_of(user).choose_notification_channel.execute(choose)
+    platform.notify_for(platform.tenant_of(user)).execute(Notification.cycle_failed(uuid4(), "omega", "timeout"))
+
+
+@when(quoted('"{user}" apre la pagina Notifiche'))
+def opens_notifications(platform: Platform, outcome: dict[str, object], user: str) -> None:
+    outcome["linked"] = linked_channels(platform, user)
 
 
 @when(quoted('"{user}" toglie il server di posta'))
@@ -164,6 +203,31 @@ def leaves_with_saved_password(platform: Platform, outcome: dict[str, object], h
     assert "refusal" not in outcome
     [login] = platform.mailer.logins
     assert (login.host, login.port, login.password) == (host, int(port), PASSWORD)
+
+
+@then(quoted('l\'email di prova parte con mittente "{sender}"'))
+def leaves_with_sender(platform: Platform, outcome: dict[str, object], sender: str) -> None:
+    assert "refusal" not in outcome
+    assert [login.sender for login in platform.mailer.logins] == [sender]
+
+
+@then(quoted('"{address}" riceve la notifica dal server "{host}"'))
+def notice_from_server(platform: Platform, address: str, host: str) -> None:
+    assert [email.subject for email in platform.mailer.received_by(address)] == ["\u26a0\ufe0f omega: ciclo fallito"]
+    assert [login.host for login in platform.mailer.sent_from(address)] == [host]
+
+
+@then(quoted('nessuna email parte dal server "{host}"'))
+def nothing_from_server(platform: Platform, host: str) -> None:
+    assert platform.mailer.logins
+    assert host not in [login.host for login in platform.mailer.logins]
+
+
+@then(quoted('la pagina Notifiche ha le schede "{first}" e "{second}" e mostra "{shown}"'))
+def notifications_tabs(outcome: dict[str, object], first: str, second: str, shown: str) -> None:
+    # The dashboard opens on the channels only while the API answers none as linked (ADR pagina-notifiche-a-schede).
+    assert (first, second) == (PREFERENCES, CHANNELS)
+    assert shown == (PREFERENCES if outcome["linked"] else CHANNELS)
 
 
 @then(quoted('i Canali di "{user}" non mostrano alcun server di posta'))

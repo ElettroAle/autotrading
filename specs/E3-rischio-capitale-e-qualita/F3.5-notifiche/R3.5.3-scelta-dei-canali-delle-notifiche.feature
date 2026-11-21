@@ -74,3 +74,18 @@ Funzionalità: R3.5.3 Scelta dei canali delle notifiche
     Dato che "bruno" sceglie il canale "nessuno" per "ciclo fallito"
     Quando un ciclo di "alfa" di "anna" fallisce
     Allora la chat "chat-anna" riceve la notifica
+  Scenario: Un canale non collegato non riceve la notifica
+    Dato che "anna" non ha una chat Telegram collegata
+    E che "anna" sceglie il canale "Telegram ed email" per "ciclo fallito"
+    Quando un ciclo di "alfa" fallisce
+    Allora la chat "chat-anna" non riceve la notifica
+    E "anna@example.com" riceve la notifica
+  Schema dello scenario: Il campanello riceve ogni notifica qualunque sia la scelta
+    Dato che "anna" sceglie il canale "<canale>" per "ciclo fallito"
+    Quando un ciclo di "alfa" fallisce
+    Allora il campanello di "anna" ha la notifica
+    Esempi:
+      | canale   |
+      | nessuno  |
+      | email    |
+      | Telegram |

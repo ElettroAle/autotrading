@@ -43,3 +43,8 @@ Funzionalità: R3.5.4 Notifiche leggibili con icone e stato del flusso
   Scenario: Notifica senza flusso
     Quando "anna" chiede la notifica di prova
     Allora la notifica ha icona e titolo e non ha lo stato del flusso
+
+  Scenario: Allarme del conto senza stato del flusso
+    Quando sul conto "test-1" si apre un allarme di riconciliazione
+    Allora "anna" riceve una notifica che inizia con "🚨 test-1: allarme di riconciliazione"
+    E la notifica non ha lo stato del flusso

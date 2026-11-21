@@ -14,6 +14,7 @@ from autotrading.application.flows.read_forecast_accuracy import ReadForecastAcc
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.forecast_accuracy import ForecastAccuracy
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
+from tests.support.flow_cycles import FlowCycles, at
 from tests.support.flows import a_configuration, a_flow
 from tests.support.platform import Platform
 from tests.support.source_selections import a_source
@@ -260,3 +261,58 @@ def page_shows(errors: ForecastErrors, asset: str, error: str, percent: str, cou
     assert shown.asset == asset
     assert (shown.mean_absolute_error, shown.mean_percent_error) == (amount(error), amount(percent))
     assert shown.evaluated == int(count)
+
+
+# The actual price comes from the price history the forecast source reads (R1.3.5): the cycles the worker runs.
+
+
+@pytest.fixture
+def flow_cycles() -> FlowCycles:
+    return FlowCycles()
+
+
+@pytest.fixture
+def quoted_before() -> dict[str, Decimal]:
+    """The last price of each asset the exchange quoted when the cycle made its forecast."""
+    return {}
+
+
+@given(
+    quoted(
+        'che alle {clock} un ciclo di "{flow}" ha previsto "{asset}" a 1 ora dai prezzi dell\'exchange, '
+        "con ultimo prezzo {price}"
+    )
+)
+def forecast_of_a_cycle(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles, quoted_before: dict[str, Decimal], clock: str, flow: str, asset: str, price: str
+) -> None:
+    flow_cycles.add_flow("anna", flow, assets=(asset,), sources=("forecast",))
+    quoted_before[asset] = flow_cycles.prices.prices[asset] = amount(price)
+    flow_cycles.run(flow, clock)
+
+
+@when(quoted('arrivano le {clock} e l\'exchange quota "{asset}" {price}'))
+def horizon_expires(flow_cycles: FlowCycles, clock: str, asset: str, price: str) -> None:
+    flow_cycles.prices.prices[asset] = amount(price)
+    flow_cycles.clock.current = at(clock)
+    flow_cycles.plan_round()
+
+
+@then(
+    quoted(
+        'la previsione delle {clock} di "{flow}" su "{asset}" a 1 ora ha il prezzo effettivo {price} dello stesso '
+        "exchange"
+    )
+)
+def actual_of_the_same_exchange(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles, quoted_before: dict[str, Decimal], clock: str, flow: str, asset: str, price: str
+) -> None:
+    forecasts = flow_cycles.forecasts_of(flow_cycles.flow(flow).tenant_id).forecasts
+    [forecast] = [
+        each
+        for each in forecasts
+        if (each.made_at, each.asset, each.horizon) == (at(clock), asset, ForecastHorizon.HOUR_1)
+    ]
+    # The forecast started from the last price of that history, the actual price is the one it quotes at the expiry.
+    assert forecast.last_price == quoted_before[asset]
+    assert forecast.actual_price == amount(price)

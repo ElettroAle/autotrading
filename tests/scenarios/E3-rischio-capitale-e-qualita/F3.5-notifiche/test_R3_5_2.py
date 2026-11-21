@@ -17,6 +17,7 @@ from tests.fakes.cycles import FakePermanentError
 from tests.fakes.outbox import OutboxState
 from tests.support.decision_steps import answer, opening
 from tests.support.flow_cycles import FlowCycles
+from tests.support.mail_servers import PASSWORD
 from tests.support.notifications import told_in
 from tests.support.steps import quoted
 
@@ -135,6 +136,7 @@ def flow_of_user_paused(flow_cycles: FlowCycles, outcome: dict[str, object], flo
     pause(flow_cycles, flow, outcome)
 
 
+@given(quoted('che un ciclo di "{flow}" ha prodotto una notifica destinata all\'email'))
 @when(quoted('un ciclo di "{flow}" produce una notifica destinata all\'email'))
 def cycle_notifies(flow_cycles: FlowCycles, flow: str) -> None:
     # The opening is the notification of the cycle: its channel is the email (R3.5.3).
@@ -142,6 +144,13 @@ def cycle_notifies(flow_cycles: FlowCycles, flow: str) -> None:
     flow_cycles.platform.order_exchange.fill_at = (MID_PRICE, OPENING_FEE)
     answer(flow_cycles, opening("BTC", quota=0.05, reasoning="r"))
     flow_cycles.run(flow)
+
+
+@when("il server di posta torna ad accettare gli invii e arriva il nuovo tentativo")
+def mail_server_accepts_again(flow_cycles: FlowCycles) -> None:
+    assert flow_cycles.platform.mailer.sent == []
+    flow_cycles.platform.mailer.accepting = True
+    flow_cycles.platform.outbox.let_backoff_pass()
 
 
 @when(quoted('"{user}" apre le Impostazioni delle notifiche'))
@@ -203,6 +212,19 @@ def failed_sending_recorded(flow_cycles: FlowCycles, caplog: pytest.LogCaptureFi
         for record in caplog.records
         if record.name == "autotrading.notifications" and record.levelno == logging.WARNING
     ]
+
+
+@then(
+    quoted(
+        'nessuna email di "{address}" contiene le credenziali del conto di "{flow}" né la password del server di posta'
+    )
+)
+def emails_without_credentials(flow_cycles: FlowCycles, address: str, flow: str) -> None:
+    received = flow_cycles.platform.mailer.received_by(address)
+    secrets = [value for value in flow_cycles.credentials_of(flow).values.values() if value] + [PASSWORD]
+    assert received
+    texts = [f"{email.subject}\n{email.text}" for email in received]
+    assert [text for text in texts if any(secret in text for secret in secrets)] == []
 
 
 @then(quoted('la pagina avvisa "{warning}"'))

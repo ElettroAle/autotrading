@@ -108,3 +108,20 @@ Funzionalità: R3.2.3 Chiusura di emergenza
     Quando "anna" sceglie la chiusura di emergenza del flusso "alfa" nel riquadro "Zona pericolosa"
     Allora la dashboard chiede conferma con "Chiudere 1 posizione del flusso alfa e metterlo in pausa?"
     E nessuna posizione viene chiusa finché "anna" non conferma
+
+  Schema dello scenario: Flussi fermi o archiviati non toccati
+    Dato che "anna" ha sul conto "test-1" anche il flusso <stato> "epsilon"
+    Quando "anna" lancia la chiusura di emergenza del conto "test-1"
+    Allora il flusso "epsilon" resta <stato>
+    E l'esito non riporta il flusso "epsilon"
+
+    Esempi:
+      | stato      |
+      | fermo      |
+      | archiviato |
+
+  Scenario: Il comando si registra con data, ora, ambito ed esito
+    Dato che sono le 10:30 UTC del 12 novembre 2026
+    Quando "anna" lancia la chiusura di emergenza del conto "test-1"
+    Allora la chiusura di emergenza è registrata alle 10:30 UTC del 12 novembre 2026 con ambito il conto "test-1"
+    E la chiusura registrata riporta chiuse le posizioni di "alfa" su "BTC" e di "beta" su "ETH"

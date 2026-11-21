@@ -1,5 +1,6 @@
 from dataclasses import replace
 from datetime import timedelta
+from http import HTTPStatus
 
 import pytest
 from pytest_bdd import given, scenarios, then, when
@@ -11,6 +12,7 @@ from autotrading.application.flows.read_free_capital import ReadFreeCapitalComma
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
+from tests.support.api_session import ApiSession
 from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, shared by the features
 from tests.support.draft_steps import Draft
 from tests.support.flow_cycles import FlowCycles
@@ -31,6 +33,8 @@ class Duplication:
     def __init__(self) -> None:
         self.free_capital: FreeCapital | None = None
         self.opened: Flow | None = None
+        # What the programmatic interface answered to the duplication.
+        self.answer: dict[str, object] = {}
 
 
 @pytest.fixture
@@ -221,3 +225,20 @@ def bare_draft(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -
     configuration = replace(a_configuration(), allocated_capital=None, assets=())
     draft = a_flow(platform.tenant_of(user), name=name, status=FlowStatus.DRAFT, configuration=configuration)
     platform.flows.flows.append(replace(draft, account_id=None))
+
+
+@when(quoted('"{user}" chiede all\'interfaccia programmatica di duplicare il flusso "{name}"'))
+def duplicate_through_the_api(  # noqa: PLR0917 - one argument per fixture and value of the step
+    platform: Platform, lifecycle: Lifecycle, draft: Draft, duplication: Duplication, user: str, name: str
+) -> None:
+    flow_id = flow_named(platform, lifecycle.user, name).id.value
+    response = ApiSession(platform).post_as(user, f"/flows/{flow_id}/duplicate")
+    assert response.status_code == HTTPStatus.CREATED, response.text
+    duplication.answer = response.json()
+    draft.name = str(duplication.answer["name"])
+
+
+@then(quoted('la risposta riporta il flusso "{name}" nello stato "{status}" alla versione {version}'))
+def api_answers_copy(duplication: Duplication, name: str, status: str, version: str) -> None:
+    answer = duplication.answer
+    assert (answer["name"], answer["status"], answer["version"]) == (name, status, int(version))

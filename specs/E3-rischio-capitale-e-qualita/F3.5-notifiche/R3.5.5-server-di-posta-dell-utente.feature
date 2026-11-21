@@ -52,3 +52,26 @@ Funzionalità: R3.5.5 Server di posta dell'utente
     E che "bruno" ha indicato l'indirizzo "bruno@example.com" per le notifiche
     Allora i Canali di "bruno" non mostrano alcun server di posta
     E la scelta dei canali di "bruno" avvisa accanto all'email con "server di posta non configurato"
+
+  Scenario: Senza mittente l'email parte a nome dell'utente
+    Dato che "anna" ha salvato il server di posta "smtp.example.com" senza mittente
+    Quando "anna" invia l'email di prova
+    Allora l'email di prova parte con mittente "anna@example.com"
+
+  Scenario: Le notifiche email partono dal server del tenant della notifica
+    Dato che "anna" ha salvato il server di posta "smtp.example.com"
+    E che "bruno" ha indicato l'indirizzo "bruno@example.com" per le notifiche
+    E che "bruno" ha salvato il server di posta "smtp.bruno.example"
+    Quando un ciclo di un flusso di "bruno" fallisce con il canale email scelto
+    Allora "bruno@example.com" riceve la notifica dal server "smtp.bruno.example"
+    E nessuna email parte dal server "smtp.example.com"
+
+  Scenario: La pagina Notifiche si apre su Canali senza canali collegati
+    Dato che "bruno" non ha collegato alcun canale
+    Quando "bruno" apre la pagina Notifiche
+    Allora la pagina Notifiche ha le schede "Preferenze" e "Canali" e mostra "Canali"
+
+  Scenario: La pagina Notifiche si apre su Preferenze con un canale collegato
+    Dato che "anna" ha salvato il server di posta "smtp.example.com"
+    Quando "anna" apre la pagina Notifiche
+    Allora la pagina Notifiche ha le schede "Preferenze" e "Canali" e mostra "Preferenze"

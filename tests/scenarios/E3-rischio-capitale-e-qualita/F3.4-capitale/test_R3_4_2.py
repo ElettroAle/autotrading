@@ -144,6 +144,12 @@ def changes_on_days(history: History, platform: Platform, name: str, first: str,
         platform.use_cases_of(history.user).change_allocated_capital.execute(command)
 
 
+@given(quoted('che "{user}" ha cambiato {times} volte il capitale di "{name}", di 1 USDC ogni volta'))
+def many_changes(history: History, user: str, times: str, name: str) -> None:
+    for _ in range(int(times)):
+        history.change_capital(user, name, history.flow(name).configuration.assigned_capital + 1)
+
+
 @given(quoted('che "{user}" ha una variazione di capitale su un suo flusso'))
 def change_of_another_tenant(history: History, user: str) -> None:
     history.add_flow(user, "test-1", "gamma", Decimal(500))
@@ -171,6 +177,12 @@ def read_account_history(history: History, user: str, account: str) -> None:
 def read_flow_history_in_period(history: History, user: str, name: str, first: str, last: str) -> None:
     assert user == history.user
     history.page = history.read_flow(name, _days(first, last))
+
+
+@when(quoted('"{user}" consulta la seconda pagina dello storico delle variazioni di "{name}"'))
+def read_second_page(history: History, user: str, name: str) -> None:
+    command = ListCapitalChangesCommand(history.flow(name).id, page=2)
+    history.page = history.platform.use_cases_of(user).list_capital_changes.execute(command)
 
 
 @when(quoted('"{user}" apre nella dashboard lo storico delle variazioni di "{name}"'))
@@ -223,6 +235,23 @@ def table_row(history: History, platform: Platform, *, reason: str, amount: str,
     rows = [(entry.occurred_at, entry.reason.value, entry.amount, entry.previous, entry.new) for entry in page.entries]
     assert rows == [(platform.now, reason, Decimal(amount), Decimal(previous), Decimal(new))]
     assert page.currency == "USDC"
+
+
+@then(quoted("la pagina contiene solo la prima variazione, da {previous} a {new} USDC"))
+def only_first_change(history: History, previous: str, new: str) -> None:
+    page = history.read()
+    assert [(entry.previous, entry.new) for entry in page.entries] == [(Decimal(previous), Decimal(new))]
+    assert not page.has_next
+
+
+@then(quoted("la prima pagina contiene le {count} variazioni più recenti, dalla più recente"))
+def first_page_newest(history: History, count: str) -> None:
+    page = history.read_flow("alfa")
+    instants = [entry.occurred_at for entry in page.entries]
+    assert len(instants) == int(count)
+    assert instants == sorted(instants, reverse=True)
+    assert page.entries[0].new == Decimal(551)
+    assert page.has_next
 
 
 @then(quoted('lo storico non contiene la variazione di "{user}"'))

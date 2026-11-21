@@ -13,6 +13,7 @@ from autotrading.adapters.inbound.api.notification_channels import CHANNEL_NAMES
 from autotrading.application.notifications.choose_notification_channel import ChooseNotificationChannelCommand
 from autotrading.application.notifications.get_notification_channels import EventChannel
 from autotrading.application.notifications.link_chat import LinkChatCommand
+from autotrading.application.notifications.list_inbox_notifications import ListInboxNotificationsCommand
 from autotrading.application.notifications.remove_flow_channel_exception import RemoveFlowChannelExceptionCommand
 from autotrading.application.notifications.set_flow_channel_exception import SetFlowChannelExceptionCommand
 from autotrading.application.notifications.set_notification_email import SetNotificationEmailCommand
@@ -254,3 +255,9 @@ def settings_warn(flow_cycles: FlowCycles, event: str, warning: str) -> None:
     channels = flow_cycles.platform.use_cases_of(user).get_notification_channels.execute().events
     [found] = [each for each in channels if each.event == NotificationEvent(event)]
     assert [warning_of(missing) for missing in found.missing_links] == [warning]
+
+
+@then(quoted('il campanello di "{user}" ha la notifica'))
+def bell_has_notice(flow_cycles: FlowCycles, outcome: dict[str, object], user: str) -> None:
+    page = flow_cycles.platform.use_cases_of(user).list_inbox_notifications.execute(ListInboxNotificationsCommand())
+    assert [notification.title for notification in page.notifications] == [outcome["notice"]]

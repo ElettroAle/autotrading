@@ -99,3 +99,29 @@ Funzionalità: R3.2.2 Perdita massima del flusso
     Dato che le aperture di "alfa" sono sospese con motivo "perdita giornaliera 6% oltre il 5%"
     Quando "anna" apre il flusso "alfa" nella dashboard
     Allora la pagina mostra "aperture sospese: perdita giornaliera 6% oltre il 5%" e il comando "Riprendi le aperture"
+
+  Scenario: Un aumento del capitale non è un guadagno
+    Dato che alle 00:00 UTC di oggi il valore di "alfa" era 1000 USDC
+    Quando "anna" aumenta di 200 USDC il capitale allocato di "alfa" e un ciclo legge il valore 1128 USDC
+    Allora le aperture di "alfa" sono sospese con motivo "perdita giornaliera 6% oltre il 5%"
+
+  Scenario: Aggiornamento del piano deciso durante la sospensione
+    Dato che le aperture di "alfa" sono sospese per perdita massima
+    E che "alfa" ha una posizione aperta su "BTC"
+    Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" a 99
+    Allora "alfa" aggiorna il piano di uscita della posizione su "BTC"
+
+  Scenario: Con ripresa il giorno dopo l'utente conferma prima
+    Dato che "alfa" ha ripresa "il giorno dopo"
+    E che le aperture di "alfa" sono sospese per perdita massima e il valore di "alfa" è 940 USDC
+    Quando "anna" conferma la ripresa delle aperture di "alfa"
+    Allora le aperture di "alfa" non sono sospese
+    E il picco di "alfa" riparte da 940 USDC
+
+  Scenario: La modifica di una soglia crea una versione
+    Quando "anna" imposta la perdita giornaliera massima di "alfa" a 3%
+    Allora la configurazione di "alfa" passa alla versione 2 con perdita giornaliera massima 3%
+
+  Scenario: La modifica della ripresa crea una versione
+    Quando "anna" imposta la ripresa di "alfa" a "il giorno dopo"
+    Allora la configurazione di "alfa" passa alla versione 2 con ripresa "il giorno dopo"

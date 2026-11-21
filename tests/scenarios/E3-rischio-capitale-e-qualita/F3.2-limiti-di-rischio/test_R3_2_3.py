@@ -7,6 +7,7 @@ shows comes from the API: one scope per command, the positions it counts, and no
 """
 
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -45,6 +46,7 @@ STOP_PRICE = Decimal(95000)
 EMERGENCY_COMMAND = "Chiusura di emergenza"
 # The emergency closing of a flow sits with Archivia at the bottom of the settings of the flow (Bug 560).
 FLOW_ZONE = "Zona pericolosa"
+LAUNCHED_AT = datetime(2026, 11, 12, 10, 30, tzinfo=UTC)
 
 
 @dataclass
@@ -172,6 +174,18 @@ def one_active_flow(emergency: Emergency, user: str, account: str, name: str, as
 def flow_without_positions(emergency: Emergency, user: str, account: str, name: str) -> None:
     # On another account than the flow that trades it, the asset is free for this flow (R1.1.2).
     emergency.add_flow(user, account, name, "ETH", held=False)
+
+
+@given(quoted('che "{user}" ha sul conto "{account}" anche il flusso {status} "{name}"'))
+def flow_without_market(emergency: Emergency, user: str, account: str, status: str, name: str) -> None:
+    flow = emergency.add_flow(user, account, name, "ETH", held=False)
+    flows = emergency.platform.flows.flows
+    flows[flows.index(flow)] = replace(flow, status=FlowStatus(status))
+
+
+@given("che sono le 10:30 UTC del 12 novembre 2026")
+def at_half_past_ten(platform: Platform) -> None:
+    platform.now = LAUNCHED_AT
 
 
 @given(quoted('che la posizione di "{name}" su "{asset}" ha un ordine di stop loss sull\'exchange'))
@@ -427,6 +441,38 @@ def account_commands_without_emergency(emergency: Emergency) -> None:
     # Opening the page runs no closing: only the command of the zone does, once confirmed.
     assert emergency.nothing_run()
     assert all(emergency.flow_position_open(name) for name in emergency.owners)
+
+
+@then(quoted('il flusso "{name}" resta {status}'))
+def status_kept(emergency: Emergency, name: str, status: str) -> None:
+    assert emergency.flow(name).status == FlowStatus(status)
+
+
+@then(quoted('l\'esito non riporta il flusso "{name}"'))
+def not_in_outcome(emergency: Emergency, name: str) -> None:
+    assert emergency.closing is not None, emergency.error
+    assert name not in [outcome.flow_name for outcome in emergency.closing.outcomes]
+
+
+@then(
+    quoted('la chiusura di emergenza è registrata alle 10:30 UTC del 12 novembre 2026 con ambito il conto "{account}"')
+)
+def closing_recorded(emergency: Emergency, platform: Platform, account: str) -> None:
+    [recorded] = platform.emergency_closings
+    assert recorded.closed_at == LAUNCHED_AT
+    assert recorded.scope == EmergencyScope(account_id=platform.account_named(emergency.user, account).id.value)
+
+
+@then(
+    quoted(
+        'la chiusura registrata riporta chiuse le posizioni di "{first}" su "{first_asset}" '
+        'e di "{second}" su "{second_asset}"'
+    )
+)
+def recorded_outcome(platform: Platform, first: str, first_asset: str, second: str, second_asset: str) -> None:
+    [recorded] = platform.emergency_closings
+    closed = {outcome.flow_name: outcome.closed for outcome in recorded.outcomes}
+    assert closed == {first: (first_asset,), second: (second_asset,)}
 
 
 @then("il comando viene rifiutato come flusso inesistente")

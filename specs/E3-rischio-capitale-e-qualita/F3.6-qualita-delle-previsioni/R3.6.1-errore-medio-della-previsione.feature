@@ -59,3 +59,8 @@ Funzionalità: R3.6.1 Errore medio della previsione
     Dato che le previsioni di "alfa" su "BTC" a 1 ora hanno errore medio assoluto 450 e percentuale 0,74% su 2 previsioni
     Quando "anna" apre la pagina del flusso "alfa" nella dashboard
     Allora la pagina mostra per "BTC" a 1 ora errore medio 450, 0,74%, 2 previsioni valutate
+
+  Scenario: Prezzo effettivo letto dall'exchange da cui viene la previsione
+    Dato che alle 10:00 un ciclo di "alfa" ha previsto "BTC" a 1 ora dai prezzi dell'exchange, con ultimo prezzo 60000
+    Quando arrivano le 11:00 e l'exchange quota "BTC" 60300
+    Allora la previsione delle 10:00 di "alfa" su "BTC" a 1 ora ha il prezzo effettivo 60300 dello stesso exchange
