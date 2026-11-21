@@ -29,9 +29,15 @@ Funzionalità: R6.4.8 Prossima esecuzione nella panoramica
     Quando "anna" sceglie il periodo "7 giorni" nella pagina del flusso "alfa"
     Allora vede "Prossima esecuzione prevista" alle 10:15
 
+  Scenario: Flusso fermo
+    Dato che il flusso "alfa" è attivo e l'ultimo ciclo è partito alle 10:00
+    E che il flusso "alfa" è fermo
+    Quando "anna" apre la panoramica del flusso "alfa"
+    Allora non vede "Prossima esecuzione prevista"
+
   Scenario: Flusso archiviato
     Dato che il flusso "alfa" è archiviato
     Quando "anna" apre la panoramica del flusso "alfa"
     Allora il flusso "alfa" mostra lo stato "archiviato"
-    E vede "Prossima esecuzione prevista" con "—"
+    E non vede "Prossima esecuzione prevista"
     E non vede alcun comando del flusso

@@ -50,3 +50,8 @@ Funzionalità: R3.4.2 Storico delle variazioni di capitale
     Dato che "bruno" ha una variazione di capitale su un suo flusso
     Quando "anna" consulta lo storico delle variazioni del conto "test-1"
     Allora lo storico non contiene la variazione di "bruno"
+  Scenario: Storico a pagine dalla variazione più recente
+    Dato che "anna" ha cambiato 51 volte il capitale di "alfa", di 1 USDC ogni volta
+    Quando "anna" consulta la seconda pagina dello storico delle variazioni di "alfa"
+    Allora la pagina contiene solo la prima variazione, da 500 a 501 USDC
+    E la prima pagina contiene le 50 variazioni più recenti, dalla più recente

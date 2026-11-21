@@ -236,3 +236,72 @@ Then('non ottiene alcuna posizione del flusso {string}', async ({ dashboard }, f
   await expect(dashboard.page.getByText('Nessuna posizione chiusa trovata.')).toBeVisible();
   await expect(dashboard.historyRows('Posizioni chiuse').filter({ hasText: flow })).toHaveCount(0);
 });
+
+Given(
+  'che {string} ha anche il flusso {string} con posizioni chiuse su {string}',
+  async ({}, account: string, flow: string, asset: string) => {
+    fakePlatform.giveFlowTo(account, flow);
+    fakePlatform.changeFlow(flow, { assets: [asset] });
+    const owner = ownerOf(account, flow);
+    const records = fakePlatform.recordsOf(account);
+    for (let day = 1; day <= DAYS_OF_NOVEMBER; day += 1) {
+      records.closedPositions.push(aHistoryPosition(owner, asset, dayOfNovember(day)));
+    }
+  },
+);
+
+// The choices reach the page in a single task, before it shows any of them, as the clicks of a quick user (Bug 291).
+When(
+  /^"([^"]+)" sceglie in rapida successione il flusso "([^"]+)", l'asset "([^"]+)" e le posizioni chiuse$/,
+  async ({ dashboard }, account: string, flow: string, asset: string) => {
+    await openHistoryAs(dashboard, account);
+    const filters = [dashboard.filter('Flusso'), dashboard.filter('Asset')];
+    for (const filter of filters) {
+      await expect(filter).toBeEnabled();
+    }
+    const [flowFilter, assetFilter, tab] = await Promise.all(
+      [...filters, dashboard.historyTab('Posizioni chiuse')].map((locator) =>
+        locator.elementHandle(),
+      ),
+    );
+    await dashboard.page.evaluate(
+      ({ elements, choices }) => {
+        const [flowSelect, assetSelect, tabButton] = elements as [
+          HTMLSelectElement,
+          HTMLSelectElement,
+          HTMLElement,
+        ];
+        const choose = (select: HTMLSelectElement, label: string): void => {
+          const option = [...select.options].find((candidate) => candidate.text === label);
+          select.value = option?.value ?? '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        choose(flowSelect, choices.flow);
+        choose(assetSelect, choices.asset);
+        tabButton.click();
+      },
+      { elements: [flowFilter, assetFilter, tab], choices: { flow, asset } },
+    );
+  },
+);
+
+Then(
+  /^ottiene solo le posizioni del flusso "([^"]+)" su "([^"]+)", con tutte le scelte nell'indirizzo$/,
+  async ({ dashboard }, flow: string, asset: string) => {
+    await expect(dashboard.historyTab('Posizioni chiuse')).toHaveAttribute('aria-selected', 'true');
+    await expect(dashboard.filter('Flusso').locator('option:checked')).toHaveText(flow);
+    await expect(dashboard.filter('Asset').locator('option:checked')).toHaveText(asset);
+    const search = new URL(dashboard.page.url()).searchParams;
+    expect(search.get('tab')).toBe('closed-positions');
+    expect(search.get('asset')).toBe(asset);
+    expect(search.get('flow')).toBe(fakePlatform.flowNamed(flow).id);
+    const rows = dashboard.historyRows('Posizioni chiuse');
+    await expect(rows).toHaveCount(DAYS_OF_NOVEMBER);
+    await expect(rows).toHaveText(
+      Array.from(
+        { length: DAYS_OF_NOVEMBER },
+        () => new RegExp(`${flow}.*${asset}|${asset}.*${flow}`),
+      ),
+    );
+  },
+);

@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import type { DataTable } from 'playwright-bdd';
 
 import { fakePlatform } from '@/testing/mocks/platform';
 
@@ -10,6 +11,9 @@ const DAY = 24 * 60 * 60 * 1000;
 const LONG_AGO = 20 * DAY;
 const RANKING_PAGE = '/ranking';
 const POSITIONS: Record<string, number> = { primo: 0, secondo: 1 };
+const STATUSES: Record<string, string> = { archiviato: 'archiviato', 'in bozza': 'bozza' };
+
+const amount = (text: string): number => Number(text.replace(',', '.'));
 
 /** The equity of the cycles of the flow, oldest first: the last `recent` in the last hours, the others long ago. */
 const recordCurve = (flow: string, equity: number[], recent: number): void => {
@@ -55,6 +59,26 @@ Given(
     recordCurve(flow, equity, equity.length);
     memory.account = account;
     memory.periodPage = RANKING_PAGE;
+  },
+);
+
+Given(
+  /^che "([^"]+)" ha il flusso "([^"]+)" (archiviato|in bozza) con equity per ciclo ([\d, ]+) USDC$/,
+  async ({}, account: string, flow: string, status: string, values: string) => {
+    fakePlatform.addFlow(account, flow, { status: STATUSES[status] ?? status });
+    recordCurve(flow, values.split(', ').map(Number), 2);
+  },
+);
+
+Given(
+  /^che "([^"]+)" ha chiuso posizioni con PnL netto (.+) USDC, commissioni totali ([\d,]+) USDC e costo del modello ([\d,]+) USD$/,
+  async ({}, flow: string, results: string, fees: string, cost: string) => {
+    const nets = results.replace(' e ', ', ').split(', ').map(amount);
+    const { history } = fakePlatform.flowNamed(flow);
+    const closedAt = new Date(Date.now() - CYCLE);
+    const share = amount(fees) / nets.length;
+    history.closedPositions.push(...nets.map((netPnl) => ({ netPnl, fees: share, closedAt })));
+    history.modelCalls.push({ costUsd: amount(cost), plannedAt: closedAt });
   },
 );
 
@@ -125,3 +149,14 @@ Then('la classifica non contiene {string}', async ({ dashboard }, flow: string) 
   await expect(dashboard.rankingRows().first()).toBeVisible();
   await expect(dashboard.rankingRow(flow)).toHaveCount(0);
 });
+
+Then(
+  'la riga di {string} nella classifica mostra:',
+  async ({ dashboard }, flow: string, table: DataTable) => {
+    for (const { colonna, valore } of table.hashes()) {
+      await expect(await dashboard.rankingCell(flow, colonna ?? '')).toHaveText(valore ?? '', {
+        useInnerText: true,
+      });
+    }
+  },
+);

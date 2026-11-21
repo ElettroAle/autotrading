@@ -1,5 +1,5 @@
 import { fakeClock } from './clock';
-import type { FakeFlowHistory } from './platform';
+import type { FakeFlow } from './platform';
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -85,13 +85,32 @@ const sum = (values: number[]): number => values.reduce((total, value) => total 
 const averageText = (values: number[]): string | null =>
   values.length === 0 ? null : String(sum(values) / values.length);
 
-/** The statistics of a flow as the API computes and writes them: amounts as text, null when not available. */
+/** The return from the first equity of a curve to the last, not available when the first is not positive. */
+export const returnOf = (curve: number[]): string | null => {
+  const first = curve[0] ?? 0;
+  const last = curve.at(-1) ?? 0;
+  return first <= 0 ? null : (((last - first) / first) * 100).toFixed(2);
+};
+
+/** The equity the flow recorded in the window, from the oldest. */
+export const curveOf = (flow: Pick<FakeFlow, 'equity'>, window: Window): number[] =>
+  flow.equity
+    .filter((point) => contains(window, point.plannedAt))
+    .toSorted((first, second) => first.plannedAt.getTime() - second.plannedAt.getTime())
+    .map((point) => point.equity);
+
+/**
+ * The statistics of a flow as the API computes and writes them: amounts as text, null when not available; the return
+ * of the period from the equity it recorded in it (ADR rendimento-del-periodo-nelle-statistiche).
+ */
 export const statisticsOf = (
-  history: FakeFlowHistory,
+  flow: Pick<FakeFlow, 'history' | 'equity'>,
   search: URLSearchParams,
   now = fakeClock.now(),
 ) => {
+  const { history } = flow;
   const window = windowOf(search, now);
+  const curve = curveOf(flow, window);
   const closed = history.closedPositions.filter((position) => contains(window, position.closedAt));
   const winning = closed.filter((position) => position.netPnl > 0).map((p) => p.netPnl);
   const losing = closed.filter((position) => position.netPnl < 0).map((p) => p.netPnl);
@@ -107,5 +126,6 @@ export const statisticsOf = (
     total_fees: String(sum(closed.map((position) => position.fees))),
     model_cost_usd: String(sum(calls.map((call) => call.costUsd))),
     model_calls_without_cost: 0,
+    return_percent: curve.length === 0 ? null : returnOf(curve),
   };
 };

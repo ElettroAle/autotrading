@@ -54,6 +54,12 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     Allora l'agente riceve per il flusso "alfa" liquidità disponibile 200 USDC
     E l'apertura del flusso "alfa" è bloccata con il motivo "liquidità del flusso insufficiente: 200 USDC"
 
+  Scenario: La liquidità del ciclo non scende sotto zero
+    Dato che le esecuzioni del flusso "alfa" hanno PnL realizzato -600 USDC e commissioni 0 USDC
+    Quando parte un ciclo del flusso "alfa" in cui l'agente apre "BTC" con quota 0,1 e leva 1
+    Allora l'agente riceve per il flusso "alfa" liquidità disponibile 0 USDC
+    E nessun ordine è inviato
+
   Scenario: Un registro incompleto mette in pausa i flussi del conto
     Dato che il registro del conto "test-1" è aggiornato a un ciclo precedente
     E che dall'ultimo ciclo il conto "test-1" ha più esecuzioni di quante l'exchange ne conservi

@@ -9274,6 +9274,17 @@
           "model_calls_without_cost": {
             "type": "integer",
             "title": "Model Calls Without Cost"
+          },
+          "return_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Percent"
           }
         },
         "type": "object",
@@ -9286,10 +9297,11 @@
           "average_losing_pnl",
           "total_fees",
           "model_cost_usd",
-          "model_calls_without_cost"
+          "model_calls_without_cost",
+          "return_percent"
         ],
         "title": "FlowStatisticsResponse",
-        "description": "The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate in percent with two\ndecimals, null when nothing is available (ADR 0122)."
+        "description": "The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate and return of the period\nin percent with two decimals, null when nothing is available (ADR 0122, ADR\nrendimento-del-periodo-nelle-statistiche)."
       },
       "ForecastAccuracyResponse": {
         "properties": {

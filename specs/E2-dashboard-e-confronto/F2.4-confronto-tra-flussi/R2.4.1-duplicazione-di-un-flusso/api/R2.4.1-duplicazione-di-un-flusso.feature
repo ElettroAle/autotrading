@@ -47,6 +47,12 @@ Funzionalità: R2.4.1 Duplicazione di un flusso
     Allora l'avvio è rifiutato con il motivo "asset mancante"
     E il flusso "alfa (copia)" resta nello stato "bozza"
 
+  Scenario: L'avvio di una bozza verifica anche conto e capitale
+    Dato che "anna" ha la bozza "gamma" senza conto, capitale allocato né asset
+    Quando "anna" avvia il flusso "gamma"
+    Allora l'avvio è rifiutato con il motivo "conto, capitale allocato e asset mancanti"
+    E il flusso "gamma" resta nello stato "bozza"
+
   Scenario: Avvia disattivato finché manca qualcosa
     Dato che "anna" ha duplicato il flusso "alfa"
     Quando "anna" apre la bozza "alfa (copia)"
@@ -62,3 +68,8 @@ Funzionalità: R2.4.1 Duplicazione di un flusso
   Scenario: Flusso di un altro utente
     Quando "bruno" chiede di duplicare il flusso "alfa"
     Allora la richiesta è rifiutata come flusso inesistente
+
+  Scenario: Duplicazione dall'interfaccia programmatica
+    Quando "anna" chiede all'interfaccia programmatica di duplicare il flusso "alfa"
+    Allora la risposta riporta il flusso "alfa (copia)" nello stato "bozza" alla versione 1
+    E esiste il flusso "alfa (copia)" nello stato "bozza" alla versione 1

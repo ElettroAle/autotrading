@@ -174,6 +174,11 @@ def bring_to_minimum_with_value_limit(bench: RiskBench, a: str) -> None:
     bench.bring_to_minimum, bench.value_percent = True, amount(a)
 
 
+@given(step(r'che il flusso "alfa" ha l\'opzione "porta al minimo" attivata e liquidità disponibile {a} USDC'))
+def bring_to_minimum_with_liquidity(bench: RiskBench, a: str) -> None:
+    bench.bring_to_minimum, bench.liquidity = True, amount(a)
+
+
 @given(parsers.re(r'^che il flusso "alfa" ha una posizione long aperta su "(?P<asset>[A-Z]+)"$'))
 def open_position(bench: RiskBench, asset: str) -> None:
     bench.open_assets.add(asset)
@@ -289,3 +294,8 @@ def no_order(bench: RiskBench, asset: str) -> None:
 @then(parsers.re(r'^la decisione su "(?P<asset>[A-Z]+)" è registrata come mantieni$'))
 def held(bench: RiskBench, asset: str) -> None:
     assert bench.outcome_of(asset) == HeldPosition(asset)
+
+
+@then(parsers.re(r'^la chiusura su "(?P<asset>[A-Z]+)" è approvata$'))
+def close_approved(bench: RiskBench, asset: str) -> None:
+    assert bench.outcome_of(asset) == ApprovedClose(asset)

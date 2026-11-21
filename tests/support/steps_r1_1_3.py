@@ -73,6 +73,12 @@ def second_version(platform: Platform, lifecycle: Lifecycle, name: str, version:
     assert flow_named(platform, lifecycle.user, name).configuration.version == int(version)
 
 
+@given(quoted('che il flusso "{name}" ha la versione {version} con il system prompt "{prompt}"'))
+def version_with_system_prompt(platform: Platform, lifecycle: Lifecycle, name: str, version: str, prompt: str) -> None:
+    modify(platform, lifecycle, lifecycle.user, name, system_prompt=prompt)
+    assert flow_named(platform, lifecycle.user, name).configuration.version == int(version)
+
+
 @when(quoted('"{user}" confronta le versioni {first} e {second} del flusso "{name}"'))
 def compare(platform: Platform, comparison: Comparison, user: str, *, first: str, second: str, name: str) -> None:
     command = CompareFlowVersionsCommand(flow_named(platform, user, name).id, int(first), int(second))
@@ -104,6 +110,11 @@ def previous_version(platform: Platform, lifecycle: Lifecycle, version: str, nam
 @then(quoted('il confronto riporta solo la differenza sul modello, da "{before}" a "{after}"'))
 def only_the_model(comparison: Comparison, before: str, after: str) -> None:
     assert comparison.differences == (ConfigurationDifference("modello", before, after),)
+
+
+@then(quoted('il confronto riporta solo la differenza sul system prompt, da "{before}" a "{after}"'))
+def only_the_system_prompt(comparison: Comparison, before: str, after: str) -> None:
+    assert comparison.differences == (ConfigurationDifference("system prompt", before, after),)
 
 
 @then(quoted('il flusso "{name}" resta alla versione di configurazione {version}'))

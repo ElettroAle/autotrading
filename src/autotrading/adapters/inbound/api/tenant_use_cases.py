@@ -475,7 +475,7 @@ class TenantUseCases:
             list_decisions=ListDecisionsUseCase(ports.flow_directory, ports.decision_history, ports.clock),
             read_flow_cost=ReadFlowCostUseCase(ports.flow_directory, ports.cycle_history),
             read_flow_statistics=ReadFlowStatisticsUseCase(
-                ports.flows, ports.closed_positions, ports.cycle_history, ports.clock
+                ports.flows, ports.closed_positions, ports.cycle_history, ports.equity_snapshots, ports.clock
             ),
             read_forecast_accuracy=ReadForecastAccuracyUseCase(ports.flows, ports.flow_forecasts, ports.clock),
             list_flow_overviews=ListFlowOverviewsUseCase(

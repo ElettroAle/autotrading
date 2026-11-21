@@ -50,3 +50,9 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
       | valore |
       | 0      |
       | 101    |
+
+  Scenario: La conferma si registra con data e ora
+    Dato che sul conto "test-1" c'è un allarme di riconciliazione
+    E che sono le 11:00 UTC del 12 novembre 2026
+    Quando "anna" conferma di aver verificato il conto "test-1"
+    Allora la conferma dell'allarme del conto "test-1" è registrata alle 11:00 UTC del 12 novembre 2026

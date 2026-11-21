@@ -2,7 +2,7 @@
 paths:
   - "src/autotrading/adapters/outbound/binance/**"
   - "tests/unit/adapters/binance/**"
-  - "tests/integration/sources/test_volumes_live.py"
+  - "tests/integration/sources/test_volumes_recorded.py"
 ---
 
 # Adapter in uscita: Binance
@@ -18,5 +18,5 @@ paths:
   solo dati grezzi.
 - `composition.py` espone `binance_adapters()`, che crea il proprio client `httpx` sull'indirizzo dei dati di mercato;
   `configuration.py` la dataclass privata `_BinanceSettings` con indirizzo e timeout.
-- Prova contro l'endpoint vero: `tests/integration/sources/test_volumes_live.py` (marker `integration`, nella
-  pipeline a ogni PR).
+- Prova su risposte vere registrate: `tests/integration/sources/test_volumes_recorded.py` (marker `integration`, nella
+  pipeline a ogni PR; ADR fonti-provate-su-risposte-registrate).

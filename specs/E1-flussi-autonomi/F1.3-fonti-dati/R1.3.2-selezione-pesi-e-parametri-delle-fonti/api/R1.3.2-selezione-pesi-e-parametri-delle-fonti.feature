@@ -29,3 +29,8 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
       | peso 0 per la fonte "indicatori"         | peso fuori da 1-10: indicatori                               |
       | peso 11 per la fonte "indicatori"        | peso fuori da 1-10: indicatori                               |
       | numero notizie 51 per la fonte "notizie" | parametro fuori dai valori ammessi: numero notizie, da 1 a 50 |
+
+  Scenario: Fonti, pesi e parametri modificati creano una nuova versione
+    Quando "anna" modifica il flusso "alfa" con peso 8 per la fonte "indicatori"
+    Allora il flusso "alfa" ha la versione di configurazione 2 con la fonte "indicatori" di peso 8
+    E la versione 1 del flusso "alfa" resta consultabile senza fonti

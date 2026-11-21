@@ -30,3 +30,15 @@ Funzionalità: R1.3.1 Catalogo delle fonti dati
       | parametro       | predefinito | ammessi       |
       | numero notizie  | 10          | da 1 a 50     |
       | età massima ore | 24          | da 1 a 168    |
+
+  Scenario: Una fonte aggiunta compare nel catalogo ed è selezionabile
+    Dato che la piattaforma aggiunge la fonte "volumi" con l'adapter "Binance"
+    Quando "anna" consulta il catalogo delle fonti
+    Allora il catalogo contiene la fonte "volumi" con l'adapter "Binance"
+    E "anna" può creare un flusso con la fonte "volumi"
+
+  Scenario: Una fonte ritirata scompare dal catalogo
+    Dato che la piattaforma ritira la fonte "sentiment"
+    Quando "anna" consulta il catalogo delle fonti
+    Allora il catalogo non contiene la fonte "sentiment"
+    E la creazione di un flusso di "anna" con la fonte "sentiment" è rifiutata con il motivo "fonte non disponibile: sentiment"

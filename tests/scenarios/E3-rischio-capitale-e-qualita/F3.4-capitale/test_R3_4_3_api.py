@@ -17,11 +17,13 @@ from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsC
 from autotrading.application.flows.rank_flows import RankFlowsCommand
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityCommand
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
+from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsCommand
 from autotrading.domain.flows.capital_history import CapitalHistoryEntry
 from autotrading.domain.flows.equity_snapshot import FlowEquity
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_statistics import FlowStatistics
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.italian_text import money_text
@@ -55,7 +57,10 @@ class Returns:
     ranking: tuple[FlowRanking, ...] = ()
     curve: FlowEquity | None = None
     curve_changes: tuple[CapitalHistoryEntry, ...] = ()
+    statistics: FlowStatistics | None = None
     currency: str = ""
+    summary_return: Decimal | None = None
+    state_return: Decimal | None = None
 
     @property
     def flow(self) -> Flow:
@@ -210,6 +215,16 @@ def ranking_and_cycle(returns: Returns, user: str, name: str) -> None:
     returns.ranking = use_cases.rank_flows.execute(RankFlowsCommand())
 
 
+@when(quoted('parte un ciclo di "{name}" e "{user}" apre le statistiche di "{again}" dall\'inizio'))
+def cycle_and_statistics(returns: Returns, name: str, user: str, again: str) -> None:
+    assert (user, name, again) == (returns.user, returns.name, returns.name)
+    # The cycle records the equity of now, the last value of the period: the user reads it from then on.
+    returns.flow_cycles.run(name, NEXT_CYCLE)
+    returns.flow_cycles.platform.now = returns.flow_cycles.clock.now()
+    use_cases = returns.flow_cycles.platform.use_cases_of(user)
+    returns.statistics = use_cases.read_flow_statistics.execute(ReadFlowStatisticsCommand(returns.flow.id.value))
+
+
 @when(quoted('"{user}" apre l\'equity curve di "{name}"'))
 def open_curve(returns: Returns, user: str, name: str) -> None:
     assert (user, name) == (returns.user, returns.name)
@@ -221,6 +236,29 @@ def open_curve(returns: Returns, user: str, name: str) -> None:
     window = TimeWindow(min(instants), max(instants) + timedelta(seconds=1))
     page = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(returns.flow.id, window=window))
     returns.curve_changes, returns.currency = page.entries, page.currency
+
+
+@when(quoted('"{user}" apre il riepilogo dei suoi flussi'))
+def open_summary(returns: Returns, user: str) -> None:
+    assert user == returns.user
+    use_cases = returns.flow_cycles.platform.use_cases_of(user)
+    overviews = use_cases.list_flow_overviews.execute(ListFlowOverviewsCommand())
+    (overview,) = [each for each in overviews if each.summary.name == returns.name]
+    assert overview.capital is not None
+    returns.summary_return = overview.capital.percent
+    returns.state_return = returns.results().total_gain_percent
+
+
+@then(quoted('il riepilogo di "{name}" mostra il rendimento {percent}%'))
+def summary_return(returns: Returns, name: str, percent: str) -> None:
+    assert name == returns.name
+    assert returns.summary_return == number(percent)
+
+
+@then(quoted('lo stato di "{name}" mostra il rendimento {percent}%'))
+def state_return(returns: Returns, name: str, percent: str) -> None:
+    assert name == returns.name
+    assert returns.state_return == number(percent)
 
 
 @then(quoted('il rendimento di "{name}" è {percent}%'))
@@ -256,3 +294,10 @@ def change_on_curve(returns: Returns, label: str) -> None:
     ]
     assert marks == [(returns.moved_at, label)]
     assert at(STARTED) < marks[0][0] < at(NEXT_CYCLE)
+
+
+@then(quoted('le statistiche di "{name}" mostrano il rendimento {percent}%'))
+def statistics_return(returns: Returns, name: str, percent: str) -> None:
+    assert name == returns.name
+    assert returns.statistics is not None
+    assert returns.statistics.return_percent == number(percent)

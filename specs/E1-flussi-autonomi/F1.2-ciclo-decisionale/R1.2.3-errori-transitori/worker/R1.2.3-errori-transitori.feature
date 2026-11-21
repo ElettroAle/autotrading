@@ -22,7 +22,7 @@ Funzionalità: R1.2.3 Ciclo fallito per un errore transitorio
   Schema dello scenario: Ciclo fallito senza ordini
     Dato che <sistema> non risponde durante il passo "<passo>" del ciclo del flusso "alfa"
     Quando il flusso "alfa" esegue un ciclo
-    Allora il ciclo è registrato come fallito al passo "<passo>" con il messaggio originale
+    Allora il ciclo è registrato come fallito al passo "<passo>" con il tipo di errore e il messaggio originale
     E il ciclo non invia ordini all'exchange
     E il flusso "alfa" è nello stato "attivo"
 

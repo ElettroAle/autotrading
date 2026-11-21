@@ -2,7 +2,12 @@ import { createBdd, defineParameterType, test as base } from 'playwright-bdd';
 
 import type { FakeSource, FakeSourceParameter } from '@/testing/mocks/catalogs';
 import type { FakeCycle } from '@/testing/mocks/cycles';
-import { fakePlatform, type FakeFlowHistory, type FakeVersion } from '@/testing/mocks/platform';
+import {
+  fakePlatform,
+  type FakeEquityPoint,
+  type FakeFlowHistory,
+  type FakeVersion,
+} from '@/testing/mocks/platform';
 import type { FakeSourceTrial } from '@/testing/mocks/source-trials';
 
 import { BrowserRestart } from './browser-restart';
@@ -28,6 +33,8 @@ export type ScenarioMemory = {
   /** The cycle the user chose, whose detail the page should show. */
   chosenCycle: FakeCycle | undefined;
   histories: Map<string, FakeFlowHistory>;
+  /** The equity the cycles of a flow recorded, by the name of the flow, waiting for the flow like its history (R2.2.6). */
+  equities: Map<string, FakeEquityPoint[]>;
   described: DescribedFlow | undefined;
   compared: number[];
   freeCapital: number | undefined;
@@ -103,6 +110,7 @@ export const test = base.extend<Fixtures>({
       cycles: [],
       chosenCycle: undefined,
       histories: new Map(),
+      equities: new Map(),
       described: undefined,
       compared: [],
       freeCapital: undefined,

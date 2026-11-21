@@ -2679,8 +2679,9 @@ export interface components {
         };
         /**
          * FlowStatisticsResponse
-         * @description The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate in percent with two
-         *     decimals, null when nothing is available (ADR 0122).
+         * @description The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate and return of the period
+         *     in percent with two decimals, null when nothing is available (ADR 0122, ADR
+         *     rendimento-del-periodo-nelle-statistiche).
          */
         FlowStatisticsResponse: {
             /** Won */
@@ -2701,6 +2702,8 @@ export interface components {
             model_cost_usd: string;
             /** Model Calls Without Cost */
             model_calls_without_cost: number;
+            /** Return Percent */
+            return_percent: string | null;
         };
         /**
          * ForecastAccuracyResponse

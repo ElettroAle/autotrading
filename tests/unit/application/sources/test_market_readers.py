@@ -9,9 +9,10 @@ from autotrading.application.sources.errors import AssetRequiredError
 from autotrading.application.sources.ports import SourceRequest
 from autotrading.application.sources.read_indicators import ReadIndicatorsUseCase, text_of
 from autotrading.application.sources.read_pivots import ReadPivotsUseCase
-from autotrading.domain.sources.errors import InsufficientHistoryError
+from autotrading.domain.sources.errors import InsufficientHistoryError, TimeframeNotAvailableError
 from autotrading.domain.sources.extended_indicators import ExtendedIndicatorChoice, fibonacci_levels
 from autotrading.domain.sources.indicator_series import WARM_UP
+from autotrading.domain.sources.long_trend import DAILY_CANDLES, DAILY_TIMEFRAME, long_trend
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe
 from tests.fakes.market_data import DEFAULT_CLOSES, FakeMarketDataAdapter
@@ -117,6 +118,46 @@ def test_a_long_history_shorter_than_the_candles_asked_is_declared() -> None:
 
     assert value.values["lungo.nota_storico"] == "storico di 60 candele, meno delle 100 richieste"
     assert value.values["lungo.candele_estese"] == "60"
+
+
+def test_without_the_long_trend_no_daily_candle_is_read() -> None:
+    market = FakeMarketDataAdapter()
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(tendenza_lunga=0))
+
+    assert [request[1] for request in market.requests] == ["15m", "4h"]
+    assert not [key for key in value.values if key.startswith("tendenza.")]
+
+
+def test_the_long_trend_reads_the_daily_candles_of_the_same_market() -> None:
+    market = FakeMarketDataAdapter()
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(tendenza_lunga=1))
+
+    daily = market.candles("BTC", DAILY_TIMEFRAME, DAILY_CANDLES, NOW)
+    change = long_trend(daily)["tendenza.variazione_30g"]
+    assert isinstance(change, Decimal)
+    assert ("BTC", "1d", 61) in market.requests
+    assert value.values["tendenza.variazione_30g"] == text_of(change)
+    assert value.values["tendenza.ultima_chiusura_istante"] == "2026-11-12T00:00:00+00:00"
+    assert value.reference_at == datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
+
+
+def test_a_short_daily_history_declares_its_missing_values() -> None:
+    market = FakeMarketDataAdapter(closes={("BTC", "1d"): DEFAULT_CLOSES[:20]})
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(tendenza_lunga=1))
+
+    assert value.values["tendenza.dati_mancanti"] == (
+        "variazione_30g, variazione_60g, massimo_20g, minimo_20g: storico di 20 giorni chiusi"
+    )
+
+
+def test_a_market_without_daily_candles_cannot_give_the_long_trend() -> None:
+    market = FakeMarketDataAdapter(published=(Timeframe(15), Timeframe(240)))
+
+    with pytest.raises(TimeframeNotAvailableError):
+        ReadIndicatorsUseCase(market, 15).execute(extended(tendenza_lunga=1))
 
 
 @pytest.mark.parametrize(

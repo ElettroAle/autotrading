@@ -234,3 +234,34 @@ Then("l'impaginazione su più colonne resta", async ({ dashboard }) => {
   expect(label.x + label.width).toBeLessThanOrEqual(value.x);
   expect(Math.abs(label.y - value.y)).toBeLessThanOrEqual(1);
 });
+
+Given(
+  'che il flusso {string} è su un conto della rete di test {string}',
+  ({ memory }, flow: string, networkName: string) => {
+    fakePlatform.configureExchangeNetwork('test', networkName);
+    flowOfScenario(memory, flow);
+  },
+);
+
+Then(
+  "l'avviso della rete nomina {string} tra virgolette senza ripetere la parola",
+  async ({ dashboard }, networkName: string) => {
+    const notice = dashboard.page.getByRole('note');
+    await expect(notice).toHaveText(
+      `Il flusso opererà sulla rete di test "${networkName}", senza denaro reale`,
+    );
+    await expect(notice).not.toContainText(`test ${networkName}`);
+  },
+);
+
+When("l'utente apre l'elenco dei suoi flussi", async ({ dashboard, memory }) => {
+  flowOfScenario(memory);
+  await openSignedIn(dashboard, memory, () => dashboard.open());
+  await expect(dashboard.flows().getByRole('listitem')).toHaveCount(1);
+});
+
+Then("l'elenco non ha la legenda degli esiti dei cicli recenti", async ({ dashboard }) => {
+  await dashboard.waitUntilRead();
+  await expect(dashboard.page.getByRole('list', { name: 'Legenda degli esiti' })).toHaveCount(0);
+  await expect(dashboard.page.getByRole('list', { name: 'Legenda' })).toHaveCount(0);
+});

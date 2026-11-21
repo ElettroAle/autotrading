@@ -44,3 +44,9 @@ Funzionalità: R1.3.4 Fonte pivot point
     Quando il flusso "alfa" esegue un ciclo
     Allora il contesto indica per "BTC" nessuna resistenza sopra il prezzo
     E il contesto indica per "BTC" il supporto più vicino R2 a distanza 4%
+
+  Scenario: Prezzo sotto l'ultimo supporto
+    Dato che il prezzo corrente di "BTC" è 64
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il contesto indica per "BTC" nessun supporto sotto il prezzo
+    E il contesto indica per "BTC" la resistenza più vicina S2 a distanza 25%

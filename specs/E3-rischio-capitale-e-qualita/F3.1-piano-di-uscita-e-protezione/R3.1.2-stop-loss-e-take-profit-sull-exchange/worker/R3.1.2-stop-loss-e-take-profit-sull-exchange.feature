@@ -84,3 +84,8 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
     Dato che "alfa" ha una posizione long su "BTC" con prezzo d'ingresso 60000 e nessun ordine di stop loss sull'exchange
     Quando parte il ciclo successivo di "alfa"
     Allora sull'exchange c'è un ordine di stop loss a 57000 sull'intera posizione di "alfa" su "BTC"
+
+  Scenario: La modifica dei predefiniti vale per le aperture successive
+    Dato che "anna" ha impostato lo stop loss predefinito di "alfa" a 3%
+    Quando "alfa" apre long su "BTC" al prezzo d'ingresso 60000 senza piano di uscita
+    Allora sull'exchange c'è un ordine di stop loss a 58200 sull'intera posizione di "alfa" su "BTC"

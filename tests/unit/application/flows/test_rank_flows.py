@@ -129,6 +129,8 @@ def test_the_return_of_a_flow_is_compounded_across_the_changes_of_its_capital(pl
     (row,) = platform.use_case().execute(RankFlowsCommand())
 
     assert row.return_percent == Decimal("15.50")
+    # ADR rendimento-del-periodo-nelle-statistiche: the statistics of the row show the same return.
+    assert row.statistics.return_percent == Decimal("15.50")
 
 
 def test_the_ranking_leaves_out_the_archived_flows(platform: Platform) -> None:

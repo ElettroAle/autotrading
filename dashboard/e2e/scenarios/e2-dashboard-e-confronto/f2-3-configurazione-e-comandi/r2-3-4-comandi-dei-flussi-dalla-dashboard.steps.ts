@@ -174,3 +174,48 @@ Then('vede i comandi {string} e {string}', async ({ dashboard }, first: string, 
 Then('non vede il comando {string}', async ({ dashboard }, command: string) => {
   await expect(dashboard.flowCommand(command)).toHaveCount(0);
 });
+
+const ARCHIVE_CONFIRMATION = "Conferma dell'archiviazione";
+
+Given(
+  'che {string} ha anche il flusso {string} fermo',
+  async ({ memory }, account: string, flow: string) => {
+    expectSignedIn(memory, account);
+    fakePlatform.giveFlowTo(account, flow);
+    fakePlatform.changeFlow(flow, { status: 'fermo' });
+  },
+);
+
+// Archivia stands in the zone of danger of the settings of the flow, behind the gear (Bug 560).
+When(
+  "{string} chiede l'archiviazione del flusso {string}",
+  async ({ dashboard, memory }, account: string, flow: string) => {
+    expectSignedIn(memory, account);
+    memory.flow = flow;
+    await openFlow(dashboard, flow);
+    await dashboard.settingsGear().click();
+    await dashboard.zone('Zona pericolosa').getByRole('button', { name: 'Archivia' }).click();
+  },
+);
+
+Then(
+  'la conferma dice che un flusso fermo non ha posizioni aperte da gestire',
+  async ({ dashboard }) => {
+    await expect(dashboard.confirmation(ARCHIVE_CONFIRMATION)).toContainText(
+      'Un flusso fermo non ha posizioni aperte da gestire',
+    );
+  },
+);
+
+Then(
+  'dopo la conferma il flusso {string} non è più tra i flussi in uso',
+  async ({ dashboard }, flow: string) => {
+    await dashboard
+      .confirmation(ARCHIVE_CONFIRMATION)
+      .getByRole('button', { name: "Conferma l'archiviazione" })
+      .click();
+    await expect(dashboard.pageHeading()).toHaveText('I tuoi flussi');
+    await expect(dashboard.flows().getByRole('link', { name: flow, exact: true })).toHaveCount(0);
+    expect(fakePlatform.flowNamed(flow).status).toBe('archiviato');
+  },
+);

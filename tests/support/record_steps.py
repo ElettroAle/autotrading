@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Callable, Iterator, Mapping
+from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
@@ -98,6 +99,14 @@ def flow_with_recorded_cycles(records: Records, user: str, flow: str, count: str
     # The flow started with its first recorded cycle, and the user consults it within the interval of the last one.
     records.platform.flows.anchors[FlowId(flow_id)] = at(instant) - (int(count) - 1) * timedelta(minutes=15)
     records.platform.now = at(instant) + timedelta(minutes=1)
+
+
+@given(quoted('che il flusso "{flow}" usa la fonte "{source}", che non risponde'))
+def source_silent(records: Records, flow: str, source: str) -> None:
+    flow_cycles = records.flow_cycles
+    selections = flow_cycles.selections((source,))
+    flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, sources=selections))
+    flow_cycles.news.reachable = False
 
 
 @given("che il fornitore IA non risponde")
@@ -449,6 +458,8 @@ def _element_holds(
 ) -> bool:
     if element.startswith("versione di configurazione "):
         return flow["versione"] == int(element.rpartition(" ")[2])
+    if element.startswith("fornitore IA "):
+        return flow["fornitore"] == element.rpartition(" ")[2]
     if element.startswith("modello "):
         return flow["modello"] == element.partition(" ")[2]
     if element.startswith("ordine su "):
@@ -525,3 +536,18 @@ def flow_in_overview(records: Records, flow: str, status: str, last: str, follow
 @then(quoted('l\'elenco non contiene il flusso "{flow}"'))
 def flow_not_in_overview(records: Records, flow: str) -> None:
     assert flow not in [overview.summary.name for overview in overviews(records)]
+
+
+@then(quoted('il ciclo registrato contiene la fonte "{source}" come assente, con il motivo'))
+def source_absent_in_record(records: Records, source: str) -> None:
+    absent = recorded(records).absent_sources
+    assert [item.source for item in absent] == [source]
+    assert all(item.reason for item in absent)
+
+
+@then(quoted('il ciclo registrato non contiene le credenziali del conto del flusso "{flow}"'))
+def record_without_credentials(records: Records, flow: str) -> None:
+    secrets = [value for value in records.flow_cycles.credentials_of(flow).values.values() if value]
+    written = repr(recorded(records))
+    assert secrets
+    assert [secret for secret in secrets if secret in written] == []
