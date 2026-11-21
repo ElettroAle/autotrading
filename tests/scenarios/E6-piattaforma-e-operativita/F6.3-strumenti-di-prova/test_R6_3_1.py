@@ -4,7 +4,6 @@ build of the dashboard (ADR pagina-fonti-con-la-prova); here being on the page i
 trial without an asset named takes the first asset the exchange trades, as the page proposes it.
 """
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
 
@@ -12,12 +11,10 @@ import pytest
 from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.sources.configure_source_adapter import ConfigureSourceAdapterCommand
-from autotrading.application.sources.errors import SourceCredentialsRejectedError
 from autotrading.application.sources.request_source_trial import RequestSourceTrialCommand
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.source_trial import SourceTrial, TrialOutcome
 from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
@@ -36,25 +33,6 @@ OUT_OF_RANGE = 51
 KEY_OF_ANNA = "K-LUNAR-ANNA"
 
 
-class CredentialsRefusedAnswer(Exception):  # noqa: N818 - the error the library of the provider raises, not a project error
-    """What the client of a provider raises when it refuses the credentials: the code the base error reads in the
-    cause (ADR permanenza-decisa-dall-errore-base).
-    """
-
-    status_code = 401
-
-
-@dataclass
-class FakeRefusingSentimentAdapter(FakeSentimentAdapter):
-    """A paid adapter of the sentiment whose provider answers its refusal with its code, as a real client does."""
-
-    def read_index(self, credentials: Mapping[str, str]) -> SentimentIndex:
-        if not self.rejects_credentials:
-            return super().read_index(credentials)
-        self.received.append(credentials)
-        raise SourceCredentialsRejectedError(self.name) from CredentialsRefusedAnswer()
-
-
 @dataclass
 class Page:
     """The page Fonti of a user: the sources it lists and the last trial, or the refusal that stopped it."""
@@ -64,7 +42,7 @@ class Page:
     trial: SourceTrial | None = None
     refusal: AutotradingError | None = None
     flows: dict[str, Flow] = field(default_factory=dict)
-    paid: FakeRefusingSentimentAdapter | None = None
+    paid: FakeSentimentAdapter | None = None
 
     @property
     def tried(self) -> SourceTrial:
@@ -127,7 +105,7 @@ def flow_with_source(platform: Platform, page: Page, user: str, name: str, sourc
 
 @given(quoted('che "{user}" ha configurato la chiave dell\'adapter "{adapter}" della fonte "{source}"'))
 def paid_adapter_configured(platform: Platform, page: Page, user: str, adapter: str, source: str) -> None:
-    page.paid = FakeRefusingSentimentAdapter(adapter, configuration_fields=(API_KEY,))
+    page.paid = FakeSentimentAdapter(adapter, configuration_fields=(API_KEY,))
     systems = platform.source_systems
     platform.source_systems = replace(systems, sentiments=(*systems.sentiments, page.paid))
     command = ConfigureSourceAdapterCommand(adapter, {API_KEY.name: KEY_OF_ANNA})
