@@ -9,7 +9,7 @@ from gherkin.token_scanner import TokenScanner
 
 from tools.errors import PipelineError
 
-EXCLUDED_TAGS = frozenset({"@wip", "@pipeline"})
+EXCLUDED_TAGS = frozenset({"@pipeline"})
 
 
 class InvalidFeatureError(PipelineError):

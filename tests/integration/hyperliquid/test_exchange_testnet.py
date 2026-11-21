@@ -1,12 +1,6 @@
-"""The Hyperliquid adapter against the testnet: run by hand once the testnet account and its API wallet exist.
-
-HYPERLIQUID_TESTNET_CREDENTIALS_FILE names a JSON file readable only by the person running the test, with
-"account_address" and "secret_key" of an API wallet approved for that account.
+"""The Hyperliquid adapter against the testnet: the roles of the addresses are public, the account value needs the
+credentials of the testnet account (tests.support.testnet_credentials).
 """
-
-import json
-import os
-from pathlib import Path
 
 import pytest
 from eth_account import Account as EthereumAccount
@@ -22,8 +16,9 @@ from autotrading.adapters.outbound.hyperliquid.exchange import (
 from autotrading.application.accounts.errors import ExchangeRejectedCredentialsError
 from autotrading.domain.accounts.credentials import Credentials
 from tests.support.credentials import hyperliquid_credentials
+from tests.support.testnet_credentials import read_testnet_credentials
 
-pytestmark = pytest.mark.testnet
+pytestmark = pytest.mark.integration
 
 # Public addresses of the testnet: an account that holds funds, and an API wallet it no longer approves (Bug 399).
 ACCOUNT = "0x9679d13e410167f3c8531533491552e2b3c87499"
@@ -32,13 +27,12 @@ REVOKED_AGENT_ADDRESS = "0xadaaf16d81cd1be30faa06ac9637c3df0e77f577"
 
 @pytest.fixture
 def credentials() -> Credentials:
-    location = os.environ.get("HYPERLIQUID_TESTNET_CREDENTIALS_FILE")
-    if not location:
-        pytest.skip("HYPERLIQUID_TESTNET_CREDENTIALS_FILE not set")
-    document = json.loads(Path(location).read_text(encoding="utf-8"))
+    document = read_testnet_credentials()
     return hyperliquid_credentials(document["account_address"], document["secret_key"])
 
 
+# Out of the pipeline until the secret with the credentials of the testnet exists (Bug 643).
+@pytest.mark.testnet_credentials
 def test_approved_credentials_read_the_account_value(credentials: Credentials) -> None:
     balance = HyperliquidTestnetExchangeAdapter().read_state(credentials).balance
 
@@ -46,6 +40,7 @@ def test_approved_credentials_read_the_account_value(credentials: Credentials) -
     assert balance.amount >= 0
 
 
+@pytest.mark.testnet_credentials
 def test_a_wallet_not_approved_for_the_account_is_rejected_by_the_exchange(credentials: Credentials) -> None:
     stranger = hyperliquid_credentials(credentials.value("account_address"), EthereumAccount.create().key.hex())
 

@@ -27,7 +27,7 @@ const testDir = defineBddConfig({
   ],
   featuresRoot: '../specs',
   steps: ['e2e/support/fixtures.ts', 'e2e/support/**/*.steps.ts', 'e2e/scenarios/**/*.steps.ts'],
-  tags: 'not @wip and not @pipeline',
+  tags: 'not @pipeline',
   // A scenario of what the worker does (the equity a cycle records) has no step here: pytest-bdd runs it on the use
   // cases, and the coverage of the scenarios reads both reports (ADR 0116).
   missingSteps: 'skip-scenario',

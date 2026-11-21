@@ -31,14 +31,22 @@ tests/
 - **Scenari**: un modulo per file `.feature`, che lo lega con `scenarios(...)`; `bdd_features_base_dir`
   punta a `specs/`. Eseguiti sui casi d'uso costruiti con gli adapter finti. Ogni `Allora` e ogni `E`
   ha una propria asserzione.
-- **Tag degli scenari**: `@wip` (User Story non ancora consegnata) e `@pipeline` (provato da una
-  run reale della pipeline) diventano marker pytest e sono esclusi dalla suite di default e dalla
-  copertura degli scenari; gli altri tag (`@R0.5.1`) sono tracciabilità e non diventano marker
-  (`tests/scenarios/conftest.py`). Consegnare una User Story significa togliere `@wip`.
-- **Integrazione**: marker `integration`. PostgreSQL in container. Hyperliquid solo con il
-  marker `testnet`, fuori dalla suite di default.
-- **Test architetturale**: fa parte della suite di default; un contratto rotto o una regola dei
-  layer violata è un test rosso. Le regole vivono in `tests/support/architecture.py`.
+- **Tag degli scenari**: solo `@pipeline` (provato da una run reale della pipeline) diventa marker
+  pytest ed è escluso dalla suite e dalla copertura degli scenari; gli altri tag (`@R0.5.1`) sono
+  tracciabilità e non diventano marker (`tests/scenarios/conftest.py`). `@wip` non esiste: un requisito
+  non pianificato non ha il `.feature` in `specs/`, i suoi criteri stanno sulla board.
+- **Integrazione**: marker `integration`, per ogni adapter contro la tecnologia vera: PostgreSQL in
+  container, testnet Hyperliquid, fornitori IA con una chiave inventata, fonti contro i servizi veri.
+  Girano solo nella pipeline, a ogni PR; in locale `addopts` esclude `pipeline` e `integration` e si
+  eseguono i test mirati.
+- **Nessun test escluso o saltato** (ADR nessun-test-escluso-o-saltato): nessun `pytest.skip`,
+  `skipif`, `xfail`, `importorskip` né `mark.skip`; nei test della dashboard nessun `.skip`, `.todo`,
+  `.fixme` né `.only`. La pipeline (`.github/actions/pytest-run/action.yml`) esclude solo il marker
+  `pipeline`. Un test che vuole un file di credenziali lo legge e fallisce se manca. Unica eccezione
+  nota il marker `testnet_credentials` dei test che mandano ordini sulla testnet, voci di
+  `known_violations.py` col Bug 643 finché il segreto delle credenziali non esiste.
+- **Test architetturale**: fa parte della suite di default; un contratto rotto, una regola dei
+  layer violata o un test escluso è un test rosso. Le regole vivono in `tests/support/architecture.py`.
 - **Adapter finti**: implementano la porta per intero, sono deterministici e vivono solo in
   `tests/fakes/`. Mai mock generici al posto di un finto quando la porta è del progetto.
 - **Rosso prima del verde**: ogni prova si osserva fallire per il motivo giusto prima di passare.

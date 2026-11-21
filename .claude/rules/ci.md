@@ -43,3 +43,6 @@ Decisioni in `docs/adr/0001`-`0013`, `0084`, `0113` e `0114`. Requisiti in `spec
 - `tools/` contiene gli script Python della pipeline: fuori dall'esagono, stessi principi di codice,
   unit test in `tests/unit/tools/`. Ogni errore discende da `tools.errors.PipelineError`.
 - Workflow validati con actionlint prima del commit.
+- Il job `test` esegue ogni test scritto, integrazione contro sistemi veri compresa: il comando di pytest esclude
+  solo il marker `pipeline` (più `testnet_credentials` fino al Bug 643), nessun test si salta (ADR
+  nessun-test-escluso-o-saltato, regola verificata in `tests/architecture/`).

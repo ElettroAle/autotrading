@@ -45,5 +45,5 @@ paths:
   usano i prezzi del catalogo.
 - `composition.py` espone `litellm_adapters()`; `configuration.py` la dataclass privata `_LiteLlmSettings` (fornitori
   abilitati, oggi `anthropic`, `deepseek`, `openai`, e tempo di attesa). Abilitare un fornitore è un nome lì.
-- Test di integrazione `-m providers`: la libreria chiama ogni fornitore abilitato con una chiave inventata, che il
-  fornitore rifiuta, nessuna spesa.
+- Test di integrazione (marker `integration`, nella pipeline a ogni PR): la libreria chiama ogni fornitore abilitato
+  con una chiave inventata, che il fornitore rifiuta, nessuna spesa.

@@ -1,5 +1,5 @@
 name: scenario-coverage
-description: Ogni scenario di specs/ non marcato @wip o @pipeline deve essere eseguito e superato.
+description: Ogni scenario di specs/ non marcato @pipeline deve essere eseguito e superato.
 runs:
   using: composite
   steps:

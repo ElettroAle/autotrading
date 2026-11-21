@@ -1,4 +1,4 @@
-"""The RSS news adapter against the real feeds of the three outlets: run by hand with -m sources."""
+"""The RSS news adapter against the real feeds of the three outlets."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -7,7 +7,7 @@ import pytest
 
 from autotrading.adapters.outbound.rss.news import NEWS_FEEDS, RssNewsAdapter
 
-pytestmark = pytest.mark.sources
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("url", NEWS_FEEDS)

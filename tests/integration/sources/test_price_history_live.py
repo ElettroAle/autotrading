@@ -1,5 +1,4 @@
-"""The price history adapter against the public candles of the Hyperliquid testnet, without credentials: run by hand
-with -m sources."""
+"""The price history adapter against the public candles of the Hyperliquid testnet, without credentials."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -8,7 +7,7 @@ import pytest
 from autotrading.adapters.outbound.hyperliquid.market_data import HyperliquidPriceHistoryAdapter
 from autotrading.domain.sources.price_forecast import history_of
 
-pytestmark = pytest.mark.sources
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.parametrize("days", [1, 7, 90])

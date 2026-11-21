@@ -43,10 +43,17 @@ def test_expected_scenarios_count_outline_rows_and_skip_pipeline(tmp_path: Path)
     ]
 
 
-def test_feature_tagged_wip_expects_nothing(tmp_path: Path) -> None:
-    write(tmp_path, "a.feature", FEATURE.replace("@R9.9.9", "@R9.9.9 @wip"))
+def test_feature_tagged_pipeline_expects_nothing(tmp_path: Path) -> None:
+    write(tmp_path, "a.feature", FEATURE.replace("@R9.9.9", "@R9.9.9 @pipeline"))
 
     assert expected_scenarios(tmp_path) == []
+
+
+def test_a_tag_other_than_pipeline_excludes_no_scenario(tmp_path: Path) -> None:
+    # ADR nessun-test-escluso-o-saltato: @wip no longer leaves a scenario out of the coverage.
+    write(tmp_path, "a.feature", FEATURE.replace("@R9.9.9", "@R9.9.9 @wip"))
+
+    assert len(expected_scenarios(tmp_path)) == 2
 
 
 def test_invalid_feature_raises_typed_error_with_path(tmp_path: Path) -> None:

@@ -23,6 +23,11 @@ def access(platform: Platform, name: str, accesses: dict[str, list[TenantId]]) -
     accesses.setdefault(name, []).append(platform.tenant_of(name))
 
 
+@given(quoted('che la persona "{name}" ha il ruolo "{role}" e non è mai entrata'))
+def never_entered(platform: Platform, name: str, role: str) -> None:
+    platform.directory.person(name).roles.add(role)
+
+
 @given(quoted('che "{name}" ha un tenant'))
 def has_tenant(platform: Platform, accesses: dict[str, list[TenantId]], name: str) -> None:
     access(platform, name, accesses)
@@ -38,6 +43,11 @@ def has_tenant_with_account(platform: Platform, accesses: dict[str, list[TenantI
 @given(quoted('che nella directory il nome visualizzato di "{name}" cambia in "{display_name}"'))
 def display_name_changes(platform: Platform, name: str, display_name: str) -> None:
     platform.directory.person(name).display_name = display_name
+
+
+@when(quoted('"{name}" accede alla piattaforma'))
+def accesses_first(platform: Platform, accesses: dict[str, list[TenantId]], name: str) -> None:
+    access(platform, name, accesses)
 
 
 @when(quoted('"{name}" accede di nuovo alla piattaforma'))
@@ -62,3 +72,21 @@ def no_second_tenant(platform: Platform, accesses: dict[str, list[TenantId]], na
 def tenant_holds_account(platform: Platform, accesses: dict[str, list[TenantId]], name: str, account: str) -> None:
     (tenant_id,) = set(accesses[name])
     assert account in [saved.name.value for saved in platform.accounts.of(tenant_id)]
+
+
+@then(quoted('la piattaforma crea un tenant intestato ad "{name}"'))
+def tenant_founded(platform: Platform, accesses: dict[str, list[TenantId]], name: str) -> None:
+    owned = [tenant.id for tenant in platform.tenants.tenants if tenant.owner == platform.user_id_of(name)]
+    assert owned == accesses[name]
+
+
+@then(quoted('il tenant di "{name}" non contiene conti'))
+def tenant_without_accounts(platform: Platform, accesses: dict[str, list[TenantId]], name: str) -> None:
+    (tenant_id,) = accesses[name]
+    assert platform.accounts.of(tenant_id) == []
+
+
+@then(quoted('il tenant di "{name}" non contiene flussi'))
+def tenant_without_flows(platform: Platform, accesses: dict[str, list[TenantId]], name: str) -> None:
+    (tenant_id,) = accesses[name]
+    assert platform.flows.of(tenant_id) == []

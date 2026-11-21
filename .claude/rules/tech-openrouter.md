@@ -33,4 +33,5 @@ paths:
   30 secondi (R1.4.9, ADR ritentativo-del-modello-nel-ciclo, ADR tentativi-del-modello-registrati-nel-ciclo).
 - `composition.py` espone `openrouter_adapters()`; `configuration.py` la dataclass privata `_OpenRouterSettings` (solo
   il tempo di attesa: nessun indirizzo né chiave della piattaforma).
-- Test di integrazione `-m providers`: elenco pubblico vero e chiave inventata rifiutata, nessuna spesa.
+- Test di integrazione (marker `integration`, nella pipeline a ogni PR): elenco pubblico vero e chiave inventata
+  rifiutata, nessuna spesa.

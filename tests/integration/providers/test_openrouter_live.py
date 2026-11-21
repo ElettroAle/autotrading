@@ -8,7 +8,7 @@ from autotrading.domain.agent.agent_context import MessageRole, ModelMessage
 from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from tests.support.provider_key import api_key_of
 
-pytestmark = pytest.mark.providers
+pytestmark = pytest.mark.integration
 
 MADE_UP_KEY = api_key_of("sk-or-v1-made-up-key-for-autotrading-tests")
 MESSAGES = (ModelMessage(MessageRole.SYSTEM, "Rispondi {}"), ModelMessage(MessageRole.USER, "{}"))
