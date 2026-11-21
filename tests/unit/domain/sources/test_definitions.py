@@ -14,11 +14,17 @@ def ranges(parameters: tuple[SourceParameter, ...]) -> list[tuple[object, ...]]:
     return [(p.key, p.label, p.default, p.minimum, p.maximum) for p in parameters]
 
 
-def test_the_indicators_are_per_asset_with_the_length_of_their_series_and_the_extended_indicators() -> None:
+def test_the_indicators_are_per_asset_with_the_length_of_their_series_the_extended_indicators_and_the_long_trend() -> (
+    None
+):
     assert (INDICATORS.name, INDICATORS.per_asset, ranges(INDICATORS.parameters)) == (
         "indicatori",
         True,
-        [("lunghezza_serie", "lunghezza serie", 10, 1, 50), *ranges(EXTENDED_PARAMETERS)],
+        [
+            ("lunghezza_serie", "lunghezza serie", 10, 1, 50),
+            *ranges(EXTENDED_PARAMETERS),
+            ("tendenza_lunga", "tendenza lunga", 0, 0, 1),
+        ],
     )
 
 
