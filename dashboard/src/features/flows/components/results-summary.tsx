@@ -86,15 +86,42 @@ type ResultsSummaryProps = {
   readonly summary: Summary;
   // Only the page of the flow gives it: the card of the list says it among its details (R2.2.2).
   readonly nextCycleAt?: string | null;
+  // An archived flow will never run a cycle again: its page says so with a dash (Bug 690).
+  readonly archived?: boolean;
+};
+
+const NextCycle = ({ at, archived }: { at: string | null | undefined; archived: boolean }) => {
+  if (archived) {
+    return (
+      <Value term="Prossima esecuzione prevista" className="text-slate-900">
+        —
+      </Value>
+    );
+  }
+  if (at === undefined || at === null) {
+    return null;
+  }
+  return (
+    <Value term="Prossima esecuzione prevista" className="text-slate-900">
+      {formatInstant(at)}
+    </Value>
+  );
 };
 
 /**
  * How the flow is doing at a glance: the gain read now and the one of the period, open positions and failed cycles, two
  * columns on a phone and four on a wide screen (R6.4.2, ADR riepilogo-dei-risultati-nella-dashboard, ADR
  * nomi-e-istanti-dei-guadagni), then when the next cycle falls, if the flow plans one (R6.4.8, ADR
- * prossima-esecuzione-nel-riepilogo-del-flusso).
+ * prossima-esecuzione-nel-riepilogo-del-flusso), a dash for an archived flow (ADR
+ * pagina-del-flusso-archiviato-in-sola-lettura).
  */
-export const ResultsSummary = ({ flowId, currency, summary, nextCycleAt }: ResultsSummaryProps) => {
+export const ResultsSummary = ({
+  flowId,
+  currency,
+  summary,
+  nextCycleAt,
+  archived = false,
+}: ResultsSummaryProps) => {
   const periodSearch = usePeriodSearch();
   return (
     <section aria-label="Riepilogo dei risultati">
@@ -117,11 +144,7 @@ export const ResultsSummary = ({ flowId, currency, summary, nextCycleAt }: Resul
           </Link>
         </Value>
         <FailedCycles flowId={flowId} count={summary.failed_cycles} />
-        {nextCycleAt !== undefined && nextCycleAt !== null && (
-          <Value term="Prossima esecuzione prevista" className="text-slate-900">
-            {formatInstant(nextCycleAt)}
-          </Value>
-        )}
+        <NextCycle at={nextCycleAt} archived={archived} />
       </dl>
     </section>
   );

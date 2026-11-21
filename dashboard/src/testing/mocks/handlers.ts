@@ -773,4 +773,8 @@ export const handlers = [
       HttpResponse.json(closedPositionPage(fakePlatform.closedPositionsOf(flow.id), request)),
     ),
   ),
+  // After every fixed path under the flows, as on the API: an archived flow answers too, the list leaves it out (Bug 690).
+  http.get('*/flows/:flowId', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) => HttpResponse.json(flowResponse(flow))),
+  ),
 ];

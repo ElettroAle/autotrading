@@ -257,9 +257,34 @@ describe('FlowView', () => {
     );
   });
 
+  // Bug 690, ADR pagina-del-flusso-archiviato-in-sola-lettura: the address of an archived flow opens its page in read
+  // only, although the list of the flows leaves it out.
+  it('opens the page of an archived flow with its status, its tabs and no command', async () => {
+    fakePlatform.changeFlow('alfa', { status: 'archiviato' });
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'alfa' })).toBeInTheDocument();
+    const head = screen.getByRole('region', { name: 'alfa' });
+    expect(head).toHaveTextContent('Stato: archiviato');
+    expect(within(head).queryAllByRole('button')).toEqual([]);
+    expect(within(head).queryAllByRole('link')).toEqual([]);
+    expect(screen.getByRole('navigation', { name: 'Dati del flusso' })).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText('Prossima esecuzione prevista', { exact: true }),
+    ).toHaveTextContent('—');
+  });
+
+  it('says the flow is not found when the API finds none with its id', async () => {
+    await renderApp({ account: 'anna', url: '/flows/flow-ghost' });
+
+    expect(await screen.findByText('Flusso non trovato.')).toBeInTheDocument();
+  });
+
   it('tells why the flow could not be read', async () => {
     server.use(
-      http.get('*/flows', () => HttpResponse.json({ detail: 'errore interno' }, { status: 500 })),
+      http.get('*/flows/:flowId', () =>
+        HttpResponse.json({ detail: 'errore interno' }, { status: 500 }),
+      ),
     );
     await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
 

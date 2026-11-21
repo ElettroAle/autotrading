@@ -50,3 +50,29 @@ Then('non vede {string}', async ({ dashboard }, term: string) => {
   await expect(dashboard.result('Guadagno attuale')).toBeVisible();
   await expect(dashboard.result(term)).toHaveCount(0);
 });
+
+// Bug 690, ADR pagina-del-flusso-archiviato-in-sola-lettura: the page of an archived flow opens in read only, from its
+// address, with its status, no next cycle and no command.
+Given('che il flusso {string} è archiviato', async ({}, flow: string) => {
+  fakePlatform.changeFlow(flow, { status: 'archiviato' });
+});
+
+Then(
+  'il flusso {string} mostra lo stato {string}',
+  async ({ dashboard }, flow: string, status: string) => {
+    await expect(dashboard.page.getByRole('region', { name: flow, exact: true })).toContainText(
+      `Stato: ${status}`,
+    );
+  },
+);
+
+Then('vede {string} con {string}', async ({ dashboard }, term: string, value: string) => {
+  await expect(dashboard.result(term)).toHaveText(value);
+});
+
+Then('non vede alcun comando del flusso', async ({ dashboard, memory }) => {
+  const head = dashboard.page.getByRole('region', { name: memory.flow, exact: true });
+  await expect(head).toBeVisible();
+  await expect(head.getByRole('button')).toHaveCount(0);
+  await expect(head.getByRole('link')).toHaveCount(0);
+});

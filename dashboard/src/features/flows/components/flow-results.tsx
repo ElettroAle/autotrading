@@ -6,7 +6,9 @@ import { useFlowResults } from '../api/get-flow-results';
 
 import { ResultsSummary } from './results-summary';
 
-const Results = ({ flowId, period }: { flowId: string; period: Period }) => {
+type ResultsProps = { readonly flowId: string; readonly archived: boolean };
+
+const Results = ({ flowId, archived, period }: ResultsProps & { readonly period: Period }) => {
   const results = useFlowResults(flowId, period);
   if (results.isPending) {
     return <Loading />;
@@ -21,16 +23,17 @@ const Results = ({ flowId, period }: { flowId: string; period: Period }) => {
       currency={results.data.currency}
       summary={results.data.summary}
       nextCycleAt={results.data.summary.next_cycle_at}
+      archived={archived}
     />
   );
 };
 
 /** The summary of the results at the top of the page of the flow, in the period of the page, with the next cycle (R6.4.2,
  * R6.4.8). */
-export const FlowResults = ({ flowId }: { flowId: string }) => {
+export const FlowResults = ({ flowId, archived }: ResultsProps) => {
   const [period] = usePeriod();
   if (!isComplete(period)) {
     return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
-  return <Results flowId={flowId} period={period} />;
+  return <Results flowId={flowId} archived={archived} period={period} />;
 };
