@@ -10,7 +10,7 @@ Funzionalità: R3.5.4 Notifiche leggibili con icone e stato del flusso
   in ogni notifica di un flusso. L'email usa lo stesso contenuto (oggetto dal titolo). Le notifiche non legate a un
   flusso (prova, allarmi del conto) hanno icona e titolo senza lo stato del flusso.
   Icone: 🟢 posizione aperta, ✅ chiusa in profitto, 🔻 chiusa in perdita, 🛑 stop loss, 🎯 take profit, ⚠️ ciclo
-  fallito, ⏸️ flusso in pausa, ▶️ ripreso, ⏹️ fermato, 🚨 allarme. Gli eventi sono quelli di R1.8.2 e R3.5.1.
+  fallito, ⏸️ flusso in pausa, 🚨 allarme. Gli eventi sono quelli di R1.8.2 e R3.5.1.
 
   Contesto:
     Dato che "anna" ha la chat Telegram collegata
