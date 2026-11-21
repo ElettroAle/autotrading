@@ -75,12 +75,11 @@ Funzionalità: R3.2.2 Perdita massima del flusso
     Quando "anna" riduce di 200 USDC il capitale allocato di "alfa" e un ciclo legge il valore 800 USDC
     Allora le aperture di "alfa" non sono sospese
 
-<<<<<<< HEAD
   Scenario: Un incasso dei profitti non è una perdita
     Dato che il valore più alto raggiunto da "alfa" è 1150 USDC
     Quando "anna" incassa i 150 USDC di profitti di "alfa" e un ciclo legge il valore 1000 USDC
     Allora le aperture di "alfa" non sono sospese
-=======
+
   Scenario: Un aumento del capitale non è un guadagno
     Dato che alle 00:00 UTC di oggi il valore di "alfa" era 1000 USDC
     Quando "anna" aumenta di 200 USDC il capitale allocato di "alfa" e un ciclo legge il valore 1128 USDC
@@ -91,4 +90,3 @@ Funzionalità: R3.2.2 Perdita massima del flusso
     E che "alfa" ha una posizione aperta su "BTC"
     Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" a 99
     Allora "alfa" aggiorna il piano di uscita della posizione su "BTC"
->>>>>>> origin/main
