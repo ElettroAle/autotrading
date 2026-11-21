@@ -2,7 +2,7 @@
 paths:
   - "src/autotrading/adapters/outbound/rss/**"
   - "tests/unit/adapters/rss/**"
-  - "tests/integration/sources/test_news_live.py"
+  - "tests/integration/sources/test_news_recorded.py"
 ---
 
 # Adapter in uscita: feed RSS

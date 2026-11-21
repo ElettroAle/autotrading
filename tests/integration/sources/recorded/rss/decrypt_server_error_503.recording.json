@@ -1,0 +1,10 @@
+{
+  "origin": "composed: an RSS feed has no error format; only the status is translated",
+  "recorded_at": "2026-11-21T20:09:09Z",
+  "method": "GET",
+  "url": "https://decrypt.co/feed",
+  "request_body": null,
+  "status": 503,
+  "content_type": "text/plain",
+  "answer": "decrypt_server_error_503.txt"
+}
