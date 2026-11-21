@@ -203,7 +203,7 @@ class FlowCycles:
     def ports_of(self, tenant_id: TenantId) -> TenantCyclePorts:
         platform = self.platform
         accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
-        opener = FakeCredentialOpenerAdapter(platform.vault)
+        opener = FakeCredentialOpenerAdapter(platform.vault, platform.openings)
         access = OpenTradingAccessUseCase(accounts, opener)
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
@@ -330,7 +330,7 @@ class FlowCycles:
             model_gateways={
                 "models": FakeModelGatewayAdapter(InMemoryModelCatalogAdapter(self.platform.model_catalog), self.model)
             },
-            provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault),
+            provider_key_opener=FakeProviderKeyOpenerAdapter(self.platform.key_vault, self.platform.openings),
             pause=self.pause,
             sources=self.systems(),
             source_secrets_opener=FakeSourceSecretsOpenerAdapter(self.platform.source_vault),

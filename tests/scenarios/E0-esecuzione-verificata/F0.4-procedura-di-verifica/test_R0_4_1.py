@@ -21,8 +21,7 @@ from autotrading.domain.verification.verification_run import VerificationRun
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.opening_steps import *  # noqa: F403 - the steps of the register of the openings, shared by the features
-from tests.support.opening_steps import SealedPlatform
-from tests.support.platform import HYPERLIQUID, STARTED_AT, registration
+from tests.support.platform import HYPERLIQUID, STARTED_AT, Platform, registration
 from tests.support.steps import quoted
 
 scenarios("E0-esecuzione-verificata/F0.4-procedura-di-verifica/R0.4.1-procedura-di-verifica-dell-esecuzione.feature")
@@ -34,7 +33,7 @@ EXCHANGE_REFUSAL = "Insufficient margin to place order. asset=0"
 class Session:
     """The platform behind its API, as a user reaches it with a token of the identity provider."""
 
-    platform: SealedPlatform = field(default_factory=SealedPlatform)
+    platform: Platform = field(default_factory=Platform)
     identity_provider: IdentityProvider = field(default_factory=IdentityProvider)
     credentials: dict[str, Credentials] = field(default_factory=dict)
     response: httpx2.Response | None = None
@@ -80,7 +79,7 @@ def session() -> Session:
 
 
 @pytest.fixture
-def platform(session: Session) -> SealedPlatform:
+def platform(session: Session) -> Platform:
     return session.platform
 
 

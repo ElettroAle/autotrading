@@ -8,9 +8,7 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
-from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
-from autotrading.application.accounts.ports import CredentialSealerPort
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.close_flow_positions import ClosingPorts
@@ -163,6 +161,7 @@ from tests.support.directory import Directory
 from tests.support.mail_servers import MailServers
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.notifications import notification_inbox, notification_routes
+from tests.support.openings import OpeningRegister
 from tests.support.procedure_orders import procedure_orders
 from tests.support.source_selections import platform_systems
 
@@ -184,6 +183,7 @@ class Platform:
     inbox: InboxStore
     key_vault: ProviderKeyVault
     source_vault: SourceSecretsVault
+    issued: list[Credentials]
 
     def __init__(self) -> None:
         self.directory = Directory()
@@ -244,8 +244,14 @@ class Platform:
         # The readings of the accounts and the alarms on their balance, as the cycles of the worker leave them.
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.forecasts: dict[TenantId, InMemoryForecastRepositoryAdapter] = {}
-        # The cycles the worker runs on request, with its clock: none until a scenario composes them (FlowCycles).
-        self.worker_clock = FakeClockAdapter(STARTED_AT)
+        # The cycles the worker runs on request, with its clock: none until a scenario composes them (FlowCycles). The
+        # openings of credentials and keys the worker records, at the instant of its clock, which the register reads
+        # without moving it (Bug 179); and the credentials the exchange issued, which the register never holds.
+        self.worker_clock, self.openings, self.issued = (
+            FakeClockAdapter(STARTED_AT),
+            OpeningRegister(lambda: self.worker_clock.current),
+            [],
+        )
         self.cycle_run_of: Callable[[TenantId], CycleRun] = no_cycle_run_of
         # The emergency closings of every tenant, as their record keeps them (R3.2.3).
         self.emergency_closings: list[EmergencyClosing] = []
@@ -273,6 +279,7 @@ class Platform:
     def accepted_credentials(self) -> Credentials:
         credentials = new_credentials()
         self.hyperliquid.accept(credentials)
+        self.issued.append(credentials)
         return credentials
 
     def register_account(self, user: str, command: RegisterAccountCommand) -> AccountRegistration:
@@ -534,12 +541,14 @@ class Platform:
     def use_cases_of(self, user: str) -> TenantUseCases:
         return self.for_tenant(self.tenant_of(user))
 
-    def sealer_of(self, tenant_id: TenantId) -> CredentialSealerPort:
+    def sealer_of(self, tenant_id: TenantId) -> FakeCredentialSealerAdapter:
         return FakeCredentialSealerAdapter(tenant_id, self.vault)
 
-    def credential_opener(self) -> FakeCredentialOpenerAdapter | SodiumCredentialOpenerAdapter:
-        """What the worker opens the credentials of the accounts with: the fake opener of the fake sealer."""
-        return FakeCredentialOpenerAdapter(self.vault)
+    def credential_opener(self) -> FakeCredentialOpenerAdapter:
+        """What the worker opens the credentials of the accounts with: the fake opener of the fake sealer, writing the
+        register of the openings on the clock of the worker (Bug 179).
+        """
+        return FakeCredentialOpenerAdapter(self.vault, self.openings)
 
     def uses_credentials(self, account: Account, credentials: Credentials) -> bool:
         """The fake seal is deterministic: sealing the same credentials again gives the saved text."""

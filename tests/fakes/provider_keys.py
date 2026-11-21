@@ -16,6 +16,7 @@ from autotrading.domain.agent.provider_name import ProviderName
 from autotrading.domain.agent.registered_provider_key import RegisteredProviderKey
 from autotrading.domain.agent.sealed_provider_key import SealedProviderKey
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.support.openings import OpeningRegister
 
 KEY_VERSION = 1
 
@@ -119,13 +120,20 @@ class FakeProviderKeyUsageAdapter:
 
 
 class FakeProviderKeyOpenerAdapter:
-    """Recovers from the vault what the private key would: only a key sealed for its own tenant and provider."""
+    """Recovers from the vault what the private key would: only a key sealed for its own tenant and provider. Every
+    opening, opened or refused, goes in the register as the opener of the worker writes it (Bug 179).
+    """
 
-    def __init__(self, vault: ProviderKeyVault) -> None:
+    def __init__(self, vault: ProviderKeyVault, register: OpeningRegister | None = None) -> None:
         self._vault = vault
+        self.register = OpeningRegister() if register is None else register
 
     def open(self, key: RegisteredProviderKey) -> ProviderKey:
         tenant_id, provider, secret = self._vault.get(key.sealed.ciphertext, (None, None, None))
-        if (tenant_id, provider) != (key.tenant_id, key.provider) or secret is None:
+        opened = (tenant_id, provider) == (key.tenant_id, key.provider) and secret is not None
+        self.register.record(
+            "modello", f"chiave {key.provider.value}", key.tenant_id, key.sealed.key_version, opened=opened
+        )
+        if not opened or secret is None:
             raise ProviderKeyNotOpenedError(key.provider)
         return secret
