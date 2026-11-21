@@ -7,11 +7,14 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsCommand
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_statistics import FlowStatistics
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.tenancy.user_id import UserId
 from tests.support.flows import a_flow
 from tests.support.platform import Platform
 from tests.support.steps import quoted
@@ -43,9 +46,20 @@ class ClosedTrade:
 
 
 @dataclass
+class CashOut:
+    """Profits the user cashed out of the flow: how much, when, and what the flow was worth just before."""
+
+    amount: Decimal
+    age: timedelta
+    value_before: Decimal
+
+
+@dataclass
 class FlowHistory:
     trades: list[ClosedTrade] = field(default_factory=list)
     model_cost: Decimal = Decimal(0)
+    values: dict[timedelta, Decimal] = field(default_factory=dict)
+    cash_outs: list[CashOut] = field(default_factory=list)
 
 
 @dataclass
@@ -53,6 +67,7 @@ class Statistics:
     platform: Platform = field(default_factory=Platform)
     histories: dict[str, FlowHistory] = field(default_factory=dict)
     seen: FlowStatistics | None = None
+    user_of_cash_outs: str = ""
 
     def history_of(self, flow: str) -> FlowHistory:
         return self.histories.setdefault(flow, FlowHistory())
@@ -76,7 +91,33 @@ class Statistics:
         cost = CallCost(1000, 100, history.model_cost)
         planned_at = self.platform.now - LONG_AGO
         self.platform.cycles.record(CycleRecord(created.id.value, planned_at, CycleOutcome.COMPLETED, cost=cost))
+        self._record_values(created, history)
         return created
+
+    def _record_values(self, flow: Flow, history: FlowHistory) -> None:
+        """The value every cycle recorded, and the cash-outs of the user with the value of the flow before each."""
+        equity = self.platform.equity_snapshots.snapshots
+        zero = Decimal(0)
+        for age, value in history.values.items():
+            planned_at = self.platform.now - age
+            snapshot = EquitySnapshot(flow.id.value, planned_at, value, zero, zero, zero, zero)
+            equity[flow.tenant_id, flow.id.value, planned_at] = snapshot
+        capital = flow.configuration.assigned_capital
+        changes = self.platform.flows.capital_changes.setdefault(flow.id, [])
+        for cash_out in history.cash_outs:
+            changes.append(
+                CapitalChange(
+                    flow.id,
+                    self.platform.now - cash_out.age,
+                    capital,
+                    capital,
+                    UserId(self.user_of_cash_outs),
+                    CapitalChangeReason.CASH_OUT,
+                    cash_out.amount,
+                    value_before=cash_out.value_before,
+                    cashed_profit=cash_out.amount,
+                )
+            )
 
     def _position(self, flow: Flow, trade: ClosedTrade) -> ClosedPosition:
         closed_at = self.platform.now - trade.age
@@ -135,6 +176,29 @@ def even_position(statistics: Statistics, flow: str, result: str) -> None:
 @given(quoted('che il flusso "{flow}" non ha posizioni chiuse'))
 def no_positions(statistics: Statistics, flow: str) -> None:
     statistics.history_of(flow)
+
+
+@given(
+    quoted('che il flusso "{flow}" valeva {first} USDC {first_days} giorni fa e {second} USDC {second_days} giorni fa')
+)
+def values_in_the_past(
+    statistics: Statistics, *, flow: str, first: str, first_days: str, second: str, second_days: str
+) -> None:
+    values = statistics.history_of(flow).values
+    values[timedelta(days=int(first_days))] = amount(first)
+    values[timedelta(days=int(second_days))] = amount(second)
+
+
+@given(quoted('che "{user}" ha incassato {cashed} USDC da "{flow}" {days} giorni fa, quando valeva {value} USDC'))
+def cashed_out(statistics: Statistics, *, user: str, cashed: str, flow: str, days: str, value: str) -> None:
+    statistics.user_of_cash_outs = user
+    cash_out = CashOut(amount(cashed), timedelta(days=int(days)), amount(value))
+    statistics.history_of(flow).cash_outs.append(cash_out)
+
+
+@given(quoted('che il flusso "{flow}" vale ora {value} USDC'))
+def value_now(statistics: Statistics, flow: str, value: str) -> None:
+    statistics.history_of(flow).values[timedelta(0)] = amount(value)
 
 
 @when(quoted('"{user}" apre le statistiche del flusso "{flow}"'))
@@ -200,3 +264,8 @@ def sees_no_operations(statistics: Statistics, operations: str) -> None:
     seen = statistics.statistics()
     assert seen.operations == int(operations)
     assert seen.win_rate_percent is None
+
+
+@then(parsers.re(r"^vede il rendimento (?P<percent>-?[\d,]+)%$"))
+def sees_the_return(statistics: Statistics, percent: str) -> None:
+    assert statistics.statistics().return_percent == amount(percent)

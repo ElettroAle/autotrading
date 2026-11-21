@@ -13,7 +13,7 @@ When(
       fakePlatform.addUser(account, { hasUserRole: true });
     }
     for (const [name, history] of memory.histories) {
-      fakePlatform.addFlow(account, name, { history });
+      fakePlatform.addFlow(account, name, { history, equity: memory.equities.get(name) ?? [] });
     }
     const [historyFlow] = [...memory.histories.keys()];
     if (memory.periodPage === '') {

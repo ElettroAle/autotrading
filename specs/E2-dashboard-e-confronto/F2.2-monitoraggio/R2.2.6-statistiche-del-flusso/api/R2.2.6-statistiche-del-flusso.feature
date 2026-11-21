@@ -9,8 +9,10 @@ Funzionalità: R2.2.6 Statistiche del flusso
   intervallo libero; R6.4.6, R6.4.7) la dashboard mostra: operazioni vinte e perse, win rate, PnL medio delle vincenti
   e delle perdenti, commissioni totali, numero di operazioni, costo del modello IA (RF-23.05). Un'operazione è una posizione chiusa nel periodo:
   vinta con PnL netto positivo, persa con PnL netto negativo; con PnL netto nullo non è né vinta né persa,
-  conta nel numero di operazioni ma non nel win rate, che è vinte su vinte più perse. Disponibile dalla
-  dashboard e dall'interfaccia programmatica.
+  conta nel numero di operazioni ma non nel win rate, che è vinte su vinte più perse. Mostra anche il rendimento del
+  periodo: dal valore all'inizio del periodo, o all'avvio se dopo, al valore alla fine, composto tra le variazioni di
+  capitale nel periodo come in R3.4.3; con «Dall'inizio» è quello del riepilogo, senza valori nel periodo non è
+  disponibile. Disponibile dalla dashboard e dall'interfaccia programmatica.
 
   Fuori ambito: il drawdown, che sta nella classifica (R2.4.2).
 
@@ -36,3 +38,10 @@ Funzionalità: R2.2.6 Statistiche del flusso
     Dato che il flusso "beta" non ha posizioni chiuse
     Quando "anna" apre le statistiche del flusso "beta"
     Allora vede 0 operazioni e win rate "non disponibile"
+
+  Scenario: Rendimento del periodo con un incasso
+    Dato che il flusso "alfa" valeva 800 USDC 20 giorni fa e 1000 USDC 6 giorni fa
+    E che "anna" ha incassato 100 USDC da "alfa" 3 giorni fa, quando valeva 1100 USDC
+    E che il flusso "alfa" vale ora 1050 USDC
+    Quando "anna" sceglie il periodo "7 giorni"
+    Allora vede il rendimento 15,50%

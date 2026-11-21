@@ -105,6 +105,7 @@ describe('FlowStatistics', () => {
           total_fees: '0',
           model_cost_usd: '0.5',
           model_calls_without_cost: 2,
+          return_percent: null,
         }),
       ),
     );
@@ -113,6 +114,42 @@ describe('FlowStatistics', () => {
     expect(await valueOf('Costo del modello IA')).toHaveTextContent(
       '0,50 USD (2 chiamate senza costo noto)',
     );
+  });
+
+  // ADR rendimento-del-periodo-nelle-statistiche: the return of the period, coloured as gains and losses are.
+  it('shows the return of the period in green when the flow gained', async () => {
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
+    fakePlatform.recordEquity('alfa', daysAgo(20), 800);
+    fakePlatform.recordEquity('alfa', daysAgo(6), 1000);
+    fakePlatform.recordEquity('alfa', new Date(), 1155);
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa?period=7d' });
+
+    const shown = await valueOf('Rendimento');
+
+    await waitFor(() => expect(shown).toHaveTextContent('+15,50%'));
+    expect(shown).toHaveClass('text-green-700');
+  });
+
+  it('shows the return of the period in red when the flow lost', async () => {
+    fakePlatform.addFlow('anna', 'alfa', { history: ALFA });
+    fakePlatform.recordEquity('alfa', daysAgo(6), 1000);
+    fakePlatform.recordEquity('alfa', new Date(), 900);
+    await renderApp({ account: 'anna', url: '/flows/flow-alfa' });
+
+    const shown = await valueOf('Rendimento');
+
+    await waitFor(() => expect(shown).toHaveTextContent('-10,00%'));
+    expect(shown).toHaveClass('text-red-700');
+  });
+
+  it('says the return is not available without values in the period', async () => {
+    fakePlatform.addFlow('anna', 'beta');
+    await renderApp({ account: 'anna', url: '/flows/flow-beta' });
+
+    const shown = await valueOf('Rendimento');
+
+    expect(shown).toHaveTextContent('non disponibile');
+    expect(shown).toHaveClass('text-slate-700');
   });
 
   it('waits for both days of a range', async () => {
