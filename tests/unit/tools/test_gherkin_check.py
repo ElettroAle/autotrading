@@ -21,3 +21,11 @@ def test_invalid_file_is_reported_by_path(tmp_path: Path, capsys: pytest.Capture
 
     assert main([str(tmp_path)]) == 1
     assert "ko.feature" in capsys.readouterr().err
+
+
+def test_the_files_in_the_folders_of_the_systems_are_validated(tmp_path: Path) -> None:
+    system = tmp_path / "E9-x" / "F9.9-x" / "R9.9.9-x" / "dashboard"
+    system.mkdir(parents=True)
+    (system / "R9.9.9-x.feature").write_text(INVALID, encoding="utf-8")
+
+    assert len(invalid_features(tmp_path)) == 1
