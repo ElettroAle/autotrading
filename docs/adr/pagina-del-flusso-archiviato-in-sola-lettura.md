@@ -21,7 +21,7 @@ l'indirizzo di un flusso archiviato mostra «Flusso non trovato.», contro R6.4.
 - **API**: la lettura del singolo flusso del tenant restituisce anche un flusso archiviato, con il suo stato; l'elenco dei
   flussi resta invariato. Un flusso di un altro tenant resta non trovato.
 - **Dashboard**: la pagina del flusso legge il flusso con la lettura singola invece di cercarlo nell'elenco. Per un
-  archiviato mostra lo stato «archiviato», la prossima esecuzione «—», nessun comando, e le schede (storico, risultati,
+  archiviato mostra lo stato «archiviato», nessuna prossima esecuzione (come per il flusso fermo, narrativa di R6.4.8), nessun comando, e le schede (storico, risultati,
   decisioni) in sola lettura.
 
 ## Conseguenze
@@ -30,5 +30,5 @@ l'indirizzo di un flusso archiviato mostra «Flusso non trovato.», contro R6.4.
 
 ## Prove
 
-- Scenari in R6.4.8 (dashboard: la pagina dell'archiviato si apre senza comandi e con «—»; api: la lettura del flusso
+- Scenari in R6.4.8 (dashboard: la pagina dell'archiviato si apre senza comandi e senza la prossima esecuzione; api: la lettura del flusso
   archiviato restituisce lo stato «archiviato»). Unit test della pagina e della rotta.
