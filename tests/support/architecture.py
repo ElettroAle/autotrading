@@ -1,4 +1,5 @@
-"""Static rules on the source tree that keep the layers apart beyond what import-linter can see.
+"""Static rules on the source tree that keep the layers apart beyond what import-linter can see, and the rule that no
+test is skipped or left out of the pipeline.
 
 The rules admit no exception by name: the only tolerated violations are the known ones, each with its Bug, listed in
 tests/architecture/known_violations.py.
@@ -14,6 +15,8 @@ from enum import StrEnum
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / "src" / "autotrading"
+REPOSITORY_ROOT = SOURCE_ROOT.parents[1]
+SOURCE_PREFIX = "src/autotrading/"
 MODULE_SCOPE = "<modulo>"
 
 
@@ -40,6 +43,7 @@ class Rule(StrEnum):
     CONFIGURATION_THROUGH_SOURCE = "configurazione-solo-dalla-sorgente"
     SETTINGS_IN_THEIR_FOLDER = "impostazioni-nella-loro-cartella"
     BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS = "bootstrap-configura-solo-con-composizioni"
+    NO_EXCLUDED_TESTS = "nessun-test-escluso"
 
 
 REMEDIES = {
@@ -105,6 +109,11 @@ REMEDIES = {
     Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS: (
         "bootstrap.py crea la ConfigurationSource e la passa solo alle funzioni <tecnologia>_adapters delle "
         "cartelle adapter (ne legge al più environment()); nessun nome di variabile, nessun default"
+    ),
+    Rule.NO_EXCLUDED_TESTS: (
+        "ogni test scritto gira nella pipeline: niente pytest.skip, skipif, xfail, importorskip, niente .skip, .todo, "
+        ".fixme, .only nella dashboard, niente @wip nei .feature; la pipeline esclude solo il marker pipeline; un test "
+        "che vuole un file lo legge e fallisce se manca (ADR nessun-test-escluso-o-saltato)"
     ),
 }
 
@@ -236,6 +245,23 @@ SOURCE_READ_IN_BOOTSTRAP = "environment"
 COMPOSITION_SUFFIX = "_adapters"
 CONFIGURATION_NAME = re.compile(r"[A-Z][A-Z0-9]*(_[A-Z0-9]+)+")
 TYPE_IGNORE = re.compile(r"#\s*type:\s*ignore(?P<code>\[[^\]]+\])?(?P<rest>.*)")
+# The rule on the tests (ADR nessun-test-escluso-o-saltato): the files it reads, from the root of the repository.
+TESTS_FOLDER = "tests/"
+PIPELINE_TEST_RUN = ".github/actions/pytest-run/action.yml"
+DASHBOARD_TEST_FOLDERS = ("dashboard/src", "dashboard/e2e", "dashboard/architecture", "dashboard/server")
+DASHBOARD_TEST_SUFFIXES = frozenset({".ts", ".tsx"})
+PIPELINE_ONLY_MARKER = "pipeline"
+SKIPPING_NAMES = frozenset({"skip", "skipif", "xfail", "importorskip"})
+SKIPPING_OWNERS = frozenset({"pytest", "mark"})
+MARKERS_OWNERS = frozenset({"pytest.mark", "mark"})
+MODULE_MARKERS = "pytestmark"
+TEST_PREFIX = "test"
+TEST_CLASS_PREFIX = "Test"
+WORK_IN_PROGRESS_TAG = "@wip"
+MARKER_SELECTION = re.compile(r"(?<!\S)-m\s+[\"']([^\"']*)[\"']")
+EXCLUDED_MARKER = re.compile(r"\bnot\s+([A-Za-z_]\w*)")
+EXCLUDING_OPTION = re.compile(r"(?<!\S)(--ignore-glob|--ignore|--deselect|-k)(?=[\s=])")
+DASHBOARD_SKIP = re.compile(r"\b(?:it|test|describe|suite)(?:\.\w+)*?\.(skip|skipIf|runIf|todo|fixme|only)\b")
 SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 ANNOTATION_FIELDS = frozenset({"annotation", "returns"})
 
@@ -247,13 +273,14 @@ class Violation:
     symbol: str
     line: int
     detail: str
+    root: str = SOURCE_PREFIX
 
     @property
     def location(self) -> str:
         return f"{self.path}:{self.symbol}"
 
     def describe(self) -> str:
-        return f"src/autotrading/{self.path}:{self.line} [{self.rule}] {self.detail} -> {REMEDIES[self.rule]}"
+        return f"{self.root}{self.path}:{self.line} [{self.rule}] {self.detail} -> {REMEDIES[self.rule]}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -819,3 +846,133 @@ CHECKS: tuple[Callable[[SourceModule], Iterator[Violation]], ...] = (
     _settings_outside_their_folder,
     _configuration_in_bootstrap,
 )
+
+
+def violations_of_file(path: str, text: str, excluded_markers: frozenset[str] = frozenset()) -> list[Violation]:
+    """The violations of one file of the repository, by its path from the root; excluded_markers are the markers the
+    pipeline leaves out."""
+    if path.startswith(SOURCE_PREFIX) and path.endswith(".py"):
+        return violations_of(SourceModule.parse(path.removeprefix(SOURCE_PREFIX), text))
+    if path.startswith(TESTS_FOLDER) and path.endswith(".py"):
+        module = SourceModule.parse(path, text)
+        return [*_skipped_python_tests(module), *_tests_with_excluded_markers(module, excluded_markers)]
+    if path.endswith(".feature"):
+        return list(_work_in_progress_tags(path, text))
+    if path == PIPELINE_TEST_RUN:
+        return list(_pipeline_exclusions(path, text))
+    if path.startswith(DASHBOARD_TEST_FOLDERS) and Path(path).suffix in DASHBOARD_TEST_SUFFIXES:
+        return list(_skipped_dashboard_tests(path, text))
+    return []
+
+
+def repository_test_violations(root: Path = REPOSITORY_ROOT) -> list[Violation]:
+    """The violations of the rule on the tests in the whole repository (ADR nessun-test-escluso-o-saltato)."""
+    excluded = pipeline_excluded_markers((root / PIPELINE_TEST_RUN).read_text(encoding="utf-8"))
+    return [
+        violation
+        for path in _test_files(root)
+        for violation in violations_of_file(
+            path.relative_to(root).as_posix(), path.read_text(encoding="utf-8"), excluded
+        )
+    ]
+
+
+def pipeline_excluded_markers(action: str) -> frozenset[str]:
+    """The markers the pytest command of the pipeline leaves out with -m."""
+    return frozenset(
+        marker for selection in MARKER_SELECTION.findall(action) for marker in EXCLUDED_MARKER.findall(selection)
+    )
+
+
+def _test_files(root: Path) -> Iterator[Path]:
+    yield root / PIPELINE_TEST_RUN
+    yield from sorted((root / TESTS_FOLDER).rglob("*.py"))
+    yield from sorted((root / "specs").rglob("*.feature"))
+    for folder in DASHBOARD_TEST_FOLDERS:
+        yield from sorted(path for path in (root / folder).rglob("*") if path.suffix in DASHBOARD_TEST_SUFFIXES)
+
+
+def _test_violation(path: str, symbol: str, line: int, detail: str) -> Violation:
+    return Violation(Rule.NO_EXCLUDED_TESTS, path, symbol, line, detail, root="")
+
+
+def _leftmost_name(node: ast.expr) -> str | None:
+    while isinstance(node, ast.Attribute | ast.Call):
+        node = node.value if isinstance(node, ast.Attribute) else node.func
+    return node.id if isinstance(node, ast.Name) else None
+
+
+def _skipping_name(node: ast.AST) -> str | None:
+    if isinstance(node, ast.Attribute) and node.attr in SKIPPING_NAMES and _leftmost_name(node) in SKIPPING_OWNERS:
+        return ast.unparse(node)
+    if isinstance(node, ast.ImportFrom) and node.module in {"pytest", "pytest.mark"}:
+        skipping = [alias.name for alias in node.names if alias.name in SKIPPING_NAMES]
+        return f"from {node.module} import {', '.join(skipping)}" if skipping else None
+    return None
+
+
+def _skipped_python_tests(module: SourceModule) -> Iterator[Violation]:
+    for scoped in _scoped_nodes(module):
+        name = _skipping_name(scoped.node)
+        if name:
+            yield _test_violation(module.path, scoped.symbol, _line_of(scoped.node), f"{name} in {scoped.symbol}")
+
+
+def _markers_in(nodes: Iterable[ast.AST]) -> set[str]:
+    return {
+        node.attr
+        for root in nodes
+        for node in ast.walk(root)
+        if isinstance(node, ast.Attribute) and ast.unparse(node.value) in MARKERS_OWNERS
+    }
+
+
+def _assigned_markers(body: list[ast.stmt]) -> set[str]:
+    return _markers_in(
+        statement.value
+        for statement in body
+        if isinstance(statement, ast.Assign | ast.AnnAssign)
+        and statement.value is not None
+        and MODULE_MARKERS in _assigned_names(statement)
+    )
+
+
+def _test_functions(tree: ast.Module) -> Iterator[tuple[str, ast.FunctionDef | ast.AsyncFunctionDef, set[str]]]:
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name.startswith(TEST_PREFIX):
+            yield node.name, node, set()
+        if isinstance(node, ast.ClassDef) and node.name.startswith(TEST_CLASS_PREFIX):
+            inherited = _markers_in(node.decorator_list) | _assigned_markers(node.body)
+            for method in node.body:
+                if isinstance(method, ast.FunctionDef | ast.AsyncFunctionDef) and method.name.startswith(TEST_PREFIX):
+                    yield f"{node.name}.{method.name}", method, inherited
+
+
+def _tests_with_excluded_markers(module: SourceModule, excluded_markers: frozenset[str]) -> Iterator[Violation]:
+    module_markers = _assigned_markers(module.tree.body)
+    for symbol, test, inherited in _test_functions(module.tree):
+        excluded = (module_markers | inherited | _markers_in(test.decorator_list)) & excluded_markers
+        if excluded:
+            detail = f"{symbol} con il marker {', '.join(sorted(excluded))} escluso dalla pipeline"
+            yield _test_violation(module.path, symbol, test.lineno, detail)
+
+
+def _work_in_progress_tags(path: str, text: str) -> Iterator[Violation]:
+    for number, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("@") and WORK_IN_PROGRESS_TAG in stripped.split():
+            yield _test_violation(path, f"riga {number}", number, f"tag {WORK_IN_PROGRESS_TAG}")
+
+
+def _pipeline_exclusions(path: str, text: str) -> Iterator[Violation]:
+    for number, line in enumerate(text.splitlines(), start=1):
+        for marker in sorted(pipeline_excluded_markers(line) - {PIPELINE_ONLY_MARKER}):
+            yield _test_violation(path, marker, number, f"la pipeline esclude il marker {marker}")
+        for option in EXCLUDING_OPTION.findall(line):
+            yield _test_violation(path, option, number, f"la pipeline esclude test con {option}")
+
+
+def _skipped_dashboard_tests(path: str, text: str) -> Iterator[Violation]:
+    for number, line in enumerate(text.splitlines(), start=1):
+        for skipping in DASHBOARD_SKIP.findall(line):
+            yield _test_violation(path, f"riga {number}", number, f".{skipping} alla riga {number}")

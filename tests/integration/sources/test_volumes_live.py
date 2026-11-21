@@ -1,12 +1,12 @@
-"""The Binance adapter of the volumes against the real public market data, without any key: run by hand with -m
-sources (ADR fonte-volumi-con-adapter-binance)."""
+"""The Binance adapter of the volumes against the real public market data, without any key (ADR
+fonte-volumi-con-adapter-binance)."""
 
 import pytest
 
 from autotrading.adapters.outbound.binance.composition import binance_adapters
 from autotrading.domain.sources.volume_snapshot import UnlistedAsset, VolumeSnapshot
 
-pytestmark = pytest.mark.sources
+pytestmark = pytest.mark.integration
 
 
 def test_the_market_data_give_the_volumes_and_the_book_of_a_listed_asset() -> None:

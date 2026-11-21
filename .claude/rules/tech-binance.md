@@ -18,4 +18,5 @@ paths:
   solo dati grezzi.
 - `composition.py` espone `binance_adapters()`, che crea il proprio client `httpx` sull'indirizzo dei dati di mercato;
   `configuration.py` la dataclass privata `_BinanceSettings` con indirizzo e timeout.
-- Prova contro l'endpoint vero: `tests/integration/sources/test_volumes_live.py` (marker `sources`).
+- Prova contro l'endpoint vero: `tests/integration/sources/test_volumes_live.py` (marker `integration`, nella
+  pipeline a ogni PR).

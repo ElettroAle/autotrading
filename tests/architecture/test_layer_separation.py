@@ -15,6 +15,7 @@ from tests.support.architecture import (
     folders_without_a_rule,
     indexed_technology_rules,
     paths_of_rule,
+    repository_test_violations,
     source_modules,
     technology_folders,
     violations_of,
@@ -27,7 +28,8 @@ RULES = SOURCE_ROOT.parents[1] / ".claude" / "rules"
 
 @pytest.fixture(scope="module")
 def violations() -> list[Violation]:
-    return [violation for module in source_modules() for violation in violations_of(module)]
+    sources = [violation for module in source_modules() for violation in violations_of(module)]
+    return [*sources, *repository_test_violations()]
 
 
 def _independent_modules() -> set[str]:

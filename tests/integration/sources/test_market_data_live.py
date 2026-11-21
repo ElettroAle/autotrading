@@ -1,5 +1,4 @@
-"""The market data adapter against the public info endpoint of the Hyperliquid testnet, without credentials: run by
-hand with -m sources."""
+"""The market data adapter against the public info endpoint of the Hyperliquid testnet, without credentials."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -8,7 +7,7 @@ import pytest
 from autotrading.adapters.outbound.hyperliquid.market_data import HyperliquidMarketDataAdapter
 from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe
 
-pytestmark = pytest.mark.sources
+pytestmark = pytest.mark.integration
 
 MARKET = HyperliquidMarketDataAdapter.for_network(testnet=True)
 

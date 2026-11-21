@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 import pytest
 
-SELECTION_TAGS = frozenset({"wip", "pipeline"})
+SELECTION_TAGS = frozenset({"pipeline"})
 
 
 def pytest_bdd_apply_tag(tag: str, function: Callable[..., object]) -> bool:

@@ -7,7 +7,6 @@ Funzionalità: R0.1.2 Tenant dell'utente creato al primo accesso
 
   Fuori ambito: eliminazione del tenant, trasferimento di un tenant ad altro utente, condivisione di tenant.
 
-  @wip
   Scenario: Al primo accesso nasce un tenant vuoto
     Dato che la persona "anna" ha il ruolo "Utente" e non è mai entrata
     Quando "anna" accede alla piattaforma

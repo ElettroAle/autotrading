@@ -10,7 +10,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import ACCOUNT_ADDRESS
 from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.statistics_period import TimeWindow
 
-pytestmark = pytest.mark.testnet
+pytestmark = pytest.mark.integration
 
 
 def test_a_fresh_address_has_an_empty_activity_in_usdc() -> None:

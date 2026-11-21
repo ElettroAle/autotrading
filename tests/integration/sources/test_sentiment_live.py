@@ -1,4 +1,4 @@
-"""Both Fear & Greed adapters against the real public endpoints, without any key: run by hand with -m sources."""
+"""Both Fear & Greed adapters against the real public endpoints, without any key."""
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -9,7 +9,7 @@ import pytest
 from autotrading.adapters.outbound.alternative_me.sentiment import AlternativeMeSentimentAdapter
 from autotrading.adapters.outbound.coinmarketcap.sentiment import CoinMarketCapSentimentAdapter
 
-pytestmark = pytest.mark.sources
+pytestmark = pytest.mark.integration
 
 # Both providers publish at least once a day.
 FRESHNESS = timedelta(days=2)

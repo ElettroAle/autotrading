@@ -184,6 +184,10 @@ regola ha eccezioni per nome**.
   `bootstrap.py` (eccezione per nome, anche nei contratti di import-linter); nessun costruttore riceve la
   `ConfigurationSource`; in `bootstrap.py` la sorgente va solo alle funzioni `*_adapters` (se ne legge al
   più `environment()`) e nessun testo ha la forma di un nome di variabile.
+- Nessun test escluso o saltato: nessun `pytest.skip`, `skipif`, `xfail`, `importorskip` né `mark.skip` nei test
+  Python, nessun `.skip`, `.todo`, `.fixme` né `.only` nei test della dashboard, nessun `@wip` nei `.feature`; la
+  pipeline esclude solo il marker `pipeline` e un test con un marker che la pipeline esclude è una violazione
+  (ADR nessun-test-escluso-o-saltato).
 
 Ogni regola ha un esempio che la viola e uno conforme. Le violazioni esistenti sono elencate per nome in
 `tests/architecture/known_violations.py`, ciascuna con il Bug che la elimina. L'elenco può solo
@@ -255,7 +259,9 @@ l'adapter. Dettagli in `.claude/rules/context-tenancy.md`.
 
 Unit test per ogni tipo di produzione, scenari Gherkin eseguiti sui casi d'uso con adapter finti,
 test di integrazione per ogni adapter contro la tecnologia vera, test architetturale. Ogni prova si
-vede rossa prima di diventare verde. Dettagli in `.claude/rules/tests.md`.
+vede rossa prima di diventare verde. Ogni test scritto gira nella pipeline a ogni PR e nessuno si salta: i test
+contro sistemi veri (testnet, fornitori IA, fonti) girano solo lì, in locale si eseguono i test mirati. Dettagli in
+`.claude/rules/tests.md`.
 
 ## Sicurezza (vincoli del proprietario)
 

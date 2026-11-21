@@ -1,16 +1,13 @@
-"""The protection adapter against the testnet: run by hand once the testnet account and its API wallet exist.
+"""The protection adapter against the testnet, with the credentials of the testnet account
+(tests.support.testnet_credentials).
 
 It opens the smallest BTC long, protects it with a stop loss and a take profit in the `positionTpsl` grouping, reads
 them back, cancels them and closes the position: the size sent with the grouping is verified on the exchange (ADR
-ordini-di-protezione-sull-exchange). HYPERLIQUID_TESTNET_CREDENTIALS_FILE names a JSON file readable only by the person
-running the test, with "account_address" and "secret_key" of an API wallet approved for that account.
+ordini-di-protezione-sull-exchange).
 """
 
-import json
-import os
 from collections.abc import Iterator
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
@@ -24,18 +21,16 @@ from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.orders.protection_order import ProtectionOrder
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.orders.trading_access import TradingAccess
+from tests.support.testnet_credentials import read_testnet_credentials
 
-pytestmark = pytest.mark.testnet
+pytestmark = pytest.mark.integration
 
 ASSET = "BTC"
 
 
 @pytest.fixture
 def access() -> TradingAccess:
-    location = os.environ.get("HYPERLIQUID_TESTNET_CREDENTIALS_FILE")
-    if not location:
-        pytest.skip("HYPERLIQUID_TESTNET_CREDENTIALS_FILE not set")
-    document = json.loads(Path(location).read_text(encoding="utf-8"))
+    document = read_testnet_credentials()
     return TradingAccess(
         TESTNET_EXCHANGE_NAME,
         {"account_address": document["account_address"], "secret_key": document["secret_key"]},
@@ -59,6 +54,8 @@ def opened(access: TradingAccess, orders: HyperliquidOrderExchangeAdapter) -> It
         orders.place_market_order(access, position.closing_order(Slippage.default()))
 
 
+# Out of the pipeline until the secret with the credentials of the testnet exists (Bug 643).
+@pytest.mark.testnet_credentials
 @pytest.mark.usefixtures("opened")
 def test_the_protections_of_the_whole_position_are_placed_read_and_cancelled(
     access: TradingAccess, orders: HyperliquidOrderExchangeAdapter
