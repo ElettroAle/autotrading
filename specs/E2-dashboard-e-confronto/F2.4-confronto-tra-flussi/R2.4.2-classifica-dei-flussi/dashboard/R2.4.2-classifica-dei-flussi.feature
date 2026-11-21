@@ -40,3 +40,24 @@ Funzionalità: R2.4.2 Classifica dei flussi
     Dato che il flusso "gamma" non ha cicli negli ultimi 7 giorni
     Quando "anna" sceglie il periodo "7 giorni"
     Allora la classifica non contiene "gamma"
+
+  Scenario: PnL, commissioni, win rate, operazioni e costo del modello nella classifica
+    Dato che "beta" ha chiuso posizioni con PnL netto +8 e -2 USDC, commissioni totali 1 USDC e costo del modello 0,40 USD
+    Quando "anna" apre la classifica
+    Allora la riga di "beta" nella classifica mostra:
+      | colonna              | valore   |
+      | PnL                  | +6 USDC  |
+      | Commissioni          | 1 USDC   |
+      | Win rate             | 50,00%   |
+      | Operazioni           | 2        |
+      | Costo del modello IA | 0,40 USD |
+
+  Schema dello scenario: Bozze e flussi archiviati fuori dalla classifica
+    Dato che "anna" ha il flusso "gamma" <stato> con equity per ciclo 100, 500 USDC
+    Quando "anna" apre la classifica
+    Allora la classifica non contiene "gamma"
+
+    Esempi:
+      | stato      |
+      | archiviato |
+      | in bozza   |

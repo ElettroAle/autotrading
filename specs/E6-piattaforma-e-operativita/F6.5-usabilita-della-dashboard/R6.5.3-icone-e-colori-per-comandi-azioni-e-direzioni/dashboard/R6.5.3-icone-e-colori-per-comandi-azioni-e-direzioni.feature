@@ -25,6 +25,7 @@ Funzionalità: R6.5.3 Icone e colori per comandi, azioni e direzioni
       | Pausa    | ambra  | pausa    |
       | Riprendi | verde  | play     |
       | Stop     | rosso  | quadrato |
+      | Avvia    | verde  | play     |
 
   Schema dello scenario: Direzioni e azioni con icona
     Quando "anna" guarda una decisione o una posizione con <valore>
@@ -38,6 +39,7 @@ Funzionalità: R6.5.3 Icone e colori per comandi, azioni e direzioni
       | chiudi   | x                |
       | mantieni | pausa            |
       | aggiorna | frecce circolari |
+      | inverti  | frecce opposte   |
 
   Scenario: Icone accessibili
     Quando un lettore di schermo legge un comando, un'azione o una direzione

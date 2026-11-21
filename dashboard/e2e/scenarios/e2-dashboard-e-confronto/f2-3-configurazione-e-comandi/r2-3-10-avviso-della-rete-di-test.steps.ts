@@ -122,3 +122,13 @@ Then("la pagina non mostra l'avviso della rete di test", async ({ dashboard }) =
   await expect(dashboard.flowName()).toBeVisible();
   await expect(dashboard.page.getByText(TEST_NETWORK_NOTICE)).toHaveCount(0);
 });
+
+// Yellow for the test network, red for real money: the same colours wherever the network matters (R2.3.10).
+Then(
+  'il segno della rete del conto {string} è {word}',
+  async ({ dashboard }, name: string, colour: string) => {
+    const tone = colour === 'giallo' ? /bg-yellow-/ : /bg-red-/;
+    expect(['giallo', 'rosso']).toContain(colour);
+    await expect(dashboard.accountNetwork(name)).toHaveClass(tone);
+  },
+);

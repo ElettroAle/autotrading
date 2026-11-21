@@ -50,3 +50,8 @@ Funzionalità: R3.4.3 Rendimento corretto dopo incassi e variazioni
     Dato che "anna" ha incassato 100 USDC da "alfa"
     Quando "anna" apre l'equity curve di "alfa"
     Allora la curva segna sull'istante dell'incasso "incasso, 100 USDC"
+  Scenario: Il riepilogo del flusso usa lo stesso rendimento
+    Dato che "anna" ha incassato 100 USDC da "alfa" quando valeva 1100 USDC e il valore di "alfa" è ora 1050 USDC
+    Quando "anna" apre il riepilogo dei suoi flussi
+    Allora il riepilogo di "alfa" mostra il rendimento 15,50%
+    E lo stato di "alfa" mostra il rendimento 15,50%

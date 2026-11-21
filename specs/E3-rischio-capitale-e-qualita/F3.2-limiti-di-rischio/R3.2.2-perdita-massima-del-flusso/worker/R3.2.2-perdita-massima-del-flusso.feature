@@ -74,3 +74,14 @@ Funzionalità: R3.2.2 Perdita massima del flusso
     Dato che alle 00:00 UTC di oggi il valore di "alfa" era 1000 USDC
     Quando "anna" riduce di 200 USDC il capitale allocato di "alfa" e un ciclo legge il valore 800 USDC
     Allora le aperture di "alfa" non sono sospese
+
+  Scenario: Un aumento del capitale non è un guadagno
+    Dato che alle 00:00 UTC di oggi il valore di "alfa" era 1000 USDC
+    Quando "anna" aumenta di 200 USDC il capitale allocato di "alfa" e un ciclo legge il valore 1128 USDC
+    Allora le aperture di "alfa" sono sospese con motivo "perdita giornaliera 6% oltre il 5%"
+
+  Scenario: Aggiornamento del piano deciso durante la sospensione
+    Dato che le aperture di "alfa" sono sospese per perdita massima
+    E che "alfa" ha una posizione aperta su "BTC"
+    Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" a 99
+    Allora "alfa" aggiorna il piano di uscita della posizione su "BTC"

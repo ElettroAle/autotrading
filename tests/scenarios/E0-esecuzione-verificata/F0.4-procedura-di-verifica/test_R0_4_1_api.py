@@ -20,6 +20,7 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from autotrading.domain.verification.verification_run import VerificationRun
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
+from tests.support.opening_steps import *  # noqa: F403 - the steps of the register of the openings, shared by the features
 from tests.support.platform import HYPERLIQUID, STARTED_AT, Platform, registration
 from tests.support.steps import quoted
 
@@ -77,6 +78,11 @@ class Session:
 @pytest.fixture
 def session() -> Session:
     return Session()
+
+
+@pytest.fixture
+def platform(session: Session) -> Platform:
+    return session.platform
 
 
 @given(quoted('che "{user}" ha il conto "{account}" su "{exchange}" con margine disponibile sufficiente'))
@@ -293,3 +299,11 @@ def verification_recorded(session: Session, user: str, account: str) -> None:
     assert run.outcome == body["outcome"] == "superata"
     sources = {order.request.source for order in session.platform.orders_of(session.platform.tenant_of(user)).orders}
     assert sources == {OrderSource(OrderOrigin.VERIFICATION, person.object_id)}
+
+
+@then("gli ordini della procedura non appartengono a nessun flusso")
+def procedure_orders_without_flow(session: Session) -> None:
+    assert session.answer(200)["outcome"] == "superata"
+    orders = session.platform.orders_of(session.platform.tenant_of("anna")).orders
+    assert [order.request.source.origin for order in orders] == [OrderOrigin.VERIFICATION, OrderOrigin.VERIFICATION]
+    assert [order.request.source.flow for order in orders] == [None, None]

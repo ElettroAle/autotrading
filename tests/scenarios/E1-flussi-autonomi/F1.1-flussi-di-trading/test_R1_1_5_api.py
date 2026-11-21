@@ -113,6 +113,11 @@ def closed_after_cycle(platform: Platform, lifecycle: Lifecycle, name: str) -> N
     assert open_assets(platform) == set()
 
 
+@then(quoted('lo stop è rifiutato con il motivo "{reason}"'))
+def stop_refused(lifecycle: Lifecycle, reason: str) -> None:
+    assert str(lifecycle.error) == reason
+
+
 @then(quoted('l\'esito dello stop riporta la posizione su "{asset}" rimasta aperta con il motivo "{reason}"'))
 def stop_reports_left_open(lifecycle: Lifecycle, asset: str, reason: str) -> None:
     assert lifecycle.stop is not None

@@ -165,3 +165,38 @@ Then(
     }
   },
 );
+
+Given(
+  'che {string} ha anche il flusso attivo {string} con cicli nel periodo mostrato',
+  ({}, account: string, flow: string) => {
+    fakePlatform.addFlow(account, flow, {
+      status: 'attivo',
+      allocatedCapital: INITIAL_CAPITAL,
+      currentCapital: INITIAL_CAPITAL,
+    });
+    EQUITIES.forEach((equity, index) =>
+      fakePlatform.recordEquity(flow, hoursAgo(EQUITIES.length - index), equity + 5),
+    );
+  },
+);
+
+Then(
+  'sotto il grafico del confronto la legenda condivisa mostra {string} e {string}, ciascuno col segno della sua curva',
+  async ({ dashboard }, first: string, second: string) => {
+    const comparison = dashboard.comparisonChart().getByRole('list', { name: 'Legenda' });
+    const chart = await dashboard.comparisonChart().locator('svg.recharts-surface').boundingBox();
+    const below = await comparison.boundingBox();
+    expect(below?.y ?? 0).toBeGreaterThanOrEqual((chart?.y ?? 0) + (chart?.height ?? 0));
+    for (const flow of [first, second]) {
+      // The mark of the shared legend: the dot of the curve, drawn around the origin of its own small drawing.
+      const mark = dashboard.legendEntry(flow).locator('svg');
+      await expect(mark).toHaveAttribute('viewBox', '-8 -8 16 16');
+      await expect(mark.locator('circle')).toHaveCount(1);
+      await expect(dashboard.comparisonPoints(flow).first()).toBeVisible();
+    }
+    const fills = await comparison
+      .locator('svg > circle')
+      .evaluateAll((dots) => dots.map((dot) => getComputedStyle(dot).fill));
+    expect(new Set(fills).size).toBe(2);
+  },
+);

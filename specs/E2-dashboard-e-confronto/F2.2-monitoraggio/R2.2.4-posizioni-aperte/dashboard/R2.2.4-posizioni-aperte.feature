@@ -21,3 +21,8 @@ Funzionalità: R2.2.4 Posizioni aperte del flusso
     Dato che il flusso "beta" non ha posizioni aperte
     Quando "anna" apre le posizioni del flusso "beta"
     Allora la pagina mostra "Nessuna posizione aperta"
+
+  Scenario: PnL corrente anche in percentuale del margine
+    Dato che la posizione su "BTC" del flusso "alfa" impegna 200 USDC di margine
+    Quando "anna" apre le posizioni del flusso "alfa"
+    Allora la posizione su "BTC" mostra PnL +12 USDC e +6,00%

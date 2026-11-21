@@ -12,6 +12,7 @@ from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.errors import AutotradingError
 from tests.fakes.exchange import REDACTED_REJECTION
+from tests.support.opening_steps import *  # noqa: F403 - the steps of the register of the openings, shared by the features
 from tests.support.platform import Platform, registration
 from tests.support.steps import quoted
 

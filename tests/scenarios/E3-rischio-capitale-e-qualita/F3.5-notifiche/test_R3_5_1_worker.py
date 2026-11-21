@@ -337,3 +337,11 @@ def cycle_completes_with_reduced_opening(events: Events, flow: str) -> None:
     assert flow_cycles.last_record(flow).outcome is CycleOutcome.COMPLETED
     [order] = flow_cycles.platform.order_exchange.sent
     assert order.size * MID_PRICE == REDUCED_MARGIN * LEVERAGE
+
+
+@then(quoted('nessuna notifica della chat "{chat}" contiene le credenziali del conto del flusso "{flow}"'))
+def notifications_without_credentials(events: Events, chat: str, flow: str) -> None:
+    received = events.received_by(chat)
+    secrets = [value for value in events.flow_cycles.credentials_of(flow).values.values() if value]
+    assert received
+    assert [message for message in received if any(secret in message for secret in secrets)] == []

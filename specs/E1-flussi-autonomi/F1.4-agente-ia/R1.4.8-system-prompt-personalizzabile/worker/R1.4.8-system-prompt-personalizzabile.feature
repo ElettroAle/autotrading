@@ -28,3 +28,10 @@ Funzionalità: R1.4.8 System prompt del flusso personalizzabile
     Dato che "anna" imposta il system prompt "{instructions}" senza il formato della risposta
     Quando il flusso "alfa" esegue un ciclo
     Allora la chiamata al modello chiede comunque la risposta nel formato delle decisioni
+
+  Scenario: Il flusso segue il predefinito aggiornato dalla piattaforma
+    Dato che il flusso "alfa" segue il system prompt predefinito
+    E che la piattaforma aggiorna il system prompt predefinito in "{instructions}. Testo aggiornato su {assets}"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il system prompt inviato all'agente è "Sei un trader prudente. Testo aggiornato su BTC"
+    E il flusso "alfa" resta alla versione di configurazione 1

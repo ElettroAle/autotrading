@@ -1,5 +1,8 @@
 """ADR stop-loss-e-take-profit-predefiniti-del-flusso: the versions saved before the defaults existed read with a
 stop loss of 5% and no take profit after the migration, without a new version.
+
+It proves, against PostgreSQL in the pipeline, the @pipeline scenario of R3.1.2 "I flussi già esistenti ricevono lo stop
+loss predefinito" (ADR casi-della-descrizione-negli-scenari).
 """
 
 from pathlib import Path

@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import replace
 
 import pytest
 from pytest_bdd import given, then, when
@@ -8,6 +9,7 @@ from autotrading.application.agent.register_provider_key import RegisterProvider
 from autotrading.application.agent.remove_provider_key import RemoveProviderKeyCommand
 from autotrading.application.agent.replace_provider_key import ReplaceProviderKeyCommand
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
 from tests.support.platform import Platform
@@ -119,3 +121,17 @@ def key_not_in_record(flow_cycles: FlowCycles, key: str) -> None:
     documents = json.dumps([document.content for document in record.documents], default=str)
     assert key not in documents
     assert key not in repr(record)
+
+
+@given(quoted('che "{user}" ha il flusso "{name}" fermo con modello "{model}"'))
+def stopped_flow_with_model(flow_cycles: FlowCycles, user: str, name: str, model: str) -> None:
+    flow = flow_cycles.add_flow(user, name, model=model)
+    flows = flow_cycles.platform.flows.flows
+    flows[flows.index(flow)] = replace(flow, status=FlowStatus.STOPPED)
+
+
+@then(quoted('"{user}" non ha una chiave registrata per il fornitore "{provider}"'))
+def key_removed(platform: Platform, outcome: dict[str, object], user: str, provider: str) -> None:
+    assert "error" not in outcome
+    keys = platform.use_cases_of(user).list_provider_keys.execute()
+    assert provider not in [key.provider.value for key in keys]

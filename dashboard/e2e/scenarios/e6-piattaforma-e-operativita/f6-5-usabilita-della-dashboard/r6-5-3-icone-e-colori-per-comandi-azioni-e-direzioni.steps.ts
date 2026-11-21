@@ -20,6 +20,7 @@ const ICONS: Readonly<Record<string, string>> = {
   più: 'plus',
   x: 'x',
   'frecce circolari': 'refresh',
+  'frecce opposte': 'arrow-left-right',
 };
 
 const COLOURS: Readonly<Record<string, (colour: Rgb) => boolean>> = {
@@ -66,6 +67,7 @@ const aCycleWithEveryAction = (): FakeCycle => {
             { tipo: 'Decision', asset: 'ETH', action: 'chiudi', reasoning: 'obiettivo raggiunto' },
             { tipo: 'Decision', asset: 'SOL', action: 'mantieni', reasoning: 'laterale' },
             { tipo: 'Decision', asset: 'XRP', action: 'aggiorna', reasoning: 'stop più vicino' },
+            { tipo: 'Decision', asset: 'ADA', action: 'inverti', reasoning: 'trend girato' },
           ],
         },
       };

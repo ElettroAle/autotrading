@@ -16,3 +16,9 @@ Funzionalità: R5.1.5 Forecast su orizzonti lunghi
   Scenario: Orizzonte non ammesso
     Quando "anna" imposta l'orizzonte "3 mesi"
     Allora la configurazione è rifiutata con il motivo che elenca gli orizzonti ammessi
+
+  Scenario: Previsione lunga nella valutazione del forecast
+    Dato che ieri alle 10:00 è stata registrata una previsione a 1 giorno
+    E che sono passate le 10:00 di oggi
+    Quando "anna" consulta l'errore della previsione di "BTC" a 1 giorno
+    Allora l'errore medio assoluto a 1 giorno è 250 su 1 previsione valutata

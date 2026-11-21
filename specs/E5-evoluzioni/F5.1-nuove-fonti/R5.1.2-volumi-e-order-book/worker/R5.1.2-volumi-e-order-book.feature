@@ -29,3 +29,9 @@ Funzionalità: R5.1.2 Volumi e order book di altri exchange
     Dato che Binance non risponde
     Quando parte il ciclo di "alfa"
     Allora la fonte "volumi" è assente nel contesto e il ciclo prosegue
+
+  Scenario: Più exchange con l'aggregato pesato sui volumi
+    Dato che il flusso "alfa" ha anche l'adapter "Secondo exchange" della fonte "volumi"
+    Quando parte il ciclo di "alfa"
+    Allora il contesto contiene per "BTC" i dati di "Binance" e di "Secondo exchange"
+    E il contesto contiene per "BTC" l'aggregato con volume 24 ore 2000000000, rapporto taker buy/sell 1,3750 e squilibrio dell'order book 0,5914

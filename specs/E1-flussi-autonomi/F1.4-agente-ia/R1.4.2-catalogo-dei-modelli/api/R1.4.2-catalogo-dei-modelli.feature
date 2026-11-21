@@ -34,3 +34,9 @@ Funzionalità: R1.4.2 Catalogo dei modelli IA
   Scenario: Parametri predefiniti
     Quando "anna" crea il flusso "alfa" con modello "openrouter/deepseek-chat" senza parametri
     Allora il flusso "alfa" usa la temperatura 1
+
+  Scenario: Un modello aggiunto con la sola configurazione è nel catalogo ed è selezionabile
+    Dato che la configurazione della piattaforma aggiunge il modello "openrouter/qwen-max" con temperatura da 0 a 2, predefinita 1
+    Quando "anna" consulta il catalogo dei modelli
+    Allora il catalogo contiene il modello "openrouter/qwen-max" con il parametro temperatura da 0 a 2, predefinita 1
+    E "anna" può creare il flusso "alfa" con modello "openrouter/qwen-max"

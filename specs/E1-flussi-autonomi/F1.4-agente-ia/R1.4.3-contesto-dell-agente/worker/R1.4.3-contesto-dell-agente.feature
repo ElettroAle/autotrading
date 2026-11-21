@@ -30,7 +30,7 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
   Scenario: Istruzioni e regole operative
     Quando il flusso "alfa" esegue un ciclo
     Allora il contesto contiene le istruzioni "Sei un trader prudente"
-    E il contesto contiene le regole operative con leva ammessa da 1 a 5
+    E il contesto contiene le regole operative: al massimo una posizione per asset, azioni ammesse, leva da 1 a 5 e formato della risposta
 
   Scenario: Ora e tempo trascorso
     Quando il flusso "alfa" esegue un ciclo alle 10:30
@@ -47,6 +47,7 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
     Quando il flusso "alfa" esegue un ciclo
     Allora il contesto contiene capitale allocato 400 USDC e liquidità disponibile 250 USDC
     E il contesto contiene il rendimento dall'avvio del 2,5%
+    E il contesto contiene il valore complessivo del flusso 410 USDC
     E il contesto contiene la posizione long su "BTC" con dimensione, leva 3, prezzo di ingresso, PnL non realizzato e prezzo di liquidazione
 
   Scenario: Soldi del flusso dopo le perdite
@@ -54,6 +55,11 @@ Funzionalità: R1.4.3 Contesto inviato all'agente
     E che il flusso "alfa" ha perso 100 USDC in posizioni chiuse
     Quando il flusso "alfa" esegue un ciclo
     Allora il contesto contiene i soldi del flusso 300 USDC
+
+  Scenario: Dati e pesi delle fonti attive per ogni asset
+    Dato che il flusso "alfa" ha attiva la fonte "pivot" con peso 8
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il contesto contiene i dati della fonte "pivot" per "BTC" e per "ETH" con peso 8
 
   Scenario: Solo il flusso, mai gli altri
     Dato che il flusso "beta" ha una posizione aperta su "SOL"

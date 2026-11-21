@@ -47,3 +47,10 @@ Funzionalità: R1.5.3 Decisioni incoerenti con lo stato del flusso
     Quando il rischio controlla le decisioni
     Allora la decisione su "BTC" è bloccata
     E la decisione su "ETH" è registrata come mantieni
+
+  Scenario: Una chiusura non libera liquidità per le aperture dello stesso ciclo
+    Dato che l'agente decide di chiudere su "BTC"
+    E che l'agente decide di aprire long su "ETH" con un margine di 50 USDC dopo le riduzioni del rischio
+    Quando il rischio controlla le decisioni
+    Allora la chiusura su "BTC" è approvata
+    E la decisione su "ETH" è bloccata con il motivo "liquidità del flusso insufficiente: 40 USDC"

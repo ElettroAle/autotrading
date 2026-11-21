@@ -32,3 +32,12 @@ Funzionalità: R2.2.2 Stato e riepilogo dei flussi
     Dato che il flusso "alfa" ha capitale attuale 270 USDC
     Quando "anna" apre la pagina dei flussi
     Allora il flusso "alfa" mostra rendimento -10,00% in rosso
+
+  Scenario: Conto, modello ed esito dell'ultima esecuzione
+    Quando "anna" apre la pagina dei flussi
+    Allora il flusso "alfa" mostra conto "principale", modello "openai/gpt-4o" e ultima esecuzione "concluso"
+
+  Scenario: Rendimento in pareggio in grigio
+    Dato che il flusso "alfa" ha capitale attuale 300 USDC
+    Quando "anna" apre la pagina dei flussi
+    Allora il flusso "alfa" mostra rendimento 0,00% in grigio

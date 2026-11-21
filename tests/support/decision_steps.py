@@ -91,14 +91,16 @@ def opening_with_fields(flow_cycles: FlowCycles, asset: str, quota: str, leverag
     answer(flow_cycles, opening(asset, fraction(quota), int(leverage), reasoning))
 
 
+# Of two matching steps pytest-bdd keeps the one whose pattern sorts last: "(?P<verb>" sorts after the "(?P<text>" of
+# the answers not conforming below, so this step wins for the texts it matches.
 @given(
     parsers.re(
-        r'^che l\'agente risponde su "(?P<asset>[^"]+)" mantieni con leva (?P<leverage>\d+) '
+        r'^che l\'agente risponde su "(?P<asset>[^"]+)" (?P<verb>mantieni|chiudi) con leva (?P<leverage>\d+) '
         r'e ragionamento "(?P<reasoning>[^"]+)"$'
     )
 )
-def hold_with_fields(flow_cycles: FlowCycles, asset: str, leverage: str, reasoning: str) -> None:
-    answer(flow_cycles, {**decision(asset, "mantieni", reasoning), "leva": int(leverage)})
+def hold_or_close_with_fields(flow_cycles: FlowCycles, asset: str, verb: str, leverage: str, reasoning: str) -> None:
+    answer(flow_cycles, {**decision(asset, verb, reasoning), "leva": int(leverage)})
 
 
 @given(
@@ -187,10 +189,10 @@ def recorded_reasoning(flow_cycles: FlowCycles, asset: str, reasoning: str) -> N
     assert decisions_by_asset(flow_cycles)[asset]["reasoning"] == reasoning
 
 
-@then(quoted('il ciclo registra per "{asset}" la decisione mantieni senza campi operativi'))
-def recorded_plain_hold(flow_cycles: FlowCycles, asset: str) -> None:
+@then(quoted('il ciclo registra per "{asset}" la decisione {action} senza campi operativi'))
+def recorded_plain_action(flow_cycles: FlowCycles, asset: str, action: str) -> None:
     held = decisions_by_asset(flow_cycles)[asset]
-    assert (held["action"], held["opening"]) == ("mantieni", None)
+    assert (held["action"], held["opening"]) == (action, None)
 
 
 @then(parsers.re(r'^l\'ordine di chiusura su "(?P<asset>[^"]+)" riguarda (?P<size>[\d,]+) \w+$'))

@@ -110,3 +110,23 @@ Then(
     await expect(dashboard.flowFact(flow, 'Rendimento')).toHaveClass(/text-red-/);
   },
 );
+
+Then(
+  'il flusso {string} mostra conto {string}, modello {string} e ultima esecuzione {string}',
+  async ({ dashboard }, flow: string, account: string, model: string, outcome: string) => {
+    await expect(dashboard.flowFact(flow, 'Conto')).toHaveText(account);
+    await expect(dashboard.flowFact(flow, 'Modello')).toHaveText(model);
+    await expect(dashboard.flowFact(flow, 'Ultima esecuzione')).toContainText(
+      `${LAST_CYCLE_TIME} · ${outcome}`,
+    );
+  },
+);
+
+// Even is neither a gain nor a loss: grey, as in every view that colours a result (Bug 620).
+Then(
+  'il flusso {string} mostra rendimento {word} in grigio',
+  async ({ dashboard }, flow: string, flowReturn: string) => {
+    await expect(dashboard.flowFact(flow, 'Rendimento')).toHaveText(flowReturn);
+    await expect(dashboard.flowFact(flow, 'Rendimento')).toHaveClass(/text-slate-/);
+  },
+);
