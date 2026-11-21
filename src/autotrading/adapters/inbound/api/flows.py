@@ -20,6 +20,7 @@ from autotrading.application.flows.compare_flow_versions import CompareFlowVersi
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
+from autotrading.application.flows.get_flow import GetFlowCommand
 from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.application.flows.list_flow_versions import ListFlowVersionsCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
@@ -518,6 +519,11 @@ def flows_router(
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)], archived: bool = False
     ) -> list[FlowResponse]:
         return [FlowResponse.of(flow) for flow in use_cases.list_flows.execute(archived=archived)]
+
+    @router.get("/flows/{flow_id}")
+    def get_flow(flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]) -> FlowResponse:
+        """One flow of the tenant, an archived one too, which the list leaves out (Bug 690)."""
+        return FlowResponse.of(use_cases.get_flow.execute(GetFlowCommand(FlowId(flow_id))))
 
     @router.patch("/flows/{flow_id}")
     def modify_flow(

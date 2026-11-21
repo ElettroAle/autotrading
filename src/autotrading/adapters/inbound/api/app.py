@@ -130,6 +130,9 @@ def create_api(
     protected.include_router(mail_server_router(use_cases_of_request))
     protected.include_router(notification_channels_router(use_cases_of_request))
     protected.include_router(notification_inbox_router(use_cases_of_request))
+    # The fixed readings of the flows before the reading of one flow, whose identifier would take their path (Bug 690).
+    protected.include_router(cycles_router(use_cases_of_request))
+    protected.include_router(flow_ranking_router(use_cases_of_request))
     protected.include_router(flows_router(use_cases_of_request, current_user))
     protected.include_router(capital_changes_router(use_cases_of_request))
     protected.include_router(assets_router(use_cases_of_request))
@@ -138,11 +141,9 @@ def create_api(
     protected.include_router(flow_statistics_router(use_cases_of_request))
     protected.include_router(forecast_accuracy_router(use_cases_of_request))
     protected.include_router(operations_router(use_cases_of_request))
-    protected.include_router(cycles_router(use_cases_of_request))
     protected.include_router(decisions_router(use_cases_of_request))
     protected.include_router(equity_router(use_cases_of_request))
     protected.include_router(history_router(use_cases_of_request))
-    protected.include_router(flow_ranking_router(use_cases_of_request))
     api.include_router(protected)
     return api
 

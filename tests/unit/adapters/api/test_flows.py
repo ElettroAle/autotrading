@@ -534,6 +534,40 @@ def test_an_archived_flow_is_listed_apart(client_of: Client, platform: Platform)
     assert [flow["id"] for flow in anna.get("/flows", params={"archived": True}).json()] == [flow_id]
 
 
+def test_an_archived_flow_is_read_alone_with_its_status(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    anna.post(f"/flows/{flow_id}/archive")
+
+    response = anna.get(f"/flows/{flow_id}")
+
+    assert response.status_code == 200
+    assert (response.json()["id"], response.json()["name"], response.json()["status"]) == (
+        flow_id,
+        "alfa",
+        "archiviato",
+    )
+
+
+def test_a_flow_of_another_tenant_or_missing_is_not_found_when_read_alone(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+    bruno = client_of("bruno")
+
+    for response in (bruno.get(f"/flows/{flow_id}"), anna.get(f"/flows/{uuid4()}")):
+        assert (response.status_code, reason_of(response)) == (404, {"detail": "flusso non trovato"})
+
+
+def test_the_fixed_readings_of_the_flows_are_not_taken_for_a_flow_read_alone(client_of: Client) -> None:
+    anna = client_of("anna")
+
+    responses = [anna.get(path) for path in ("/flows/overview", "/flows/ranking", "/flows/system-prompt")]
+
+    assert [response.status_code for response in responses] == [200, 200, 200]
+
+
 @pytest.mark.parametrize(
     ("changes", "reason", "field"),
     [

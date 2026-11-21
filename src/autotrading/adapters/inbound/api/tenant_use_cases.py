@@ -42,6 +42,7 @@ from autotrading.application.flows.duplicate_flow import DuplicateFlowUseCase
 from autotrading.application.flows.export_account_operations import ExportAccountOperationsUseCase
 from autotrading.application.flows.export_flow_operations import ExportFlowOperationsUseCase
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyUseCase
+from autotrading.application.flows.get_flow import GetFlowUseCase
 from autotrading.application.flows.get_flow_version import GetFlowVersionUseCase
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyUseCase
 from autotrading.application.flows.list_account_capital_changes import ListAccountCapitalChangesUseCase
@@ -279,6 +280,7 @@ class TenantUseCases:
     list_models: ListModelsUseCase
     create_flow: CreateFlowUseCase
     list_flows: ListFlowsUseCase
+    get_flow: GetFlowUseCase
     read_default_system_prompt: ReadDefaultSystemPromptUseCase
     list_tradable_assets: ListTradableAssetsUseCase
     read_free_capital: ReadFreeCapitalUseCase
@@ -392,6 +394,7 @@ class TenantUseCases:
             list_models=ListModelsUseCase(ports.model_catalogs, keys),
             create_flow=CreateFlowUseCase(tenant_id, ports.flows, ports.flow_checks),
             list_flows=ListFlowsUseCase(ports.flows),
+            get_flow=GetFlowUseCase(ports.flows),
             read_default_system_prompt=ReadDefaultSystemPromptUseCase(),
             list_tradable_assets=ListTradableAssetsUseCase(ports.flow_checks.markets),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
