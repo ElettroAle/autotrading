@@ -27,18 +27,21 @@ class LossReferences:
 NO_REFERENCES = LossReferences(None, None)
 
 
-def at_capital(snapshot: EquitySnapshot, capital: Decimal) -> Decimal:
-    """The recorded equity brought to the capital allocated now: a change of capital is neither a loss nor a gain, so
-    it moves the reference by the same amount (R3.2.2).
+def at_capital(snapshot: EquitySnapshot, capital: Decimal, cashed_profit: Decimal) -> Decimal:
+    """The recorded equity brought to the capital allocated now and to the profits cashed out until now: a change of
+    capital and a cash-out are neither a loss nor a gain, so they move the reference by the same amount (R3.2.2, ADR
+    perdita-massima-al-netto-degli-incassi).
     """
-    return snapshot.equity - snapshot.allocated_capital + capital
+    cashed_since = cashed_profit - snapshot.cashed_profit
+    return snapshot.equity - snapshot.allocated_capital + capital - cashed_since
 
 
 @dataclass(frozen=True, slots=True)
 class LossGuard:
     """The losses of a flow against its thresholds: the reason the openings are suspended, if one is passed (R3.2.2).
 
-    The value is the total value of the flow read now (R1.6.1).
+    The value is the total value of the flow read now (R1.6.1); the profits cashed out are those of the flow until now
+    (R3.4.1).
     """
 
     value: Decimal
@@ -48,10 +51,12 @@ class LossGuard:
     max_drawdown_percent: Decimal | None
 
     @classmethod
-    def of(cls, configuration: FlowConfiguration, value: Decimal, references: LossReferences) -> LossGuard:
+    def of(
+        cls, configuration: FlowConfiguration, value: Decimal, references: LossReferences, cashed_profit: Decimal
+    ) -> LossGuard:
         capital = configuration.assigned_capital
-        daily = None if references.daily is None else at_capital(references.daily, capital)
-        peak = value if references.peak is None else max(at_capital(references.peak, capital), value)
+        daily = None if references.daily is None else at_capital(references.daily, capital, cashed_profit)
+        peak = value if references.peak is None else max(at_capital(references.peak, capital, cashed_profit), value)
         return cls(value, daily, peak, configuration.max_daily_loss_percent, configuration.max_drawdown_percent)
 
     def breach(self) -> str | None:

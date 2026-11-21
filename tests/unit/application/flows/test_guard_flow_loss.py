@@ -4,6 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.guard_flow_loss import GuardFlowLossUseCase
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
@@ -11,6 +12,7 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.cycles import FakeClockAdapter
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore
@@ -54,13 +56,29 @@ class World:
             EquitySnapshot(self.flow.id.value, at, CAPITAL, realized, Decimal(0), Decimal(0), Decimal(0))
         )
 
-    def guarded(self, value: str) -> bool:
-        state = FlowState(self.flow.id, "USDC", CAPITAL, (), Decimal(value) - CAPITAL, Decimal(0), Decimal(0))
+    def guarded(self, value: str, *, cashed: str = "0") -> bool:
+        """The flow worth the value after cashing out the profits, which its realized PnL still holds."""
+        realized = Decimal(value) - CAPITAL + Decimal(cashed)
+        changes = () if cashed == "0" else (self.cash_out(Decimal(cashed)),)
+        state = FlowState(self.flow.id, "USDC", CAPITAL, (), realized, Decimal(0), Decimal(0), capital_changes=changes)
         account = CycleAccount("USDC", Decimal(5000), ())
         flow = CycleFlow(TENANT, self.flow, "test-1", "Hyperliquid", FIRST_START, account, state)
         suspension = self.use_case.execute(flow)
         assert suspension == self.status.at(NOW, self.flow.configuration.openings_resume).suspension
         return suspension is not None
+
+    def cash_out(self, profit: Decimal) -> CapitalChange:
+        return CapitalChange(
+            self.flow.id,
+            MIDNIGHT + timedelta(hours=1),
+            CAPITAL,
+            CAPITAL,
+            UserId("anna"),
+            CapitalChangeReason.CASH_OUT,
+            profit,
+            value_before=CAPITAL + profit,
+            cashed_profit=profit,
+        )
 
     @property
     def status(self) -> OpeningsStatus:
@@ -153,3 +171,12 @@ def test_a_manual_suspension_stays_after_midnight() -> None:
 
     assert world.guarded("940")
     assert world.status.suspension is not None
+
+
+def test_profits_cashed_out_after_the_references_are_not_a_loss() -> None:
+    """ADR-perdita-massima-al-netto-degli-incassi: the guard measures from the references net of the cash-outs."""
+    world = World()
+    world.recorded(MIDNIGHT - timedelta(hours=12), "1150")
+
+    assert not world.guarded("1000", cashed="150")
+    assert world.notices == []

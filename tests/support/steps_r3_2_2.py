@@ -13,6 +13,7 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, parsers, then, when
 
+from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
@@ -120,7 +121,9 @@ class MaximumLoss:
         equities = InMemoryEquitySnapshotRepositoryAdapter(self.flow_cycles.equity_snapshots, self.tenant_id)
         now = self.now()
         references = equities.loss_references(flow.id.value, day_start(now), status.peak_since(FIRST_START), now)
-        return LossGuard.of(flow.configuration, self.value, references).peak
+        changes = self.flow_cycles.platform.flows.capital_changes.get(flow.id, [])
+        cashed_profit = sum((change.cashed_profit for change in changes), Decimal(0))
+        return LossGuard.of(flow.configuration, self.value, references, cashed_profit).peak
 
     def suspension_notices(self) -> list[str]:
         received = self.flow_cycles.platform.messenger.received_by(chat_named(self.user))
@@ -296,6 +299,22 @@ def capital_reduced(loss: MaximumLoss, user: str, reduction: str, value: str) ->
     command = ChangeAllocatedCapitalCommand(loss.flow_id, CAPITAL - amount(reduction), platform.user_id_of(user))
     platform.use_cases_of(user).change_allocated_capital.execute(command)
     loss.worth(amount(value))
+    loss.run_cycle()
+
+
+@when(
+    parsers.re(
+        r'^"(?P<user>[^"]+)" incassa i (?P<profit>[\d,]+) USDC di profitti di "alfa" '
+        r"e un ciclo legge il valore (?P<value>[\d,]+) USDC$"
+    )
+)
+def profits_cashed_out(loss: MaximumLoss, user: str, profit: str, value: str) -> None:
+    platform = loss.flow_cycles.platform
+    loss.worth(CAPITAL + amount(profit))
+    command = CashOutProfitsCommand(loss.flow_id, platform.user_id_of(user), None)
+    outcome = platform.use_cases_of(user).cash_out_profits.execute(command)
+    assert outcome.freed == amount(profit)
+    loss.value = amount(value)
     loss.run_cycle()
 
 
