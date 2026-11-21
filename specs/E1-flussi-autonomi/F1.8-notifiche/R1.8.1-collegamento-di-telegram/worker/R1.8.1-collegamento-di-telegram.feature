@@ -41,6 +41,7 @@ Funzionalità: R1.8.1 Collegamento di Telegram
       | condizione                                       |
       | sono le 10:16                                    |
       | il codice è già stato usato dalla chat "chat-anna" |
+      | il codice inviato non è mai stato emesso         |
 
   Scenario: Collegamento dal link del bot
     Dato che "anna" ha chiesto un codice di collegamento alle 10:00

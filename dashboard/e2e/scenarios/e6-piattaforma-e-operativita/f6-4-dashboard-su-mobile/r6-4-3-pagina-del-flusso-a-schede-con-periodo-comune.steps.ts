@@ -398,3 +398,60 @@ Then(
     );
   },
 );
+
+When('apre la scheda Cicli e torna indietro', async ({ dashboard }) => {
+  await tab(dashboard, 'Cicli').click();
+  await expect(tab(dashboard, 'Cicli')).toHaveAttribute('aria-current', 'page');
+  await dashboard.page.goBack();
+});
+
+Then("l'equity curve non ha segni per i cicli conclusi", async ({ dashboard, memory }) => {
+  await expect(dashboard.equityPoints()).toHaveCount(memory.cycles.length);
+  // Only a failed cycle is marked on the curve, to lead to its detail (ADR cicli-falliti-sull-equity-curve).
+  await expect(dashboard.equityCurve().getByRole('link', { name: /^Ciclo / })).toHaveCount(0);
+});
+
+When(
+  "{string} sceglie una dopo l'altra le schede della pagina del flusso {string}",
+  async ({ dashboard, memory }, account: string, flow: string) => {
+    memory.flow = flow;
+    await openFlowSignedIn(dashboard, memory, account);
+  },
+);
+
+Then(
+  'a ogni scheda la prima scheda è intera, lo sfondo della barra è sotto tutte le schede e la barra resta visibile sopra il contenuto',
+  async ({ dashboard }) => {
+    const names = await tabs(dashboard).getByRole('link').allInnerTexts();
+    expect(names.length).toBeGreaterThan(1);
+    for (const name of names) {
+      await tab(dashboard, name).click();
+      await expect(tab(dashboard, name)).toHaveAttribute('aria-current', 'page');
+      await expect(tabs(dashboard)).toBeInViewport();
+      const background = await boxOf(tabs(dashboard).getByRole('list'));
+      const items = await tabs(dashboard).getByRole('listitem').all();
+      for (const item of items) {
+        const box = await boxOf(item);
+        expect(background.x, `${name}: the background starts before the tabs`).toBeLessThanOrEqual(
+          box.x,
+        );
+        expect(
+          background.x + background.width,
+          `${name}: the background reaches past every tab`,
+        ).toBeGreaterThanOrEqual(box.x + box.width);
+      }
+      // Scrolled back to its start, the bar shows its first tab in full (Bug 439).
+      await tabs(dashboard).evaluate((scroller) => {
+        scroller.scrollLeft = 0;
+      });
+      const bar = await boxOf(tabs(dashboard));
+      const first = await boxOf(items[0] ?? tabs(dashboard));
+      expect(first.x, `${name}: the first tab starts within the bar`).toBeGreaterThanOrEqual(bar.x);
+      expect(
+        first.x + first.width,
+        `${name}: the first tab ends within the bar`,
+      ).toBeLessThanOrEqual(bar.x + bar.width);
+    }
+    expect(await dashboard.horizontalOverflow()).toBeLessThanOrEqual(0);
+  },
+);

@@ -14,6 +14,14 @@ from autotrading.domain.errors import AutotradingError
 HELD_SECONDS = 5.0
 
 
+class TooManyRequestsAnswer(Exception):  # noqa: N818 - the error the library of the provider raises, not a project error
+    """What the library of a provider raises for a limit of frequency, quota messages included: the code the base
+    error reads in the cause (ADR permanenza-decisa-dall-errore-base, Bug 445).
+    """
+
+    status_code = 429
+
+
 @dataclass(frozen=True, slots=True)
 class ModelCall:
     model: str

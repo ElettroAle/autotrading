@@ -11,6 +11,8 @@ Funzionalità: R1.4.4 Decisione dell'agente per ogni asset
   Un'apertura contiene in più: direzione, quota dei soldi del flusso da impegnare come margine (frazione da
   0 a 1, R1.5.1) e leva. Per "mantieni" e "chiudi" i campi operativi presenti si ignorano.
   La chiusura è sempre totale.
+  Ogni apertura della chiave del fornitore IA per chiamare il modello si registra con tenant, fornitore, versione della
+  chiave, esito e istante, mai con la chiave (Bug 179).
 
   Fuori ambito: exit plan, confidenza, chiusure parziali; la risposta non conforme (R1.4.5).
 
@@ -43,3 +45,21 @@ Funzionalità: R1.4.4 Decisione dell'agente per ogni asset
     E che l'agente risponde chiudi su "ETH"
     Quando il flusso "alfa" esegue un ciclo
     Allora l'ordine di chiusura su "ETH" riguarda 0,5 ETH
+
+  Scenario: Chiudi con campi operativi
+    Dato che il flusso "alfa" ha una posizione long su "ETH" di 0,5 ETH
+    E che l'agente risponde su "ETH" chiudi con leva 10 e ragionamento "obiettivo raggiunto"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il ciclo registra per "ETH" la decisione chiudi senza campi operativi
+    E l'ordine di chiusura su "ETH" riguarda 0,5 ETH
+
+  Scenario: L'apertura della chiave del fornitore IA è registrata senza la chiave
+    Quando il flusso "alfa" esegue un ciclo
+    Allora l'apertura della chiave del fornitore "openrouter" è registrata con il tenant, la versione della chiave, l'esito "riuscita" e l'istante
+    E la registrazione non contiene la chiave del fornitore "openrouter"
+
+  Scenario: Un'apertura rifiutata della chiave del fornitore IA è registrata
+    Dato che la chiave salvata del fornitore "openrouter" non si può più aprire
+    Quando il flusso "alfa" esegue un ciclo
+    Allora l'apertura della chiave del fornitore "openrouter" è registrata con il tenant, la versione della chiave, l'esito "rifiutata" e l'istante
+    E la registrazione non contiene la chiave del fornitore "openrouter"

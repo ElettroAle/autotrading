@@ -225,3 +225,67 @@ Then('apre il dettaglio del ciclo di quella decisione', async ({ dashboard, memo
     dashboard.page.getByText(formatInstant(chosen?.planned_at ?? '')).first(),
   ).toBeVisible();
 });
+
+const DIRECTION_LABELS: Record<string, string> = { long: 'Long', short: 'Short' };
+
+When(
+  '{string} filtra lo storico per direzione {string}',
+  async ({ dashboard, memory }, account: string, direction: string) => {
+    await openHistory(dashboard, memory, account, memory.flow);
+    const label = DIRECTION_LABELS[direction] ?? direction;
+    await choice(dashboard, 'Direzione', label).click();
+    await expect(choice(dashboard, 'Direzione', label)).toHaveAttribute('aria-pressed', 'true');
+    await dashboard.waitUntilRead();
+  },
+);
+
+Then(
+  'vede solo le decisioni di aprire {word}',
+  async ({ dashboard, memory }, direction: string) => {
+    const expected = decisionsOf(memory).filter(
+      (decision) => decision.opening?.direction === direction,
+    );
+    await expect(rows(dashboard)).toHaveCount(expected.length);
+    expect(await cellTexts(dashboard, 'Azione')).toEqual(expected.map(() => 'apri'));
+    expect(await cellTexts(dashboard, 'Direzione')).toEqual(expected.map(() => direction));
+  },
+);
+
+Given(
+  "che il flusso {string} ha altri {int} cicli conclusi nell'ultimo giorno su BTC ed ETH",
+  ({ memory }, flow: string, count: number) => {
+    const [newest, ...older] = memory.cycles;
+    const newestAt = Date.parse(newest?.planned_at ?? '');
+    // One an hour before the newest, after the cycle of the day before: the oldest stay on the last page.
+    const added = Array.from({ length: count }, (_, index) =>
+      withDecisions(aCompletedCycle(new Date(newestAt - (index + 1) * HOUR)), [
+        aDecision('BTC', ['mantieni', null], 40),
+        aDecision('ETH', ['mantieni', null], 40),
+      ]),
+    );
+    memory.cycles = [...(newest === undefined ? [] : [newest]), ...added, ...older];
+    fakePlatform.recordCycles(flow, memory.cycles);
+  },
+);
+
+When(
+  '{string} apre la seconda pagina dello storico delle decisioni',
+  async ({ dashboard, memory }, account: string) => {
+    await openHistory(dashboard, memory, account, memory.flow);
+    await dashboard.page.getByRole('link', { name: 'Pagina successiva' }).click();
+    await expect(dashboard.content().getByText('Pagina 2')).toBeVisible();
+  },
+);
+
+Then(
+  'vede le {int} decisioni più vecchie, dalla più recente',
+  async ({ dashboard, memory }, count: number) => {
+    const instants = memory.cycles.flatMap((cycle) => [
+      formatInstant(cycle.planned_at),
+      formatInstant(cycle.planned_at),
+    ]);
+    await expect(rows(dashboard)).toHaveCount(count);
+    expect(await cellTexts(dashboard, 'Istante')).toEqual(instants.slice(-count));
+    await expect(dashboard.page.getByRole('link', { name: 'Pagina successiva' })).toHaveCount(0);
+  },
+);

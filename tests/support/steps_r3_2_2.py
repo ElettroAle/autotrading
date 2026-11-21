@@ -125,6 +125,12 @@ class MaximumLoss:
         cashed_profit = sum((change.cashed_profit for change in changes), Decimal(0))
         return LossGuard.of(flow.configuration, self.value, references, cashed_profit).peak
 
+    def modify(self, user: str, command: ModifyFlowCommand) -> None:
+        try:
+            self.flow_cycles.platform.use_cases_of(user).modify_flow.execute(command)
+        except AutotradingError as error:
+            self.refusals.append(error)
+
     def suspension_notices(self) -> list[str]:
         received = self.flow_cycles.platform.messenger.received_by(chat_named(self.user))
         return [text for text in received if "aperture sospese" in text]
@@ -318,6 +324,33 @@ def profits_cashed_out(loss: MaximumLoss, user: str, profit: str, value: str) ->
     loss.run_cycle()
 
 
+@when(
+    parsers.re(
+        r'^"(?P<user>[^"]+)" aumenta di (?P<increase>[\d,]+) USDC il capitale allocato di "alfa" '
+        r"e un ciclo legge il valore (?P<value>[\d,]+) USDC$"
+    )
+)
+def capital_increased(loss: MaximumLoss, user: str, increase: str, value: str) -> None:
+    platform = loss.flow_cycles.platform
+    command = ChangeAllocatedCapitalCommand(loss.flow_id, CAPITAL + amount(increase), platform.user_id_of(user))
+    platform.use_cases_of(user).change_allocated_capital.execute(command)
+    loss.worth(amount(value))
+    loss.run_cycle()
+
+
+@when(quoted('l\'agente di "alfa" decide di aggiornare lo stop su "{asset}" a {stop}'))
+def agent_updates_stop(loss: MaximumLoss, asset: str, stop: str) -> None:
+    fields = {"direzione": None, "quota": None, "leva": None, "obiettivo": None, "invalidazione": None}
+    update = {**decision(asset, "aggiorna"), **fields, "stop": int(stop), "togli_obiettivo": False}
+    answer(loss.flow_cycles, update)
+    loss.run_cycle()
+
+
+@when(quoted('"{user}" imposta la ripresa di "alfa" a "{resume}"'))
+def set_resume(loss: MaximumLoss, user: str, resume: str) -> None:
+    loss.modify(user, ModifyFlowCommand(loss.flow_id, openings_resume=RESUMES[resume]))
+
+
 @when(quoted('"{user}" imposta la perdita {threshold} di "alfa" a {value}%'))
 def set_threshold(loss: MaximumLoss, user: str, threshold: str, value: str) -> None:
     percent = amount(value)
@@ -408,6 +441,30 @@ def modification_refused(loss: MaximumLoss, reason: str) -> None:
         Decimal(5),
         Decimal(10),
     )
+
+
+@then(quoted('"alfa" aggiorna il piano di uscita della posizione su "{asset}"'))
+def plan_updated(loss: MaximumLoss, asset: str) -> None:
+    assert loss.outcome_of(asset)["tipo"] == "ApprovedUpdate"
+
+
+@then(
+    parsers.re(
+        r'^la configurazione di "alfa" passa alla versione (?P<version>\d+) con perdita giornaliera massima '
+        r"(?P<value>[\d,]+)%$"
+    )
+)
+def new_version_with_daily_loss(loss: MaximumLoss, version: str, value: str) -> None:
+    assert loss.refusals == []
+    configuration = loss.flow_cycles.flow(FLOW).configuration
+    assert (configuration.version, configuration.max_daily_loss_percent) == (int(version), amount(value))
+
+
+@then(quoted('la configurazione di "alfa" passa alla versione {version} con ripresa "{resume}"'))
+def new_version_with_resume(loss: MaximumLoss, version: str, resume: str) -> None:
+    assert loss.refusals == []
+    configuration = loss.flow_cycles.flow(FLOW).configuration
+    assert (configuration.version, configuration.openings_resume) == (int(version), RESUMES[resume])
 
 
 @then(quoted('la pagina mostra "{notice}" e il comando "{command}"'))

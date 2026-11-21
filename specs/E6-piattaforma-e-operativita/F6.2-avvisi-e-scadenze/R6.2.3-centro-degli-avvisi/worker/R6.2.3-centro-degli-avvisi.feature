@@ -44,3 +44,26 @@ Funzionalità: R6.2.3 Centro degli avvisi
     Dato che "anna" ha collegato Telegram
     Quando si apre l'avviso di una posizione su un asset di nessun flusso
     Allora la notifica porta al dettaglio dell'avviso
+
+  Scenario: Avviso della posizione estranea risolto quando la posizione non c'è più
+    Dato che sul conto "test-1" è aperto l'avviso di una posizione su un asset di nessun flusso
+    Quando il flusso "alfa" esegue un ciclo senza più quella posizione sul conto
+    Allora l'avviso della posizione è risolto
+
+  Scenario: Avviso della chiave risolto quando la chiave è rimossa
+    Dato che la chiave "openrouter" scade tra 20 giorni con un avviso aperto
+    Quando "anna" ferma il flusso "alfa" e rimuove la chiave "openrouter"
+    E la piattaforma controlla le scadenze
+    Allora l'avviso della chiave "openrouter" è risolto
+
+  Scenario: Avvisi risolti conservati 90 giorni
+    Dato che l'allarme di riconciliazione del conto "test-1" si è risolto 91 giorni fa
+    E che la pausa automatica del flusso "alfa" si è risolta 89 giorni fa
+    Quando sul conto "test-1" si apre un nuovo allarme di riconciliazione
+    Allora "anna" vede l'avviso aperto "allarme di riconciliazione" e quello risolto "pausa automatica"
+
+  Scenario: Movimenti non spiegati nel riquadro del conto
+    Dato che il saldo del conto "test-1" si discosta da quello atteso entro la soglia
+    Quando il flusso "alfa" esegue un ciclo
+    E "anna" apre i movimenti non spiegati del conto "test-1"
+    Allora vede la variazione del saldo di 5 con il totale netto delle variazioni 5

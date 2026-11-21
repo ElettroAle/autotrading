@@ -51,3 +51,13 @@ Funzionalità: R2.3.1 Gestione dei conti dalla dashboard
     Dato che il conto "principale" ha il flusso attivo "alfa"
     Quando "anna" chiede di rimuovere il conto "principale"
     Allora la conferma dice che cosa accade al flusso "alfa" (R1.1.8)
+
+  Scenario: Elenco compatto dei conti
+    Dato che "anna" ha il conto "principale"
+    Quando "anna" apre i suoi conti
+    Allora il conto "principale" mostra nell'elenco nome, rete, stato della riconciliazione, saldo, capitale libero e il menu delle azioni
+
+  Scenario: Pagina del conto a schede
+    Dato che "anna" ha il conto "principale"
+    Quando "anna" apre il conto "principale" dall'elenco
+    Allora la pagina del conto ha le schede "Panoramica", "Riconciliazione", "Capitale" e "Impostazioni" e mostra "Panoramica"

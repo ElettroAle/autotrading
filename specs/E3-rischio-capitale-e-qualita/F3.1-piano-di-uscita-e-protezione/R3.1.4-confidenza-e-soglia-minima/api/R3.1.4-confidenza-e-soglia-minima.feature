@@ -29,3 +29,7 @@ Funzionalità: R3.1.4 Confidenza e soglia minima
     Dato che l'agente di "alfa" ha deciso di aprire long su "BTC" con confidenza 75
     Quando "anna" apre nella dashboard il dettaglio di quel ciclo
     Allora la decisione su "BTC" mostra confidenza 75
+
+  Scenario: La modifica della confidenza minima crea una versione
+    Quando "anna" imposta la confidenza minima di "alfa" a 70
+    Allora la configurazione di "alfa" passa alla versione successiva con confidenza minima 70

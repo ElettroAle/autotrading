@@ -37,3 +37,13 @@ Funzionalità: R2.3.10 Avviso della rete di test
     Dato che il flusso "delta" è assegnato a un conto sulla rete reale
     Quando "anna" apre il flusso "delta"
     Allora la pagina non mostra l'avviso della rete di test
+
+  Scenario: L'avviso della rete di test è giallo
+    Dato che "anna" ha il conto "test-1" su un exchange configurato sulla rete di test "testnet"
+    Quando "anna" apre i suoi conti
+    Allora il segno della rete del conto "test-1" è giallo
+
+  Scenario: L'avviso della rete reale è rosso
+    Dato che "anna" ha il conto "vero-1" su un exchange configurato sulla rete reale
+    Quando "anna" apre i suoi conti
+    Allora il segno della rete del conto "vero-1" è rosso

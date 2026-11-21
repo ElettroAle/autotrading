@@ -23,3 +23,12 @@ Funzionalità: R2.2.5 Posizioni chiuse del flusso
     Dato che il flusso "beta" non ha posizioni chiuse
     Quando "anna" apre le posizioni chiuse del flusso "beta"
     Allora la pagina mostra "Nessuna posizione chiusa"
+
+  Scenario: Direzione, istanti, commissioni e motivo della chiusura
+    Quando "anna" apre le posizioni chiuse del flusso "alfa"
+    Allora la prima riga mostra direzione long, gli istanti di apertura e di chiusura, commissioni 0,08 USDC e motivo "decisione dell'agente"
+
+  Scenario: Importi senza valuta se la valuta del conto non è disponibile
+    Dato che l'exchange del conto del flusso "alfa" non risponde
+    Quando "anna" apre le posizioni chiuse del flusso "alfa"
+    Allora la prima riga mostra PnL +15 e commissioni 0,08 senza valuta

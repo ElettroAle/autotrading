@@ -161,3 +161,37 @@ Then(
     );
   },
 );
+
+When(
+  "{string} sceglie nel flusso {string} l'adapter {string} della fonte {string}",
+  async ({ dashboard, memory }, account: string, flow: string, adapter: string, source: string) => {
+    await openEditorAs(dashboard, account, flow);
+    await activate(dashboard, source);
+    await adaptersOf(dashboard, source)
+      .getByRole('checkbox', { name: adapter, exact: true })
+      .check();
+    // The catalog of the scenario keeps the adapter chosen alone, as the form shows it.
+    const offered = catalogSource(source);
+    memory.sourceCatalog = [
+      { ...offered, adapters: offered.adapters.filter((each) => each.name === adapter) },
+    ];
+  },
+);
+
+Then(
+  "il modulo dell'adapter ha il peso e un campo per ogni parametro dichiarato, con i limiti e il valore predefinito",
+  async ({ dashboard, memory }) => {
+    const [source] = memory.sourceCatalog;
+    const [declared] = source?.adapters ?? [];
+    expect(declared, "l'adapter è nel catalogo").toBeDefined();
+    const label = `${source?.name ?? ''} · ${declared?.name ?? ''}`;
+    await expect(dashboard.field(`Peso di ${label}`)).toBeVisible();
+    expect(declared?.parameters.length).toBeGreaterThan(0);
+    for (const parameter of declared?.parameters ?? []) {
+      const field = dashboard.field(`${parameter.label} di ${label}`);
+      await expect(field).toHaveAttribute('min', String(parameter.minimum));
+      await expect(field).toHaveAttribute('max', String(parameter.maximum));
+      await expect(field).toHaveAttribute('placeholder', String(parameter.default));
+    }
+  },
+);

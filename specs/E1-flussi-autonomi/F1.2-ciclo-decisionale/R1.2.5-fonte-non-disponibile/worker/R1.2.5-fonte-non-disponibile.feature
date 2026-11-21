@@ -24,6 +24,21 @@ Funzionalità: R1.2.5 Fonte dati non disponibile
     E il ciclo registra la fonte "notizie" come assente con il motivo "nessuna risposta entro 60 secondi"
     E il ciclo prosegue fino alla decisione dell'agente
 
+  Scenario: Una fonte risponde con un errore
+    Dato che la fonte "notizie" risponde con l'errore "limite di richieste superato"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il contesto inviato all'agente contiene i dati della fonte "indicatori"
+    E il contesto dichiara mancanti i dati della fonte "notizie"
+    E il ciclo registra la fonte "notizie" come assente con il motivo "limite di richieste superato"
+    E il ciclo prosegue fino alla decisione dell'agente
+
+  Scenario: Le fonti si interrogano in parallelo
+    Dato che le fonti "indicatori" e "notizie" rispondono dopo 40 secondi ciascuna
+    Quando il flusso "alfa" esegue un ciclo
+    Allora le fonti "indicatori" e "notizie" sono interrogate insieme
+    E il contesto inviato all'agente contiene i dati delle fonti "indicatori" e "notizie"
+    E nessuna fonte è registrata come assente
+
   Scenario: Tempo massimo di risposta per un intervallo breve
     Dato che il flusso "alfa" ha intervallo di ciclo di 2 minuti
     E che la fonte "notizie" risponde dopo 40 secondi

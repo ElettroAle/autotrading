@@ -14,12 +14,13 @@ from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.notifications.link_chat import LinkChatCommand
 from autotrading.application.orders.close_position import ClosePositionCommand
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.flows.account_reconciliation import AccountReading
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.cycles import FakeTransientError
-from tests.support.activity import a_position, an_activity
+from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flow_cycles import FlowCycles
 from tests.support.notifications import chat_named, told_in
 from tests.support.platform import HYPERLIQUID
@@ -159,6 +160,8 @@ def position_closes_for(flow_cycles: FlowCycles, asset: str, flow: str, reason: 
         use_cases.remove_account_with_flows.execute(
             RemoveAccountWithFlowsCommand(operating.assigned_account_id, user_id, confirmed=True)
         )
+    elif reason == "chiusura fuori dalla piattaforma":
+        close_outside(flow_cycles, flow, asset, Decimal(pnl.replace(",", ".")))
     else:
         assert reason == "comando manuale", reason
         use_cases.close_position.execute(ClosePositionCommand(operating.assigned_account_id, asset, user_id))
@@ -242,3 +245,41 @@ def failed_sending_recorded(caplog: pytest.LogCaptureFixture) -> None:
 @then("nessuna notifica viene inviata")
 def nothing_sent(flow_cycles: FlowCycles) -> None:
     assert flow_cycles.platform.messenger.sent == []
+
+
+@given(quoted('che l\'exchange rifiuta le credenziali del conto del flusso "{flow}" perché "{reason}"'))
+def credentials_refused(flow_cycles: FlowCycles, flow: str, reason: str) -> None:
+    flow_cycles.platform.hyperliquid.revoke(flow_cycles.credentials_of(flow), reason)
+
+
+@when(quoted('sul conto di "{flow}" compare un\'esecuzione non attribuibile su "{asset}"'))
+def unattributable_fill(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
+    # The fills of an account are reconciled from its second reading on: the first cycle reads it once.
+    flow_cycles.run(flow)
+    flow_cycles.clock.current += CYCLE
+    address = flow_cycles.credentials_of(flow).value("account_address")
+    manual = a_fill(asset, None, fill_id="manuale", executed_at=flow_cycles.clock.now() - timedelta(minutes=1))
+    flow_cycles.platform.activity_reader.executions.setdefault(address, []).append(manual)
+    flow_cycles.run(flow)
+
+
+def close_outside(flow_cycles: FlowCycles, flow: str, asset: str, pnl: Decimal) -> None:
+    """The position the cycle opened is gone from the exchange at the next reading, sold outside the platform."""
+    platform, operating = flow_cycles.platform, flow_cycles.flow(flow)
+    address = flow_cycles.credentials_of(flow).value("account_address")
+    open_assets = {operating.id: frozenset({asset})}
+    platform.readings.save_reading(AccountReading(operating.assigned_account_id, flow_cycles.clock.now(), open_assets))
+    flow_cycles.clock.current += CYCLE
+    sold_at = flow_cycles.clock.now() - timedelta(minutes=1)
+    sale = a_fill(asset, None, realized_pnl=pnl, fill_id="fuori", executed_at=sold_at)
+    platform.activity_reader.executions.setdefault(address, []).append(sale)
+    answer(flow_cycles)
+    flow_cycles.run(flow)
+
+
+@then(quoted('nessuna notifica della chat "{chat}" contiene le credenziali del conto del flusso "{flow}"'))
+def notifications_without_credentials(flow_cycles: FlowCycles, chat: str, flow: str) -> None:
+    received = flow_cycles.platform.messenger.received_by(chat_named(chat))
+    secrets = [value for value in flow_cycles.credentials_of(flow).values.values() if value]
+    assert received
+    assert [message for message in received if any(secret in message for secret in secrets)] == []

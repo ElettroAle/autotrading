@@ -9,6 +9,8 @@ Funzionalità: R1.1.4 Avvio, pausa e ripresa di un flusso
   Solo un flusso attivo esegue cicli. In pausa il flusso non prende nuove decisioni e le sue posizioni restano
   aperte sull'exchange; alla ripresa riparte dal proprio stato, con le stesse posizioni e lo stesso capitale.
   Si avvia un flusso fermo; si mette in pausa un flusso attivo; si riprende un flusso in pausa.
+  Un flusso fermo si avvia solo se il suo capitale allocato non supera il capitale libero del conto letto all'avvio,
+  senza contare il flusso stesso: il saldo può essere sceso mentre era fermo. La ripresa non chiede capitale.
 
   Fuori ambito: lo stop (R1.1.5), l'archiviazione (R1.1.6), la pausa automatica per errori permanenti (R1.2.4).
 
@@ -20,6 +22,13 @@ Funzionalità: R1.1.4 Avvio, pausa e ripresa di un flusso
     Quando "anna" avvia il flusso "alfa"
     Allora il flusso "alfa" è nello stato "attivo"
     E il flusso "alfa" esegue il primo ciclo all'avvio
+
+  Scenario: Avvio rifiutato se il capitale allocato supera il capitale libero letto ora
+    Dato che il flusso "alfa" è fermo con capitale allocato 100 USDC
+    E che il saldo del conto "test-1" letto ora è 60 USDC
+    Quando "anna" avvia il flusso "alfa"
+    Allora il comando è rifiutato con il motivo "capitale allocato oltre il capitale libero: 60 USDC"
+    E il flusso "alfa" è nello stato "fermo"
 
   Scenario: Pausa di un flusso attivo
     Dato che il flusso "alfa" è attivo con una posizione aperta su "BTC"

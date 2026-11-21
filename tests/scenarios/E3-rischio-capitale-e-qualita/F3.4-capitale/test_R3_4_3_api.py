@@ -56,6 +56,8 @@ class Returns:
     curve: FlowEquity | None = None
     curve_changes: tuple[CapitalHistoryEntry, ...] = ()
     currency: str = ""
+    summary_return: Decimal | None = None
+    state_return: Decimal | None = None
 
     @property
     def flow(self) -> Flow:
@@ -221,6 +223,29 @@ def open_curve(returns: Returns, user: str, name: str) -> None:
     window = TimeWindow(min(instants), max(instants) + timedelta(seconds=1))
     page = use_cases.list_capital_changes.execute(ListCapitalChangesCommand(returns.flow.id, window=window))
     returns.curve_changes, returns.currency = page.entries, page.currency
+
+
+@when(quoted('"{user}" apre il riepilogo dei suoi flussi'))
+def open_summary(returns: Returns, user: str) -> None:
+    assert user == returns.user
+    use_cases = returns.flow_cycles.platform.use_cases_of(user)
+    overviews = use_cases.list_flow_overviews.execute(ListFlowOverviewsCommand())
+    (overview,) = [each for each in overviews if each.summary.name == returns.name]
+    assert overview.capital is not None
+    returns.summary_return = overview.capital.percent
+    returns.state_return = returns.results().total_gain_percent
+
+
+@then(quoted('il riepilogo di "{name}" mostra il rendimento {percent}%'))
+def summary_return(returns: Returns, name: str, percent: str) -> None:
+    assert name == returns.name
+    assert returns.summary_return == number(percent)
+
+
+@then(quoted('lo stato di "{name}" mostra il rendimento {percent}%'))
+def state_return(returns: Returns, name: str, percent: str) -> None:
+    assert name == returns.name
+    assert returns.state_return == number(percent)
 
 
 @then(quoted('il rendimento di "{name}" è {percent}%'))

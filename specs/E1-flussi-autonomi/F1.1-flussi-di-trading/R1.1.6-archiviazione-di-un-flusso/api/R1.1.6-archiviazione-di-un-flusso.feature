@@ -37,3 +37,15 @@ Funzionalità: R1.1.6 Archiviazione di un flusso
     Dato che il flusso "alfa" è archiviato
     Quando "anna" modifica il modello del flusso "alfa"
     Allora la modifica è rifiutata con il motivo "un flusso archiviato non si modifica"
+
+  Scenario: Un flusso archiviato non si avvia
+    Dato che il flusso "alfa" è archiviato
+    Quando "anna" avvia il flusso "alfa"
+    Allora l'avvio è rifiutato con il motivo "comando avvia non ammesso per un flusso archiviato"
+    E il flusso "alfa" è nello stato "archiviato"
+
+  Scenario: Versioni e posizioni chiuse di un flusso archiviato restano consultabili
+    Dato che il flusso "alfa" ha 2 versioni della configurazione e una posizione chiusa su "BTC"
+    E che il flusso "alfa" è archiviato
+    Allora le 2 versioni della configurazione del flusso "alfa" restano consultabili
+    E la posizione chiusa su "BTC" del flusso "alfa" resta consultabile

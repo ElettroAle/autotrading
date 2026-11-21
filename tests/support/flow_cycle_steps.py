@@ -11,20 +11,24 @@ import pytest
 from pytest_bdd import given, parsers, then, when
 
 from autotrading.application.agent.errors import ModelCreditExhaustedError, ModelKeyRejectedError
+from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
+from autotrading.domain.flows.selections import AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import SHORT_HORIZONS, ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from tests.fakes.model_call import TooManyRequestsAnswer
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import BALANCE, FlowCycles, at
 from tests.support.flows import ANTHROPIC_MODEL
-from tests.support.source_selections import reader_of
+from tests.support.source_selections import PLATFORM_CATALOG, a_source_request, reader_of
 from tests.support.steps import quoted
 
 
@@ -252,6 +256,14 @@ def credit_exhausted(flow_cycles: FlowCycles, provider: str) -> None:
     flow_cycles.model.failure = ModelCreditExhaustedError(ProviderName(provider))
 
 
+@given(quoted('che il fornitore "{provider}" risponde "troppe richieste" con il messaggio "{message}"'))
+def provider_rate_limited(flow_cycles: FlowCycles, provider: str, message: str) -> None:
+    # Read as credit exhausted by its message, the answer is still a limit of frequency by its code.
+    failure = ModelCreditExhaustedError(ProviderName(provider))
+    failure.__cause__ = TooManyRequestsAnswer(f"429 {message}")
+    flow_cycles.model.failure = failure
+
+
 @given(quoted('che il fornitore "{provider}" rifiuta la chiave'))
 def key_rejected(flow_cycles: FlowCycles, provider: str) -> None:
     flow_cycles.model.failure = ModelKeyRejectedError(ProviderName(provider))
@@ -329,6 +341,43 @@ def no_news_last_hour(flow_cycles: FlowCycles) -> None:
 
 
 # When
+
+
+@pytest.fixture
+def modification() -> list[AutotradingError]:
+    """The refusal of the modification the scenario asks, if any."""
+    return []
+
+
+@when(
+    parsers.re(
+        r'^"(?P<user>[^"]+)" imposta sul flusso "(?P<flow>[^"]+)" la fonte "(?P<source>[^"]+)" '
+        r"con (?P<label>[^\d]+) (?P<value>\d+)$"
+    )
+)
+def set_source_parameter(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles,
+    modification: list[AutotradingError],
+    user: str,
+    flow: str,
+    source: str,
+    label: str,
+    value: str,
+) -> None:
+    name, adapter = reader_of(source)
+    parameters = PLATFORM_CATALOG.find(name).definition.parameters
+    (key,) = [parameter.key for parameter in parameters if parameter.label == label]
+    request = a_source_request(source, None, {key: int(value)}, adapter)
+    command = ModifyFlowCommand(flow_cycles.flow(flow).id, sources=(request,))
+    try:
+        flow_cycles.platform.use_cases_of(user).modify_flow.execute(command)
+    except AutotradingError as error:
+        modification.append(error)
+
+
+@then(quoted('la modifica è rifiutata con il motivo "{reason}"'))
+def modification_refused(modification: list[AutotradingError], reason: str) -> None:
+    assert [str(error) for error in modification] == [reason]
 
 
 @when(quoted('il flusso "{flow}" esegue un ciclo'))
@@ -518,7 +567,12 @@ def instructions_in_context(flow_cycles: FlowCycles, instructions: str) -> None:
     assert flow_cycles.system_text().startswith(instructions + "\n")
 
 
-@then(quoted("il contesto contiene le regole operative con leva ammessa da {lowest} a {highest}"))
+@then(
+    quoted(
+        "il contesto contiene le regole operative: al massimo una posizione per asset, azioni ammesse, "
+        "leva da {lowest} a {highest} e formato della risposta"
+    )
+)
 def operational_rules(flow_cycles: FlowCycles, lowest: str, highest: str) -> None:
     text = flow_cycles.system_text()
     assert f"- leva da {lowest} a {highest};" in text
@@ -556,6 +610,27 @@ def capital_in_context(flow_cycles: FlowCycles, capital: str, liquidity: str) ->
     assert state["valuta"] == "USDC"
     assert Decimal(str(state["capitale_allocato"])) == number(capital)
     assert Decimal(str(state["liquidita_disponibile"])) == number(liquidity)
+
+
+@then(parsers.re(r"^il contesto contiene il valore complessivo del flusso (?P<value>[\d,]+) USDC$"))
+def total_value_in_context(flow_cycles: FlowCycles, value: str) -> None:
+    assert Decimal(str(state_in_context(flow_cycles)["valore_complessivo"])) == number(value)
+
+
+@given(quoted('che il flusso "{flow}" ha attiva la fonte "{source}" con peso {weight}'))
+def weighted_source(flow_cycles: FlowCycles, flow: str, source: str, weight: str) -> None:
+    name, adapter = reader_of(source)
+    parameters = PLATFORM_CATALOG.find(name).settings(adapter, {})
+    selection = SourceSelection(name, (AdapterSelection(adapter, int(weight), parameters),))
+    flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, sources=(selection,)))
+
+
+@then(quoted('il contesto contiene i dati della fonte "{source}" per "{first}" e per "{second}" con peso {weight}'))
+def source_data_in_context(flow_cycles: FlowCycles, source: str, first: str, second: str, weight: str) -> None:
+    entries = flow_cycles.context()["fonti"]
+    assert isinstance(entries, list)
+    shown = [(entry["asset"], entry["peso"], bool(entry["valori"])) for entry in entries if entry["fonte"] == source]
+    assert shown == [(first, int(weight), True), (second, int(weight), True)]
 
 
 @then(parsers.re(r"^il contesto contiene i soldi del flusso (?P<funds>[\d,]+) USDC$"))

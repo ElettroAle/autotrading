@@ -234,3 +234,50 @@ Then(
     );
   },
 );
+
+Then(
+  "il conto {string} mostra nell'elenco nome, rete, stato della riconciliazione, saldo, capitale libero e il menu delle azioni",
+  async ({ dashboard }, name: string) => {
+    const item = dashboard.accountItem(name);
+    await expect(item.getByRole('link', { name, exact: true })).toBeVisible();
+    await expect(dashboard.accountNetwork(name)).toBeVisible();
+    await expect(item.getByRole('status', { name: 'Stato della riconciliazione' })).toBeVisible();
+    await expect(dashboard.accountItemDetail(name, 'Saldo (con risultato aperto)')).toBeVisible();
+    await expect(dashboard.accountItemDetail(name, 'Capitale libero')).toBeVisible();
+    await expect(
+      item.getByRole('button', { name: `Azioni del conto ${name}`, exact: true }),
+    ).toBeVisible();
+    // The rest of the account is on its page: no form and no tab in the list (Bug 616).
+    await expect(item.getByRole('textbox')).toHaveCount(0);
+    await expect(dashboard.page.getByRole('navigation', { name: 'Schede del conto' })).toHaveCount(
+      0,
+    );
+  },
+);
+
+When(
+  "{string} apre il conto {string} dall'elenco",
+  async ({ dashboard, memory }, account: string, name: string) => {
+    expectSignedIn(memory, account);
+    await reopenWithAccount(dashboard, name);
+    await dashboard.openAccount(name);
+  },
+);
+
+Then(
+  'la pagina del conto ha le schede {string}, {string}, {string} e {string} e mostra {string}',
+  async (
+    { dashboard },
+    first: string,
+    second: string,
+    third: string,
+    fourth: string,
+    shown: string,
+  ) => {
+    const tabs = dashboard.page
+      .getByRole('navigation', { name: 'Schede del conto' })
+      .getByRole('link');
+    await expect(tabs).toHaveText([first, second, third, fourth]);
+    await expect(dashboard.accountTab(shown)).toHaveAttribute('aria-current', 'page');
+  },
+);

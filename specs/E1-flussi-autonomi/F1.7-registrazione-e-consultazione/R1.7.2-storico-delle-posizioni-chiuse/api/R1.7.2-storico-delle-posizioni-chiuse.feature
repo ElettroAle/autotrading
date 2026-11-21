@@ -26,6 +26,12 @@ Funzionalità: R1.7.2 Storico delle posizioni chiuse
     E la posizione ha PnL 2 USDC pari al 4% del margine e commissioni 0,08 USDC
     E la posizione ha motivo di chiusura "decisione dell'agente"
 
+  Scenario: Cicli e istanti di apertura e di chiusura
+    Dato che il flusso "alfa" ha aperto una posizione su "BTC" nel ciclo delle 10:00 e l'agente l'ha chiusa nel ciclo delle 10:15
+    Quando "anna" consulta lo storico delle posizioni chiuse del flusso "alfa"
+    Allora la posizione ha ciclo di apertura delle 10:00 e ciclo di chiusura delle 10:15
+    E la posizione ha per istanti di apertura e di chiusura quelli delle due esecuzioni
+
   Schema dello scenario: Motivi di chiusura
     Dato che una posizione del flusso "alfa" è stata chiusa per <evento>
     Quando "anna" consulta lo storico delle posizioni chiuse del flusso "alfa"

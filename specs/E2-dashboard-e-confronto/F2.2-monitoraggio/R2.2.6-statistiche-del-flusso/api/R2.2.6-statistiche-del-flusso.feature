@@ -36,3 +36,7 @@ Funzionalità: R2.2.6 Statistiche del flusso
     Dato che il flusso "beta" non ha posizioni chiuse
     Quando "anna" apre le statistiche del flusso "beta"
     Allora vede 0 operazioni e win rate "non disponibile"
+
+  Scenario: Statistiche dall'interfaccia programmatica
+    Quando "anna" chiede all'interfaccia programmatica le statistiche del flusso "alfa"
+    Allora la risposta riporta 2 vinte, 2 perse, win rate 50,00%, commissioni 3 USDC, 4 operazioni e costo del modello 1,20 USD

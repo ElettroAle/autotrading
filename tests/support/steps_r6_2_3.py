@@ -4,18 +4,23 @@ api-degli-avvisi-e-link-nelle-notifiche). playwright-bdd runs the same scenarios
 """
 
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
 import pytest
-from pytest_bdd import given, then, when
+from pytest_bdd import given, parsers, then, when
 
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
+from autotrading.application.agent.remove_provider_key import RemoveProviderKeyCommand
+from autotrading.application.agent.set_provider_key_expiry import SetProviderKeyExpiryCommand
+from autotrading.application.flows.archive_flow import ArchiveFlowCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.confirm_reconciliation import ConfirmReconciliationCommand
 from autotrading.application.flows.errors import FlowCredentialsRejectedError
+from autotrading.application.flows.list_unattributable import ListUnattributableCommand
 from autotrading.application.flows.pause_affected_flows import PauseAffectedFlowsCommand, PauseAffectedFlowsUseCase
+from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.application.notifications.get_alert import GetAlertCommand
 from autotrading.application.notifications.list_alerts import ListAlertsCommand
 from autotrading.application.notifications.notify_reconciliation_alarm import NotifyReconciliationAlarmUseCase
@@ -25,6 +30,7 @@ from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.unattributable import UnattributableKind
+from autotrading.domain.flows.unattributable_page import UnattributableFilter, UnattributablePage
 from autotrading.domain.notifications.alert import (
     Alert,
     AlertKind,
@@ -48,6 +54,14 @@ CHAT = ChatId(6230)
 USDC = "USDC"
 # The balance the account had at the previous reading, and the one an alarm reads beyond the threshold of 1%.
 REFERENCE, READ_BEYOND = Decimal(1000), Decimal(980)
+# The alerts as the scenarios name them.
+KINDS = {
+    "allarme di riconciliazione": AlertKind.RECONCILIATION_ALARM,
+    "pausa automatica": AlertKind.FLOW_PAUSED,
+    "esecuzione senza identificativo": AlertKind.UNATTRIBUTABLE_FILL,
+}
+SEVERITIES = {"critica": AlertSeverity.CRITICAL, "attenzione": AlertSeverity.WARNING}
+RESOURCE_KINDS = {"conto": AlertResourceKind.ACCOUNT, "flusso": AlertResourceKind.FLOW}
 
 
 @dataclass
@@ -58,6 +72,7 @@ class Alerts:
     listed: list[Alert] = field(default_factory=list)
     detail: Alert | None = None
     alert_of_bruno: Alert | None = None
+    movements: UnattributablePage | None = None
 
     @property
     def platform(self) -> Platform:
@@ -115,8 +130,22 @@ class Alerts:
         ending = self.cycles.flow(flow)
         self.cycles.ports_of(ending.tenant_id).end_cycle.execute(ending.id.value, READ_AT, ())
 
+    def stop(self, flow: str, user: str = "anna") -> None:
+        command = StopFlowCommand(self.cycles.flow(flow).id, self.platform.user_id_of(user))
+        self.use_cases(user).stop_flow.execute(command)
+
+    def on(self, day: datetime) -> None:
+        """The instant of the worker and of the API."""
+        self.cycles.clock.current = day
+        self.platform.now = day
+
     def open_page(self, criteria: AlertFilter) -> None:
         self.listed = list(self.use_cases().list_alerts.execute(ListAlertsCommand(criteria)).alerts)
+
+
+def day_of(text: str) -> datetime:
+    """«17/11/2026», as the scenarios write a day, at its start."""
+    return datetime.strptime(text, "%d/%m/%Y").replace(tzinfo=UTC)
 
 
 @pytest.fixture
@@ -194,6 +223,52 @@ def other_user_alert(alerts: Alerts, user: str) -> None:
     [alerts.alert_of_bruno] = alerts.all_alerts(user)
 
 
+@given(quoted('che sul conto "{account}" è aperto l\'avviso di una posizione su un asset di nessun flusso'))
+def foreign_position_open(alerts: Alerts, account: str) -> None:
+    position_of_no_flow(alerts)
+    assert alerts.only(AlertKind.UNATTRIBUTABLE_POSITION).cause.resource.resource_id == alerts.account(account)
+
+
+@given(quoted('che la chiave "{key}" scade tra {days} giorni con un avviso aperto'))
+def key_expiring_with_alert(alerts: Alerts, key: str, days: str) -> None:
+    today = alerts.cycles.clock.now()
+    alerts.on(today)
+    expiry = (today + timedelta(days=int(days))).date()
+    alerts.use_cases().set_provider_key_expiry.execute(SetProviderKeyExpiryCommand(key, expiry))
+    alerts.platform.check_key_expiries(alerts.tenant())
+    assert alerts.only(AlertKind.KEY_EXPIRING).is_open
+
+
+@given(
+    parsers.re(
+        r'che il (?P<day>\d{2}/\d{2}/\d{4}) sul conto "(?P<account>[^"]+)" si è aperto un allarme di riconciliazione'
+    )
+)
+def alarm_opened_on(alerts: Alerts, day: str, account: str) -> None:
+    alerts.on(day_of(day))
+    alerts.raise_alarm(account)
+
+
+@given(parsers.re(r'che il (?P<day>\d{2}/\d{2}/\d{4}) il flusso "(?P<flow>[^"]+)" è andato in pausa automatica'))
+def paused_on(alerts: Alerts, day: str, flow: str) -> None:
+    alerts.on(day_of(day))
+    alerts.pause_on_its_own(flow)
+
+
+@given(quoted('che l\'allarme di riconciliazione del conto "{account}" si è risolto {days} giorni fa'))
+def alarm_resolved_days_ago(alerts: Alerts, account: str, days: str) -> None:
+    alerts.on(READ_AT - timedelta(days=int(days)))
+    alerts.raise_alarm(account)
+    alerts.use_cases().confirm_reconciliation.execute(ConfirmReconciliationCommand(alerts.account(account)))
+
+
+@given(quoted('che la pausa automatica del flusso "{flow}" si è risolta {days} giorni fa'))
+def pause_resolved_days_ago(alerts: Alerts, flow: str, days: str) -> None:
+    alerts.on(READ_AT - timedelta(days=int(days)))
+    alerts.pause_on_its_own(flow)
+    resume(alerts, "anna", flow)
+
+
 # When
 
 
@@ -254,7 +329,100 @@ def open_account_alarms(alerts: Alerts, user: str, account: str) -> None:
     alerts.open_page(AlertFilter(resource_id=alerts.account(account)))
 
 
+@when(quoted('il flusso "{flow}" esegue un ciclo senza più quella posizione sul conto'))
+def cycle_without_position(alerts: Alerts, flow: str) -> None:
+    alerts.platform.activity_reader.activities[alerts.address(flow)] = an_activity(
+        read_at=READ_AT + timedelta(minutes=15)
+    )
+    alerts.end_cycle(flow)
+
+
+@when(quoted('"{user}" ferma il flusso "{flow}"'))
+def stops(alerts: Alerts, user: str, flow: str) -> None:
+    alerts.stop(flow, user)
+
+
+@when(quoted('"{user}" ferma e archivia il flusso "{flow}"'))
+def stops_and_archives(alerts: Alerts, user: str, flow: str) -> None:
+    alerts.stop(flow, user)
+    # The stop resolves the alert as well: it is resolved again, at the archiving, only if still open.
+    alerts.use_cases(user).archive_flow.execute(ArchiveFlowCommand(alerts.cycles.flow(flow).id))
+
+
+@when(quoted('"{user}" ferma il flusso "{flow}" e rimuove la chiave "{key}"'))
+def stops_and_removes_key(alerts: Alerts, user: str, flow: str, key: str) -> None:
+    alerts.stop(flow, user)
+    assert alerts.only(AlertKind.KEY_EXPIRING).is_open
+    alerts.use_cases(user).remove_provider_key.execute(RemoveProviderKeyCommand(key))
+
+
+@when("la piattaforma controlla le scadenze")
+def checks_expiries(alerts: Alerts) -> None:
+    alerts.platform.check_key_expiries(alerts.tenant())
+
+
+@when(quoted('"{user}" filtra gli avvisi per gravità "{severity}"'))
+def filters_by_severity(alerts: Alerts, user: str, severity: str) -> None:
+    assert user == "anna"
+    alerts.open_page(AlertFilter(severity=SEVERITIES[severity]))
+
+
+@when(quoted('"{user}" filtra gli avvisi per tipo di risorsa "{kind}"'))
+def filters_by_resource_kind(alerts: Alerts, user: str, kind: str) -> None:
+    assert user == "anna"
+    alerts.open_page(AlertFilter(resource_kind=RESOURCE_KINDS[kind]))
+
+
+@when(parsers.re(r'"(?P<user>[^"]+)" filtra gli avvisi aperti dal (?P<since>[\d/]+) al (?P<until>[\d/]+)'))
+def filters_by_period(alerts: Alerts, user: str, since: str, until: str) -> None:
+    assert user == "anna"
+    alerts.open_page(AlertFilter(since=day_of(since), until=day_of(until)))
+
+
+@when(quoted('sul conto "{account}" si apre un nuovo allarme di riconciliazione'))
+def new_alarm(alerts: Alerts, account: str) -> None:
+    alerts.on(READ_AT)
+    alerts.raise_alarm(account)
+
+
+@when(quoted('"{user}" apre i movimenti non spiegati del conto "{account}"'))
+def opens_movements(alerts: Alerts, user: str, account: str) -> None:
+    command = ListUnattributableCommand(alerts.account(account), UnattributableFilter())
+    alerts.movements = alerts.use_cases(user).list_unattributable.execute(command)
+
+
 # Then
+
+
+@then("l'avviso della posizione è risolto")
+def position_alert_resolved(alerts: Alerts) -> None:
+    assert alerts.only(AlertKind.UNATTRIBUTABLE_POSITION).state is AlertState.RESOLVED
+
+
+@then(quoted('l\'avviso della chiave "{key}" è risolto'))
+def key_alert_resolved(alerts: Alerts, key: str) -> None:
+    alert = alerts.only(AlertKind.KEY_EXPIRING)
+    assert (alert.cause.resource.name, alert.state) == (key, AlertState.RESOLVED)
+
+
+@then(quoted('vede gli avvisi "{names}"'))
+def sees_alerts(alerts: Alerts, names: str) -> None:
+    expected = sorted(KINDS[name] for name in names.split(", "))
+    assert sorted(alert.cause.kind for alert in alerts.listed) == expected
+
+
+@then(quoted('"{user}" vede l\'avviso aperto "{opened}" e quello risolto "{resolved}"'))
+def sees_kept_alerts(alerts: Alerts, user: str, opened: str, resolved: str) -> None:
+    kept = sorted((alert.cause.kind, alert.state) for alert in alerts.all_alerts(user))
+    assert kept == sorted([(KINDS[opened], AlertState.OPEN), (KINDS[resolved], AlertState.RESOLVED)])
+
+
+@then(quoted("vede la variazione del saldo di {change} con il totale netto delle variazioni {net}"))
+def sees_movements(alerts: Alerts, change: str, net: str) -> None:
+    assert alerts.movements is not None
+    [case] = alerts.movements.cases
+    assert (case.item.kind, case.item.amount) == (UnattributableKind.BALANCE_CHANGE, Decimal(change))
+    assert (alerts.movements.count, alerts.movements.net_change) == (1, Decimal(net))
 
 
 @then(

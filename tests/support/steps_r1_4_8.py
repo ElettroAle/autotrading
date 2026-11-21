@@ -7,6 +7,7 @@ from pytest_bdd import given, parsers, then, when
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.domain.agent.answer_format import DECISIONS_FORMAT
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows import flow_configuration
 from autotrading.domain.flows.errors import UnknownPromptPlaceholderError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -151,3 +152,29 @@ def default_restored(flow_cycles: FlowCycles, prompt_change: PromptChange, flow:
 def schema_still_requested(flow_cycles: FlowCycles) -> None:
     assert flow_cycles.system_text() == "Sei un trader prudente"
     assert flow_cycles.model.calls[-1].answer == DECISIONS_FORMAT
+
+
+@given(quoted('che il flusso "{flow}" segue il system prompt predefinito'))
+def follows_default(flow_cycles: FlowCycles, flow: str) -> None:
+    assert flow_cycles.flow(flow).configuration.system_prompt is None
+
+
+@given(quoted('che la piattaforma aggiorna il system prompt predefinito in "{prompt}"'))
+def default_updated(monkeypatch: pytest.MonkeyPatch, prompt: str) -> None:
+    # A new release of the platform brings another default: the configuration reads the one of the release running.
+    monkeypatch.setattr(flow_configuration, "DEFAULT_SYSTEM_PROMPT", prompt)
+
+
+@then(quoted('il flusso "{flow}" resta alla versione di configurazione {version}'))
+def version_kept(flow_cycles: FlowCycles, flow: str, version: str) -> None:
+    configuration = flow_cycles.flow(flow).configuration
+    assert (configuration.version, configuration.system_prompt) == (int(version), None)
+
+
+@then(quoted('il flusso "{flow}" ha la versione di configurazione {version} con il system prompt "{prompt}"'))
+def version_with_prompt(
+    flow_cycles: FlowCycles, prompt_change: PromptChange, flow: str, version: str, prompt: str
+) -> None:
+    assert prompt_change.error is None
+    configuration = flow_of(flow_cycles, prompt_change.user, flow).configuration
+    assert (configuration.version, configuration.system_prompt) == (int(version), prompt)

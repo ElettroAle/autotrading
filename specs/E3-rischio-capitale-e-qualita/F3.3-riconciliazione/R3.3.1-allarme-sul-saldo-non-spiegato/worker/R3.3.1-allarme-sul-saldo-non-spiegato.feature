@@ -104,3 +104,9 @@ Funzionalità: R3.3.1 Allarme sul saldo non spiegato
     Quando il conto si riconcilia
     Allora il saldo atteso è 1003,9
     E nessuna variazione del saldo non spiegata si registra
+
+  Scenario: Aggiornamento del piano deciso durante l'allarme
+    Dato che sul conto "test-1" c'è un allarme di riconciliazione
+    E che "alfa" ha una posizione aperta su "BTC"
+    Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" a 99
+    Allora "alfa" aggiorna il piano di uscita della posizione su "BTC"

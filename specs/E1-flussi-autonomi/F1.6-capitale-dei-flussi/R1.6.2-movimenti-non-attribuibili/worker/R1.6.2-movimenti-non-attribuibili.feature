@@ -42,6 +42,12 @@ Funzionalità: R1.6.2 Posizioni e movimenti non attribuibili
     Quando il flusso "alfa" esegue un ciclo
     Allora la posizione su "BTC" compare nello storico del flusso "alfa" come chiusa con il motivo "chiusa fuori dalla piattaforma"
 
+  Scenario: Esecuzione senza identificativo della piattaforma
+    Dato che sul conto "test-1" c'è un acquisto di 0,5 "SOL" senza identificativo della piattaforma
+    Quando il flusso "alfa" esegue un ciclo
+    E il flusso "alfa" esegue un altro ciclo
+    Allora per il conto "test-1" c'è una sola registrazione dell'esecuzione non attribuibile su "SOL" di 0,5
+
   Scenario: Variazione del saldo non spiegata
     Dato che il saldo del conto "test-1" è aumentato di 200 USDC senza esecuzioni dei flussi
     Quando il flusso "alfa" esegue un ciclo
