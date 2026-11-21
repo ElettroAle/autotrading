@@ -276,3 +276,24 @@ def position_totals(history: History, pnl: str, fees: str) -> None:
 @then(quoted("il totale delle commissioni degli ordini è {fees}"))
 def order_totals(history: History, fees: str) -> None:
     assert history.totals == OrderHistoryTotals(amount_of(fees))
+
+
+@given(quoted('che "{user}" ha anche il flusso "{flow}" con posizioni chiuse su "{asset}"'))
+def another_flow_with_positions(history: History, user: str, flow: str, asset: str) -> None:
+    owned = history.flow(user, flow)
+    for day in range(1, 31):
+        history.add_closed_position(owned, asset, day_of_november(day))
+
+
+# Choices in quick succession are the dashboard's (Bug 291): the API receives them together, in one query.
+@when(quoted('"{user}" sceglie in rapida successione il flusso "{flow}", l\'asset "{asset}" e le posizioni chiuse'))
+def quick_choices(history: History, user: str, flow: str, asset: str) -> None:
+    command = QueryClosedPositionHistoryCommand(HistoryFilter(flow_id=history.flows[flow].flow_id, asset=asset))
+    history.found = history.platform.use_cases_of(user).query_closed_position_history.execute(command).page.entries
+
+
+@then(quoted('ottiene solo le posizioni del flusso "{flow}" su "{asset}", con tutte le scelte nell\'indirizzo'))
+def positions_of_flow_and_asset(history: History, flow: str, asset: str) -> None:
+    positions = [entry for entry in history.found if isinstance(entry, ClosedPositionHistoryEntry)]
+    assert len(positions) == len(history.found) == 30
+    assert {(entry.flow_name, entry.position.asset) for entry in positions} == {(flow, asset)}

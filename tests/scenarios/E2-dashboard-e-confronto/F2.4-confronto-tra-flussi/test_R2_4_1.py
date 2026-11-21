@@ -15,7 +15,7 @@ from tests.support.draft_steps import *  # noqa: F403 - the steps of a draft, sh
 from tests.support.draft_steps import Draft
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flow_steps import provider_key_registered, valid_command
-from tests.support.flows import account_id_of
+from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.lifecycle_steps import *  # noqa: F403 - the steps of the life of a flow, shared by the features
 from tests.support.lifecycle_steps import Lifecycle, attempt, flow_named
 from tests.support.platform import Platform
@@ -213,3 +213,11 @@ def start_disabled(duplication: Duplication, text: str, link: str) -> None:
     assert draft.missing_before_start != ()
     assert text == f"Per avviarla manca: {listed(draft.missing_before_start)}"
     assert (draft.status, link) == (FlowStatus.DRAFT, "Configura")
+
+
+@given(quoted('che "{user}" ha la bozza "{name}" senza conto, capitale allocato né asset'))
+def bare_draft(platform: Platform, lifecycle: Lifecycle, user: str, name: str) -> None:
+    lifecycle.user = user
+    configuration = replace(a_configuration(), allocated_capital=None, assets=())
+    draft = a_flow(platform.tenant_of(user), name=name, status=FlowStatus.DRAFT, configuration=configuration)
+    platform.flows.flows.append(replace(draft, account_id=None))

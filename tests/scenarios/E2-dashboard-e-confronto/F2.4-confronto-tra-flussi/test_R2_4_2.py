@@ -10,9 +10,14 @@ import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from autotrading.application.flows.rank_flows import RankFlowsCommand
+from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_ranking import FlowRanking
+from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.equity_snapshots import InMemoryEquitySnapshotRepositoryAdapter
 from tests.support.flows import a_flow
 from tests.support.platform import Platform
@@ -25,6 +30,7 @@ CYCLE = timedelta(minutes=15)
 LONG_AGO = timedelta(days=20)
 TWO_DECIMALS = Decimal("0.01")
 POSITIONS = {"primo": 0, "secondo": 1, "terzo": 2}
+STATUSES = {"archiviato": FlowStatus.ARCHIVED, "in bozza": FlowStatus.DRAFT}
 
 
 def amount(text: str) -> Decimal:
@@ -42,6 +48,10 @@ class FlowCurve:
     user: str
     equity: list[Decimal]
     recent: int
+    status: FlowStatus = FlowStatus.ACTIVE
+    results: list[Decimal] = field(default_factory=list)
+    fees: Decimal = Decimal(0)
+    model_cost: Decimal = Decimal(0)
 
     def planned(self, now: datetime) -> list[datetime]:
         old = len(self.equity) - self.recent
@@ -57,8 +67,16 @@ class Ranking:
     owner: str = ""
     rows: tuple[FlowRanking, ...] | None = None
 
-    def give(self, user: str, flow: str, equity: list[Decimal], *, recent: bool = True) -> None:
-        self.curves[flow] = FlowCurve(user, equity, len(equity) if recent else 0)
+    def give(
+        self,
+        user: str,
+        flow: str,
+        equity: list[Decimal],
+        *,
+        recent: bool = True,
+        status: FlowStatus = FlowStatus.ACTIVE,
+    ) -> None:
+        self.curves[flow] = FlowCurve(user, equity, len(equity) if recent else 0, status)
 
     def open(self, user: str, period: str = "all") -> None:
         for name, curve in self.curves.items():
@@ -79,17 +97,39 @@ class Ranking:
         return [row.flow_name for row in self.shown()]
 
     def _record(self, name: str, curve: FlowCurve) -> None:
-        flow = a_flow(self.platform.tenant_of(curve.user), name=name)
+        flow = a_flow(self.platform.tenant_of(curve.user), name=name, status=curve.status)
         self.platform.flows.flows.append(flow)
         equity = InMemoryEquitySnapshotRepositoryAdapter(self.platform.equity_snapshots, flow.tenant_id)
         for planned_at, value in zip(curve.planned(self.platform.now), curve.equity, strict=True):
             equity.record(_snapshot(flow, planned_at, value))
+        closed_at = self.platform.now - CYCLE
+        share = curve.fees / len(curve.results) if curve.results else Decimal(0)
+        for result in curve.results:
+            self.platform.closed_positions.positions.append(_position(flow, closed_at, result, share))
+        cost = CallCost(1000, 100, curve.model_cost)
+        self.platform.cycles.record(CycleRecord(flow.id.value, closed_at, CycleOutcome.COMPLETED, cost=cost))
 
 
 def _snapshot(flow: Flow, planned_at: datetime, equity: Decimal) -> EquitySnapshot:
     capital = flow.configuration.allocated_capital
     assert capital is not None, "a flow that records its equity has an allocated capital"
     return EquitySnapshot(flow.id.value, planned_at, capital, equity - capital, Decimal(0), Decimal(0), Decimal(0))
+
+
+def _position(flow: Flow, closed_at: datetime, net_pnl: Decimal, fees: Decimal) -> ClosedPosition:
+    return ClosedPosition(
+        tenant_id=flow.tenant_id,
+        flow_id=flow.id,
+        asset="BTC",
+        side=TradeSide.LONG,
+        leverage=2,
+        margin=Decimal(50),
+        opening=PositionEnd(Decimal(100), closed_at - CYCLE),
+        closing=PositionEnd(Decimal(100), closed_at),
+        fees=fees,
+        reason=CloseReason.AGENT,
+        realized_pnl=net_pnl + fees,
+    )
 
 
 def percent(value: Decimal | None) -> Decimal | None:
@@ -114,6 +154,22 @@ def flow_with_equity(ranking: Ranking, user: str, flow: str, values: str) -> Non
 def flow_of_another_user(ranking: Ranking, user: str, flow: str) -> None:
     # A curve that would top the ranking if it leaked into the ranking of another user.
     ranking.give(user, flow, [Decimal(100), Decimal(400)])
+
+
+@given(quoted('che "{user}" ha il flusso "{flow}" {status} con equity per ciclo {values} USDC'))
+def flow_out_of_work(ranking: Ranking, user: str, flow: str, status: str, values: str) -> None:
+    ranking.give(user, flow, amounts(values), status=STATUSES[status])
+
+
+@given(
+    parsers.re(
+        r'^che "(?P<flow>[^"]+)" ha chiuso posizioni con PnL netto (?P<results>.+) USDC, commissioni totali '
+        r"(?P<fees>[\d,]+) USDC e costo del modello (?P<cost>[\d,]+) USD$"
+    )
+)
+def flow_trades(ranking: Ranking, flow: str, results: str, fees: str, cost: str) -> None:
+    curve = ranking.curves[flow]
+    curve.results, curve.fees, curve.model_cost = amounts(results), amount(fees), amount(cost)
 
 
 @given(quoted('che negli ultimi 7 giorni "{flow}" ha equity {values} USDC'))
@@ -182,3 +238,17 @@ def flow_values(ranking: Ranking, flow: str, result: str, dd: str) -> None:
 def not_in_ranking(ranking: Ranking, flow: str) -> None:
     assert ranking.shown(), "la classifica è vuota"
     assert flow not in ranking.names(), f"classifica: {ranking.names()}"
+
+
+@then(quoted('la riga di "{flow}" nella classifica mostra:'))
+def row_columns(ranking: Ranking, flow: str, datatable: list[list[str]]) -> None:
+    statistics = ranking.row_of(flow).statistics
+    shown = {
+        "PnL": statistics.net_pnl,
+        "Commissioni": statistics.total_fees,
+        "Win rate": percent(statistics.win_rate_percent),
+        "Operazioni": Decimal(statistics.operations),
+        "Costo del modello IA": statistics.model_cost_usd,
+    }
+    expected = {column: amount(value.split(" ")[0].rstrip("%")) for column, value in datatable[1:]}
+    assert {column: shown[column] for column in expected} == expected

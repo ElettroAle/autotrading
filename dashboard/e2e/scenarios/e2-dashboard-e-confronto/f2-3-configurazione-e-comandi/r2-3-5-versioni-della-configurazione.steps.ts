@@ -98,3 +98,65 @@ Then(
     await expect(changed.locator('mark')).toHaveText([before, after]);
   },
 );
+
+// The text of a step writes the line breaks of the prompt as « / ».
+const promptOf = (text: string): string => text.replaceAll(' / ', '\n');
+
+const withSystemPrompt = (
+  memory: ScenarioMemory,
+  numbers: number[],
+  name: string,
+  prompt: string,
+) => {
+  const flow = memory.described;
+  expect(flow?.name).toBe(name);
+  if (flow === undefined) {
+    return;
+  }
+  const versions = flow.versions.map((version) =>
+    numbers.includes(version.number)
+      ? { ...version, configuration: { ...version.configuration, systemPrompt: promptOf(prompt) } }
+      : version,
+  );
+  memory.described = { ...flow, versions };
+};
+
+Given(
+  'che nella versione {int} del flusso {string} il system prompt diventa {string}',
+  ({ memory }, number: number, name: string, prompt: string) => {
+    withSystemPrompt(memory, [number], name, prompt);
+  },
+);
+
+Given(
+  'che nelle versioni {int} e {int} del flusso {string} il system prompt è {string}',
+  ({ memory }, first: number, second: number, name: string, prompt: string) => {
+    withSystemPrompt(memory, [first, second], name, prompt);
+  },
+);
+
+const systemPromptRow = (dashboard: DashboardPages) =>
+  dashboard
+    .comparison()
+    .getByRole('row')
+    .filter({ has: dashboard.page.getByRole('rowheader', { name: 'system prompt' }) });
+
+Then(
+  'la riga del system prompt è evidenziata, da {string} al testo {string} con gli a capo',
+  async ({ dashboard }, before: string, after: string) => {
+    const marks = systemPromptRow(dashboard).locator('mark');
+    await expect(marks).toHaveCount(2);
+    await expect(marks.first()).toHaveText(before);
+    expect(await marks.nth(1).innerText()).toBe(promptOf(after));
+  },
+);
+
+Then(
+  'la riga del system prompt mostra {string} in entrambe le versioni, senza evidenza',
+  async ({ dashboard }, value: string) => {
+    const cells = systemPromptRow(dashboard).getByRole('cell');
+    await expect(cells).toHaveCount(2);
+    expect(await cells.allInnerTexts()).toEqual([promptOf(value), promptOf(value)]);
+    await expect(systemPromptRow(dashboard).locator('mark')).toHaveCount(0);
+  },
+);

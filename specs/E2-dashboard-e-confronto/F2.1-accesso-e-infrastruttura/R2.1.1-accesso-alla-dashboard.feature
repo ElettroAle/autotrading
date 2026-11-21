@@ -41,3 +41,8 @@ Funzionalità: R2.1.1 Accesso alla dashboard
     Quando "anna" apre la pagina del flusso "alfa"
     Allora viene portata alla pagina di accesso
     E dopo l'accesso torna alla pagina del flusso "alfa"
+
+  Scenario: Primo accesso con un tenant nuovo
+    Dato che "dario" ha il ruolo Utente e non ha mai usato la piattaforma
+    Quando "dario" apre la dashboard ed entra con il proprio account
+    Allora vede la pagina iniziale senza flussi

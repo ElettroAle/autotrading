@@ -139,7 +139,42 @@ CASES_OF_E1 = {
     f"{E1}/F1.8-notifiche/R1.8.2-notifiche-essenziali.feature": ("Una notifica non contiene mai credenziali",),
 }
 
-CASES = {**CASES_OF_E0, **CASES_OF_E1}
+# Task 676: the cases of E2.
+E2 = "E2-dashboard-e-confronto"
+CASES_OF_E2 = {
+    f"{E2}/F2.1-accesso-e-infrastruttura/R2.1.1-accesso-alla-dashboard.feature": ("Primo accesso con un tenant nuovo",),
+    f"{E2}/F2.2-monitoraggio/R2.2.2-stato-e-riepilogo-dei-flussi.feature": (
+        "Conto, modello ed esito dell'ultima esecuzione",
+        "Rendimento in pareggio in grigio",
+    ),
+    f"{E2}/F2.2-monitoraggio/R2.2.4-posizioni-aperte.feature": ("PnL corrente anche in percentuale del margine",),
+    f"{E2}/F2.2-monitoraggio/R2.2.5-posizioni-chiuse.feature": (
+        "Direzione, istanti, commissioni e motivo della chiusura",
+        "Importi senza valuta se la valuta del conto non è disponibile",
+    ),
+    f"{E2}/F2.3-configurazione-e-comandi/R2.3.4-comandi-dei-flussi-dalla-dashboard.feature": (
+        "Archiviazione con conferma",
+    ),
+    f"{E2}/F2.3-configurazione-e-comandi/R2.3.5-versioni-della-configurazione.feature": (
+        "Confronto del system prompt cambiato",
+        "La riga del system prompt c'è anche quando non cambia",
+    ),
+    f"{E2}/F2.3-configurazione-e-comandi/R2.3.10-avviso-della-rete-di-test.feature": (
+        "L'avviso della rete di test è giallo",
+        "L'avviso della rete reale è rosso",
+    ),
+    f"{E2}/F2.4-confronto-tra-flussi/R2.4.1-duplicazione-di-un-flusso.feature": (
+        "L'avvio di una bozza verifica anche conto e capitale",
+    ),
+    f"{E2}/F2.4-confronto-tra-flussi/R2.4.2-classifica-dei-flussi.feature": (
+        "PnL, commissioni, win rate, operazioni e costo del modello nella classifica",
+        "Bozze e flussi archiviati fuori dalla classifica",
+    ),
+    f"{E2}/F2.5-storico-ed-esportazione/R2.5.1-storico-interrogabile.feature": (
+        "Scelte in rapida successione si sommano",
+    ),
+}
+CASES = {**CASES_OF_E0, **CASES_OF_E1, **CASES_OF_E2}
 # The epics whose features the scenario modules of pytest-bdd bind; those of the dashboard bind its Playwright
 # scenarios (ADR 0116).
 EPICS_BOUND_BY_PYTEST = (E0, E1)
