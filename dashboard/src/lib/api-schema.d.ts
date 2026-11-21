@@ -786,6 +786,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Flow Overviews */
+        get: operations["list_flow_overviews_flows_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/cycles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cycles */
+        get: operations["list_cycles_flows__flow_id__cycles_get"];
+        put?: never;
+        /**
+         * Run Cycle Now
+         * @description A cycle of the flow now, run by the worker and answered when it ends (R6.5.2): a failed cycle is the
+         *     cycle created, a flow not active or a cycle in progress a refusal.
+         */
+        post: operations["run_cycle_now_flows__flow_id__cycles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/cycles/{planned_at}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Cycle */
+        get: operations["read_cycle_flows__flow_id__cycles__planned_at__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/{flow_id}/cost": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Flow Cost */
+        get: operations["read_flow_cost_flows__flow_id__cost_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/flows/ranking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rank Flows */
+        get: operations["rank_flows_flows_ranking_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows": {
         parameters: {
             query?: never;
@@ -848,7 +938,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Flow
+         * @description One flow of the tenant, an archived one too, which the list leaves out (Bug 690).
+         */
+        get: operations["get_flow_flows__flow_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -971,28 +1065,6 @@ export interface paths {
         /** Change Allocated Capital */
         put: operations["change_allocated_capital_flows__flow_id__allocated_capital_put"];
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/flows/{flow_id}/cycles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Cycles */
-        get: operations["list_cycles_flows__flow_id__cycles_get"];
-        put?: never;
-        /**
-         * Run Cycle Now
-         * @description A cycle of the flow now, run by the worker and answered when it ends (R6.5.2): a failed cycle is the
-         *     cycle created, a flow not active or a cycle in progress a refusal.
-         */
-        post: operations["run_cycle_now_flows__flow_id__cycles_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1281,57 +1353,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/flows/overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Flow Overviews */
-        get: operations["list_flow_overviews_flows_overview_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/flows/{flow_id}/cycles/{planned_at}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Cycle */
-        get: operations["read_cycle_flows__flow_id__cycles__planned_at__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/flows/{flow_id}/cost": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Flow Cost */
-        get: operations["read_flow_cost_flows__flow_id__cost_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/flows/{flow_id}/decisions": {
         parameters: {
             query?: never;
@@ -1432,23 +1453,6 @@ export interface paths {
         };
         /** Query Order History */
         get: operations["query_order_history_history_orders_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/flows/ranking": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Rank Flows */
-        get: operations["rank_flows_flows_ranking_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5534,6 +5538,213 @@ export interface operations {
             };
         };
     };
+    list_flow_overviews_flows_overview_get: {
+        parameters: {
+            query?: {
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
+                period?: string;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowOverviewResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cycles_flows__flow_id__cycles_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                /** @description concluso o fallito */
+                outcome?: string | null;
+                /** @description apertura, chiusura, mantenimento o nessuna */
+                decision?: string | null;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CyclePageResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_cycle_now_flows__flow_id__cycles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleSummaryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_cycle_flows__flow_id__cycles__planned_at__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+                planned_at: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CycleDetailResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_flow_cost_flows__flow_id__cost_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowCostResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rank_flows_flows_ranking_get: {
+        parameters: {
+            query?: {
+                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
+                period?: string;
+                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                from?: string | null;
+                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
+                to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowRankingResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_flows_flows_get: {
         parameters: {
             query?: {
@@ -5649,6 +5860,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DefaultSystemPromptResponse"];
+                };
+            };
+        };
+    };
+    get_flow_flows__flow_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5903,78 +6145,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FlowResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_cycles_flows__flow_id__cycles_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                /** @description concluso o fallito */
-                outcome?: string | null;
-                /** @description apertura, chiusura, mantenimento o nessuna */
-                decision?: string | null;
-                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                from?: string | null;
-                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                to?: string | null;
-            };
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CyclePageResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    run_cycle_now_flows__flow_id__cycles_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CycleSummaryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6539,105 +6709,6 @@ export interface operations {
             };
         };
     };
-    list_flow_overviews_flows_overview_get: {
-        parameters: {
-            query?: {
-                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
-                period?: string;
-                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                from?: string | null;
-                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                to?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FlowOverviewResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_cycle_flows__flow_id__cycles__planned_at__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                flow_id: string;
-                planned_at: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CycleDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_flow_cost_flows__flow_id__cost_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                flow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FlowCostResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_decisions_flows__flow_id__decisions_get: {
         parameters: {
             query?: {
@@ -6868,42 +6939,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryOrdersPageResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    rank_flows_flows_ranking_get: {
-        parameters: {
-            query?: {
-                /** @description 30m, 1h, 6h, 12h, 24h, 7d, 30d, all o range */
-                period?: string;
-                /** @description inizio dell'intervallo, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                from?: string | null;
-                /** @description fine dell'intervallo, minuto compreso, istante ISO 8601 letto al minuto; senza fuso vale UTC, una data sola vale la mezzanotte UTC */
-                to?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FlowRankingResponse"][];
                 };
             };
             /** @description Validation Error */

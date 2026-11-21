@@ -34,3 +34,10 @@ Funzionalità: R6.4.8 Prossima esecuzione nella panoramica
     E che il flusso "alfa" è fermo
     Quando "anna" apre la panoramica del flusso "alfa"
     Allora non vede "Prossima esecuzione prevista"
+
+  Scenario: Flusso archiviato
+    Dato che il flusso "alfa" è archiviato
+    Quando "anna" apre la panoramica del flusso "alfa"
+    Allora il flusso "alfa" mostra lo stato "archiviato"
+    E non vede "Prossima esecuzione prevista"
+    E non vede alcun comando del flusso

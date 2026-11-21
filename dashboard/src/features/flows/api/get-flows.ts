@@ -7,9 +7,12 @@ import { pageDataQuery } from '@/lib/react-query';
 /** A draft runs no cycle: account, capital and assets are set in its configuration before it starts (ADR 0124). */
 export const DRAFT_STATUS = 'bozza';
 
+/** An archived flow is final: its page opens in read only, out of the list (R1.1.6, Bug 690). */
+export const ARCHIVED_STATUS = 'archiviato';
+
 export const FLOWS_QUERY_KEY = ['flows'];
 
-const flowSchema = z.object({
+export const flowSchema = z.object({
   id: z.string(),
   name: z.string(),
   status: z.string(),

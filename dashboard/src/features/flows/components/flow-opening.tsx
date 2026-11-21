@@ -1,4 +1,5 @@
-import { DRAFT_STATUS, useFlows } from '../api/get-flows';
+import { useFlow } from '../api/get-flow';
+import { DRAFT_STATUS } from '../api/get-flows';
 
 import { DraftReadiness } from './draft-readiness';
 import { FlowResults } from './flow-results';
@@ -8,7 +9,7 @@ import { FlowResults } from './flow-results';
  * with what it lacks to start and the way to its configuration (ADR assegnazione-della-bozza-nel-form-di-configurazione).
  */
 export const FlowOpening = ({ flowId }: { flowId: string }) => {
-  const flow = useFlows().data?.find((candidate) => candidate.id === flowId);
+  const flow = useFlow(flowId).data;
   if (flow === undefined) {
     return null;
   }

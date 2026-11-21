@@ -5,16 +5,16 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderInApp } from '@/testing/test-utils';
 
-import { useFlows } from '../api/get-flows';
+import { useFlow } from '../api/get-flow';
 
 import { FlowOpening } from './flow-opening';
 
 const Probe = ({ flowId }: { flowId: string }) => {
-  const read = useFlows().data !== undefined;
+  const answered = !useFlow(flowId).isPending;
   return (
     <>
       <FlowOpening flowId={flowId} />
-      {read && <p>flussi letti</p>}
+      {answered && <p>flusso letto</p>}
     </>
   );
 };
@@ -57,21 +57,19 @@ describe('FlowOpening', () => {
   // rule, so it shows what the API names even when the other fields of the draft are all set.
   it('says what the API declares the draft lacks, not what its fields would suggest', async () => {
     server.use(
-      http.get('*/flows', () =>
-        HttpResponse.json([
-          {
-            id: 'flow-bozza',
-            name: 'bozza',
-            status: 'bozza',
-            account_id: 'account-principale',
-            version: 1,
-            assets: ['ETH'],
-            allocated_capital: '100',
-            model: { name: 'openrouter/deepseek-chat' },
-            sources: [],
-            missing: ['capitale allocato'],
-          },
-        ]),
+      http.get('*/flows/:flowId', () =>
+        HttpResponse.json({
+          id: 'flow-bozza',
+          name: 'bozza',
+          status: 'bozza',
+          account_id: 'account-principale',
+          version: 1,
+          assets: ['ETH'],
+          allocated_capital: '100',
+          model: { name: 'openrouter/deepseek-chat' },
+          sources: [],
+          missing: ['capitale allocato'],
+        }),
       ),
     );
     await renderInApp(<Probe flowId="flow-bozza" />, { account: 'anna' });
@@ -90,10 +88,20 @@ describe('FlowOpening', () => {
     expect(screen.queryByRole('note', { name: 'Da configurare' })).not.toBeInTheDocument();
   });
 
+  // Bug 690: an archived flow keeps its results; it plans no cycle, so the next one does not appear.
+  it('opens the overview of an archived flow with its results and no next cycle', async () => {
+    fakePlatform.changeFlow('alfa', { status: 'archiviato' });
+    await renderInApp(<Probe flowId="flow-alfa" />, { account: 'anna' });
+
+    const summary = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
+    expect(summary).toHaveTextContent('Guadagno attuale');
+    expect(summary).not.toHaveTextContent('Prossima esecuzione prevista');
+  });
+
   it('shows nothing for a flow the user does not have', async () => {
     await renderInApp(<Probe flowId="flow-omega" />, { account: 'anna' });
 
-    await screen.findByText('flussi letti');
+    await screen.findByText('flusso letto');
     expect(screen.queryByRole('note', { name: 'Da configurare' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('region', { name: 'Riepilogo dei risultati' }),
