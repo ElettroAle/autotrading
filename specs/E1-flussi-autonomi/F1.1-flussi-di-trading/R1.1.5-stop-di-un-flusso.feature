@@ -43,6 +43,18 @@ Funzionalità: R1.1.5 Stop di un flusso
     E l'esito dello stop riporta la posizione su "ETH" rimasta aperta con il motivo "Order rejected"
     E sull'exchange la posizione su "BTC" è chiusa
 
+  Scenario: Stop rifiutato per un flusso fermo
+    Dato che il flusso "alfa" è fermo
+    Quando "anna" ferma il flusso "alfa"
+    Allora lo stop è rifiutato con il motivo "comando ferma non ammesso per un flusso fermo"
+
+  Scenario: Stop rifiutato per un flusso archiviato
+    Dato che il flusso "alfa" è fermo
+    E che il flusso "alfa" è archiviato
+    Quando "anna" ferma il flusso "alfa"
+    Allora lo stop è rifiutato con il motivo "comando ferma non ammesso per un flusso archiviato"
+    E il flusso "alfa" è nello stato "archiviato"
+
   Scenario: Riavvio di un flusso fermo
     Dato che il flusso "alfa" è fermo
     Quando "anna" avvia il flusso "alfa"

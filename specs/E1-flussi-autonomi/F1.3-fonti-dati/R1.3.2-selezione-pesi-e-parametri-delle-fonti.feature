@@ -63,6 +63,11 @@ Funzionalità: R1.3.2 Selezione, pesi e parametri delle fonti per flusso
     Quando il flusso "alfa" esegue un ciclo
     Allora il system prompt inviato all'agente contiene la regola del peso e i pesi "forecast 10, indicatori 2"
 
+  Scenario: Fonti, pesi e parametri modificati creano una nuova versione
+    Quando "anna" modifica il flusso "alfa" con peso 8 per la fonte "indicatori"
+    Allora il flusso "alfa" ha la versione di configurazione 2 con la fonte "indicatori" di peso 8
+    E la versione 1 del flusso "alfa" resta consultabile senza fonti
+
   Schema dello scenario: Peso o parametro non valido
     Quando "anna" modifica il flusso "alfa" con <valore>
     Allora la modifica è rifiutata con il motivo "<motivo>"

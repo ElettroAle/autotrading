@@ -43,6 +43,55 @@ CASES_OF_E0 = {
     ),
 }
 
+# Task 674: the cases of E1 from F1.1 to F1.3.
+E1 = "E1-flussi-autonomi"
+CASES_OF_E1 = {
+    f"{E1}/F1.1-flussi-di-trading/R1.1.3-modifica-versionata-della-configurazione.feature": (
+        "Confronto del system prompt tra due versioni",
+    ),
+    f"{E1}/F1.1-flussi-di-trading/R1.1.4-avvio-pausa-e-ripresa.feature": (
+        "Avvio rifiutato se il capitale allocato supera il capitale libero letto ora",
+    ),
+    f"{E1}/F1.1-flussi-di-trading/R1.1.5-stop-di-un-flusso.feature": (
+        "Stop rifiutato per un flusso fermo",
+        "Stop rifiutato per un flusso archiviato",
+    ),
+    f"{E1}/F1.1-flussi-di-trading/R1.1.6-archiviazione-di-un-flusso.feature": (
+        "Un flusso archiviato non si avvia",
+        "Versioni e posizioni chiuse di un flusso archiviato restano consultabili",
+    ),
+    f"{E1}/F1.1-flussi-di-trading/R1.1.7-capitale-allocato.feature": (
+        "La variazione è registrata con data, ora e utente",
+        "Variazione rifiutata per un flusso archiviato",
+    ),
+    f"{E1}/F1.2-ciclo-decisionale/R1.2.1-cicli-pianificati.feature": (
+        "Dopo un'assenza del pianificatore si esegue solo l'ultimo ciclo dovuto",
+    ),
+    f"{E1}/F1.2-ciclo-decisionale/R1.2.4-pausa-per-errori-permanenti.feature": (
+        "Un limite di frequenza del fornitore IA non mette in pausa, anche se parla di quota",
+    ),
+    f"{E1}/F1.2-ciclo-decisionale/R1.2.5-fonte-non-disponibile.feature": (
+        "Una fonte risponde con un errore",
+        "Le fonti si interrogano in parallelo",
+    ),
+    f"{E1}/F1.3-fonti-dati/R1.3.1-catalogo-delle-fonti.feature": (
+        "Una fonte aggiunta compare nel catalogo ed è selezionabile",
+        "Una fonte ritirata scompare dal catalogo",
+    ),
+    f"{E1}/F1.3-fonti-dati/R1.3.2-selezione-pesi-e-parametri-delle-fonti.feature": (
+        "Fonti, pesi e parametri modificati creano una nuova versione",
+    ),
+    f"{E1}/F1.3-fonti-dati/R1.3.3-indicatori-tecnici.feature": ("Lunghezza della serie fuori dall'intervallo",),
+    f"{E1}/F1.3-fonti-dati/R1.3.4-pivot-point.feature": ("Prezzo sotto l'ultimo supporto",),
+    f"{E1}/F1.3-fonti-dati/R1.3.5-forecast.feature": ("Profondità dello storico fuori dall'intervallo",),
+    f"{E1}/F1.3-fonti-dati/R1.3.7-notizie.feature": ("Numero di notizie ed età massima fuori dall'intervallo",),
+}
+
+CASES = {**CASES_OF_E0, **CASES_OF_E1}
+# The epics whose features the scenario modules of pytest-bdd bind; those of the dashboard bind its Playwright
+# scenarios (ADR 0116).
+EPICS_BOUND_BY_PYTEST = (E0, E1)
+
 FEATURE_WITH_A_RULE = """# language: it
 @R0.4.1
 Funzionalità: R0.4.1 Procedura
@@ -111,19 +160,19 @@ def test_adr_casi_della_descrizione_negli_scenari_a_feature_proved_by_the_pipeli
     assert not runs_in_the_suite(_parsed(FEATURE_PROVED_BY_THE_PIPELINE, tmp_path))
 
 
-def test_adr_casi_della_descrizione_negli_scenari_every_feature_of_e0_run_by_the_suite_is_bound() -> None:
+def test_adr_casi_della_descrizione_negli_scenari_every_feature_run_by_the_suite_is_bound() -> None:
     # The features of the dashboard are bound by its Playwright scenarios (ADR 0116), not by a module of pytest-bdd.
     unbound = [
         path.relative_to(SPECS).as_posix()
-        for path in feature_files(SPECS / E0)
+        for epic in EPICS_BOUND_BY_PYTEST
+        for path in feature_files(SPECS / epic)
         if runs_in_the_suite(parse_feature(path)) and path.relative_to(SPECS).as_posix() not in bound_features()
     ]
     assert unbound == [], "a .feature with scenarios the suite runs needs a scenario module that binds it"
 
 
-def test_adr_casi_della_descrizione_negli_scenari_the_cases_of_e0_are_scenarios() -> None:
+def test_adr_casi_della_descrizione_negli_scenari_the_cases_are_scenarios() -> None:
     missing = {
-        path: sorted(set(cases) - set(scenario_names(parse_feature(SPECS / path))))
-        for path, cases in CASES_OF_E0.items()
+        path: sorted(set(cases) - set(scenario_names(parse_feature(SPECS / path)))) for path, cases in CASES.items()
     }
     assert {path: cases for path, cases in missing.items() if cases} == {}

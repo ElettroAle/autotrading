@@ -4,10 +4,11 @@ from dataclasses import replace
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from autotrading.application.flows.get_flow_version import GetFlowVersionCommand
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, ActiveSource
 from tests.support.flow_cycles import FlowCycles
 from tests.support.flows import scenario_catalog
-from tests.support.lifecycle_steps import Lifecycle, add_flow, modify
+from tests.support.lifecycle_steps import Lifecycle, add_flow, flow_named, modify
 from tests.support.platform import Platform
 from tests.support.source_collection import SourceCycle
 from tests.support.source_selections import (
@@ -274,3 +275,18 @@ def rule_in_own_prompt(flow_cycles: FlowCycles, weights: str) -> None:
     assert flow_cycles.system_text() == "\n".join(
         ("Decidi con prudenza. " + weight_meaning("1", "10", "5"), *WEIGHT_RULE, weights_line(weights))
     )
+
+
+@then(quoted('il flusso "{flow}" ha la versione di configurazione {version} con la fonte "{source}" di peso {weight}'))
+def version_with_source(
+    platform: Platform, lifecycle: Lifecycle, flow: str, version: str, *, source: str, weight: str
+) -> None:
+    configuration = flow_named(platform, lifecycle.user, flow).configuration
+    chosen = [(selection.name, adapter.weight) for selection in configuration.sources for adapter in selection.adapters]
+    assert (configuration.version, chosen) == (int(version), [(source, int(weight))])
+
+
+@then(quoted('la versione {version} del flusso "{flow}" resta consultabile senza fonti'))
+def version_without_sources(platform: Platform, lifecycle: Lifecycle, version: str, flow: str) -> None:
+    command = GetFlowVersionCommand(flow_named(platform, lifecycle.user, flow).id, int(version))
+    assert platform.use_cases_of(lifecycle.user).get_flow_version.execute(command).sources == ()

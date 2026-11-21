@@ -33,3 +33,14 @@ Funzionalità: R1.3.7 Fonte notizie
     E che nessuna notizia è stata pubblicata nell'ultima ora
     Quando il flusso "alfa" esegue un ciclo
     Allora il contesto dichiara che non ci sono notizie nell'ultima ora
+
+  Schema dello scenario: Numero di notizie ed età massima fuori dall'intervallo
+    Quando "anna" imposta sul flusso "alfa" la fonte "notizie" con <parametro> <valore>
+    Allora la modifica è rifiutata con il motivo "parametro fuori dai valori ammessi: <parametro>, <ammessi>"
+
+    Esempi:
+      | parametro       | valore | ammessi     |
+      | numero notizie  | 0      | da 1 a 50   |
+      | numero notizie  | 51     | da 1 a 50   |
+      | età massima ore | 0      | da 1 a 168  |
+      | età massima ore | 169    | da 1 a 168  |

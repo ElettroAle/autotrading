@@ -8,6 +8,7 @@ Funzionalità: R1.2.1 Cicli pianificati
   Il primo ciclo parte all'avvio del flusso; i successivi ogni intervallo di ciclo da quell'istante.
   Alla ripresa da una pausa il primo ciclo parte alla ripresa e la pianificazione riparte da lì.
   Un ciclo è puntuale se parte entro 60 secondi dall'istante previsto; oltre, il ritardo si registra con il ciclo.
+  Dopo un'assenza del pianificatore si esegue solo l'ultimo istante dovuto: i cicli persi non si recuperano.
   Ogni ciclo esegue, nell'ordine: lettura dello stato del flusso, raccolta dei dati delle fonti attive,
   composizione del contesto, decisione dell'agente, controllo del rischio, esecuzione degli ordini,
   aggiornamento dello stato del flusso, registrazione del ciclo.
@@ -39,6 +40,11 @@ Funzionalità: R1.2.1 Cicli pianificati
     Dato che il flusso "alfa" ha un ciclo previsto alle 10:22:00
     Quando il ciclo parte alle 10:22:40
     Allora il ciclo è registrato senza ritardo
+
+  Scenario: Dopo un'assenza del pianificatore si esegue solo l'ultimo ciclo dovuto
+    Dato che il flusso "alfa" ha un ciclo previsto alle 10:07:00
+    Quando il pianificatore torna in funzione alle 11:05:00 dopo un'assenza
+    Allora il ciclo delle 10:52:00 del flusso "alfa" è eseguito una sola volta
 
   Scenario: I passi del ciclo nell'ordine
     Quando il flusso "alfa" esegue un ciclo

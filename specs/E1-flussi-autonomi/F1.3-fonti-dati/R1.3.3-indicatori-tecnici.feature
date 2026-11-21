@@ -55,3 +55,12 @@ Funzionalità: R1.3.3 Fonte indicatori tecnici
     Dato che il flusso "alfa" ha la lunghezza della serie degli indicatori a 20
     Quando il flusso "alfa" esegue un ciclo
     Allora le serie degli indicatori per "BTC" hanno 20 valori
+
+  Schema dello scenario: Lunghezza della serie fuori dall'intervallo
+    Quando "anna" imposta sul flusso "alfa" la fonte "indicatori" con lunghezza serie <valore>
+    Allora la modifica è rifiutata con il motivo "parametro fuori dai valori ammessi: lunghezza serie, da 1 a 50"
+
+    Esempi:
+      | valore |
+      | 0      |
+      | 51     |

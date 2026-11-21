@@ -44,3 +44,12 @@ Funzionalità: R1.3.5 Fonte forecast
     Quando il flusso "alfa" esegue un ciclo
     Allora la previsione per "BTC" usa 3 giorni di storico
     E il contesto dichiara per "BTC" lo storico ridotto a 3 giorni
+
+  Schema dello scenario: Profondità dello storico fuori dall'intervallo
+    Quando "anna" imposta sul flusso "alfa" la fonte "forecast" con profondità storico giorni <valore>
+    Allora la modifica è rifiutata con il motivo "parametro fuori dai valori ammessi: profondità storico giorni, da 1 a 90"
+
+    Esempi:
+      | valore |
+      | 0      |
+      | 91     |

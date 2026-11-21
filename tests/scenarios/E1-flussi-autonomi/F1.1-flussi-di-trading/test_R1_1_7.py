@@ -1,7 +1,7 @@
 import threading
 import uuid
 from dataclasses import replace
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -151,3 +151,32 @@ def capital_of(record: CycleRecord) -> Decimal:
     state = document["stato"]
     assert isinstance(state, dict)
     return Decimal(state["allocated_capital"])
+
+
+def instant(time: str, day: str) -> datetime:
+    """An instant as the feature writes it, "10:30" of "12 novembre 2026": the scenarios name November only."""
+    number, month, year = day.split()
+    assert month == "novembre"
+    hours, minutes = time.split(":")
+    return datetime(int(year), 11, int(number), int(hours), int(minutes), tzinfo=UTC)
+
+
+@given(quoted("che sono le {time} del {day}"))
+def now_is(platform: Platform, time: str, day: str) -> None:
+    platform.now = instant(time, day)
+
+
+@then(
+    quoted(
+        'la variazione da {previous} a {new} USDC del flusso "{name}" è registrata alle {time} del {day} per "{user}"'
+    )
+)
+def change_recorded_with_user(
+    platform: Platform, lifecycle: Lifecycle, previous: str, new: str, name: str, *, time: str, day: str, user: str
+) -> None:
+    flow = flow_named(platform, lifecycle.user, name)
+    recorded = [
+        (change.changed_at, change.previous, change.new, change.user_id)
+        for change in platform.flows.capital_changes[flow.id]
+    ]
+    assert recorded == [(instant(time, day), Decimal(previous), Decimal(new), platform.user_id_of(user))]

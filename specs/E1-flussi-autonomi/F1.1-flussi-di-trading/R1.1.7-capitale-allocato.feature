@@ -25,6 +25,17 @@ Funzionalità: R1.1.7 Variazione del capitale allocato
     E il capitale libero del conto "test-1" è 300 USDC
     E la variazione da 400 a 700 USDC è registrata nello storico del flusso "alfa"
 
+  Scenario: La variazione è registrata con data, ora e utente
+    Dato che sono le 10:30 del 12 novembre 2026
+    Quando "anna" porta il capitale allocato del flusso "alfa" a 500 USDC
+    Allora la variazione da 400 a 500 USDC del flusso "alfa" è registrata alle 10:30 del 12 novembre 2026 per "anna"
+
+  Scenario: Variazione rifiutata per un flusso archiviato
+    Dato che il flusso "alfa" è archiviato
+    Quando "anna" porta il capitale allocato del flusso "alfa" a 500 USDC
+    Allora la variazione è rifiutata con il motivo "un flusso archiviato non si modifica"
+    E il flusso "alfa" ha capitale allocato 400 USDC
+
   Scenario: Aumento oltre il capitale libero
     Quando "anna" porta il capitale allocato del flusso "alfa" a 1100 USDC
     Allora la variazione è rifiutata con il motivo "capitale allocato oltre il capitale disponibile: 1000 USDC"

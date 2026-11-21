@@ -11,8 +11,10 @@ import pytest
 from pytest_bdd import given, parsers, then, when
 
 from autotrading.application.agent.errors import ModelCreditExhaustedError, ModelKeyRejectedError
+from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.domain.accounts.position import Position, PositionSide
 from autotrading.domain.agent.provider_name import ProviderName
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.ledger import FlowTotals
@@ -21,10 +23,11 @@ from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import SHORT_HORIZONS, ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
+from tests.fakes.model_call import TooManyRequestsAnswer
 from tests.support.activity import a_position, an_activity
 from tests.support.flow_cycles import BALANCE, FlowCycles, at
 from tests.support.flows import ANTHROPIC_MODEL
-from tests.support.source_selections import reader_of
+from tests.support.source_selections import PLATFORM_CATALOG, a_source_request, reader_of
 from tests.support.steps import quoted
 
 
@@ -252,6 +255,14 @@ def credit_exhausted(flow_cycles: FlowCycles, provider: str) -> None:
     flow_cycles.model.failure = ModelCreditExhaustedError(ProviderName(provider))
 
 
+@given(quoted('che il fornitore "{provider}" risponde "troppe richieste" con il messaggio "{message}"'))
+def provider_rate_limited(flow_cycles: FlowCycles, provider: str, message: str) -> None:
+    # Read as credit exhausted by its message, the answer is still a limit of frequency by its code.
+    failure = ModelCreditExhaustedError(ProviderName(provider))
+    failure.__cause__ = TooManyRequestsAnswer(f"429 {message}")
+    flow_cycles.model.failure = failure
+
+
 @given(quoted('che il fornitore "{provider}" rifiuta la chiave'))
 def key_rejected(flow_cycles: FlowCycles, provider: str) -> None:
     flow_cycles.model.failure = ModelKeyRejectedError(ProviderName(provider))
@@ -329,6 +340,43 @@ def no_news_last_hour(flow_cycles: FlowCycles) -> None:
 
 
 # When
+
+
+@pytest.fixture
+def modification() -> list[AutotradingError]:
+    """The refusal of the modification the scenario asks, if any."""
+    return []
+
+
+@when(
+    parsers.re(
+        r'^"(?P<user>[^"]+)" imposta sul flusso "(?P<flow>[^"]+)" la fonte "(?P<source>[^"]+)" '
+        r"con (?P<label>[^\d]+) (?P<value>\d+)$"
+    )
+)
+def set_source_parameter(  # noqa: PLR0917 - one argument per value of the step
+    flow_cycles: FlowCycles,
+    modification: list[AutotradingError],
+    user: str,
+    flow: str,
+    source: str,
+    label: str,
+    value: str,
+) -> None:
+    name, adapter = reader_of(source)
+    parameters = PLATFORM_CATALOG.find(name).definition.parameters
+    (key,) = [parameter.key for parameter in parameters if parameter.label == label]
+    request = a_source_request(source, None, {key: int(value)}, adapter)
+    command = ModifyFlowCommand(flow_cycles.flow(flow).id, sources=(request,))
+    try:
+        flow_cycles.platform.use_cases_of(user).modify_flow.execute(command)
+    except AutotradingError as error:
+        modification.append(error)
+
+
+@then(quoted('la modifica è rifiutata con il motivo "{reason}"'))
+def modification_refused(modification: list[AutotradingError], reason: str) -> None:
+    assert [str(error) for error in modification] == [reason]
 
 
 @when(quoted('il flusso "{flow}" esegue un ciclo'))
