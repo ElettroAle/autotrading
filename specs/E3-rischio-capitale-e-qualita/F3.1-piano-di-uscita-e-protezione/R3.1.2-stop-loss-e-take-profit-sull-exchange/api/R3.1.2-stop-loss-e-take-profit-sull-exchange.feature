@@ -48,3 +48,10 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
   Scenario: La modifica dei predefiniti crea una versione
     Quando "anna" imposta lo stop loss predefinito di "alfa" a 3%
     Allora "alfa" ha una nuova versione della configurazione con stop loss predefinito 3%
+
+  @pipeline
+  Scenario: I flussi già esistenti ricevono lo stop loss predefinito
+    Dato che "anna" aveva il flusso "alfa" salvato prima degli stop loss predefiniti
+    Quando la piattaforma passa alla versione con gli stop loss predefiniti
+    Allora "alfa" ha lo stop loss predefinito 5% e nessun take profit predefinito
+    E la configurazione di "alfa" resta alla stessa versione

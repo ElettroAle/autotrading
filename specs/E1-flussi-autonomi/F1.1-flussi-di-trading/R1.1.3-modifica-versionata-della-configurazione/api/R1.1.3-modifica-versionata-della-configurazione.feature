@@ -30,6 +30,11 @@ Funzionalità: R1.1.3 Modifica versionata della configurazione
     Quando "anna" confronta le versioni 1 e 2 del flusso "alfa"
     Allora il confronto riporta solo la differenza sul modello, da "openrouter/deepseek-chat" a "anthropic/claude-sonnet"
 
+  Scenario: Confronto del system prompt tra due versioni
+    Dato che il flusso "alfa" ha la versione 2 con il system prompt "Opera solo a favore di tendenza."
+    Quando "anna" confronta le versioni 1 e 2 del flusso "alfa"
+    Allora il confronto riporta solo la differenza sul system prompt, da "predefinito" a "Opera solo a favore di tendenza."
+
   Scenario: Modifica non valida rifiutata
     Quando "anna" modifica l'intervallo di ciclo del flusso "alfa" in 0 minuti
     Allora la modifica è rifiutata con il motivo "intervallo di ciclo fuori da 1-1440 minuti"

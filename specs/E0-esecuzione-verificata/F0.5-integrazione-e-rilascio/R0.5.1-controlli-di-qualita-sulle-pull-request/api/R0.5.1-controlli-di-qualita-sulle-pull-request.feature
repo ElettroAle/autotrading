@@ -28,6 +28,12 @@ Funzionalità: R0.5.1 Controlli di qualità obbligatori sulle pull request
     Allora la pull request è integrata nel ramo principale come un unico commit
 
   @pipeline
+  Scenario: Il commit integrato ha per titolo il titolo della pull request
+    Dato che una pull request supera tutti i controlli
+    Quando il proprietario chiede di integrarla
+    Allora il titolo del commit integrato nel ramo principale è il titolo della pull request
+
+  @pipeline
   Schema dello scenario: Un controllo fallito blocca l'integrazione
     Dato che una pull request contiene "<difetto>"
     Quando i controlli di qualità vengono eseguiti
@@ -76,6 +82,13 @@ Funzionalità: R0.5.1 Controlli di qualità obbligatori sulle pull request
     Quando l'autore invia un commit che corregge la violazione
     Allora la revisione chiude il thread
     E la pull request si può integrare
+
+  @pipeline
+  Scenario: La revisione valuta le regole che la pull request porta
+    Dato che una pull request modifica una regola del repository e il codice che quella regola copre
+    Quando la revisione AI esamina la pull request
+    Allora la revisione valuta il codice con la regola come la pull request la porta
+    E la revisione non apre un thread per la modifica alla regola
 
   @pipeline
   Scenario: Una revisione che non si completa blocca l'integrazione

@@ -28,13 +28,14 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
     E la chat "chat-bruno" non riceve la notifica
 
     Esempi:
-      | evento                                                                | titolo                     | righe                                                  |
-      | il flusso "alfa" apre long su "BTC" con leva 3 e valore 150 USDC      | 🟢 alfa: posizione aperta   | Asset: BTC; Direzione: long; Leva: 3; Valore: 150 USDC |
-      | il flusso "alfa" chiude la posizione su "BTC" con PnL 4,20 USDC       | ✅ alfa: posizione chiusa   | Asset: BTC; PnL: 4,20 USDC                             |
-      | un ciclo del flusso "alfa" fallisce con il messaggio "timeout"        | ⚠️ alfa: ciclo fallito     | Errore: timeout                                        |
-      | l'exchange rifiuta un ordine del flusso "alfa" con "Order rejected"   | ⚠️ alfa: ordine rifiutato  | Errore: Order rejected                                 |
-      | il flusso "alfa" va in pausa per "credito esaurito presso openrouter" | ⏸️ alfa: in pausa          | Motivo: credito esaurito presso openrouter             |
-      | sul conto di "alfa" compare una posizione non attribuibile su "SOL"   | posizione non attribuibile | Asset: SOL                                             |
+      | evento                                                                | titolo                      | righe                                                  |
+      | il flusso "alfa" apre long su "BTC" con leva 3 e valore 150 USDC      | 🟢 alfa: posizione aperta    | Asset: BTC; Direzione: long; Leva: 3; Valore: 150 USDC |
+      | il flusso "alfa" chiude la posizione su "BTC" con PnL 4,20 USDC       | ✅ alfa: posizione chiusa    | Asset: BTC; PnL: 4,20 USDC                             |
+      | un ciclo del flusso "alfa" fallisce con il messaggio "timeout"        | ⚠️ alfa: ciclo fallito      | Errore: timeout                                        |
+      | l'exchange rifiuta un ordine del flusso "alfa" con "Order rejected"   | ⚠️ alfa: ordine rifiutato   | Errore: Order rejected                                 |
+      | il flusso "alfa" va in pausa per "credito esaurito presso openrouter" | ⏸️ alfa: in pausa           | Motivo: credito esaurito presso openrouter             |
+      | sul conto di "alfa" compare una posizione non attribuibile su "SOL"   | posizione non attribuibile  | Asset: SOL                                             |
+      | sul conto di "alfa" compare un'esecuzione non attribuibile su "SOL"   | esecuzione non attribuibile | Asset: SOL                                             |
 
   Schema dello scenario: Ogni chiusura notificata una volta
     Dato che il flusso "alfa" ha una posizione aperta su "BTC"
@@ -42,16 +43,23 @@ Funzionalità: R1.8.2 Notifiche essenziali su Telegram
     Allora la chat "chat-anna" riceve una sola notifica "✅ alfa: posizione chiusa" con le righe "Asset: BTC; PnL: 4,20 USDC"
 
     Esempi:
-      | motivo                 |
-      | decisione dell'agente  |
-      | stop del flusso        |
-      | rimozione del conto    |
-      | comando manuale        |
+      | motivo                           |
+      | decisione dell'agente            |
+      | stop del flusso                  |
+      | rimozione del conto              |
+      | comando manuale                  |
+      | chiusura fuori dalla piattaforma |
 
   Scenario: Notifica e storico con lo stesso PnL
     Dato che il flusso "alfa" ha una posizione aperta su "BTC"
     Quando la posizione su "BTC" del flusso "alfa" si chiude per decisione dell'agente con PnL 4,20 USDC
     Allora lo storico del flusso "alfa" contiene la posizione su "BTC" con PnL 4,20 USDC
+
+  Scenario: Una notifica non contiene mai credenziali
+    Dato che l'exchange rifiuta le credenziali del conto del flusso "alfa" perché "API wallet scaduto"
+    Quando il flusso "alfa" apre una posizione su "BTC"
+    Allora la chat "chat-anna" riceve una notifica "⏸️ alfa: in pausa" con le righe "Motivo: credenziali del conto non valide: test-1 (API wallet scaduto)"
+    E nessuna notifica della chat "chat-anna" contiene le credenziali del conto del flusso "alfa"
 
   Scenario: Invio fallito non ferma il ciclo
     Dato che Telegram non risponde

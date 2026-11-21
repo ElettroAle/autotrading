@@ -52,3 +52,8 @@ Funzionalità: R2.5.1 Storico interrogabile
   Scenario: Totale delle commissioni degli ordini
     Quando "anna" interroga gli ordini del conto "principale"
     Allora il totale delle commissioni degli ordini è 33
+
+  Scenario: Scelte in rapida successione si sommano
+    Dato che "anna" ha anche il flusso "beta" con posizioni chiuse su "ETH"
+    Quando "anna" sceglie in rapida successione il flusso "alfa", l'asset "ETH" e le posizioni chiuse
+    Allora ottiene solo le posizioni del flusso "alfa" su "ETH", con tutte le scelte nell'indirizzo

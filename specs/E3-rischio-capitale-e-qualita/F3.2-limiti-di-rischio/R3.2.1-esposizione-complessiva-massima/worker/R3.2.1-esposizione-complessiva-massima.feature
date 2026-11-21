@@ -62,3 +62,17 @@ Funzionalità: R3.2.1 Esposizione complessiva massima
     E che "alfa" ha una posizione su "ETH" con margine 300 USDC
     Quando l'agente di "alfa" decide di aprire long su "BTC" con margine 150 USDC
     Allora "alfa" apre la posizione su "BTC" con margine 150 USDC
+
+  Scenario: Residuo sotto l'importo minimo dell'exchange
+    Dato che "alfa" ha esposizione complessiva massima del margine 30%
+    E che "alfa" ha una posizione su "ETH" con margine 295 USDC
+    Quando l'agente di "alfa" decide di aprire long su "BTC" con margine 150 USDC
+    Allora "alfa" non apre la posizione su "BTC"
+    E il ciclo di "alfa" registra "valore sotto il minimo dell'exchange per BTC: 10 USDC"
+
+  Scenario: Il limite complessivo si applica dopo quello per operazione
+    Dato che "alfa" ha esposizione massima del margine per operazione 20% ed esposizione complessiva massima del margine 30%
+    E che "alfa" ha una posizione su "ETH" con margine 200 USDC
+    Quando l'agente di "alfa" decide di aprire long su "BTC" con margine 250 USDC
+    Allora "alfa" apre la posizione su "BTC" con margine 100 USDC
+    E il ciclo di "alfa" registra "apertura BTC ridotta da 200 a 100 USDC di margine: esposizione complessiva del margine al 30%"

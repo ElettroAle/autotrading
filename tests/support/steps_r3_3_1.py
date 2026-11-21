@@ -1,6 +1,6 @@
 """The alarm on the balance of an account the cycles cannot explain (R3.3.1), on the cycles as the worker runs them."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -50,6 +50,7 @@ ACCOUNT_OF_FLOWS = "test-1"
 MOVEMENTS = {"deposito": Decimal(1), "prelievo": Decimal(-1)}
 SOL = Market("SOL", max_leverage=20, size_decimals=2, mid_price=Decimal(150), min_order_value=Decimal(10))
 LATE_ASSET = "BTC"
+CONFIRMED_AT = datetime(2026, 11, 12, 11, 0, tzinfo=UTC)
 
 
 class LateRows:
@@ -251,6 +252,11 @@ def alarm(flow_cycles: FlowCycles, account: str) -> None:
     alarm_with_reading(flow_cycles, Decimal(980))
 
 
+@given("che sono le 11:00 UTC del 12 novembre 2026")
+def at_eleven(flow_cycles: FlowCycles) -> None:
+    flow_cycles.platform.now = CONFIRMED_AT
+
+
 @given(quoted('che "{flow}" ha una posizione aperta su "{asset}"'))
 def open_position(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
     access = TradingAccess(HYPERLIQUID, flow_cycles.credentials_of(flow).values)
@@ -290,6 +296,25 @@ def agent_opens(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
 @when(quoted('l\'agente di "{flow}" decide di chiudere la posizione su "{asset}"'))
 def agent_closes(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
     answer(flow_cycles, {"asset": asset, "azione": "chiudi", "confidenza": 70, "ragionamento": "r"})
+    next_cycle(flow_cycles, flow)
+
+
+@when(quoted('l\'agente di "{flow}" decide di aggiornare lo stop su "{asset}" a {stop}'))
+def agent_updates_stop(flow_cycles: FlowCycles, flow: str, asset: str, stop: str) -> None:
+    update = {
+        "asset": asset,
+        "azione": "aggiorna",
+        "direzione": None,
+        "quota": None,
+        "leva": None,
+        "obiettivo": None,
+        "stop": int(stop),
+        "invalidazione": None,
+        "togli_obiettivo": False,
+        "confidenza": 70,
+        "ragionamento": "proteggo il guadagno",
+    }
+    answer(flow_cycles, update)
     next_cycle(flow_cycles, flow)
 
 
@@ -414,6 +439,21 @@ def closed(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
 def opened(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
     assert opened_coins(flow_cycles) == [asset]
     assert blocked_reasons(flow_cycles, flow) == {}
+
+
+@then(quoted('"{flow}" aggiorna il piano di uscita della posizione su "{asset}"'))
+def plan_updated(flow_cycles: FlowCycles, flow: str, asset: str) -> None:
+    document = flow_cycles.last_record(flow).document(CycleStep.RISK_CHECK)
+    assert document is not None
+    outcomes = document["esiti"]
+    assert isinstance(outcomes, list)
+    assert [outcome["tipo"] for outcome in outcomes if outcome["asset"] == asset] == ["ApprovedUpdate"]
+
+
+@then(quoted('la conferma dell\'allarme del conto "{account}" è registrata alle 11:00 UTC del 12 novembre 2026'))
+def confirmation_recorded(flow_cycles: FlowCycles, account: str) -> None:
+    [alarm] = flow_cycles.readings.alarms_of(account_id(flow_cycles, account))
+    assert alarm.confirmed_at == CONFIRMED_AT
 
 
 @then(quoted('l\'allarme del conto "{account}" è chiuso'))

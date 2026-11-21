@@ -471,3 +471,17 @@ def funding_first(bench: AttributionBench, since: str, until: str, paid: str) ->
 def only_purchase(pages: list[OperationsPage], asset: str, bought: str) -> None:
     rows = [(operation.asset, operation.occurred_at, operation.size) for operation in pages[0].operations]
     assert rows == [(asset, at(bought), Decimal(1))]
+
+
+@given(
+    step(
+        r'che un ordine della piattaforma senza flusso, come un comando manuale o uno stop, esegue su "{asset}"'
+        r" una vendita con PnL realizzato {a} USDC"
+    )
+)
+def order_without_flow(bench: AttributionBench, asset: str, a: str) -> None:
+    order, account_id = uuid4(), bench.flow("alfa").assigned_account_id
+    bench.orders.add(order, account_id, None)
+    sale = a_fill(asset, order, size=Decimal(-1), realized_pnl=amount(a), fill_id="senza-flusso")
+    bench.extend(account_id, fills=(sale,))
+    bench.record_executions(account_id)

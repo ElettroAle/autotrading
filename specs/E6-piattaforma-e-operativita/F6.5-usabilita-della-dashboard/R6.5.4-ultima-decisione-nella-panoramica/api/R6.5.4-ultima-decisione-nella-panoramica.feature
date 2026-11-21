@@ -25,3 +25,8 @@ Funzionalità: R6.5.4 Ultima decisione nella panoramica
     Dato che il flusso "beta" non ha cicli conclusi
     Quando "anna" apre la Panoramica del flusso "beta"
     Allora il riquadro dice "nessuna decisione ancora"
+
+  Scenario: Ultima decisione dall'interfaccia programmatica
+    Dato che l'ultimo ciclo concluso di "alfa", alle 10:00, ha deciso per BTC "apri long" con confidenza 72
+    Quando "anna" chiede l'ultima decisione del flusso "alfa" all'interfaccia programmatica
+    Allora la risposta ha la decisione delle 10:00 per BTC "apri" "long" con confidenza 72

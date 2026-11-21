@@ -32,3 +32,7 @@ Funzionalità: R1.4.8 System prompt del flusso personalizzabile
     Dato che "anna" ha impostato un system prompt personalizzato
     Quando "anna" ripristina il system prompt predefinito
     Allora la configurazione del flusso "alfa" mostra il testo predefinito, indicato come predefinito
+
+  Scenario: La modifica del system prompt è una nuova versione della configurazione
+    Quando "anna" imposta il system prompt "{instructions}, solo a favore di tendenza"
+    Allora il flusso "alfa" ha la versione di configurazione 2 con il system prompt "{instructions}, solo a favore di tendenza"

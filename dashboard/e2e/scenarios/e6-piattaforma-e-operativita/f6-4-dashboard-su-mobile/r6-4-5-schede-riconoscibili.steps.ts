@@ -106,3 +106,16 @@ Then(
     ).toBeLessThanOrEqual(width);
   },
 );
+
+When(
+  'sceglie con la freccia a destra la scheda dopo {string}',
+  async ({ dashboard }, name: string) => {
+    await dashboard.historyTab(name).focus();
+    await dashboard.page.keyboard.press('ArrowRight');
+  },
+);
+
+Then('la scheda {string} è scelta e ha il fuoco', async ({ dashboard }, name: string) => {
+  await expect(dashboard.historyTab(name)).toHaveAttribute('aria-selected', 'true');
+  await expect(dashboard.historyTab(name)).toBeFocused();
+});

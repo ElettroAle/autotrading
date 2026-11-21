@@ -227,6 +227,21 @@ def time_comes(cycles: Cycles, instant: str) -> None:
     cycles.tick(instant)
 
 
+@when(parsers.re(rf"^il pianificatore torna in funzione alle {TIME} dopo un'assenza$"))
+def scheduler_back(cycles: Cycles, instant: str) -> None:
+    cycles.tick(instant)
+
+
+@given(quoted('che la fonte "{source}" risponde con l\'errore "{message}"'))
+def source_failing(cycles: Cycles, source: str, message: str) -> None:
+    cycles.sources.failing[source] = FakeTransientError(message)
+
+
+@given(quoted('che le fonti "{first}" e "{second}" rispondono dopo {seconds} secondi ciascuna'))
+def sources_late(cycles: Cycles, first: str, second: str, seconds: str) -> None:
+    cycles.sources.late.update({first: float(seconds), second: float(seconds)})
+
+
 @when(parsers.re(rf"^il ciclo parte alle {TIME}$"))
 def cycle_starts_at(cycles: Cycles, instant: str) -> None:
     cycles.tick(instant)
@@ -326,7 +341,7 @@ def steps_in_order(cycles: Cycles, datatable: list[list[str]]) -> None:
 # Then: failures and pauses
 
 
-@then(quoted('il ciclo è registrato come fallito al passo "{step}" con il messaggio originale'))
+@then(quoted('il ciclo è registrato come fallito al passo "{step}" con il tipo di errore e il messaggio originale'))
 def failed_with_original_message(cycles: Cycles, step: str) -> None:
     failure = cycles.last_record("alfa").failure
     assert failure is not None
@@ -390,6 +405,24 @@ def position_stays_open(cycles: Cycles, asset: str) -> None:
 def context_has_source(cycles: Cycles, source: str) -> None:
     readings = cycles.context.composed[cycles.id_of("alfa")].readings
     assert [reading.source for reading in readings] == [ActiveSource(source, adapter_of(source)).label]
+
+
+@then(quoted('il contesto inviato all\'agente contiene i dati delle fonti "{first}" e "{second}"'))
+def context_has_both_sources(cycles: Cycles, first: str, second: str) -> None:
+    readings = cycles.context.composed[cycles.id_of("alfa")].readings
+    expected = [ActiveSource(source, adapter_of(source)).label for source in (first, second)]
+    assert sorted(reading.source for reading in readings) == sorted(expected)
+
+
+@then(quoted('le fonti "{first}" e "{second}" sono interrogate insieme'))
+def sources_asked_together(cycles: Cycles, first: str, second: str) -> None:
+    assert set(cycles.sources.late) == {first, second}
+    assert cycles.sources.most_at_once == 2
+
+
+@then("nessuna fonte è registrata come assente")
+def no_source_absent(cycles: Cycles) -> None:
+    assert cycles.last_record("alfa").absent_sources == ()
 
 
 @then("il contesto inviato all'agente contiene lo stato del flusso")

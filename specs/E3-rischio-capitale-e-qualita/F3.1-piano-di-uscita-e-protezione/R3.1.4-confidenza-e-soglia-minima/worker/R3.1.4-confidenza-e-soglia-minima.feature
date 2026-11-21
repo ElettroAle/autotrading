@@ -42,3 +42,17 @@ Funzionalità: R3.1.4 Confidenza e soglia minima
   Scenario: Decisione senza confidenza
     Quando l'agente di "alfa" risponde con una decisione su "BTC" senza confidenza
     Allora la decisione su "BTC" viene scartata come non conforme
+
+  Schema dello scenario: Confidenza della risposta fuori dall'intervallo
+    Quando l'agente di "alfa" risponde con una decisione su "BTC" con confidenza <valore>
+    Allora la decisione su "BTC" viene scartata con il motivo "valore fuori dall'intervallo: confidenza"
+
+    Esempi:
+      | valore |
+      | -1     |
+      | 101    |
+
+  Scenario: L'aggiornamento del piano non dipende dalla confidenza
+    Dato che "alfa" ha una posizione aperta su "BTC"
+    Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" con confidenza 20
+    Allora "alfa" aggiorna il piano di uscita della posizione su "BTC"

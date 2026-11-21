@@ -61,3 +61,17 @@ Funzionalità: R3.1.3 Aggiornamento di stop e obiettivo di una posizione aperta
     Dato che "alfa" ha anche l'asset "ETH" senza posizione aperta
     Quando l'agente di "alfa" decide di aggiornare lo stop su "ETH" a 3000
     Allora la decisione su "ETH" viene bloccata con "nessuna posizione aperta su ETH"
+
+  Scenario: Nuova condizione di invalidazione
+    Dato che l'agente di "alfa" ha aggiornato l'invalidazione su "BTC" a "chiusura sotto 61000"
+    Quando parte il ciclo successivo di "alfa"
+    Allora lo stato del flusso inviato all'agente riporta per la posizione su "BTC" l'invalidazione "chiusura sotto 61000"
+    E sull'exchange l'unico ordine di stop loss di "alfa" su "BTC" è a 57000
+
+  Scenario: Un aggiornamento senza stop non toglie lo stop
+    Quando l'agente di "alfa" decide di aggiornare l'obiettivo su "BTC" a 68000
+    Allora sull'exchange l'unico ordine di stop loss di "alfa" su "BTC" è a 57000
+
+  Scenario: Il piano aggiornato è quello che la dashboard mostra
+    Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" a 62000
+    Allora la dashboard di "anna" mostra per la posizione di "alfa" su "BTC" stop 62000 e take profit 66000

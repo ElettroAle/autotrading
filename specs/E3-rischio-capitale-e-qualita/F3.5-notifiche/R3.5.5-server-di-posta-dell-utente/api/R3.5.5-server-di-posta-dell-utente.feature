@@ -52,3 +52,8 @@ Funzionalità: R3.5.5 Server di posta dell'utente
     E che "bruno" ha indicato l'indirizzo "bruno@example.com" per le notifiche
     Allora i Canali di "bruno" non mostrano alcun server di posta
     E la scelta dei canali di "bruno" avvisa accanto all'email con "server di posta non configurato"
+
+  Scenario: Senza mittente l'email parte a nome dell'utente
+    Dato che "anna" ha salvato il server di posta "smtp.example.com" senza mittente
+    Quando "anna" invia l'email di prova
+    Allora l'email di prova parte con mittente "anna@example.com"

@@ -46,6 +46,21 @@ Funzionalità: R0.4.1 Procedura di verifica dell'esecuzione
     Allora la procedura non parte con il motivo "BTC è un asset del flusso alfa"
     E nessun ordine è inviato all'exchange
 
+  Scenario: Procedura rifiutata su un asset di un flusso in pausa del conto
+    Dato che sul conto "test-1" il flusso "alfa" in pausa ha l'asset "BTC"
+    Quando "anna" lancia la procedura di verifica sul conto "test-1"
+    Allora la procedura non parte con il motivo "BTC è un asset del flusso alfa"
+    E nessun ordine è inviato all'exchange
+
+  Scenario: Gli ordini della procedura non appartengono a nessun flusso
+    Quando "anna" lancia la procedura di verifica sul conto "test-1"
+    Allora gli ordini della procedura non appartengono a nessun flusso
+
+  Scenario: Le aperture delle credenziali della procedura sono registrate
+    Quando "anna" lancia la procedura di verifica sul conto "test-1"
+    Allora ogni apertura delle credenziali del conto "test-1" è registrata con il tenant, la versione della chiave, l'esito "riuscita" e l'istante
+    E la registrazione non contiene le credenziali del conto "test-1"
+
   Regola: l'importo della procedura lo sceglie l'utente; se non lo indica vale il minimo dell'exchange del conto
 
     Scenario: Collaudo con importo scelto

@@ -392,7 +392,10 @@ class FakeFlowsAdapter:
 
 
 class FakeSourcesAdapter:
-    """Sources that answer at once, fail, answer late or never answer until the test ends."""
+    """Sources that answer at once, fail, answer late or never answer until the test ends.
+
+    It counts the sources asked at the same time: the most at once tells whether they were asked in parallel.
+    """
 
     def __init__(self, seconds: float) -> None:
         self._seconds = seconds
@@ -400,8 +403,21 @@ class FakeSourcesAdapter:
         self.late: dict[str, float] = {}
         self.failing: dict[str, AutotradingError] = {}
         self.released = threading.Event()
+        self._asking = 0
+        self.most_at_once = 0
+        self._counting = threading.Lock()
 
     def execute(self, request: SourceRequest, active: ActiveSource) -> object:
+        with self._counting:
+            self._asking += 1
+            self.most_at_once = max(self.most_at_once, self._asking)
+        try:
+            return self._answer(request, active)
+        finally:
+            with self._counting:
+                self._asking -= 1
+
+    def _answer(self, request: SourceRequest, active: ActiveSource) -> object:
         flow_id = request.flow_id
         source = active.source
         if source in self.silent:

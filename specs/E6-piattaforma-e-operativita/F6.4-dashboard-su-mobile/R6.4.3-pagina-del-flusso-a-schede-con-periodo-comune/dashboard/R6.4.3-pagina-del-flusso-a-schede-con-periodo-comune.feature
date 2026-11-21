@@ -69,3 +69,17 @@ Funzionalità: R6.4.3 Pagina del flusso a schede con periodo comune
   Scenario: Posizioni aperte attuali
     Quando "anna" apre la Panoramica del flusso "alfa" con il periodo "ultima settimana"
     Allora le posizioni aperte sono quelle attuali e la pagina lo dice
+
+  Scenario: Tornare indietro conserva periodo, intervallo e scheda
+    Dato che "anna" è sulla scheda Posizioni chiuse con l'intervallo dal 10 al 12 novembre 2026
+    Quando apre la scheda Cicli e torna indietro
+    Allora vede ancora la scheda Posizioni chiuse con lo stesso intervallo
+
+  Scenario: Cicli conclusi senza segni sull'equity curve
+    Quando "anna" apre la pagina del flusso "alfa"
+    Allora l'equity curve non ha segni per i cicli conclusi
+
+  Scenario: Barra delle schede intera e visibile su schermo stretto
+    Dato uno schermo largo 360 pixel
+    Quando "anna" sceglie una dopo l'altra le schede della pagina del flusso "alfa"
+    Allora a ogni scheda la prima scheda è intera, lo sfondo della barra è sotto tutte le schede e la barra resta visibile sopra il contenuto

@@ -7,7 +7,9 @@ Funzionalità: R1.2.4 Pausa automatica per un errore permanente
 
   Un errore permanente è un errore che si ripete a ogni ciclo finché l'utente non interviene: credito esaurito
   presso il fornitore IA, chiave del fornitore IA non valida o revocata, credenziali dell'exchange non valide o
-  revocate. Un limite di frequenza dell'exchange o del fornitore («troppe richieste») non è mai permanente.
+  revocate. Un limite di frequenza dell'exchange o del fornitore («troppe richieste») non è mai permanente, nemmeno
+  quando il messaggio del fornitore parla di quota esaurita: il credito esaurito è permanente solo quando il fornitore
+  risponde «pagamento richiesto».
   Il motivo di un rifiuto delle credenziali riporta il motivo dato dall'exchange.
   Il ciclo si interrompe come per un errore transitorio (R1.2.3) e in più il flusso passa allo stato "in pausa",
   con il motivo della pausa automatica. Le posizioni aperte restano sull'exchange.
@@ -43,6 +45,18 @@ Funzionalità: R1.2.4 Pausa automatica per un errore permanente
     Allora il ciclo è registrato come fallito
     E il flusso "alfa" è nello stato "attivo"
     E il flusso "beta" è nello stato "attivo"
+
+  Schema dello scenario: Un limite di frequenza del fornitore IA non mette in pausa, anche se parla di quota
+    Dato che il fornitore "openrouter" risponde "troppe richieste" con il messaggio "<messaggio>"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora il ciclo è registrato come fallito
+    E il flusso "alfa" è nello stato "attivo"
+    E il flusso "beta" è nello stato "attivo"
+
+    Esempi:
+      | messaggio                       |
+      | insufficient_quota              |
+      | You exceeded your current quota |
 
   Scenario: La chiave del fornitore mette in pausa i flussi che la usano
     Dato che "anna" ha anche il flusso "gamma" attivo con un modello del fornitore "anthropic"

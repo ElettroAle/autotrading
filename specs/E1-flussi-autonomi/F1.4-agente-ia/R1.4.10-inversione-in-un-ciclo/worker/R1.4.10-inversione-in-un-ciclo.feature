@@ -60,3 +60,8 @@ Funzionalità: R1.4.10 Inversione della posizione in un ciclo
     Dato che l'agente risponde inverti su "BTC" con direzione short, quota 0,2 e leva 3
     Quando il flusso "alfa" esegue un ciclo
     Allora "alfa" ha una posizione long aperta su "BTC"
+
+  Scenario: L'apertura dell'inversione riceve stop e obiettivo sull'exchange
+    Dato che l'agente risponde inverti su "BTC" con quota 0,2, leva 3, obiettivo 110000 e stop 97000
+    Quando il flusso "alfa" esegue un ciclo
+    Allora sull'exchange la posizione long di "alfa" su "BTC" ha lo stop loss a 97000 e il take profit a 110000

@@ -34,3 +34,9 @@ Funzionalità: R1.5.2 Leva massima del flusso
     Dato che l'agente decide di aprire long su "BTC" con quota 0,05 e leva 3
     Quando il rischio controlla la decisione
     Allora l'apertura eseguita ha leva 3
+
+  Scenario: La riduzione della leva precede il controllo dell'esposizione
+    Dato che il flusso "alfa" ha esposizione massima del valore 20% e nessun limite sul margine
+    E che l'agente decide di aprire long su "BTC" con quota 0,05 e leva 10
+    Quando il rischio controlla la decisione
+    Allora l'apertura eseguita impegna 40 USDC di margine con leva 5

@@ -60,3 +60,13 @@ Funzionalità: R6.4.1 Dashboard leggibile su mobile
     Dato uno schermo largo 1280 pixel
     Quando l'utente apre la pagina del flusso
     Allora l'impaginazione su più colonne resta
+
+  Scenario: Avviso della rete senza parole ripetute
+    Dato che il flusso "prova-btc" è su un conto della rete di test "testnet"
+    Quando l'utente apre la pagina del flusso "prova-btc"
+    Allora l'avviso della rete nomina "testnet" tra virgolette senza ripetere la parola
+
+  Scenario: Elenco dei flussi senza legenda degli esiti
+    Dato uno schermo largo 360 pixel
+    Quando l'utente apre l'elenco dei suoi flussi
+    Allora l'elenco non ha la legenda degli esiti dei cicli recenti

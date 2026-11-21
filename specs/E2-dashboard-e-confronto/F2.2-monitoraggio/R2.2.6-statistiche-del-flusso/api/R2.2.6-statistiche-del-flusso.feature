@@ -45,3 +45,7 @@ Funzionalità: R2.2.6 Statistiche del flusso
     E che il flusso "alfa" vale ora 1050 USDC
     Quando "anna" sceglie il periodo "7 giorni"
     Allora vede il rendimento 15,50%
+
+  Scenario: Statistiche dall'interfaccia programmatica
+    Quando "anna" chiede all'interfaccia programmatica le statistiche del flusso "alfa"
+    Allora la risposta riporta 2 vinte, 2 perse, win rate 50,00%, commissioni 3 USDC, 4 operazioni e costo del modello 1,20 USD

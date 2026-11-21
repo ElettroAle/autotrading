@@ -116,3 +116,21 @@ Then(
     });
   },
 );
+
+When(
+  '{string} apre la pagina del flusso {string} da un indirizzo salvato con il periodo {string}',
+  async ({ dashboard }, account: string, flow: string, period: string) => {
+    await dashboard.openFlowAs(account, flow);
+    await dashboard.open(
+      `/flows/${encodeURIComponent(fakePlatform.flowNamed(flow).id)}?period=${period}`,
+    );
+    await expect(dashboard.period()).toBeVisible();
+  },
+);
+
+Then('il guadagno nel periodo vale dal primo ciclo del flusso', async ({ dashboard, memory }) => {
+  const cycles = fakePlatform.flowNamed(memory.flow).equity.length;
+  await expect(dashboard.result('Guadagno nel periodo')).toContainText(
+    `+${(cycles - 1).toLocaleString('it-IT')},00 USDC`,
+  );
+});

@@ -58,4 +58,4 @@ class GuardFlowLossUseCase:
             return None
         peak_since = status.peak_since(flow.started_at)
         references = self._references.loss_references(flow.flow.id.value, day_start(now), peak_since, now)
-        return LossGuard.of(configuration, flow.total_value, references).breach()
+        return LossGuard.of(configuration, flow.total_value, references, flow.attributed.cashed_profit).breach()

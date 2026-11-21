@@ -78,3 +78,33 @@ Funzionalità: R6.2.3 Centro degli avvisi
     Dato che "bruno" ha un avviso aperto
     Quando "anna" apre la pagina Avvisi
     Allora l'avviso di "bruno" non compare
+
+  Schema dello scenario: Avviso del flusso risolto quando il flusso finisce
+    Dato che il flusso "alfa" è in pausa automatica con un avviso aperto
+    Quando "anna" <comando> il flusso "alfa"
+    Allora l'avviso del flusso "alfa" è risolto
+
+    Esempi:
+      | comando          |
+      | ferma            |
+      | ferma e archivia |
+
+  Schema dello scenario: Filtri per gravità e tipo di risorsa
+    Dato che sul conto "test-1" è aperto un allarme di riconciliazione
+    E che sul conto "test-1" è aperto l'avviso di un'esecuzione senza identificativo della piattaforma
+    E che il flusso "alfa" è in pausa automatica
+    Quando "anna" filtra gli avvisi per <filtro> "<valore>"
+    Allora vede gli avvisi "<avvisi>"
+
+    Esempi:
+      | filtro          | valore     | avvisi                                                       |
+      | gravità         | attenzione | esecuzione senza identificativo                              |
+      | gravità         | critica    | allarme di riconciliazione, pausa automatica                 |
+      | tipo di risorsa | flusso     | pausa automatica                                             |
+      | tipo di risorsa | conto      | allarme di riconciliazione, esecuzione senza identificativo |
+
+  Scenario: Filtro per periodo
+    Dato che il 17/11/2026 sul conto "test-1" si è aperto un allarme di riconciliazione
+    E che il 19/11/2026 il flusso "alfa" è andato in pausa automatica
+    Quando "anna" filtra gli avvisi aperti dal 18/11/2026 al 20/11/2026
+    Allora vede gli avvisi "pausa automatica"
