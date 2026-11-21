@@ -8,7 +8,9 @@ from uuid import UUID
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, TenantUseCases
 from autotrading.adapters.inbound.api.worker import WorkerUseCases
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
+from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
+from autotrading.application.accounts.ports import CredentialSealerPort
 from autotrading.application.accounts.read_exchange_state import ReadExchangeStateCommand, ReadExchangeStateUseCase
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.flows.close_flow_positions import ClosingPorts
@@ -413,7 +415,7 @@ class Platform:
     def worker_for(self, tenant_id: TenantId) -> WorkerUseCases:
         """What the worker builds for a request of the API, with the opener only it holds."""
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
-        opener = FakeCredentialOpenerAdapter(self.vault)
+        opener = self.credential_opener()
         access = OpenTradingAccessUseCase(accounts, opener)
         order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
@@ -495,7 +497,7 @@ class Platform:
     def cancel_protections(self, tenant_id: TenantId) -> CancelProtectionsUseCase:
         """What the worker runs after every closing: the protections of the position leave the exchange (R3.1.2)."""
         access = OpenTradingAccessUseCase(
-            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), FakeCredentialOpenerAdapter(self.vault)
+            InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), self.credential_opener()
         )
         protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
         return CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
@@ -532,8 +534,12 @@ class Platform:
     def use_cases_of(self, user: str) -> TenantUseCases:
         return self.for_tenant(self.tenant_of(user))
 
-    def sealer_of(self, tenant_id: TenantId) -> FakeCredentialSealerAdapter:
+    def sealer_of(self, tenant_id: TenantId) -> CredentialSealerPort:
         return FakeCredentialSealerAdapter(tenant_id, self.vault)
+
+    def credential_opener(self) -> FakeCredentialOpenerAdapter | SodiumCredentialOpenerAdapter:
+        """What the worker opens the credentials of the accounts with: the fake opener of the fake sealer."""
+        return FakeCredentialOpenerAdapter(self.vault)
 
     def uses_credentials(self, account: Account, credentials: Credentials) -> bool:
         """The fake seal is deterministic: sealing the same credentials again gives the saved text."""

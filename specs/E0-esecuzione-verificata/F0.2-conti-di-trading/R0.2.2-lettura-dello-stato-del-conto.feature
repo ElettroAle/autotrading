@@ -41,3 +41,14 @@ Funzionalità: R0.2.2 Lettura dello stato del conto
     Quando "anna" chiede lo stato del conto "test-1"
     Allora la richiesta fallisce con il motivo "credenziali rifiutate dall'exchange"
     E l'esito riporta il messaggio originale dell'exchange
+
+  Scenario: La lettura registra l'apertura delle credenziali senza le credenziali
+    Quando "anna" chiede lo stato del conto "test-1"
+    Allora l'apertura delle credenziali del conto "test-1" è registrata con il tenant, la versione della chiave, l'esito "riuscita" e l'istante
+    E la registrazione non contiene le credenziali del conto "test-1"
+
+  Scenario: Un'apertura rifiutata delle credenziali è registrata
+    Dato che le credenziali salvate del conto "test-1" non si possono più aprire
+    Quando "anna" chiede lo stato del conto "test-1"
+    Allora l'apertura delle credenziali del conto "test-1" è registrata con il tenant, la versione della chiave, l'esito "rifiutata" e l'istante
+    E la registrazione non contiene le credenziali del conto "test-1"

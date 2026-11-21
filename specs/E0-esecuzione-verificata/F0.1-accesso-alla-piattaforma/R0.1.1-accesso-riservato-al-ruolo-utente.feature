@@ -28,3 +28,8 @@ Funzionalità: R0.1.1 Accesso riservato agli utenti con il ruolo Utente
     E che nella directory a "anna" viene tolto il ruolo "Utente"
     Quando "anna" accede di nuovo alla piattaforma con una nuova identità emessa dalla directory
     Allora l'accesso di "anna" è negato con il motivo "ruolo Utente assente"
+
+  Scenario: La documentazione interattiva offre solo l'accesso con codice di autorizzazione e PKCE
+    Quando una persona apre la documentazione interattiva della piattaforma
+    Allora la documentazione offre l'accesso con il codice di autorizzazione protetto da PKCE
+    E la documentazione non offre il flusso implicito
