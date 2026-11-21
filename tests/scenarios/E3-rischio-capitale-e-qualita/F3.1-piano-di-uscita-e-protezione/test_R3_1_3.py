@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
@@ -179,6 +180,11 @@ def stop_updated(updates: PlanUpdates, flow: str, asset: str, price: str) -> Non
     ]
 
 
+@given(quoted('che l\'agente di "{flow}" ha aggiornato l\'invalidazione su "{asset}" a "{invalidation}"'))
+def invalidation_updated(updates: PlanUpdates, flow: str, asset: str, invalidation: str) -> None:
+    updates.update(flow, asset, invalidazione=invalidation)
+
+
 @given(quoted('che "{flow}" ha anche l\'asset "{asset}" senza posizione aperta'))
 def asset_without_position(updates: PlanUpdates, flow: str, asset: str) -> None:
     def with_asset(configuration: FlowConfiguration) -> FlowConfiguration:
@@ -246,6 +252,40 @@ def plan_in_context(updates: PlanUpdates, asset: str, stop: str) -> None:
     assert isinstance(state, dict)
     [held] = [held for held in state["posizioni_aperte"] if held["asset"] == asset]
     assert number(held["stop"]) == number(stop)
+
+
+@then(
+    quoted(
+        'lo stato del flusso inviato all\'agente riporta per la posizione su "{asset}" '
+        'l\'invalidazione "{invalidation}"'
+    )
+)
+def invalidation_in_context(updates: PlanUpdates, asset: str, invalidation: str) -> None:
+    state = updates.flow_cycles.context()["stato_del_flusso"]
+    assert isinstance(state, dict)
+    [held] = [held for held in state["posizioni_aperte"] if held["asset"] == asset]
+    assert held["invalidazione"] == invalidation
+
+
+@then(
+    parsers.re(
+        r'^la dashboard di "(?P<user>[^"]+)" mostra per la posizione di "(?P<flow>[^"]+)" su "(?P<asset>[^"]+)" '
+        rf"stop {NUMBER.format('stop')} e take profit {NUMBER.format('target')}$"
+    )
+)
+def plan_in_dashboard(  # noqa: PLR0917 - one argument per value of the step
+    updates: PlanUpdates, user: str, flow: str, asset: str, stop: str, target: str
+) -> None:
+    flow_cycles, owned = updates.flow_cycles, updates.flow_cycles.flow(flow)
+    # The API reads the account by its identifier: the exchange shows it the position the worker reads.
+    platform = flow_cycles.platform
+    platform.account_activity.activities[owned.assigned_account_id] = platform.activity_reader.activities[
+        updates.address(flow)
+    ]
+    command = ReadFlowResultsCommand(owned.id.value)
+    state = flow_cycles.platform.use_cases_of(user).read_flow_results.execute(command).state
+    plan = state.exit_plans[asset]
+    assert (plan.stop, plan.target) == (number(stop), number(target))
 
 
 @then(quoted('la decisione su "{asset}" viene bloccata con "{reason}"'))

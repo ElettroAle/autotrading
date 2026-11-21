@@ -174,7 +174,30 @@ CASES_OF_E2 = {
         "Scelte in rapida successione si sommano",
     ),
 }
-CASES = {**CASES_OF_E0, **CASES_OF_E1, **CASES_OF_E2}
+# Task 677: the cases of E3.
+E3 = "E3-rischio-capitale-e-qualita"
+CASES_OF_E3 = {
+    f"{E3}/F3.1-piano-di-uscita-e-protezione/R3.1.2-stop-loss-e-take-profit-sull-exchange.feature": (
+        "La modifica dei predefiniti vale per le aperture successive",
+    ),
+    f"{E3}/F3.1-piano-di-uscita-e-protezione/R3.1.3-aggiornamento-di-stop-e-obiettivo.feature": (
+        "Nuova condizione di invalidazione",
+        "Un aggiornamento senza stop non toglie lo stop",
+        "Il piano aggiornato è quello che la dashboard mostra",
+    ),
+    f"{E3}/F3.1-piano-di-uscita-e-protezione/R3.1.4-confidenza-e-soglia-minima.feature": (
+        "Confidenza della risposta fuori dall'intervallo",
+        "L'aggiornamento del piano non dipende dalla confidenza",
+        "La modifica della confidenza minima crea una versione",
+    ),
+    f"{E3}/F3.2-limiti-di-rischio/R3.2.1-esposizione-complessiva-massima.feature": (
+        "Residuo sotto l'importo minimo dell'exchange",
+        "Il limite complessivo si applica dopo quello per operazione",
+        "Limite complessivo sul valore fuori dall'intervallo",
+        "La modifica dei limiti complessivi crea una versione",
+    ),
+}
+CASES = {**CASES_OF_E0, **CASES_OF_E1, **CASES_OF_E2, **CASES_OF_E3}
 # The epics whose features the scenario modules of pytest-bdd bind; those of the dashboard bind its Playwright
 # scenarios (ADR 0116).
 EPICS_BOUND_BY_PYTEST = (E0, E1)

@@ -164,6 +164,22 @@ def margin_limit_without_positions(exposure: OverallExposure, a: str) -> None:
     exposure.limit(margin=amount(a))
 
 
+@given(
+    step(
+        r'che "alfa" ha esposizione massima del margine per operazione {a}% '
+        r"ed esposizione complessiva massima del margine {b}%"
+    )
+)
+def operation_and_overall_limits(exposure: OverallExposure, a: str, b: str) -> None:
+    exposure.limit(margin=amount(b))
+    exposure.flow_cycles.reconfigure(
+        "alfa",
+        lambda configuration: replace(
+            configuration, risk_limits=replace(configuration.risk_limits, max_margin_exposure_percent=amount(a))
+        ),
+    )
+
+
 @given('che "alfa" non ha limiti di esposizione complessiva')
 def no_overall_limits(exposure: OverallExposure) -> None:
     limits = exposure.flow_cycles.flow("alfa").configuration.risk_limits
@@ -219,9 +235,16 @@ def opens_two(exposure: OverallExposure, first: str, a: str, second: str, b: str
     exposure.decide((first, 1, amount(a)), (second, 1, amount(b)))
 
 
-@when(step(r'"(?P<user>[^"]+)" imposta l\'esposizione complessiva massima del margine di "alfa" a {a}%'))
-def set_margin_limit(exposure: OverallExposure, user: str, a: str) -> None:
-    command = ModifyFlowCommand(exposure.flow_cycles.flow("alfa").id, max_total_margin_exposure_percent=amount(a))
+@when(
+    step(r'"(?P<user>[^"]+)" imposta l\'esposizione complessiva massima del (?P<kind>margine|valore) di "alfa" a {a}%')
+)
+def set_overall_limit(exposure: OverallExposure, user: str, kind: str, a: str) -> None:
+    flow_id = exposure.flow_cycles.flow("alfa").id
+    command = (
+        ModifyFlowCommand(flow_id, max_total_margin_exposure_percent=amount(a))
+        if kind == "margine"
+        else ModifyFlowCommand(flow_id, max_total_value_exposure_percent=amount(a))
+    )
     try:
         exposure.flow_cycles.platform.use_cases_of(user).modify_flow.execute(command)
     except AutotradingError as error:
@@ -277,3 +300,18 @@ def modification_refused(exposure: OverallExposure, reason: str) -> None:
     assert [str(error) for error in exposure.refusals] == [reason]
     configuration = exposure.flow_cycles.flow("alfa").configuration
     assert (configuration.version, configuration.risk_limits.max_total_margin_exposure_percent) == (1, None)
+
+
+@then(
+    step(
+        r'la configurazione di "alfa" passa alla versione (?P<version>\d+) con esposizione complessiva massima del '
+        r"margine {a}%"
+    )
+)
+def new_version(exposure: OverallExposure, version: str, a: str) -> None:
+    assert exposure.refusals == []
+    configuration = exposure.flow_cycles.flow("alfa").configuration
+    assert (configuration.version, configuration.risk_limits.max_total_margin_exposure_percent) == (
+        int(version),
+        amount(a),
+    )

@@ -32,6 +32,8 @@ NO_DECISIONS = '{"decisioni": []}'
 # never share an asset (R1.1.2).
 OTHER_ACCOUNT = "secondo"
 OPENING_CYCLE, CLOSING_CYCLE = "10:00", "10:15"
+# A stop closer to the price than the default stop of the flow, so the update goes through as decided.
+UPDATED_STOP = 99
 
 
 class Confidences:
@@ -185,6 +187,35 @@ def agent_answers_without_confidence(confidences: Confidences, flow: str, asset:
     confidences.decide(flow, {"asset": asset, "azione": "mantieni", "ragionamento": "mercato laterale"})
 
 
+@when(
+    parsers.re(
+        r'^l\'agente di "(?P<flow>[^"]+)" risponde con una decisione su "(?P<asset>[^"]+)" con confidenza '
+        r"(?P<confidence>-?\d+)$"
+    )
+)
+def agent_answers_with_confidence(confidences: Confidences, flow: str, asset: str, confidence: str) -> None:
+    decision = {"asset": asset, "azione": "mantieni", "confidenza": int(confidence), "ragionamento": "laterale"}
+    confidences.decide(flow, decision)
+
+
+@when(quoted('l\'agente di "{flow}" decide di aggiornare lo stop su "{asset}" con confidenza {confidence}'))
+def agent_updates_stop(confidences: Confidences, flow: str, asset: str, confidence: str) -> None:
+    decision: dict[str, object] = {
+        "asset": asset,
+        "azione": "aggiorna",
+        "direzione": None,
+        "quota": None,
+        "leva": None,
+        "obiettivo": None,
+        "stop": UPDATED_STOP,
+        "invalidazione": None,
+        "togli_obiettivo": False,
+        "confidenza": int(confidence),
+        "ragionamento": "proteggo il guadagno",
+    }
+    confidences.decide(flow, decision, CLOSING_CYCLE)
+
+
 @when(quoted('"{user}" apre nella dashboard il dettaglio di quel ciclo'))
 def cycle_in_dashboard(confidences: Confidences, user: str) -> None:
     assert confidences.decided_cycle is not None
@@ -239,6 +270,25 @@ def change_refused(confidences: Confidences, message: str) -> None:
 def decision_discarded(confidences: Confidences, asset: str) -> None:
     discarded = entry_on(confidences.document("alfa", CycleStep.AGENT_DECISION), "scartate", asset)
     assert discarded["reason"] == "campo obbligatorio mancante: confidenza"
+
+
+@then(quoted('la decisione su "{asset}" viene scartata con il motivo "{reason}"'))
+def decision_discarded_with(confidences: Confidences, asset: str, reason: str) -> None:
+    discarded = entry_on(confidences.document("alfa", CycleStep.AGENT_DECISION), "scartate", asset)
+    assert discarded["reason"] == reason
+
+
+@then(quoted('"{flow}" aggiorna il piano di uscita della posizione su "{asset}"'))
+def flow_updates_plan(confidences: Confidences, flow: str, asset: str) -> None:
+    assert entry_on(confidences.document(flow, CycleStep.RISK_CHECK), "esiti", asset)["tipo"] == "ApprovedUpdate"
+
+
+@then(quoted('la configurazione di "{flow}" passa alla versione successiva con confidenza minima {minimum}'))
+def new_version_with_minimum(confidences: Confidences, flow: str, minimum: str) -> None:
+    assert confidences.error is None
+    configuration = confidences.flow_cycles.flow(flow).configuration
+    assert configuration.version == confidences.version_before + 1
+    assert configuration.minimum_confidence == MinimumConfidence(int(minimum))
 
 
 @then(quoted('la decisione su "{asset}" mostra confidenza {confidence}'))

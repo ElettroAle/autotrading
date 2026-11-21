@@ -56,3 +56,21 @@ Funzionalità: R3.1.4 Confidenza e soglia minima
     Dato che l'agente di "alfa" ha deciso di aprire long su "BTC" con confidenza 75
     Quando "anna" apre nella dashboard il dettaglio di quel ciclo
     Allora la decisione su "BTC" mostra confidenza 75
+
+  Schema dello scenario: Confidenza della risposta fuori dall'intervallo
+    Quando l'agente di "alfa" risponde con una decisione su "BTC" con confidenza <valore>
+    Allora la decisione su "BTC" viene scartata con il motivo "valore fuori dall'intervallo: confidenza"
+
+    Esempi:
+      | valore |
+      | -1     |
+      | 101    |
+
+  Scenario: L'aggiornamento del piano non dipende dalla confidenza
+    Dato che "alfa" ha una posizione aperta su "BTC"
+    Quando l'agente di "alfa" decide di aggiornare lo stop su "BTC" con confidenza 20
+    Allora "alfa" aggiorna il piano di uscita della posizione su "BTC"
+
+  Scenario: La modifica della confidenza minima crea una versione
+    Quando "anna" imposta la confidenza minima di "alfa" a 70
+    Allora la configurazione di "alfa" passa alla versione successiva con confidenza minima 70

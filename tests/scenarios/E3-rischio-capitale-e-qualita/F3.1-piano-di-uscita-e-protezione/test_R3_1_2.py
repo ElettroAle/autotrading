@@ -272,6 +272,7 @@ def agent_closes(protection: Protection, flow: str, asset: str) -> None:
     flow_cycles.run(flow, "10:30")
 
 
+@given(quoted('che "{user}" ha impostato lo stop loss predefinito di "{flow}" a {value}%'))
 @when(quoted('"{user}" imposta lo stop loss predefinito di "{flow}" a {value}%'))
 def sets_default_stop(protection: Protection, user: str, flow: str, value: str) -> None:
     protection.modify(user, flow, default_stop_loss_percent=number(value))
