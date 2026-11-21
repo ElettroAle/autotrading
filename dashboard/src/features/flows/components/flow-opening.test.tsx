@@ -88,13 +88,14 @@ describe('FlowOpening', () => {
     expect(screen.queryByRole('note', { name: 'Da configurare' })).not.toBeInTheDocument();
   });
 
-  // Bug 690: an archived flow keeps its results, with no next cycle.
-  it('opens the overview of an archived flow with its results and a dash as the next cycle', async () => {
+  // Bug 690: an archived flow keeps its results; it plans no cycle, so the next one does not appear.
+  it('opens the overview of an archived flow with its results and no next cycle', async () => {
     fakePlatform.changeFlow('alfa', { status: 'archiviato' });
     await renderInApp(<Probe flowId="flow-alfa" />, { account: 'anna' });
 
     const summary = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
-    expect(summary).toHaveTextContent('Prossima esecuzione prevista—');
+    expect(summary).toHaveTextContent('Guadagno attuale');
+    expect(summary).not.toHaveTextContent('Prossima esecuzione prevista');
   });
 
   it('shows nothing for a flow the user does not have', async () => {

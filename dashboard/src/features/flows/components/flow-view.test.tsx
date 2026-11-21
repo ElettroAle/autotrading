@@ -269,9 +269,10 @@ describe('FlowView', () => {
     expect(within(head).queryAllByRole('button')).toEqual([]);
     expect(within(head).queryAllByRole('link')).toEqual([]);
     expect(screen.getByRole('navigation', { name: 'Dati del flusso' })).toBeInTheDocument();
+    await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
     expect(
-      await screen.findByLabelText('Prossima esecuzione prevista', { exact: true }),
-    ).toHaveTextContent('—');
+      screen.queryByLabelText('Prossima esecuzione prevista', { exact: true }),
+    ).not.toBeInTheDocument();
   });
 
   it('says the flow is not found when the API finds none with its id', async () => {

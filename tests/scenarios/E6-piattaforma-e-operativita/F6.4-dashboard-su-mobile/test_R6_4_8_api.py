@@ -17,8 +17,7 @@ from tests.support.platform import Platform
 from tests.support.steps import quoted
 
 scenarios(
-    "E6-piattaforma-e-operativita/F6.4-dashboard-su-mobile/R6.4.8-prossima-esecuzione-nella-panoramica/api/"
-    "R6.4.8-prossima-esecuzione-nella-panoramica.feature"
+    "E6-piattaforma-e-operativita/F6.4-dashboard-su-mobile/R6.4.8-prossima-esecuzione-nella-panoramica/api/R6.4.8-prossima-esecuzione-nella-panoramica.feature"
 )
 
 

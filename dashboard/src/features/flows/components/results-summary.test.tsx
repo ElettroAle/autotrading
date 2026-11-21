@@ -124,22 +124,6 @@ describe('ResultsSummary', () => {
     ).not.toBeInTheDocument();
   });
 
-  // Bug 690, ADR pagina-del-flusso-archiviato-in-sola-lettura: an archived flow will never run a cycle again.
-  it('shows a dash as the next cycle of an archived flow', async () => {
-    await renderInApp(
-      <ResultsSummary
-        flowId="flow-alfa"
-        currency="USDC"
-        summary={GAINING}
-        nextCycleAt={null}
-        archived
-      />,
-    );
-    const summary = await screen.findByRole('region', { name: 'Riepilogo dei risultati' });
-
-    expect(valueOf(summary, 'Prossima esecuzione prevista')).toHaveTextContent('—');
-  });
-
   // The card of the list says the next cycle among its details (R2.2.2): its summary does not repeat it.
   it('shows no next cycle where the page does not give it', async () => {
     const summary = await show(GAINING);

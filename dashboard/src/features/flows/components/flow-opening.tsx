@@ -1,5 +1,5 @@
 import { useFlow } from '../api/get-flow';
-import { ARCHIVED_STATUS, DRAFT_STATUS } from '../api/get-flows';
+import { DRAFT_STATUS } from '../api/get-flows';
 
 import { DraftReadiness } from './draft-readiness';
 import { FlowResults } from './flow-results';
@@ -16,5 +16,5 @@ export const FlowOpening = ({ flowId }: { flowId: string }) => {
   if (flow.status === DRAFT_STATUS) {
     return <DraftReadiness flow={flow} />;
   }
-  return <FlowResults flowId={flow.id} archived={flow.status === ARCHIVED_STATUS} />;
+  return <FlowResults flowId={flow.id} />;
 };

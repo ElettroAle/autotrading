@@ -52,7 +52,7 @@ Then('non vede {string}', async ({ dashboard }, term: string) => {
 });
 
 // Bug 690, ADR pagina-del-flusso-archiviato-in-sola-lettura: the page of an archived flow opens in read only, from its
-// address, with its status, no next cycle and no command.
+// address, with its status and no command; it plans no cycle, so the next one does not appear.
 Given('che il flusso {string} è archiviato', async ({}, flow: string) => {
   fakePlatform.changeFlow(flow, { status: 'archiviato' });
 });
@@ -65,10 +65,6 @@ Then(
     );
   },
 );
-
-Then('vede {string} con {string}', async ({ dashboard }, term: string, value: string) => {
-  await expect(dashboard.result(term)).toHaveText(value);
-});
 
 Then('non vede alcun comando del flusso', async ({ dashboard, memory }) => {
   const head = dashboard.page.getByRole('region', { name: memory.flow, exact: true });
