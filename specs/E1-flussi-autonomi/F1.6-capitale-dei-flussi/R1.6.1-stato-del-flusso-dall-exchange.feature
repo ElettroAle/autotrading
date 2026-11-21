@@ -81,6 +81,12 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     Allora l'agente riceve per il flusso "alfa" liquidità disponibile 200 USDC
     E l'apertura del flusso "alfa" è bloccata con il motivo "liquidità del flusso insufficiente: 200 USDC"
 
+  Scenario: La liquidità del ciclo non scende sotto zero
+    Dato che le esecuzioni del flusso "alfa" hanno PnL realizzato -600 USDC e commissioni 0 USDC
+    Quando parte un ciclo del flusso "alfa" in cui l'agente apre "BTC" con quota 0,1 e leva 1
+    Allora l'agente riceve per il flusso "alfa" liquidità disponibile 0 USDC
+    E nessun ordine è inviato
+
   Scenario: Lo storico del flusso resta intero quando l'exchange non lo mostra più
     Dato che le esecuzioni del flusso "alfa" hanno PnL realizzato 40 USDC e commissioni 2 USDC
     E che l'exchange non mostra più le esecuzioni del conto "test-1"
@@ -105,6 +111,11 @@ Funzionalità: R1.6.1 Stato del flusso attribuito dall'exchange
     E che l'exchange liquida la posizione "BTC" con PnL realizzato -80 USDC
     Quando "anna" consulta lo stato del flusso "alfa"
     Allora il flusso "alfa" ha liquidità disponibile 420 USDC
+
+  Scenario: Un ordine della piattaforma senza flusso è del flusso che ha l'asset
+    Dato che un ordine della piattaforma senza flusso, come un comando manuale o uno stop, esegue su "BTC" una vendita con PnL realizzato -20 USDC
+    Quando "anna" consulta lo stato del flusso "alfa"
+    Allora il flusso "alfa" ha liquidità disponibile 480 USDC
 
   Schema dello scenario: Solo la chiusura esatta della posizione del flusso fuori dalla piattaforma è del flusso
     Dato che il flusso "alfa" ha aperto 2 "BTC" con i propri ordini

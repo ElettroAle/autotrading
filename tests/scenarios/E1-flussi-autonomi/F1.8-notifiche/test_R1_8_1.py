@@ -6,6 +6,7 @@ from pytest_bdd import given, scenarios, then, when
 
 from autotrading.application.notifications.link_chat import HOW_TO_LINK, INVALID_CODE, LINKED
 from autotrading.application.notifications.request_link_code import IssuedLinkCode
+from autotrading.domain.notifications.link_code import LinkCode
 from autotrading.domain.notifications.notification import Notification
 from tests.support.notifications import chat_named, told
 from tests.support.platform import Platform
@@ -67,6 +68,11 @@ def clock_moves(platform: Platform, clock: str) -> None:
 @given(quoted('che il codice è già stato usato dalla chat "{chat}"'))
 def code_used(platform: Platform, chat: str, codes: dict[str, str]) -> None:
     send_code(platform, chat, codes["anna"])
+
+
+@given("che il codice inviato non è mai stato emesso")
+def code_never_issued(codes: dict[str, str]) -> None:
+    codes["anna"] = LinkCode.new().text
 
 
 @given(quoted('che la chat "{chat}" è collegata al tenant di "{user}"'))

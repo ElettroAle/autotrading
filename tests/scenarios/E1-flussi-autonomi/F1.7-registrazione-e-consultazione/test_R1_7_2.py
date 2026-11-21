@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -31,6 +32,8 @@ from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import READ_AT, a_fill, an_activity
+from tests.support.flow_cycles import FlowCycles
+from tests.support.flow_cycles import at as cycle_at
 from tests.support.flows import ACCOUNT, a_flow, account_id_of
 from tests.support.lifecycle_steps import hold_position
 from tests.support.orders import a_flow_order
@@ -266,3 +269,56 @@ def position_reason(history: History, reason: str) -> None:
 def history_order(history: History, instants: str) -> None:
     expected = [at(instant.strip()) for instant in instants.replace(" e ", ", ").split(", ")]
     assert [position.closing.at for position in history.consulted] == expected
+
+
+def a_decision(asset: str, action: str) -> dict[str, object]:
+    return {
+        "asset": asset,
+        "azione": action,
+        "direzione": "long",
+        "quota": 0.05,
+        "leva": 3,
+        "obiettivo": None,
+        "stop": None,
+        "invalidazione": None,
+        "confidenza": 70,
+        "ragionamento": "r",
+    }
+
+
+@given(
+    parsers.re(
+        r'^che il flusso "(?P<flow>[^"]+)" ha aperto una posizione su "(?P<asset>[^"]+)" nel ciclo delle '
+        r"(?P<opened>\d\d:\d\d) e l'agente l'ha chiusa nel ciclo delle (?P<closed>\d\d:\d\d)$"
+    )
+)
+def opened_and_closed_by_cycles(history: History, flow: str, asset: str, opened: str, closed: str) -> None:
+    """The cycles the worker runs open and close the position: the history keeps both cycles (R1.7.2)."""
+    flow_cycles = FlowCycles()
+    flow_cycles.add_flow(history.owners[flow], flow, assets=(asset,))
+    flow_cycles.model.text = json.dumps({"decisioni": [a_decision(asset, "apri")]})
+    flow_cycles.run(flow, opened)
+    flow_cycles.model.text = json.dumps({"decisioni": [a_decision(asset, "chiudi")]})
+    flow_cycles.run(flow, closed)
+    history.platform = flow_cycles.platform
+    history.flows[flow] = flow_cycles.flow(flow)
+
+
+@then(
+    parsers.re(
+        r"^la posizione ha ciclo di apertura delle (?P<opened>\d\d:\d\d) "
+        r"e ciclo di chiusura delle (?P<closed>\d\d:\d\d)$"
+    )
+)
+def position_cycles(history: History, opened: str, closed: str) -> None:
+    position = history.position()
+    assert (position.opening.cycle, position.closing.cycle) == (cycle_at(opened), cycle_at(closed))
+
+
+@then("la posizione ha per istanti di apertura e di chiusura quelli delle due esecuzioni")
+def position_instants(history: History) -> None:
+    position = history.position()
+    orders = history.platform.orders_of(position.tenant_id).orders
+    executed = [order.execution.executed_at for order in orders if order.execution]
+    assert len(executed) == 2
+    assert [position.opening.at, position.closing.at] == executed

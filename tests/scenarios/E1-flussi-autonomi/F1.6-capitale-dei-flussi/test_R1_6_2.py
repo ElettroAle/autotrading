@@ -229,3 +229,20 @@ def recorded_once(bench: AttributionBench, account: str, asset: str) -> None:
     items = recorded(bench, account, UnattributableKind.POSITION)
     assert [item.asset for item in items] == [asset]
     assert len(items) == 1
+
+
+@given(step(r'che sul conto "{account}" c\'è un acquisto di {a} "{asset}" senza identificativo della piattaforma'))
+def fill_without_platform_id(bench: AttributionBench, account: str, a: str, asset: str) -> None:
+    account_id = bench.account(account)
+    # The fills of the account are reconciled from its second reading on: the first one has nothing to compare with.
+    bench.previous_reading(account_id)
+    fill = a_fill(asset, None, size=amount(a), fill_id="manuale", executed_at=READ_AT - timedelta(minutes=1))
+    bench.extend(account_id, fills=(fill,))
+
+
+@then(
+    step(r'per il conto "{account}" c\'è una sola registrazione dell\'esecuzione non attribuibile su "{asset}" di {a}')
+)
+def fill_recorded_once(bench: AttributionBench, account: str, asset: str, a: str) -> None:
+    items = recorded(bench, account, UnattributableKind.FILL)
+    assert [(item.reference, item.asset, item.amount) for item in items] == [("manuale", asset, amount(a))]

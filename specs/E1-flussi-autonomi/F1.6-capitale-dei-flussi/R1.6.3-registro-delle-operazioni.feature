@@ -39,6 +39,17 @@ Funzionalità: R1.6.3 Registro delle operazioni
     Quando "anna" esporta le operazioni del flusso "alfa" dalle 10:00 alle 12:00
     Allora l'esportazione contiene le operazioni delle 10:30, delle 11:00 e delle 11:30, in quest'ordine, del flusso "alfa"
 
+  Scenario: Colonne del file esportato
+    Dato che il flusso "alfa" ha esecuzioni con PnL realizzato 10 USDC e commissione 1 USDC su "BTC" alle 10:30
+    E che il flusso "alfa" ha ricevuto un funding di 2 USDC su "BTC" alle 11:00
+    Quando "anna" esporta le operazioni del flusso "alfa"
+    Allora il file esportato ha le colonne:
+      | istante | flusso | asset | tipo | lato | quantità | prezzo | commissione | PnL realizzato | funding |
+    E il file esportato ha le righe:
+      | istante | flusso | asset | lato     | quantità | commissione | PnL realizzato | funding |
+      | 10:30   | alfa   | BTC   | acquisto | 1        | 1           | 10             | 0       |
+      | 11:00   | alfa   | BTC   |          |          | 0           | 0              | 2       |
+
   Scenario: L'esportazione comprende tutte le operazioni del filtro, oltre la pagina
     Dato che il flusso "alfa" ha 60 esecuzioni con PnL realizzato 1 USDC su "BTC", una al minuto
     Quando "anna" esporta le operazioni del flusso "alfa"

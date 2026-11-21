@@ -44,3 +44,9 @@ Funzionalità: R1.4.1 Chiavi dei fornitori IA dell'utente
     Allora la chiave "K-OR" non compare nel contesto inviato all'agente
     E la chiave "K-OR" non compare nei log
     E la chiave "K-OR" non compare nel ciclo registrato
+
+  Scenario: Rimozione di una chiave che nessun flusso attivo o in pausa usa
+    Dato che "anna" ha registrato la chiave "K-OR" per il fornitore "openrouter"
+    E che "anna" ha il flusso "alfa" fermo con modello "openrouter/deepseek-chat"
+    Quando "anna" rimuove la chiave del fornitore "openrouter"
+    Allora "anna" non ha una chiave registrata per il fornitore "openrouter"

@@ -24,6 +24,7 @@ from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market_order import MarketOrder
+from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.support.activity import an_activity
@@ -334,3 +335,34 @@ def decision_blocked(reversals: Reversals, asset: str, reason: str) -> None:
     outcome = reversals.risk_outcome(asset)
     assert (outcome["tipo"], outcome["reason"]) == ("BlockedDecision", reason)
     assert not [order for order in reversals.sent_in_cycle() if order.coin == asset]
+
+
+@given(
+    quoted(
+        'che l\'agente risponde inverti su "{asset}" con quota {quota}, leva {leverage}, obiettivo {target} '
+        "e stop {stop}"
+    )
+)
+def agent_reverses_with_plan(  # noqa: PLR0917 - one argument per value of the step
+    reversals: Reversals, asset: str, quota: str, leverage: str, target: str, stop: str
+) -> None:
+    reversal = decision(asset, "inverti", None, float(number(quota)), int(leverage))
+    reversals.answer({**reversal, "obiettivo": int(target), "stop": int(stop)})
+
+
+@then(
+    quoted(
+        'sull\'exchange la posizione long di "{flow}" su "{asset}" ha lo stop loss a {stop} e il take profit a {target}'
+    )
+)
+def reversal_protected(reversals: Reversals, flow: str, asset: str, stop: str, target: str) -> None:
+    assert flow == reversals.flow
+    held = reversals.held(asset)
+    assert held is not None
+    assert held.direction is Direction.LONG
+    protections = reversals.flow_cycles.platform.protection_exchange.of(reversals.address, asset)
+    placed = {(each.kind, each.trigger_price, each.closing_direction) for each in protections}
+    assert placed == {
+        (ProtectionKind.STOP_LOSS, number(stop), Direction.LONG),
+        (ProtectionKind.TAKE_PROFIT, number(target), Direction.LONG),
+    }

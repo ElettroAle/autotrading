@@ -1,3 +1,4 @@
+import csv
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -7,6 +8,7 @@ from uuid import uuid4
 import pytest
 from pytest_bdd import given, scenarios, then, when
 
+from autotrading.adapters.inbound.api.operations_csv import csv_lines
 from autotrading.application.flows.export_account_operations import (
     ExportAccountOperationsCommand,
     ExportAccountOperationsUseCase,
@@ -234,3 +236,23 @@ def rows_seen(register: Register, rows: str) -> None:
 @then(step(r"l'esportazione contiene l'operazione (?P<rows>delle .+)"))
 def rows_exported(register: Register, rows: str) -> None:
     assert owners_of(register.exported) == expected_rows(rows)
+
+
+def exported_file(register: Register) -> list[dict[str, str]]:
+    """The file the API streams for the exported rows (ADR 0080)."""
+    return list(csv.DictReader("".join(csv_lines(register.exported)).splitlines()))
+
+
+@then("il file esportato ha le colonne:")
+def exported_columns(register: Register, datatable: list[list[str]]) -> None:
+    header = next(csv.reader("".join(csv_lines(register.exported)).splitlines()))
+    assert header == datatable[0]
+
+
+@then("il file esportato ha le righe:")
+def exported_cells(register: Register, datatable: list[list[str]]) -> None:
+    columns, *rows = datatable
+    found = [{column: row[column] for column in columns} for row in exported_file(register)]
+    for row in found:
+        row["istante"] = datetime.fromisoformat(row["istante"]).strftime("%H:%M")
+    assert found == [dict(zip(columns, row, strict=True)) for row in rows]

@@ -19,6 +19,7 @@ from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
+from autotrading.domain.flows.selections import AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.sources.news_item import NewsItem
 from autotrading.domain.sources.price_forecast import SHORT_HORIZONS, ForecastHorizon, PriceForecast
@@ -566,7 +567,12 @@ def instructions_in_context(flow_cycles: FlowCycles, instructions: str) -> None:
     assert flow_cycles.system_text().startswith(instructions + "\n")
 
 
-@then(quoted("il contesto contiene le regole operative con leva ammessa da {lowest} a {highest}"))
+@then(
+    quoted(
+        "il contesto contiene le regole operative: al massimo una posizione per asset, azioni ammesse, "
+        "leva da {lowest} a {highest} e formato della risposta"
+    )
+)
 def operational_rules(flow_cycles: FlowCycles, lowest: str, highest: str) -> None:
     text = flow_cycles.system_text()
     assert f"- leva da {lowest} a {highest};" in text
@@ -604,6 +610,27 @@ def capital_in_context(flow_cycles: FlowCycles, capital: str, liquidity: str) ->
     assert state["valuta"] == "USDC"
     assert Decimal(str(state["capitale_allocato"])) == number(capital)
     assert Decimal(str(state["liquidita_disponibile"])) == number(liquidity)
+
+
+@then(parsers.re(r"^il contesto contiene il valore complessivo del flusso (?P<value>[\d,]+) USDC$"))
+def total_value_in_context(flow_cycles: FlowCycles, value: str) -> None:
+    assert Decimal(str(state_in_context(flow_cycles)["valore_complessivo"])) == number(value)
+
+
+@given(quoted('che il flusso "{flow}" ha attiva la fonte "{source}" con peso {weight}'))
+def weighted_source(flow_cycles: FlowCycles, flow: str, source: str, weight: str) -> None:
+    name, adapter = reader_of(source)
+    parameters = PLATFORM_CATALOG.find(name).settings(adapter, {})
+    selection = SourceSelection(name, (AdapterSelection(adapter, int(weight), parameters),))
+    flow_cycles.reconfigure(flow, lambda configuration: replace(configuration, sources=(selection,)))
+
+
+@then(quoted('il contesto contiene i dati della fonte "{source}" per "{first}" e per "{second}" con peso {weight}'))
+def source_data_in_context(flow_cycles: FlowCycles, source: str, first: str, second: str, weight: str) -> None:
+    entries = flow_cycles.context()["fonti"]
+    assert isinstance(entries, list)
+    shown = [(entry["asset"], entry["peso"], bool(entry["valori"])) for entry in entries if entry["fonte"] == source]
+    assert shown == [(first, int(weight), True), (second, int(weight), True)]
 
 
 @then(parsers.re(r"^il contesto contiene i soldi del flusso (?P<funds>[\d,]+) USDC$"))

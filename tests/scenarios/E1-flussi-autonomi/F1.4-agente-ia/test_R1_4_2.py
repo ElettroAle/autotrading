@@ -1,3 +1,4 @@
+from dataclasses import replace
 from decimal import Decimal
 
 import pytest
@@ -8,6 +9,7 @@ from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
 from autotrading.domain.agent.model_parameter import RangeParameter
 from tests.support.flow_steps import *  # noqa: F403 - the steps of flow creation, shared by the features
+from tests.support.flow_steps import Creation, create, flow_of, valid_command
 from tests.support.platform import Platform
 from tests.support.steps import quoted
 
@@ -66,3 +68,21 @@ def catalog_shows(
 def provider_has_key(consulted: dict[str, ModelListing], provider: str) -> None:
     listed = {listing.provider.value: listing.key_registered for listing in consulted["catalog"].providers}
     assert listed == {provider: True}
+
+
+@given(
+    quoted(
+        'che la configurazione della piattaforma aggiunge il modello "{model}" con temperatura da {minimum} a '
+        "{maximum}, predefinita {default}"
+    )
+)
+def model_added(platform: Platform, model: str, minimum: str, maximum: str, default: str) -> None:
+    temperature = RangeParameter("temperature", Decimal(minimum), Decimal(maximum), Decimal(default))
+    platform.model_catalog = ModelCatalog((*platform.model_catalog.models, ModelDefinition(model, (temperature,))))
+
+
+@then(quoted('"{user}" può creare il flusso "{name}" con modello "{model}"'))
+def flow_created_with_model(platform: Platform, creation: Creation, user: str, name: str, model: str) -> None:
+    create(platform, creation, user, replace(valid_command(platform, user, name), model=model))
+    assert creation.error is None
+    assert flow_of(creation, platform, name).configuration.model.name == model

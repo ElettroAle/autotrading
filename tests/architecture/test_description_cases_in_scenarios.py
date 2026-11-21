@@ -85,6 +85,58 @@ CASES_OF_E1 = {
     f"{E1}/F1.3-fonti-dati/R1.3.4-pivot-point.feature": ("Prezzo sotto l'ultimo supporto",),
     f"{E1}/F1.3-fonti-dati/R1.3.5-forecast.feature": ("Profondità dello storico fuori dall'intervallo",),
     f"{E1}/F1.3-fonti-dati/R1.3.7-notizie.feature": ("Numero di notizie ed età massima fuori dall'intervallo",),
+    # Task 675: the cases of E1 from F1.4 to F1.8.
+    f"{E1}/F1.4-agente-ia/R1.4.1-chiavi-dei-fornitori-ia.feature": (
+        "Rimozione di una chiave che nessun flusso attivo o in pausa usa",
+    ),
+    f"{E1}/F1.4-agente-ia/R1.4.2-catalogo-dei-modelli.feature": (
+        "Un modello aggiunto con la sola configurazione è nel catalogo ed è selezionabile",
+    ),
+    f"{E1}/F1.4-agente-ia/R1.4.3-contesto-dell-agente.feature": ("Dati e pesi delle fonti attive per ogni asset",),
+    f"{E1}/F1.4-agente-ia/R1.4.4-decisione-per-asset.feature": (
+        "Chiudi con campi operativi",
+        "L'apertura della chiave del fornitore IA è registrata senza la chiave",
+        "Un'apertura rifiutata della chiave del fornitore IA è registrata",
+    ),
+    f"{E1}/F1.4-agente-ia/R1.4.8-system-prompt-personalizzabile.feature": (
+        "Il flusso segue il predefinito aggiornato dalla piattaforma",
+        "La modifica del system prompt è una nuova versione della configurazione",
+    ),
+    f"{E1}/F1.4-agente-ia/R1.4.10-inversione-in-un-ciclo.feature": (
+        "L'apertura dell'inversione riceve stop e obiettivo sull'exchange",
+    ),
+    f"{E1}/F1.5-rischio-ed-esecuzione/R1.5.2-leva-massima.feature": (
+        "La riduzione della leva precede il controllo dell'esposizione",
+    ),
+    f"{E1}/F1.5-rischio-ed-esecuzione/R1.5.3-decisioni-incoerenti.feature": (
+        "Una chiusura non libera liquidità per le aperture dello stesso ciclo",
+    ),
+    f"{E1}/F1.5-rischio-ed-esecuzione/R1.5.4-importo-minimo-dell-exchange.feature": (
+        "Minimo oltre la liquidità del flusso",
+    ),
+    f"{E1}/F1.6-capitale-dei-flussi/R1.6.1-stato-del-flusso-dall-exchange.feature": (
+        "La liquidità del ciclo non scende sotto zero",
+        "Un ordine della piattaforma senza flusso è del flusso che ha l'asset",
+    ),
+    f"{E1}/F1.6-capitale-dei-flussi/R1.6.2-movimenti-non-attribuibili.feature": (
+        "Esecuzione senza identificativo della piattaforma",
+    ),
+    f"{E1}/F1.6-capitale-dei-flussi/R1.6.3-registro-delle-operazioni.feature": ("Colonne del file esportato",),
+    f"{E1}/F1.7-registrazione-e-consultazione/R1.7.1-registrazione-del-ciclo.feature": (
+        "Fonte assente nel ciclo registrato",
+        "Le credenziali del conto non compaiono nella registrazione",
+    ),
+    f"{E1}/F1.7-registrazione-e-consultazione/R1.7.2-storico-delle-posizioni-chiuse.feature": (
+        "Cicli e istanti di apertura e di chiusura",
+    ),
+    f"{E1}/F1.7-registrazione-e-consultazione/R1.7.3-consultazione-di-flussi-e-cicli.feature": (
+        "Elenco dei flussi con conto, ambiente, pausa automatica e modello",
+        "Letture dello stesso conto entro 10 secondi",
+        "Nuova lettura dopo 10 secondi",
+        "Tenant e conti diversi non condividono la lettura",
+        "Una lettura fallita non si riusa",
+    ),
+    f"{E1}/F1.8-notifiche/R1.8.2-notifiche-essenziali.feature": ("Una notifica non contiene mai credenziali",),
 }
 
 CASES = {**CASES_OF_E0, **CASES_OF_E1}
