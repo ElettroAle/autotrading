@@ -160,8 +160,9 @@ class ImmediateCycleScheduler:
 class FlowCycles:
     """The flows of the users with their cycles, run as the worker composes them."""
 
-    def __init__(self) -> None:
-        self.platform = Platform()
+    def __init__(self, platform: Platform | None = None) -> None:
+        # The platform of the API too when a scenario hands it over: what the API does is what the cycles find.
+        self.platform = platform or Platform()
         self.platform.model_catalog = scenario_catalog()
         self.clock = FakeClockAdapter(at("10:00"))
         self.checkpoints = InMemoryCycleCheckpointsAdapter()

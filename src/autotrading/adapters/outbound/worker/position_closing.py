@@ -35,12 +35,12 @@ class WorkerPositionClosingAdapter:
     def __repr__(self) -> str:
         return f"WorkerPositionClosingAdapter(tenant_id={self._tenant_id.value})"
 
-    def close(self, account_id: UUID, coin: str, user_id: UserId) -> OrderOutcome:
+    def close(self, account_id: UUID, coin: str, user_id: UserId, flow_id: UUID | None) -> OrderOutcome:
         path = f"/tenants/{self._tenant_id.value}/accounts/{account_id}/positions/{coin}/close"
         try:
             response = self._client.post(
                 path,
-                json={"user_id": user_id.value},
+                json={"user_id": user_id.value, "flow_id": None if flow_id is None else str(flow_id)},
                 headers={"Authorization": f"Bearer {self._token}"},
                 timeout=TIMEOUT_SECONDS,
             )

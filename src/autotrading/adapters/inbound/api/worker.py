@@ -101,6 +101,12 @@ class UserRequest(BaseModel):
     user_id: str
 
 
+class PositionClosingRequest(UserRequest):
+    # The flow whose position closes (stop, cash-out, emergency): its executions are of that flow whatever flow holds
+    # the asset later. None is a manual command (ADR chiusure-dei-flussi-con-il-flusso-nell-ordine).
+    flow_id: UUID | None = None
+
+
 class VerificationRequest(UserRequest):
     # None leaves the value to the minimum of the exchange of the account.
     amount: Decimal | None = Field(default=None, gt=0)
@@ -331,8 +337,11 @@ def create_worker_api(
         return {"recorded": len(recorded.entries)}
 
     @api.post("/tenants/{tenant_id}/accounts/{account_id}/positions/{coin}/close", dependencies=[Depends(require_api)])
-    def close_position(tenant_id: UUID, account_id: UUID, coin: str, request: UserRequest) -> OrderOutcomeResponse:
-        command = CloseExchangePositionCommand(account_id, coin, OrderSource(OrderOrigin.MANUAL, request.user_id))
+    def close_position(
+        tenant_id: UUID, account_id: UUID, coin: str, request: PositionClosingRequest
+    ) -> OrderOutcomeResponse:
+        source = OrderSource(OrderOrigin.MANUAL, request.user_id, closing_flow_id=request.flow_id)
+        command = CloseExchangePositionCommand(account_id, coin, source)
         order = for_tenant(TenantId(tenant_id)).close_exchange_position.execute(command)
         return OrderOutcomeResponse.of(OrderOutcome.of(order))
 

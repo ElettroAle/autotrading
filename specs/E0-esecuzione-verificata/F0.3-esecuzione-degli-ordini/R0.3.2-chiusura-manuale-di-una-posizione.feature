@@ -6,6 +6,8 @@ Funzionalità: R0.3.2 Chiusura manuale di una posizione
   Perché possa sempre togliere esposizione senza aspettare un flusso
 
   La chiusura è totale. L'utente non può aprire posizioni a mano.
+  Le esecuzioni di una chiusura manuale appartengono al flusso che ha l'asset sul conto quando il registro delle
+  operazioni le legge (Bug 684).
 
   Fuori ambito: chiusura parziale, chiusura di tutte le posizioni con un comando (chiusura di emergenza), apertura manuale.
 
@@ -31,3 +33,12 @@ Funzionalità: R0.3.2 Chiusura manuale di una posizione
     Quando "anna" chiede di aprire una posizione su "BTC" del conto "test-1"
     Allora la richiesta è respinta con il motivo "apertura manuale non consentita"
     E nessun ordine è inviato all'exchange
+
+  Scenario: La chiusura manuale resta del flusso che ha l'asset
+    Dato che "anna" ha sul conto "test-1" il flusso attivo "alfa" con asset "BTC"
+    E che il conto "test-1" ha una posizione long su "BTC"
+    E che il registro del flusso "alfa" riporta le sue posizioni aperte
+    Quando "anna" chiude la posizione su "BTC" del conto "test-1"
+    E il flusso "alfa" esegue un ciclo che registra le esecuzioni delle chiusure
+    Allora il registro del flusso "alfa" riporta la chiusura su "BTC" e nessuna posizione aperta
+    E il flusso "alfa" non è in pausa

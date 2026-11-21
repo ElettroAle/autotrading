@@ -58,7 +58,7 @@ def test_the_outcome_of_the_worker_arrives_unchanged(worker: Worker) -> None:
     account = worker.saved_account()
     holding(worker, account)
 
-    outcome = adapter_on(worker).close(account.id.value, "BTC", ANNA)
+    outcome = adapter_on(worker).close(account.id.value, "BTC", ANNA, None)
 
     (order,) = worker.orders.orders
     assert outcome == OrderOutcome.of(order)
@@ -69,10 +69,37 @@ def test_the_worker_records_the_close_with_the_user_who_asked(worker: Worker) ->
     account = worker.saved_account()
     holding(worker, account)
 
-    adapter_on(worker).close(account.id.value, "BTC", ANNA)
+    adapter_on(worker).close(account.id.value, "BTC", ANNA, None)
 
     (order,) = worker.orders.orders
     assert order.request.source == OrderSource(OrderOrigin.MANUAL, "oid-anna")
+
+
+def test_the_worker_records_the_closing_of_a_flow_with_the_flow_it_closes(worker: Worker) -> None:
+    account, flow_id = worker.saved_account(), uuid4()
+    holding(worker, account)
+
+    adapter_on(worker).close(account.id.value, "BTC", ANNA, flow_id)
+
+    (order,) = worker.orders.orders
+    assert order.request.source == OrderSource(OrderOrigin.MANUAL, "oid-anna", closing_flow_id=flow_id)
+
+
+def test_the_request_of_a_closing_of_a_flow_names_the_flow() -> None:
+    seen: list[httpx.Request] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(404, json={"detail": "non trovato"})
+
+    flow_id = uuid4()
+    client = httpx.Client(transport=httpx.MockTransport(record), base_url="http://worker")
+
+    with pytest.raises(OrderAccountNotFoundError):
+        WorkerPositionClosingAdapter(client, TOKEN, TENANT).close(uuid4(), "BTC", ANNA, flow_id)
+
+    (request,) = seen
+    assert request.content == f'{{"user_id":"oid-anna","flow_id":"{flow_id}"}}'.encode()
 
 
 def test_a_refused_close_arrives_with_reason_and_message(worker: Worker) -> None:
@@ -80,7 +107,7 @@ def test_a_refused_close_arrives_with_reason_and_message(worker: Worker) -> None
     holding(worker, account)
     worker.order_exchange.rejection = MARGIN
 
-    outcome = adapter_on(worker).close(account.id.value, "BTC", ANNA)
+    outcome = adapter_on(worker).close(account.id.value, "BTC", ANNA, None)
 
     assert (outcome.status, outcome.reason, outcome.exchange_message) == (
         OrderStatus.REJECTED,
@@ -93,7 +120,7 @@ def test_without_a_position_the_worker_answers_with_the_coin(worker: Worker) -> 
     account = worker.saved_account()
 
     with pytest.raises(NoOpenPositionError) as raised:
-        adapter_on(worker).close(account.id.value, "kPEPE", ANNA)
+        adapter_on(worker).close(account.id.value, "kPEPE", ANNA, None)
 
     assert str(raised.value) == "nessuna posizione aperta su kPEPE"
 
@@ -103,14 +130,14 @@ def test_an_account_of_another_tenant_is_not_found_by_the_worker(worker: Worker)
     holding(worker, theirs)
 
     with pytest.raises(OrderAccountNotFoundError):
-        adapter_on(worker).close(theirs.id.value, "BTC", ANNA)
+        adapter_on(worker).close(theirs.id.value, "BTC", ANNA, None)
 
     assert worker.order_exchange.sent == []
 
 
 def test_an_exchange_the_worker_cannot_reach_is_unavailable() -> None:
     with pytest.raises(OrderExchangeUnavailableError):
-        answering(503, {"detail": "exchange non raggiungibile"}).close(uuid4(), "BTC", ANNA)
+        answering(503, {"detail": "exchange non raggiungibile"}).close(uuid4(), "BTC", ANNA, None)
 
 
 def test_a_caller_without_the_token_is_refused_and_reads_as_an_unavailable_worker(worker: Worker) -> None:
@@ -118,7 +145,7 @@ def test_a_caller_without_the_token_is_refused_and_reads_as_an_unavailable_worke
     holding(worker, account)
 
     with pytest.raises(OrderWorkerUnavailableError):
-        adapter_on(worker, token=token_hex(16)).close(account.id.value, "BTC", ANNA)
+        adapter_on(worker, token=token_hex(16)).close(account.id.value, "BTC", ANNA, None)
 
     assert worker.order_exchange.sent == []
 
@@ -130,7 +157,7 @@ def test_a_worker_that_does_not_answer_is_unavailable() -> None:
     client = httpx.Client(transport=httpx.MockTransport(refuse), base_url="http://worker")
 
     with pytest.raises(OrderWorkerUnavailableError):
-        WorkerPositionClosingAdapter(client, TOKEN, TENANT).close(uuid4(), "BTC", ANNA)
+        WorkerPositionClosingAdapter(client, TOKEN, TENANT).close(uuid4(), "BTC", ANNA, None)
 
 
 @pytest.mark.parametrize(
@@ -145,7 +172,7 @@ def test_a_worker_that_does_not_answer_is_unavailable() -> None:
 )
 def test_an_answer_the_api_cannot_use_is_an_unavailable_worker(status: int, body: object) -> None:
     with pytest.raises(OrderWorkerUnavailableError):
-        answering(status, body).close(uuid4(), "BTC", ANNA)
+        answering(status, body).close(uuid4(), "BTC", ANNA, None)
 
 
 def test_the_request_names_tenant_account_coin_user_and_token() -> None:
@@ -159,12 +186,12 @@ def test_the_request_names_tenant_account_coin_user_and_token() -> None:
     client = httpx.Client(transport=httpx.MockTransport(record), base_url="http://worker")
 
     with pytest.raises(OrderAccountNotFoundError):
-        WorkerPositionClosingAdapter(client, TOKEN, TENANT).close(account_id, "BTC", ANNA)
+        WorkerPositionClosingAdapter(client, TOKEN, TENANT).close(account_id, "BTC", ANNA, None)
 
     (request,) = seen
     assert request.url.path == f"/tenants/{TENANT.value}/accounts/{account_id}/positions/BTC/close"
     assert request.headers["Authorization"] == f"Bearer {TOKEN}"
-    assert request.content == b'{"user_id":"oid-anna"}'
+    assert request.content == b'{"user_id":"oid-anna","flow_id":null}'
     assert request.extensions["timeout"]["read"] == TIMEOUT_SECONDS
 
 

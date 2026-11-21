@@ -27,6 +27,7 @@ class ClosePositionUseCase:
 
     def execute(self, command: ClosePositionCommand) -> OrderOutcome:
         coin = command.coin.strip()
-        outcome = self._closing.close(command.account_id, coin, command.user_id)
+        # A manual command closes for no flow: what it executes is of the flow holding the asset (ADR 0063).
+        outcome = self._closing.close(command.account_id, coin, command.user_id, None)
         self._history.execute(command.account_id, coin, outcome)
         return outcome

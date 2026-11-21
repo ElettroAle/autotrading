@@ -33,7 +33,7 @@ class CloseFlowPositionUseCase:
 
     def execute(self, position: FlowPositionToClosePort) -> ClosingReport:
         try:
-            outcome = self._closing.close(position.account_id, position.asset, position.user_id)
+            outcome = self._closing.close(position.account_id, position.asset, position.user_id, position.flow_id)
         except NoOpenPositionError:
             return ClosingReport(found=False)
         except (OrderAccountNotFoundError, OrderExchangeUnavailableError, OrderWorkerUnavailableError) as error:
