@@ -1,0 +1,10 @@
+{
+  "origin": "live",
+  "recorded_at": "2026-11-21T20:09:09Z",
+  "method": "GET",
+  "url": "https://data-api.binance.vision/api/v3/depth?symbol=BTCUSDT&limit=1000",
+  "request_body": null,
+  "status": 200,
+  "content_type": "application/json;charset=UTF-8",
+  "answer": "depth_btcusdt.json"
+}

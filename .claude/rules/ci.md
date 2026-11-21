@@ -45,4 +45,6 @@ Decisioni in `docs/adr/0001`-`0013`, `0084`, `0113` e `0114`. Requisiti in `spec
 - Workflow validati con actionlint prima del commit.
 - Il job `test` esegue ogni test scritto, integrazione contro sistemi veri compresa: il comando di pytest esclude
   solo il marker `pipeline` (più `testnet_credentials` fino al Bug 643), nessun test si salta (ADR
-  nessun-test-escluso-o-saltato, regola verificata in `tests/architecture/`).
+  nessun-test-escluso-o-saltato, regola verificata in `tests/architecture/`). I sistemi veri chiamati sono la testnet
+  Hyperliquid per `orders` e `accounts` e i fornitori IA; le fonti girano su risposte registrate, mai dal vivo (ADR
+  fonti-provate-su-risposte-registrate).

@@ -1,0 +1,10 @@
+{
+  "origin": "composed: in the error format of https://developers.binance.com/docs/binance-spot-api-docs/errors (-1003 TOO_MANY_REQUESTS)",
+  "recorded_at": "2026-11-21T20:09:09Z",
+  "method": "GET",
+  "url": "https://data-api.binance.vision/api/v3/ticker/24hr?symbol=BTCUSDT",
+  "request_body": null,
+  "status": 429,
+  "content_type": "application/json",
+  "answer": "rate_limited_429.json"
+}
