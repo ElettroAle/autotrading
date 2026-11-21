@@ -46,6 +46,11 @@ Funzionalità: R3.4.3 Rendimento corretto dopo incassi e variazioni
     Quando "anna" apre la classifica dei flussi e parte un ciclo di "alfa"
     Allora la classifica mostra per "alfa" il rendimento 15,50%
     E lo stato del flusso inviato all'agente riporta il rendimento 15,50%
+  Scenario: Statistiche dall'inizio con lo stesso rendimento
+    Dato che "anna" ha incassato 100 USDC da "alfa" quando valeva 1100 USDC e il valore di "alfa" è ora 1050 USDC
+    Quando parte un ciclo di "alfa" e "anna" apre le statistiche di "alfa" dall'inizio
+    Allora le statistiche di "alfa" mostrano il rendimento 15,50%
+    E il rendimento di "alfa" è 15,50%
   Scenario: Variazione segnata sull'equity curve
     Dato che "anna" ha incassato 100 USDC da "alfa"
     Quando "anna" apre l'equity curve di "alfa"

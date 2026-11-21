@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -8,6 +8,8 @@ from autotrading.application.flows.ports import (
     EquitySnapshotRepositoryPort,
     FlowRepositoryPort,
 )
+from autotrading.domain.flows.capital_change import CapitalChange
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_cost import FlowCost
 from autotrading.domain.flows.flow_ranking import FlowRanking, ranked_by_return
@@ -61,10 +63,16 @@ class RankFlowsUseCase:
             if not snapshots:
                 continue
             changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())
-            statistics = self._statistics(flow, window)
+            statistics = self._statistics(flow, window, snapshots, changes)
             yield FlowRanking.of(flow.id.value, flow.name.value, snapshots, statistics, changes)
 
-    def _statistics(self, flow: Flow, window: TimeWindow) -> FlowStatistics:
+    def _statistics(
+        self,
+        flow: Flow,
+        window: TimeWindow,
+        snapshots: Sequence[EquitySnapshot],
+        changes: Iterable[CapitalChange],
+    ) -> FlowStatistics:
         positions = self._positions.closed_within(flow.id, window)
         cost = FlowCost.of(self._history.costs_within(flow.id.value, window))
-        return FlowStatistics.of(positions, cost)
+        return FlowStatistics.of(positions, cost, snapshots, changes)

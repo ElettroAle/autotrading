@@ -2,8 +2,11 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
+from autotrading.domain.flows.capital_change import CapitalChange
 from autotrading.domain.flows.closed_position import ClosedPosition
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow_cost import FlowCost
+from autotrading.domain.flows.flow_return import FlowReturn
 
 PERCENT = Decimal(100)
 
@@ -16,7 +19,9 @@ class FlowStatistics:
     when even. An even operation counts among the operations but not in the win rate, which is won over won and lost
     and is not available without a won or lost operation. The model cost leaves the calls whose cost nobody knows
     apart, as the cost of the flow does (R1.4.6). The net PnL is the sum of the net results of the operations, the
-    PnL the ranking compares (R2.4.2).
+    PnL the ranking compares (R2.4.2). The return is the one of the period: from the first value the flow recorded in
+    it to the last, compounded across the changes of the capital between them as the return of the flow is (R3.4.3,
+    ADR rendimento-del-periodo-nelle-statistiche), and not available without a value in the period.
     """
 
     won: int
@@ -29,9 +34,16 @@ class FlowStatistics:
     total_fees: Decimal
     model_cost_usd: Decimal
     model_calls_without_cost: int
+    return_percent: Decimal | None
 
     @classmethod
-    def of(cls, positions: Iterable[ClosedPosition], cost: FlowCost) -> FlowStatistics:
+    def of(
+        cls,
+        positions: Iterable[ClosedPosition],
+        cost: FlowCost,
+        values: Sequence[EquitySnapshot] = (),
+        changes: Iterable[CapitalChange] = (),
+    ) -> FlowStatistics:
         closed = list(positions)
         winning = [position.net_pnl for position in closed if position.net_pnl > 0]
         losing = [position.net_pnl for position in closed if position.net_pnl < 0]
@@ -46,7 +58,14 @@ class FlowStatistics:
             total_fees=sum((position.fees for position in closed), Decimal(0)),
             model_cost_usd=cost.total_usd,
             model_calls_without_cost=cost.unavailable_calls,
+            return_percent=_period_return(values, changes),
         )
+
+
+def _period_return(values: Sequence[EquitySnapshot], changes: Iterable[CapitalChange]) -> Decimal | None:
+    if not values:
+        return None
+    return FlowReturn.over(values, changes).percent
 
 
 def _win_rate(won: int, lost: int) -> Decimal | None:

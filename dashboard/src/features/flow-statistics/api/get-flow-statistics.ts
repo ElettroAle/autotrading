@@ -15,6 +15,7 @@ const statisticsSchema = z.object({
   total_fees: z.string(),
   model_cost_usd: z.string(),
   model_calls_without_cost: z.number(),
+  return_percent: z.string().nullable(),
 });
 
 export type FlowStatistics = z.infer<typeof statisticsSchema>;

@@ -673,7 +673,7 @@ export const handlers = [
         return problem(404, 'Not Found', 'flusso non trovato');
       }
       try {
-        return HttpResponse.json(statisticsOf(flow.history, new URL(request.url).searchParams));
+        return HttpResponse.json(statisticsOf(flow, new URL(request.url).searchParams));
       } catch (error) {
         if (error instanceof InvalidPeriod) {
           return problem(400, 'Bad Request', error.message);

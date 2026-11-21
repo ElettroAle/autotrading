@@ -10,6 +10,7 @@ from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.flows import a_flow
@@ -89,6 +90,7 @@ def test_the_statistics_of_a_flow_answer_with_amounts_as_text(client_of: Client,
         "total_fees": "3",
         "model_cost_usd": "1.2",
         "model_calls_without_cost": 0,
+        "return_percent": None,
     }
 
 
@@ -155,3 +157,23 @@ def test_the_statistics_of_a_flow_of_another_user_do_not_exist(client_of: Client
 
     assert response.status_code == 404
     assert reason_of(response) == {"detail": "flusso non trovato"}
+
+
+def worth(platform: Platform, flow: Flow, value: str, age: timedelta) -> None:
+    planned_at = platform.now - age
+    zero = Decimal(0)
+    snapshot = EquitySnapshot(flow.id.value, planned_at, Decimal(value), zero, zero, zero, zero)
+    platform.equity_snapshots.snapshots[flow.tenant_id, flow.id.value, planned_at] = snapshot
+
+
+def test_the_return_of_the_period_answers_in_percent_with_two_decimals(client_of: Client, platform: Platform) -> None:
+    # ADR rendimento-del-periodo-nelle-statistiche.
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    worth(platform, flow, "800", timedelta(days=20))
+    worth(platform, flow, "1000", timedelta(days=6))
+    worth(platform, flow, "1080", timedelta(0))
+
+    body = anna.get(f"/flows/{flow.id.value}/statistics", params={"period": "7d"}).json()
+
+    assert body["return_percent"] == "8.00"

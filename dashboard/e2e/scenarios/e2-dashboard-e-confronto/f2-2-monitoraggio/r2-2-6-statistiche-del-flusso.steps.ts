@@ -1,6 +1,11 @@
 import { expect } from '@playwright/test';
 
-import { emptyHistory, fakePlatform, type FakeFlowHistory } from '@/testing/mocks/platform';
+import {
+  emptyHistory,
+  fakePlatform,
+  type FakeEquityPoint,
+  type FakeFlowHistory,
+} from '@/testing/mocks/platform';
 
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When, type ScenarioMemory } from '../../../support/fixtures';
@@ -40,7 +45,7 @@ const openStatistics = async (
     fakePlatform.addUser(account, { hasUserRole: true });
   }
   for (const [name, history] of memory.histories) {
-    fakePlatform.addFlow(account, name, { history });
+    fakePlatform.addFlow(account, name, { history, equity: memory.equities.get(name) ?? [] });
   }
   await dashboard.openFlow(flow);
   await dashboard.signInAs(account);
@@ -89,6 +94,38 @@ Given(
       fees: 0,
       closedAt: daysAgo(RECENT_DAYS),
     });
+  },
+);
+
+const equityOf = (memory: ScenarioMemory, flow: string): FakeEquityPoint[] => {
+  historyOf(memory, flow);
+  const equity = memory.equities.get(flow) ?? [];
+  memory.equities.set(flow, equity);
+  return equity;
+};
+
+// ADR rendimento-del-periodo-nelle-statistiche: the values the cycles of the flow recorded make its return.
+Given(
+  /^che il flusso "([^"]+)" valeva ([\d,]+) USDC (\d+) giorni fa e ([\d,]+) USDC (\d+) giorni fa$/,
+  async (
+    { memory },
+    flow: string,
+    first: string,
+    firstDays: string,
+    second: string,
+    secondDays: string,
+  ) => {
+    equityOf(memory, flow).push(
+      { plannedAt: daysAgo(Number(firstDays)), equity: amount(first) },
+      { plannedAt: daysAgo(Number(secondDays)), equity: amount(second) },
+    );
+  },
+);
+
+Given(
+  /^che il flusso "([^"]+)" vale ora ([\d,]+) USDC$/,
+  async ({ memory }, flow: string, value: string) => {
+    equityOf(memory, flow).push({ plannedAt: new Date(), equity: amount(value) });
   },
 );
 
@@ -149,3 +186,8 @@ Then(
     await expect(dashboard.statistic('Win rate')).toHaveText(rate);
   },
 );
+
+Then(/^vede il rendimento ([+-][\d,]+%) in verde$/, async ({ dashboard }, shown: string) => {
+  await expect(dashboard.statistic('Rendimento')).toHaveText(shown);
+  await expect(dashboard.statistic('Rendimento')).toHaveClass(/text-green-/);
+});

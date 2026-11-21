@@ -16,8 +16,9 @@ TWO_DECIMALS = Decimal("0.01")
 
 
 class FlowStatisticsResponse(BaseModel):
-    """The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate in percent with two
-    decimals, null when nothing is available (ADR 0122).
+    """The statistics of a flow over a period (R2.2.6): amounts as text (ADR 0018), win rate and return of the period
+    in percent with two decimals, null when nothing is available (ADR 0122, ADR
+    rendimento-del-periodo-nelle-statistiche).
     """
 
     won: int
@@ -29,20 +30,21 @@ class FlowStatisticsResponse(BaseModel):
     total_fees: str
     model_cost_usd: str
     model_calls_without_cost: int
+    return_percent: str | None
 
     @classmethod
     def of(cls, statistics: FlowStatistics) -> FlowStatisticsResponse:
-        rate = statistics.win_rate_percent
         return cls(
             won=statistics.won,
             lost=statistics.lost,
             operations=statistics.operations,
-            win_rate_percent=None if rate is None else str(rate.quantize(TWO_DECIMALS)),
+            win_rate_percent=_optional_percent(statistics.win_rate_percent),
             average_winning_pnl=_optional_amount(statistics.average_winning_pnl),
             average_losing_pnl=_optional_amount(statistics.average_losing_pnl),
             total_fees=amount_text(statistics.total_fees),
             model_cost_usd=amount_text(statistics.model_cost_usd),
             model_calls_without_cost=statistics.model_calls_without_cost,
+            return_percent=_optional_percent(statistics.return_percent),
         )
 
 
@@ -65,3 +67,7 @@ def flow_statistics_router(use_cases_of_request: Callable[..., TenantUseCases]) 
 
 def _optional_amount(amount: Decimal | None) -> str | None:
     return None if amount is None else amount_text(amount)
+
+
+def _optional_percent(percent: Decimal | None) -> str | None:
+    return None if percent is None else str(percent.quantize(TWO_DECIMALS))

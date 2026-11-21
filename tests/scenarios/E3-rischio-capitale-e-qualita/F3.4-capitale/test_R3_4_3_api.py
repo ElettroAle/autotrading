@@ -17,11 +17,13 @@ from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsC
 from autotrading.application.flows.rank_flows import RankFlowsCommand
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityCommand
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
+from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsCommand
 from autotrading.domain.flows.capital_history import CapitalHistoryEntry
 from autotrading.domain.flows.equity_snapshot import FlowEquity
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_results import FlowResults
+from autotrading.domain.flows.flow_statistics import FlowStatistics
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.italian_text import money_text
@@ -55,6 +57,7 @@ class Returns:
     ranking: tuple[FlowRanking, ...] = ()
     curve: FlowEquity | None = None
     curve_changes: tuple[CapitalHistoryEntry, ...] = ()
+    statistics: FlowStatistics | None = None
     currency: str = ""
     summary_return: Decimal | None = None
     state_return: Decimal | None = None
@@ -212,6 +215,16 @@ def ranking_and_cycle(returns: Returns, user: str, name: str) -> None:
     returns.ranking = use_cases.rank_flows.execute(RankFlowsCommand())
 
 
+@when(quoted('parte un ciclo di "{name}" e "{user}" apre le statistiche di "{again}" dall\'inizio'))
+def cycle_and_statistics(returns: Returns, name: str, user: str, again: str) -> None:
+    assert (user, name, again) == (returns.user, returns.name, returns.name)
+    # The cycle records the equity of now, the last value of the period: the user reads it from then on.
+    returns.flow_cycles.run(name, NEXT_CYCLE)
+    returns.flow_cycles.platform.now = returns.flow_cycles.clock.now()
+    use_cases = returns.flow_cycles.platform.use_cases_of(user)
+    returns.statistics = use_cases.read_flow_statistics.execute(ReadFlowStatisticsCommand(returns.flow.id.value))
+
+
 @when(quoted('"{user}" apre l\'equity curve di "{name}"'))
 def open_curve(returns: Returns, user: str, name: str) -> None:
     assert (user, name) == (returns.user, returns.name)
@@ -281,3 +294,10 @@ def change_on_curve(returns: Returns, label: str) -> None:
     ]
     assert marks == [(returns.moved_at, label)]
     assert at(STARTED) < marks[0][0] < at(NEXT_CYCLE)
+
+
+@then(quoted('le statistiche di "{name}" mostrano il rendimento {percent}%'))
+def statistics_return(returns: Returns, name: str, percent: str) -> None:
+    assert name == returns.name
+    assert returns.statistics is not None
+    assert returns.statistics.return_percent == number(percent)

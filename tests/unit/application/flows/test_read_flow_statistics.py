@@ -6,14 +6,18 @@ import pytest
 from autotrading.application.flows.errors import FlowNotFoundError
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsCommand, ReadFlowStatisticsUseCase
 from autotrading.domain.flows.call_cost import CallCost
+from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
+from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.errors import InvalidStatisticsPeriodError
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleRepositoryAdapter
+from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.support.flows import a_flow
 
@@ -26,6 +30,7 @@ class Platform:
         self.flows = FlowStore()
         self.positions = ClosedPositionStore()
         self.cycles = InMemoryCycleRepositoryAdapter()
+        self.equity = EquitySnapshotStore()
 
     def flow(self, tenant_id: TenantId = TENANT) -> Flow:
         flow = a_flow(tenant_id)
@@ -53,11 +58,32 @@ class Platform:
         call = CallCost(10, 10, Decimal(cost))
         self.cycles.record(CycleRecord(flow.id.value, planned_at, CycleOutcome.COMPLETED, cost=call))
 
+    def worth(self, flow: Flow, value: str, planned_at: datetime) -> None:
+        zero = Decimal(0)
+        snapshot = EquitySnapshot(flow.id.value, planned_at, Decimal(value), zero, zero, zero, zero)
+        self.equity.snapshots[flow.tenant_id, flow.id.value, planned_at] = snapshot
+
+    def cash_out(self, flow: Flow, amount: str, value_before: str, changed_at: datetime) -> None:
+        capital = flow.configuration.assigned_capital
+        change = CapitalChange(
+            flow.id,
+            changed_at,
+            capital,
+            capital,
+            UserId("anna"),
+            CapitalChangeReason.CASH_OUT,
+            Decimal(amount),
+            value_before=Decimal(value_before),
+            cashed_profit=Decimal(amount),
+        )
+        self.flows.capital_changes.setdefault(flow.id, []).append(change)
+
     def use_case(self) -> ReadFlowStatisticsUseCase:
         return ReadFlowStatisticsUseCase(
             InMemoryFlowRepositoryAdapter(self.flows, TENANT),
             InMemoryClosedPositionRepositoryAdapter(self.positions, TENANT),
             InMemoryCycleHistoryAdapter(self.cycles, self.flows, TENANT),
+            InMemoryEquitySnapshotRepositoryAdapter(self.equity, TENANT),
             lambda: NOW,
         )
 
@@ -131,3 +157,45 @@ def test_an_invalid_period_is_rejected_before_reading_the_flow(platform: Platfor
 
     with pytest.raises(InvalidStatisticsPeriodError):
         platform.use_case().execute(ReadFlowStatisticsCommand(other.id.value, "1y"))
+
+
+def test_the_return_is_the_one_of_the_period_across_its_changes_of_the_capital(platform: Platform) -> None:
+    flow = platform.flow()
+    platform.worth(flow, "800", NOW - timedelta(days=20))
+    platform.worth(flow, "1000", NOW - timedelta(days=6))
+    platform.cash_out(flow, "100", "1100", NOW - timedelta(days=3))
+    platform.worth(flow, "1050", NOW)
+
+    statistics = platform.use_case().execute(ReadFlowStatisticsCommand(flow.id.value, "7d"))
+
+    assert statistics.return_percent == Decimal("15.50")
+
+
+def test_the_return_of_the_whole_life_starts_at_the_first_value(platform: Platform) -> None:
+    flow = platform.flow()
+    platform.worth(flow, "800", NOW - timedelta(days=20))
+    platform.cash_out(flow, "100", "1100", NOW - timedelta(days=3))
+    platform.worth(flow, "1050", NOW)
+
+    statistics = platform.use_case().execute(ReadFlowStatisticsCommand(flow.id.value))
+
+    assert statistics.return_percent == Decimal("44.38")
+
+
+def test_the_return_is_not_available_without_values_in_the_period(platform: Platform) -> None:
+    flow = platform.flow()
+    platform.worth(flow, "800", NOW - timedelta(days=20))
+
+    statistics = platform.use_case().execute(ReadFlowStatisticsCommand(flow.id.value, "7d"))
+
+    assert statistics.return_percent is None
+
+
+def test_the_values_of_another_flow_do_not_count(platform: Platform) -> None:
+    flow, other = platform.flow(), platform.flow()
+    platform.worth(other, "800", NOW - timedelta(days=1))
+    platform.worth(other, "900", NOW)
+
+    statistics = platform.use_case().execute(ReadFlowStatisticsCommand(flow.id.value))
+
+    assert statistics.return_percent is None

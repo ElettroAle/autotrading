@@ -5,11 +5,13 @@ import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { usePeriod } from '@/components/ui/period-selector/use-period';
 import {
+  formatPercent,
   formatRate,
   formatRoundedAmount,
   formatRoundedResult,
   formatUsd,
 } from '@/utils/format-amount';
+import { gainTone } from '@/utils/gain-tone';
 
 import { useFlowStatistics, type FlowStatistics as Statistics } from '../api/get-flow-statistics';
 
@@ -25,14 +27,22 @@ const modelCost = ({ model_cost_usd, model_calls_without_cost }: Statistics): st
     : `${cost} (${model_calls_without_cost} chiamate senza costo noto)`;
 };
 
-const Statistic = ({ label, children }: { label: string; children: ReactNode }) => {
+const Statistic = ({
+  label,
+  className = '',
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) => {
   const id = useId();
   return (
     <div className="flex justify-between gap-4 border-b border-slate-100 py-1">
       <dt id={id} className="text-slate-600">
         {label}
       </dt>
-      <dd aria-labelledby={id} className={`${DETAIL_VALUE} font-medium`}>
+      <dd aria-labelledby={id} className={`${DETAIL_VALUE} font-medium ${className}`}>
         {children}
       </dd>
     </div>
@@ -52,6 +62,9 @@ const StatisticsList = ({ statistics }: { statistics: Statistics }) => (
 
 const StatisticsValues = ({ statistics }: { statistics: Statistics }) => (
   <dl>
+    <Statistic label="Rendimento" className={gainTone(statistics.return_percent)}>
+      {orNotAvailable(statistics.return_percent, formatPercent)}
+    </Statistic>
     <Statistic label="Operazioni vinte">{statistics.won}</Statistic>
     <Statistic label="Operazioni perse">{statistics.lost}</Statistic>
     <Statistic label="Win rate">
