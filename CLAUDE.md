@@ -260,7 +260,8 @@ l'adapter. Dettagli in `.claude/rules/context-tenancy.md`.
 Unit test per ogni tipo di produzione, scenari Gherkin eseguiti sui casi d'uso con adapter finti,
 test di integrazione per ogni adapter contro la tecnologia vera, test architetturale. Ogni prova si
 vede rossa prima di diventare verde. Ogni test scritto gira nella pipeline a ogni PR e nessuno si salta: i test
-contro sistemi veri (testnet, fornitori IA, fonti) girano solo lì, in locale si eseguono i test mirati. Dettagli in
+contro sistemi veri (testnet, fornitori IA) girano solo lì, in locale si eseguono i test mirati. Le fonti si provano su
+risposte vere registrate, senza chiamate dal vivo (ADR fonti-provate-su-risposte-registrate). Dettagli in
 `.claude/rules/tests.md`.
 
 ## Sicurezza (vincoli del proprietario)

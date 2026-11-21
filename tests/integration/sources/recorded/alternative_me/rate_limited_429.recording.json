@@ -1,0 +1,10 @@
+{
+  "origin": "composed: alternative.me documents no error body (https://alternative.me/crypto/fear-and-greed-index/#api); only the status is translated",
+  "recorded_at": "2026-11-21T20:09:09Z",
+  "method": "GET",
+  "url": "https://api.alternative.me/fng/?limit=1",
+  "request_body": null,
+  "status": 429,
+  "content_type": "text/plain",
+  "answer": "rate_limited_429.txt"
+}

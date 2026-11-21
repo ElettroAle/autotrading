@@ -41,9 +41,17 @@ tests/
   tracciabilità e non diventano marker (`tests/scenarios/conftest.py`). `@wip` non esiste: un requisito
   non pianificato non ha il `.feature` in `specs/`, i suoi criteri stanno sulla board.
 - **Integrazione**: marker `integration`, per ogni adapter contro la tecnologia vera: PostgreSQL in
-  container, testnet Hyperliquid, fornitori IA con una chiave inventata, fonti contro i servizi veri.
+  container, testnet Hyperliquid per `orders` e `accounts`, fornitori IA con una chiave inventata.
   Girano solo nella pipeline, a ogni PR; in locale `addopts` esclude `pipeline` e `integration` e si
   eseguono i test mirati.
+- **Fonti su risposte registrate** (ADR fonti-provate-su-risposte-registrate): i test delle fonti,
+  `tests/integration/sources/test_<fonte>_recorded.py` (marker `integration`), non chiamano mai i servizi dal vivo.
+  Girano su risposte vere catturate una volta dal vivo e salvate come arrivano in
+  `tests/integration/sources/recorded/<tecnologia>/`, ciascuna col proprio `<nome>.recording.json` (richiesta, URL,
+  stato, data di registrazione); `tests/support/recorded_answers.py` le serve con `httpx.MockTransport` o come
+  trasporto della sessione dell'SDK Hyperliquid e fa fallire il test su una richiesta non registrata. Ogni fonte ha
+  almeno una risposta di errore (429 o 5xx). I fornitori a chiave seguono ADR
+  risposte-http-registrate-per-i-fornitori-a-chiave.
 - **Nessun test escluso o saltato** (ADR nessun-test-escluso-o-saltato): nessun `pytest.skip`,
   `skipif`, `xfail`, `importorskip` né `mark.skip`; nei test della dashboard nessun `.skip`, `.todo`,
   `.fixme` né `.only`; Playwright con `missingSteps: 'fail-on-gen'`, `tags: 'not @pipeline'` e nessun `grep`,

@@ -2,7 +2,7 @@
 paths:
   - "src/autotrading/adapters/outbound/alternative_me/**"
   - "tests/unit/adapters/test_fear_and_greed_sources.py"
-  - "tests/integration/sources/test_sentiment_live.py"
+  - "tests/integration/sources/test_sentiment_recorded.py"
 ---
 
 # Adapter in uscita: alternative.me
