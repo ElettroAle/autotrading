@@ -62,7 +62,6 @@ bdd_features_base_dir = "specs"
 markers = [
     "pipeline: scenario provato da un'esecuzione reale della pipeline, non da pytest",
     "integration: adapter contro la tecnologia vera (PostgreSQL, testnet, fornitori IA, fonti)",
-    "testnet_credentials: ordini sulla testnet con le credenziali del conto, fuori dalla pipeline fino al Bug 643",
 ]
 
 [tool.coverage.run]

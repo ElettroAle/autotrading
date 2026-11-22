@@ -18,7 +18,7 @@ REPOSITORY_FOLDERS = ("tests/", "specs/", "dashboard/", ".github/")
 PIPELINE_TEST_RUN = ".github/actions/pytest-run/action.yml"
 PLAYWRIGHT_CONFIG = "dashboard/playwright.config.ts"
 STORY = "specs/E0-x/F0.1-x/R0.1.2-x"
-CREDENTIALS_MARKER = frozenset({"testnet_credentials"})
+EXCLUDED_MARKER = frozenset({"slow"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,20 +223,20 @@ VIOLATING = [
     Case(
         Rule.NO_EXCLUDED_TESTS,
         "tests/integration/hyperliquid/test_a.py",
-        "pytestmark = pytest.mark.integration\n@pytest.mark.testnet_credentials\ndef test_a(): ...\n",
-        CREDENTIALS_MARKER,
+        "pytestmark = pytest.mark.integration\n@pytest.mark.slow\ndef test_a(): ...\n",
+        EXCLUDED_MARKER,
     ),
     Case(
         Rule.NO_EXCLUDED_TESTS,
         "tests/integration/hyperliquid/test_a.py",
-        "pytestmark = [pytest.mark.integration, pytest.mark.testnet_credentials]\ndef test_a(): ...\n",
-        CREDENTIALS_MARKER,
+        "pytestmark = [pytest.mark.integration, pytest.mark.slow]\ndef test_a(): ...\n",
+        EXCLUDED_MARKER,
     ),
     Case(
         Rule.NO_EXCLUDED_TESTS,
         "tests/integration/hyperliquid/test_a.py",
-        "@pytest.mark.testnet_credentials\nclass TestA:\n    def test_b(self): ...\n",
-        CREDENTIALS_MARKER,
+        "@pytest.mark.slow\nclass TestA:\n    def test_b(self): ...\n",
+        EXCLUDED_MARKER,
     ),
     Case(Rule.NO_EXCLUDED_TESTS, f"{STORY}/api/R0.1.2-x.feature", "@R0.1.2 @wip\nFunzionalità: X\n"),
     Case(
@@ -362,7 +362,7 @@ CLEAN = [
         Rule.NO_EXCLUDED_TESTS,
         "tests/integration/hyperliquid/test_a.py",
         "pytestmark = pytest.mark.integration\n@pytest.mark.parametrize('x', [1])\ndef test_a(x): ...\n",
-        CREDENTIALS_MARKER,
+        EXCLUDED_MARKER,
     ),
     Case(
         Rule.NO_EXCLUDED_TESTS,
@@ -423,9 +423,9 @@ def test_every_rule_has_a_compliant_example() -> None:
 
 
 def test_a_test_with_a_marker_the_pipeline_leaves_out_is_named_by_its_identifier() -> None:
-    source = "@pytest.mark.testnet_credentials\nclass TestA:\n    def test_b(self): ...\n    def helper(self): ...\n"
+    source = "@pytest.mark.slow\nclass TestA:\n    def test_b(self): ...\n    def helper(self): ...\n"
 
-    caught = violations_of_file("tests/integration/x/test_a.py", source, CREDENTIALS_MARKER)
+    caught = violations_of_file("tests/integration/x/test_a.py", source, EXCLUDED_MARKER)
 
     assert [violation.location for violation in caught] == ["tests/integration/x/test_a.py:TestA.test_b"]
 
@@ -439,7 +439,7 @@ def test_an_excluded_marker_is_named_by_the_marker() -> None:
 @pytest.mark.parametrize(
     ("action", "excluded"),
     [
-        ('run: uv run pytest -m "not pipeline and not testnet_credentials"\n', {"pipeline", "testnet_credentials"}),
+        ('run: uv run pytest -m "not pipeline and not slow"\n', {"pipeline", "slow"}),
         ("run: uv run pytest --cov\n", set()),
     ],
 )
