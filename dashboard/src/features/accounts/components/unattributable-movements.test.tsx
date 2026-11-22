@@ -48,7 +48,14 @@ const rowsOf = (shown: HTMLElement): string[] =>
 
 describe('UnattributableMovements', () => {
   beforeEach(() => {
+    // The period of the record starts at the minute of the render: a minute that changes during a test reads another
+    // record, from its first page (Bug 714). The clock stands still, the timers run.
+    vi.useFakeTimers({ toFake: ['Date'] });
     fakePlatform.giveAccountTo('anna', 'test-1', 1000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('lists the cases of the last 24 hours, the most recent first, with the net of the changes above the table', async () => {
