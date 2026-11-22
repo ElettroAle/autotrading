@@ -16,7 +16,6 @@ from autotrading.adapters.outbound.hyperliquid.market_data import MARKET_DATA, H
 from autotrading.application.sources.errors import SourceUnavailableError
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
-from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe
 from tests.support.recorded_answers import RecordedInfoSdk, RecordedService
 
@@ -82,22 +81,6 @@ def test_the_recorded_contexts_give_the_current_values_of_the_asset() -> None:
         funding_rate=Decimal("0.0000125"),
     )
     assert service.received[-1] == ("POST", INFO_URL, {"type": "metaAndAssetCtxs"})
-
-
-def test_the_recorded_daily_candle_gives_the_previous_utc_day() -> None:
-    service = RecordedService("hyperliquid", *METADATA, "candles_btc_previous_day")
-
-    day = market(service).previous_day("BTC", NOW)
-
-    assert day == DailyRange(high=Decimal("63044.0"), low=Decimal("56371.0"), close=Decimal("58828.0"))
-    assert service.received[-1] == (
-        "POST",
-        INFO_URL,
-        {
-            "type": "candleSnapshot",
-            "req": {"coin": "BTC", "interval": "1d", "startTime": 1795132800000, "endTime": 1795219199999},
-        },
-    )
 
 
 def test_a_rate_limit_is_a_transient_unavailability_of_the_market_data() -> None:

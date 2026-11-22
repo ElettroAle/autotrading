@@ -5,6 +5,7 @@ import httpx
 
 from autotrading.application.sources.errors import SourceTrialWorkerUnavailableError
 from autotrading.domain.sources.errors import InvalidSourceTrialError
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.source_sample import SourceValue
 from autotrading.domain.sources.source_trial import SourceTrial, TrialOutcome
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -29,7 +30,9 @@ class WorkerSourceTrialAdapter:
     def __repr__(self) -> str:
         return f"WorkerSourceTrialAdapter(tenant_id={self._tenant_id.value})"
 
-    def try_adapter(self, source: str, adapter: str, asset: str | None, parameters: Mapping[str, int]) -> SourceTrial:
+    def try_adapter(
+        self, source: str, adapter: str, asset: str | None, parameters: Mapping[str, SourceParameterValue]
+    ) -> SourceTrial:
         path = f"/tenants/{self._tenant_id.value}/sources/{source}/adapters/{adapter}/trials"
         try:
             response = self._client.post(

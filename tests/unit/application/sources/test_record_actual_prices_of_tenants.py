@@ -16,7 +16,7 @@ TEN = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 
 def expired_forecasts() -> InMemoryForecastRepositoryAdapter:
     repository = InMemoryForecastRepositoryAdapter()
-    repository.add(PriceForecast(uuid4(), "BTC", ForecastHorizon.MINUTES_15, TEN, Decimal(100), Decimal(101), 7, False))
+    repository.add(PriceForecast(uuid4(), "BTC", ForecastHorizon(15), TEN, Decimal(100), Decimal(101), 7, False))
     return repository
 
 

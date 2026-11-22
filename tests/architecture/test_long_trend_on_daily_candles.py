@@ -1,7 +1,7 @@
-"""ADR-tendenza-lunga-sulle-candele-giornaliere: the trend over several days is a parameter of the indicators source,
-valid for every adapter, from 0 to 1 and off by default; its values are computed only in the domain of the sources, on
-the daily candles the reader of the indicators asks the same market for, in the number the domain declares and only
-when the choice of the flow switches the trend on.
+"""ADR-tendenza-lunga-sulle-candele-giornaliere: the trend over several days belongs to the indicators source, valid
+for every adapter; its values are computed only in the domain of the sources, on the daily candles the reader of the
+indicators asks the same market for, in the number the choice of the flow asks and only when it switches the trend on.
+The flag and the fixed days are replaced by the lists of ADR-parametri-delle-fonti-come-liste-libere.
 """
 
 import ast
@@ -12,7 +12,7 @@ import pytest
 
 from autotrading.adapters.outbound.hyperliquid.market_data import DECLARATION
 from autotrading.domain.sources.indicators import INDICATORS
-from autotrading.domain.sources.long_trend import LONG_TREND
+from autotrading.domain.sources.long_trend import CHANNEL_DAYS, TREND_DAYS
 from tests.support.architecture import SOURCE_ROOT
 
 ROOT = Path(SOURCE_ROOT)
@@ -20,7 +20,7 @@ DOMAIN = ROOT / "domain"
 READER = ROOT / "application" / "sources" / "read_indicators.py"
 # The prefix of the values, a change in days alone or as the head of an f-string, the channel, the last close.
 TREND_NAME = re.compile(r"tendenza\.|^variazione_(\d+g)?$|_20g|ultima_chiusura")
-DAILY_COUNT = "DAILY_CANDLES"
+DAILY_COUNT = "daily_candles"
 CHOICE = "LongTrendChoice"
 
 
@@ -39,17 +39,16 @@ def reads_the_daily_candles_of_the_choice(source: str) -> bool:
         isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
         and node.func.attr == "candles"
-        and any(isinstance(argument, ast.Name) and argument.id == DAILY_COUNT for argument in node.args)
+        and any(isinstance(argument, ast.Attribute) and argument.attr == DAILY_COUNT for argument in node.args)
         for node in ast.walk(tree)
     )
     follows_the_choice = any(isinstance(node, ast.Name) and node.id == CHOICE for node in ast.walk(tree))
     return asks_the_count and follows_the_choice
 
 
-def test_adr_tendenza_lunga_sulle_candele_giornaliere_the_parameter_belongs_to_the_source_for_every_adapter() -> None:
-    assert (LONG_TREND.key, LONG_TREND.default, LONG_TREND.minimum, LONG_TREND.maximum) == ("tendenza_lunga", 0, 0, 1)
-    assert LONG_TREND in INDICATORS.parameters
-    assert LONG_TREND not in DECLARATION.parameters
+def test_adr_tendenza_lunga_sulle_candele_giornaliere_the_parameters_belong_to_the_source_for_every_adapter() -> None:
+    assert {TREND_DAYS, CHANNEL_DAYS} <= set(INDICATORS.parameters)
+    assert not {TREND_DAYS, CHANNEL_DAYS} & set(DECLARATION.parameters)
 
 
 @pytest.mark.parametrize(
@@ -82,11 +81,12 @@ def test_adr_tendenza_lunga_sulle_candele_giornaliere_the_values_are_computed_on
     [
         (
             "def read(self):\n"
-            "    if LongTrendChoice.of(settings).active:\n"
-            "        return market.candles(asset, DAILY, DAILY_CANDLES, now)\n",
+            "    trend = LongTrendChoice.of(settings)\n"
+            "    if trend.active:\n"
+            "        return market.candles(asset, DAILY, trend.daily_candles, now)\n",
             True,
         ),
-        ("def read(self):\n    return market.candles(asset, DAILY, DAILY_CANDLES, now)\n", False),
+        ("def read(self):\n    return market.candles(asset, DAILY, choice.daily_candles, now)\n", False),
         (
             "def read(self):\n"
             "    if LongTrendChoice.of(settings).active:\n"

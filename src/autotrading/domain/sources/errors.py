@@ -54,6 +54,31 @@ class SourceParameterNotAmongChoicesError(SourceParameterRefusedError):
         return {"field": self.key, "choices": list(self.choices)}
 
 
+class SourceListValueOutOfRangeError(SourceParameterRefusedError):
+    """A value of a list parameter outside the range it declares (ADR parametri-delle-fonti-come-liste-libere)."""
+
+    def __init__(self, label: str, minimum: int, maximum: int, key: str) -> None:
+        super().__init__(f"{label}: ogni valore tra {minimum} e {maximum}", label, key)
+        self.minimum = minimum
+        self.maximum = maximum
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.key, "minimum": self.minimum, "maximum": self.maximum}
+
+
+class TooManySourceListValuesError(SourceParameterRefusedError):
+    """A list parameter with more values than it declares (ADR parametri-delle-fonti-come-liste-libere)."""
+
+    def __init__(self, label: str, maximum_values: int, key: str) -> None:
+        super().__init__(f"{label}: al massimo {maximum_values} valori", label, key)
+        self.maximum_values = maximum_values
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"field": self.key, "maximum_values": self.maximum_values}
+
+
 class SourceAdapterNotAvailableError(DomainError):
     status_code = 404
 
@@ -129,6 +154,16 @@ class InvalidSocialSnapshotError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("dati social non validi")
+
+
+class InvalidForecastHorizonError(DomainError):
+    """A horizon of no minutes: a defect, as the source admits only the horizons of its range."""
+
+    status_code = 500
+
+    def __init__(self, minutes: int) -> None:
+        super().__init__(f"orizzonte della previsione non valido: {minutes} minuti")
+        self.minutes = minutes
 
 
 class InvalidPriceForecastError(DomainError):

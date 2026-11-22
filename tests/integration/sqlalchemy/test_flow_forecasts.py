@@ -48,8 +48,8 @@ def record(database: Engine, flow: Flow, horizon: ForecastHorizon, actual: str |
 
 def test_the_expired_forecasts_of_the_flow_read_with_their_actual_price(database: Engine) -> None:
     flow = new_flow(database)
-    record(database, flow, ForecastHorizon.MINUTES_15, "60000")
-    record(database, flow, ForecastHorizon.HOUR_1, None)
+    record(database, flow, ForecastHorizon(15), "60000")
+    record(database, flow, ForecastHorizon(60), None)
     repository = SqlAlchemyForecastRepositoryAdapter(database, flow.tenant_id)
 
     expired = repository.expired_forecasts(flow.id, MADE + timedelta(minutes=30))
@@ -66,7 +66,7 @@ def test_the_expired_forecasts_of_the_flow_read_with_their_actual_price(database
 def test_the_forecasts_of_another_flow_are_left_out(database: Engine) -> None:
     flow = new_flow(database)
     other = new_flow(database, flow.tenant_id)
-    record(database, other, ForecastHorizon.MINUTES_15, "60000")
+    record(database, other, ForecastHorizon(15), "60000")
 
     repository = SqlAlchemyForecastRepositoryAdapter(database, flow.tenant_id)
 
@@ -75,7 +75,7 @@ def test_the_forecasts_of_another_flow_are_left_out(database: Engine) -> None:
 
 def test_the_forecasts_of_a_tenant_are_invisible_to_the_others(database: Engine) -> None:
     flow, other = new_flow(database), new_flow(database)
-    record(database, flow, ForecastHorizon.MINUTES_15, "60000")
+    record(database, flow, ForecastHorizon(15), "60000")
 
     repository = SqlAlchemyForecastRepositoryAdapter(database, other.tenant_id)
 

@@ -1,7 +1,8 @@
 """R5.1.4: Fibonacci retracements, Gann angles and the dominant cycle enter the context of the cycle as parameters of
 the indicators source, computed on the closed 4-hour candles of the exchange; a history shorter than the candles asked
 is declared and the indicators are computed on what there is. On the cycle the worker composes, with the fake market of
-the exchange (ADR indicatori-estesi-nel-domain).
+the exchange (ADR indicatori-estesi-nel-domain): activating an indicator chooses for it the window of N candles, 100 if
+the scenario names none (ADR parametri-delle-fonti-come-liste-libere).
 """
 
 from decimal import Decimal
@@ -17,7 +18,8 @@ scenarios("E5-evoluzioni/F5.1-nuove-fonti/R5.1.4-indicatori-estesi/worker/R5.1.4
 USER = "anna"
 INDICATORS = "indicatori"
 LONG = "4h"
-EXTENDED_CANDLES = "candele_estese"
+# The N of the requirement when the scenario does not name it.
+WINDOW = 100
 FIBONACCI_LEVELS = ("23.6%", "38.2%", "50%", "61.8%", "78.6%")
 # Ten older candles far below the window: only the last N candles may set the range of the retracements.
 OLDER = 10
@@ -62,8 +64,11 @@ def window_closes(count: int, low: Decimal, high: Decimal) -> list[Decimal]:
     return [middle + amplitude * Decimal((index * 7) % 5 - 2) / 2 for index in range(count)]
 
 
-def activate(flow_cycles: FlowCycles, flow: str, *indicators: str) -> None:
-    flow_cycles.set_source_parameters(flow, INDICATORS, **dict.fromkeys(indicators, 1))
+def activate(flow_cycles: FlowCycles, flow: str, *indicators: str, window: int = WINDOW) -> None:
+    """Each indicator on the window of N candles: its list of windows holds N alone."""
+    flow_cycles.set_source_parameters(
+        flow, INDICATORS, **{f"{indicator}_candele": (window,) for indicator in indicators}
+    )
 
 
 # Given
@@ -114,8 +119,7 @@ def activates_two(flow_cycles: FlowCycles, user: str, first: str, second: str) -
 def cycle_with_candles(flow_cycles: FlowCycles, count: str) -> None:
     flow = the_flow(flow_cycles)
     # N counts only for the extended indicators: all three are on, so that something is computed on the history.
-    flow_cycles.set_source_parameters(flow, INDICATORS, **{EXTENDED_CANDLES: int(count)})
-    activate(flow_cycles, flow, "fibonacci", "gann", "ciclo")
+    activate(flow_cycles, flow, "fibonacci", "gann", "ciclo", window=int(count))
     flow_cycles.run(flow)
 
 
@@ -125,16 +129,16 @@ def cycle_with_candles(flow_cycles: FlowCycles, count: str) -> None:
 @then(quoted('il contesto contiene per "{asset}" i livelli {levels}'))
 def fibonacci_levels(flow_cycles: FlowCycles, asset: str, levels: str) -> None:
     values = indicators_of(flow_cycles, asset)
-    assert [number(values[f"lungo.fibonacci.{level}"]) for level in FIBONACCI_LEVELS] == listed(levels)
+    assert [number(values[f"lungo.fibonacci{WINDOW}.{level}"]) for level in FIBONACCI_LEVELS] == listed(levels)
 
 
 @then(quoted("il contesto contiene gli angoli di Gann 1x1, 1x2 e 2x1 e il ciclo dominante con periodo e fase"))
 def gann_and_cycle(flow_cycles: FlowCycles) -> None:
     values = indicators_of(flow_cycles, the_asset(flow_cycles))
-    assert values["lungo.gann.perno"] in {"minimo", "massimo"}
-    assert all(number(values[f"lungo.gann.{angle}"]) > 0 for angle in ("1x1", "1x2", "2x1"))
-    assert 4 <= int(values["lungo.ciclo.periodo_candele"]) <= 50
-    assert 0 <= number(values["lungo.ciclo.fase_gradi"]) < 360
+    assert values[f"lungo.gann{WINDOW}.perno"] in {"minimo", "massimo"}
+    assert all(number(values[f"lungo.gann{WINDOW}.{angle}"]) > 0 for angle in ("1x1", "1x2", "2x1"))
+    assert 4 <= int(values[f"lungo.ciclo{WINDOW}.periodo_candele"]) <= 50
+    assert 0 <= number(values[f"lungo.ciclo{WINDOW}.fase_gradi"]) < 360
 
 
 @then(quoted('il contesto dichiara "{note}" e calcola sulle {count}'))
@@ -142,6 +146,5 @@ def declared_short_history(flow_cycles: FlowCycles, note: str, count: str) -> No
     values = indicators_of(flow_cycles, the_asset(flow_cycles))
     closes = window_closes(int(count), Decimal(50000), Decimal(60000))
     assert values["lungo.nota_storico"] == note
-    assert values["lungo.candele_estese"] == count
-    assert number(values["lungo.fibonacci.minimo"]) == min(closes) - 1
-    assert number(values["lungo.fibonacci.massimo"]) == max(closes) + 1
+    assert number(values[f"lungo.fibonacci{WINDOW}.minimo"]) == min(closes) - 1
+    assert number(values[f"lungo.fibonacci{WINDOW}.massimo"]) == max(closes) + 1

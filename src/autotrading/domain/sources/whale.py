@@ -1,13 +1,14 @@
 from collections.abc import Mapping
 
 from autotrading.domain.sources.source_definition import SourceDefinition
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 
 # The threshold of value is a parameter of every adapter of the source, which declares its default and its range: the
 # reading asks the provider for the transfers at or above it (R5.1.1, ADR fonte-whale-con-adapter-arkham).
 MINIMUM_USD = "soglia_usd"
 
 
-def no_large_transfers(settings: Mapping[str, int]) -> Mapping[str, str]:  # noqa: ARG001 - the shape of a silence
+def no_large_transfers(settings: Mapping[str, SourceParameterValue]) -> Mapping[str, str]:  # noqa: ARG001 - the shape of a silence
     """No large transfer in the last interval is itself a datum for the agent: the source is not absent (R5.1.1)."""
     return {"nota": "nessun grande trasferimento nell'ultimo intervallo"}
 

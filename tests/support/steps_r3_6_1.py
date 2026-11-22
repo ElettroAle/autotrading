@@ -21,7 +21,8 @@ from tests.support.source_selections import a_source
 from tests.support.steps import quoted
 
 NOW = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
-HORIZONS = {"1 ora": ForecastHorizon.HOUR_1, "15 minuti": ForecastHorizon.MINUTES_15}
+ONE_HOUR = ForecastHorizon(60)
+HORIZONS = {"1 ora": ONE_HOUR, "15 minuti": ForecastHorizon(15)}
 ACTUAL = Decimal(60000)
 FORECAST_SOURCE = a_source("forecast", parameters={"profondita_storico_giorni": 7})
 
@@ -57,7 +58,7 @@ class ForecastErrors:
         flow: str,
         predicted: Decimal,
         actual: Decimal | None,
-        horizon: ForecastHorizon = ForecastHorizon.HOUR_1,
+        horizon: ForecastHorizon = ONE_HOUR,
         expires_at: datetime | None = None,
     ) -> None:
         """A forecast the flow recorded: unless told, it expired an hour ago, each a minute before the previous."""
@@ -72,7 +73,7 @@ class ForecastErrors:
         self,
         flow: str,
         error: Decimal,
-        horizon: ForecastHorizon = ForecastHorizon.HOUR_1,
+        horizon: ForecastHorizon = ONE_HOUR,
         expires_at: datetime | None = None,
     ) -> None:
         self.forecast(flow, ACTUAL + error, ACTUAL, horizon, expires_at)
@@ -309,7 +310,7 @@ def actual_of_the_same_exchange(  # noqa: PLR0917 - one argument per value of th
     [forecast] = [
         each
         for each in forecasts
-        if (each.made_at, each.asset, each.horizon) == (at(clock), asset, ForecastHorizon.HOUR_1)
+        if (each.made_at, each.asset, each.horizon) == (at(clock), asset, ForecastHorizon(60))
     ]
     # The forecast started from the last price of that history, the actual price is the one it quotes at the expiry.
     assert forecast.last_price == quoted_before[asset]

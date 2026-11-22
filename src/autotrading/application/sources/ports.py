@@ -9,13 +9,13 @@ from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.key_expiry import KeyExpiry
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.news_item import NewsItem
-from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, PricePoint
 from autotrading.domain.sources.sealed_source_secrets import SealedSourceSecrets
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from autotrading.domain.sources.social_snapshot import SocialSnapshot
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_credentials import SourceCredentials
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.source_sample import SourceSample, SourceValue
 from autotrading.domain.sources.source_trial import SourceTrial
 from autotrading.domain.sources.timeframe import Timeframe
@@ -148,10 +148,6 @@ class MarketDataPort(Protocol):
         """Mark price, mid price, open interest and funding rate now. Raises SourceUnavailableError."""
         ...
 
-    def previous_day(self, asset: str, now: datetime) -> DailyRange:
-        """High, low and close of the UTC day before `now`. Raises SourceUnavailableError."""
-        ...
-
 
 class PriceForecasterPort(Protocol):
     """The model that forecasts the price of an asset from its history (R1.3.5, ADR 0107)."""
@@ -193,7 +189,7 @@ class SourceRequest:
 
     flow_id: UUID | None
     asset: str | None
-    settings: Mapping[str, int]
+    settings: Mapping[str, SourceParameterValue]
     now: datetime
     # The values the tenant gave the adapter, secrets included: only the worker opens them, and none appears in a
     # log or in the record of the cycle (R4.1.2).
@@ -249,7 +245,7 @@ class CycleSourceAskPort(Protocol):
     def weight(self) -> int: ...
 
     @property
-    def parameters(self) -> Mapping[str, int]: ...
+    def parameters(self) -> Mapping[str, SourceParameterValue]: ...
 
     @property
     def assets(self) -> tuple[str, ...]: ...
@@ -350,6 +346,8 @@ class SourceTrialPort(Protocol):
     TrySourceAdapterUseCase. A source that fails is the outcome of the trial, not an error.
     """
 
-    def try_adapter(self, source: str, adapter: str, asset: str | None, parameters: Mapping[str, int]) -> SourceTrial:
+    def try_adapter(
+        self, source: str, adapter: str, asset: str | None, parameters: Mapping[str, SourceParameterValue]
+    ) -> SourceTrial:
         """Raises SourceTrialWorkerUnavailableError when the worker cannot be reached or answers in another shape."""
         ...

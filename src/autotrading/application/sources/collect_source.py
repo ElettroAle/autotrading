@@ -5,6 +5,7 @@ from datetime import datetime
 from autotrading.application.sources.ports import SampleRepositoryPort, SourceReaderPort, SourceRequest
 from autotrading.domain.sources.errors import SourceAdapterNotAvailableError
 from autotrading.domain.sources.source_catalog import OfferedSource, SourceCatalog
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.source_sample import CycleReference, SourceSample
 
 # A reader reads one adapter of one source: the source and the adapter name it (R4.1.1).
@@ -19,7 +20,7 @@ class CollectSourceCommand:
     source: str
     adapter: str
     weight: int
-    parameters: Mapping[str, int]
+    parameters: Mapping[str, SourceParameterValue]
     assets: tuple[str, ...]
     collected_at: datetime
     # What the worker opened of the credentials of the adapter, none when it declares no field (R4.1.2).

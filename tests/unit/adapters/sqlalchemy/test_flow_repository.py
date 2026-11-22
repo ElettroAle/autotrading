@@ -100,6 +100,22 @@ def test_a_configuration_read_back_from_json_is_the_same_with_its_version() -> N
     assert configuration_of(4, document) == replace(CONFIGURATION, version=4)
 
 
+def test_a_list_parameter_is_saved_as_a_json_list_and_reads_back_as_the_same_list() -> None:
+    """ADR parametri-delle-fonti-come-liste-libere: a list of a source keeps its values in their order."""
+    configuration = replace(
+        CONFIGURATION, sources=(a_source("indicatori", 2, {"tendenza_giorni": (7, 30), "lunghezza_serie": 10}),)
+    )
+
+    document = document_of(configuration)
+
+    [adapter] = configuration.sources[0].adapters
+    parameters = {"tendenza_giorni": [7, 30], "lunghezza_serie": 10}
+    assert document["sources"] == [
+        {"name": "indicatori", "adapters": [{"name": adapter.name, "weight": 2, "parameters": parameters}]}
+    ]
+    assert configuration_of(configuration.version, json.loads(json.dumps(document))) == configuration
+
+
 def test_a_flow_is_saved_with_its_status_and_its_first_version() -> None:
     tenant_id = TenantId.new()
     flow = a_flow(tenant_id, status=FlowStatus.PAUSED, configuration=CONFIGURATION)

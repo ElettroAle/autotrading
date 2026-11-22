@@ -185,8 +185,8 @@ def forecast_of(flow: Flow, horizon: ForecastHorizon, made_at: datetime) -> Pric
 def test_a_forecast_expires_with_its_horizon_and_records_its_actual_price(database: Engine) -> None:
     flow = new_flow(database)
     repository = SqlAlchemyForecastRepositoryAdapter(database, flow.tenant_id)
-    short = forecast_of(flow, ForecastHorizon.MINUTES_15, PLANNED)
-    long = forecast_of(flow, ForecastHorizon.HOUR_1, PLANNED)
+    short = forecast_of(flow, ForecastHorizon(15), PLANNED)
+    long = forecast_of(flow, ForecastHorizon(60), PLANNED)
     repository.add(short)
     repository.add(long)
 
@@ -200,7 +200,7 @@ def test_a_forecast_expires_with_its_horizon_and_records_its_actual_price(databa
 def test_a_forecast_reads_back_whole(database: Engine) -> None:
     flow = new_flow(database)
     repository = SqlAlchemyForecastRepositoryAdapter(database, flow.tenant_id)
-    forecast = replace(forecast_of(flow, ForecastHorizon.HOUR_1, PLANNED), history_days=3, shortened=True)
+    forecast = replace(forecast_of(flow, ForecastHorizon(60), PLANNED), history_days=3, shortened=True)
     repository.add(forecast)
 
     assert repository.expired_without_actual(PLANNED + timedelta(days=1)) == [forecast]
@@ -208,9 +208,7 @@ def test_a_forecast_reads_back_whole(database: Engine) -> None:
 
 def test_the_forecasts_of_a_tenant_are_invisible_to_the_others(database: Engine) -> None:
     flow, other = new_flow(database), new_flow(database)
-    SqlAlchemyForecastRepositoryAdapter(database, flow.tenant_id).add(
-        forecast_of(flow, ForecastHorizon.MINUTES_15, PLANNED)
-    )
+    SqlAlchemyForecastRepositoryAdapter(database, flow.tenant_id).add(forecast_of(flow, ForecastHorizon(15), PLANNED))
 
     assert (
         SqlAlchemyForecastRepositoryAdapter(database, other.tenant_id).expired_without_actual(

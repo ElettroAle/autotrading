@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from autotrading.adapters.inbound.api.source_parameters import ParameterBody
 from autotrading.domain.sources.source_sample import SourceValue
 from autotrading.domain.sources.source_trial import SourceTrial, TrialOutcome
 
@@ -10,7 +11,7 @@ class SourceTrialRequest(BaseModel):
     """The asset, only for a per-asset source, and the parameters the user set: the others take their default."""
 
     asset: str | None = None
-    parameters: dict[str, int] = Field(default_factory=dict)
+    parameters: dict[str, ParameterBody] = Field(default_factory=dict)
 
 
 class SourceTrialValueResponse(BaseModel):
