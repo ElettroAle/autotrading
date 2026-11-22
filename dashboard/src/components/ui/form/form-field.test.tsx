@@ -27,6 +27,40 @@ describe('FormField', () => {
     expect(capital).not.toHaveAttribute('aria-invalid');
   });
 
+  it('describes the control by what it admits, and then by the reason of a refusal', () => {
+    render(
+      <FormField
+        id="days"
+        label="tendenza giorni"
+        error="valore oltre il tetto"
+        hint="ogni valore tra 1 e 3650"
+      >
+        {(control) => <input {...control} />}
+      </FormField>,
+    );
+
+    const days = screen.getByRole('textbox', { name: 'tendenza giorni' });
+    expect(days).toHaveAccessibleDescription('ogni valore tra 1 e 3650 valore oltre il tetto');
+    expect(days).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('describes the control by what it admits while no refusal concerns it', () => {
+    render(
+      <FormField
+        id="days"
+        label="tendenza giorni"
+        error={undefined}
+        hint="ogni valore tra 1 e 3650"
+      >
+        {(control) => <input {...control} />}
+      </FormField>,
+    );
+
+    const days = screen.getByRole('textbox', { name: 'tendenza giorni' });
+    expect(days).toHaveAccessibleDescription('ogni valore tra 1 e 3650');
+    expect(days).not.toHaveAttribute('aria-invalid');
+  });
+
   // The width itself is proved by the browser on a phone (e2e/layout, ADR 0146): jsdom lays nothing out.
   it('keeps a control as wide as its form and never wider, cutting a long value short', () => {
     expect(FORM_CONTROL.split(' ')).toEqual(

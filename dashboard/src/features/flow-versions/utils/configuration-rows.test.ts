@@ -10,7 +10,10 @@ const CONFIGURATION: Configuration = {
   cycle_minutes: 30,
   model: { name: 'openrouter/deepseek-chat', parameters: { temperature: '0.5', effort: 'alto' } },
   sources: [
-    { name: 'notizie', adapters: [{ name: 'RSS', weight: 7, parameters: { hours: 6 } }] },
+    {
+      name: 'notizie',
+      adapters: [{ name: 'RSS', weight: 7, parameters: { hours: 6, giorni: [7, 30] } }],
+    },
     {
       name: 'sentiment',
       adapters: [
@@ -83,7 +86,7 @@ describe('configurationRows', () => {
       {
         part: 'fonti',
         value:
-          'notizie · RSS (peso 7, hours 6); sentiment · alternative.me (peso 5); sentiment · CoinMarketCap (peso 3)',
+          'notizie · RSS (peso 7, giorni [7, 30], hours 6); sentiment · alternative.me (peso 5); sentiment · CoinMarketCap (peso 3)',
       },
       { part: 'istruzioni', value: 'prudente' },
       { part: 'leva massima', value: '5' },

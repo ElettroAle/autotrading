@@ -1,5 +1,6 @@
 import { FAKE_SOURCES } from '@/testing/mocks/catalogs';
 import type { FakeSource } from '@/testing/mocks/platform';
+import type { FakeParameterValue } from '@/testing/mocks/source-parameters';
 
 // The forecast is not in the catalog of the fake platform: its flows are written straight in the platform.
 const ADAPTER_OUT_OF_THE_CATALOG = 'Prophet';
@@ -16,7 +17,7 @@ export const adapterOf = (source: string): string =>
 export const aSource = (
   name: string,
   weight: number,
-  parameters?: Readonly<Record<string, number>>,
+  parameters?: Readonly<Record<string, FakeParameterValue>>,
 ): FakeSource => ({
   name,
   adapters: [

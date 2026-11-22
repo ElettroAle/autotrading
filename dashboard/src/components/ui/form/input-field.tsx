@@ -8,15 +8,16 @@ type Reason = { readonly message?: string } | undefined;
 type InputFieldProps = InputHTMLAttributes<HTMLInputElement> & {
   readonly label: string;
   readonly error?: Reason;
+  readonly hint?: string;
   readonly ref?: Ref<HTMLInputElement>;
 };
 
 /** A labelled text input of a form, with the reason of a refusal beside it (ADR 0130). */
-export const InputField = ({ label, error, id, ...input }: InputFieldProps) => {
+export const InputField = ({ label, error, hint, id, ...input }: InputFieldProps) => {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   return (
-    <FormField id={inputId} label={label} error={error?.message}>
+    <FormField id={inputId} label={label} error={error?.message} hint={hint}>
       {(control) => <input {...control} className={FORM_CONTROL} {...input} />}
     </FormField>
   );

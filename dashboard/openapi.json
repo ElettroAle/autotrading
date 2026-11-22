@@ -6103,7 +6103,7 @@
           },
           "parameters": {
             "additionalProperties": {
-              "type": "integer"
+              "$ref": "#/components/schemas/ParameterBody"
             },
             "type": "object",
             "title": "Parameters"
@@ -6127,7 +6127,7 @@
           },
           "parameters": {
             "additionalProperties": {
-              "type": "integer"
+              "$ref": "#/components/schemas/ParameterBody"
             },
             "type": "object",
             "title": "Parameters"
@@ -10865,6 +10865,19 @@
         "title": "OrderTotalsResponse",
         "description": "The fees of the executions of every order of the filters, not only of the page (Bug 569)."
       },
+      "ParameterBody": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        ]
+      },
       "PositionLeftOpenResponse": {
         "properties": {
           "asset": {
@@ -11507,9 +11520,16 @@
             "type": "string",
             "title": "Label"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "number",
+              "list"
+            ],
+            "title": "Kind"
+          },
           "default": {
-            "type": "integer",
-            "title": "Default"
+            "$ref": "#/components/schemas/ParameterBody"
           },
           "minimum": {
             "type": "integer",
@@ -11525,16 +11545,29 @@
             },
             "type": "array",
             "title": "Choices"
+          },
+          "maximum_values": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Values"
           }
         },
         "type": "object",
         "required": [
           "key",
           "label",
+          "kind",
           "default",
           "minimum",
           "maximum",
-          "choices"
+          "choices",
+          "maximum_values"
         ],
         "title": "SourceParameterResponse"
       },
@@ -11634,7 +11667,7 @@
           },
           "parameters": {
             "additionalProperties": {
-              "type": "integer"
+              "$ref": "#/components/schemas/ParameterBody"
             },
             "type": "object",
             "title": "Parameters"
@@ -11833,7 +11866,7 @@
           },
           "parameters": {
             "additionalProperties": {
-              "type": "integer"
+              "$ref": "#/components/schemas/ParameterBody"
             },
             "type": "object",
             "title": "Parameters"

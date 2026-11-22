@@ -10,6 +10,7 @@ import {
   type FakeUser,
 } from './platform';
 import { fakeSourceCredentials, notConfiguredReason } from './source-credentials';
+import { listOutcomeOf, type FakeParameterValue } from './source-parameters';
 
 /**
  * A configuration the API refuses, with the status, the reason and the setting it names, as the API answers it
@@ -197,9 +198,21 @@ const adapterOf = (
   if (weight < 1 || weight > MAX_WEIGHT) {
     throw new Refusal(422, `peso fuori da 1-10: ${source.name}`, 'sources');
   }
-  const given = (request.parameters ?? {}) as Record<string, number>;
+  const given = (request.parameters ?? {}) as Record<string, unknown>;
+  // Every list follows the common rules from its declaration alone (ADR parametri-delle-fonti-come-liste-libere).
+  const lists: Record<string, readonly number[]> = {};
+  for (const parameter of adapter.parameters) {
+    if (parameter.kind === 'list' && given[parameter.key] !== undefined) {
+      const outcome = listOutcomeOf(parameter, given[parameter.key]);
+      if ('refusal' in outcome) {
+        throw new Refusal(422, outcome.refusal, 'sources');
+      }
+      lists[parameter.key] = outcome.saved;
+    }
+  }
+  const numbers = given as Record<string, number>;
   const notAmongChoices = adapter.parameters.find((parameter) => {
-    const value = given[parameter.key];
+    const value = numbers[parameter.key];
     return (
       value !== undefined &&
       parameter.choices.length > 0 &&
@@ -211,8 +224,12 @@ const adapterOf = (
     throw new Refusal(422, `${notAmongChoices.label}: ammessi ${labels}`, 'sources');
   }
   const outOfRange = adapter.parameters.find((parameter) => {
-    const value = given[parameter.key];
-    return value !== undefined && (value < parameter.minimum || value > parameter.maximum);
+    const value = numbers[parameter.key];
+    return (
+      parameter.kind === 'number' &&
+      value !== undefined &&
+      (value < parameter.minimum || value > parameter.maximum)
+    );
   });
   if (outOfRange !== undefined) {
     throw new Refusal(
@@ -222,9 +239,9 @@ const adapterOf = (
     );
   }
   const parameters = Object.fromEntries(
-    adapter.parameters.map((parameter) => [
+    adapter.parameters.map((parameter): [string, FakeParameterValue] => [
       parameter.key,
-      given[parameter.key] ?? parameter.default,
+      lists[parameter.key] ?? numbers[parameter.key] ?? parameter.default,
     ]),
   );
   return { name, weight, parameters };

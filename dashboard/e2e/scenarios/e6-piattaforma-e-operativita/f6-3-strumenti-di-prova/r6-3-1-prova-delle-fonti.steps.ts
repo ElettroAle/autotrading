@@ -1,5 +1,6 @@
 import { expect, type Locator } from '@playwright/test';
 
+import { defaultTextOf } from '@/lib/parameter-lists';
 import { FAKE_SOURCES, type FakeSource } from '@/testing/mocks/catalogs';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { fakeSourceTrials, type FakeSourceTrial } from '@/testing/mocks/source-trials';
@@ -67,7 +68,7 @@ When(
     const form = trialForm(dashboard, source);
     await form.getByLabel('Asset').selectOption(asset);
     for (const parameter of catalogSource(source).adapters[0]?.parameters ?? []) {
-      await expect(form.getByLabel(parameter.label)).toHaveValue(String(parameter.default));
+      await expect(form.getByLabel(parameter.label)).toHaveValue(defaultTextOf(parameter));
     }
     memory.sourceTrial = await tryIt(dashboard, source);
   },
