@@ -1,6 +1,9 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+
+from autotrading.domain.sources.candle import Candle
 
 THREE = Decimal(3)
 HUNDRED = Decimal(100)
@@ -14,11 +17,18 @@ class PricePosition(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class DailyRange:
-    """Highest, lowest and closing price of the previous UTC day of an asset (R1.3.4)."""
+    """Highest, lowest and closing price of the closed UTC days before now of an asset (R1.3.4, ADR
+    parametri-delle-fonti-come-liste-libere).
+    """
 
     high: Decimal
     low: Decimal
     close: Decimal
+
+    @classmethod
+    def over(cls, days: Sequence[Candle]) -> DailyRange:
+        """The range of the daily candles together: the highest high, the lowest low, the last close."""
+        return cls(max(day.high for day in days), min(day.low for day in days), days[-1].close)
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,6 +16,9 @@ DEFAULT_WEIGHT = 5
 ADAPTER_SEPARATOR = " · "
 
 type ModelParameterValue = Decimal | str
+# A parameter of an adapter of a source: a whole number, or a list of them (ADR
+# parametri-delle-fonti-come-liste-libere).
+type AdapterParameterValue = int | tuple[int, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +55,7 @@ class AdapterSelection:
 
     name: str
     weight: int = DEFAULT_WEIGHT
-    parameters: Mapping[str, int] = field(default_factory=dict)
+    parameters: Mapping[str, AdapterParameterValue] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

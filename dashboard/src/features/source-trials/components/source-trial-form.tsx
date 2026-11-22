@@ -13,6 +13,7 @@ import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField, type UnavailableList } from '@/components/ui/form/select-field';
 import { showRefusal } from '@/lib/form-errors';
 import { choiceOptionsOf, hasChoices } from '@/lib/parameter-choices';
+import { isList, listRangeOf } from '@/lib/parameter-lists';
 
 import type { TrialSource } from '../api/get-trial-sources';
 import { useTrySourceAdapter } from '../api/try-source-adapter';
@@ -157,7 +158,17 @@ export const SourceTrialForm = ({
           />
         )}
         {adapter?.parameters.map((parameter) =>
-          hasChoices(parameter) ? (
+          isList(parameter) ? (
+            <InputField
+              key={`${adapter.name}-${parameter.key}`}
+              label={parameter.label}
+              type="text"
+              inputMode="numeric"
+              hint={listRangeOf(parameter)}
+              error={errors.parameters?.[parameter.key]}
+              {...register(`parameters.${parameter.key}`)}
+            />
+          ) : hasChoices(parameter) ? (
             <SelectField
               key={`${adapter.name}-${parameter.key}`}
               label={parameter.label}

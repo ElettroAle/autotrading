@@ -5,52 +5,48 @@ from autotrading.domain.sources.news import NEWS
 from autotrading.domain.sources.pivots import PIVOTS
 from autotrading.domain.sources.sentiment import SENTIMENT
 from autotrading.domain.sources.social import SOCIAL
-from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter
+from autotrading.domain.sources.source_list_parameter import DeclaredParameter
 from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import MINIMUM_USD, WHALE
 
 
-def ranges(parameters: tuple[SourceParameter, ...]) -> list[tuple[object, ...]]:
+def ranges(parameters: tuple[DeclaredParameter, ...]) -> list[tuple[object, ...]]:
     return [(p.key, p.label, p.default, p.minimum, p.maximum) for p in parameters]
 
 
-def test_the_indicators_are_per_asset_with_the_length_of_their_series_the_extended_indicators_and_the_long_trend() -> (
-    None
-):
+def test_the_indicators_are_per_asset_with_the_length_of_their_series_and_the_lists_of_their_values() -> None:
     assert (INDICATORS.name, INDICATORS.per_asset, ranges(INDICATORS.parameters)) == (
         "indicatori",
         True,
         [
             ("lunghezza_serie", "lunghezza serie", 10, 1, 50),
+            ("medie_periodi", "medie periodi", (20, 50), 2, 10000),
+            ("rsi_periodi", "rsi periodi", (7, 14), 2, 10000),
+            ("volume_relativo_candele", "volume relativo candele", (), 2, 10000),
             *ranges(EXTENDED_PARAMETERS),
-            ("tendenza_lunga", "tendenza lunga", 0, 0, 1),
+            ("tendenza_giorni", "tendenza giorni", (), 1, 3650),
+            ("canale_giorni", "canale giorni", (), 2, 3650),
         ],
     )
 
 
-def test_the_pivots_are_per_asset_without_parameters() -> None:
-    assert (PIVOTS.name, PIVOTS.per_asset, PIVOTS.parameters) == ("pivot", True, ())
+def test_the_pivots_are_per_asset_with_the_days_of_each_series_the_previous_day_by_default() -> None:
+    assert (PIVOTS.name, PIVOTS.per_asset, ranges(PIVOTS.parameters)) == (
+        "pivot",
+        True,
+        [("pivot_giorni", "pivot giorni", (1,), 1, 3650)],
+    )
 
 
-def test_the_forecast_is_per_asset_with_the_depth_of_its_history_and_the_long_horizon_with_its_depth() -> None:
+def test_the_forecast_is_per_asset_with_the_depth_of_its_history_its_horizons_and_the_depth_of_the_daily_one() -> None:
     assert (FORECAST.name, FORECAST.per_asset, ranges(FORECAST.parameters)) == (
         "forecast",
         True,
         [
             ("profondita_storico_giorni", "profondità storico giorni", 7, 1, 90),
-            ("orizzonte_lungo", "orizzonte lungo", 0, 0, 10080),
+            ("orizzonti_minuti", "orizzonti minuti", (15, 60), 15, 43200),
             ("profondita_lunga_giorni", "profondità lunga giorni", 365, 30, 1000),
         ],
-    )
-
-
-def test_the_long_horizon_of_the_forecast_is_none_1_day_or_1_week() -> None:
-    [long_horizon] = [parameter for parameter in FORECAST.parameters if parameter.key == "orizzonte_lungo"]
-
-    assert long_horizon.choices == (
-        ParameterChoice(0, "nessuno"),
-        ParameterChoice(1440, "1 giorno"),
-        ParameterChoice(10080, "1 settimana"),
     )
 
 

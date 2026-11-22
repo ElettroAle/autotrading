@@ -15,6 +15,7 @@ from autotrading.application.sources.source_readers import readers_of
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.sources.errors import SourceAdapterNotAvailableError
 from autotrading.domain.sources.source_catalog import OfferedSource
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.source_sample import SourceValue
 from autotrading.domain.sources.source_trial import SourceTrial
 
@@ -27,7 +28,7 @@ class TrySourceAdapterCommand:
     adapter: str
     # None for a source of the whole market.
     asset: str | None = None
-    parameters: Mapping[str, int] = field(default_factory=dict)
+    parameters: Mapping[str, SourceParameterValue] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

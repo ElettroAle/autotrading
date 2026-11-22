@@ -25,7 +25,7 @@ def test_the_adapter_reaches_the_forecaster_at_its_address() -> None:
         ConfigurationSource({"FORECASTER_URL": "http://forecaster:8000"}), httpx.MockTransport(handle)
     )
     history = history_of([PricePoint(NOW - timedelta(minutes=age), Decimal(1)) for age in (2, 1, 0)], 1, NOW)
-    adapter.predict("BTC", history, (ForecastHorizon.MINUTES_15,))
+    adapter.predict("BTC", history, (ForecastHorizon(15),))
 
     assert urls == ["http://forecaster:8000/forecast"]
 

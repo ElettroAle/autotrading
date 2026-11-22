@@ -21,8 +21,9 @@ from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.sources.forecast import HORIZONS
 from autotrading.domain.sources.news_item import NewsItem
-from autotrading.domain.sources.price_forecast import SHORT_HORIZONS, ForecastHorizon, PriceForecast
+from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.sources.sentiment_index import SentimentIndex
 from tests.fakes.model_call import TooManyRequestsAnswer
 from tests.support.activity import a_position, an_activity
@@ -30,6 +31,9 @@ from tests.support.flow_cycles import BALANCE, FlowCycles, at
 from tests.support.flows import ANTHROPIC_MODEL
 from tests.support.source_selections import PLATFORM_CATALOG, a_source_request, reader_of
 from tests.support.steps import quoted
+
+# The horizons of the forecast a flow gets when it chooses none: 15 minutes and 1 hour (R1.3.5).
+DEFAULT_HORIZONS = tuple(ForecastHorizon(minutes) for minutes in HORIZONS.default)
 
 
 @pytest.fixture
@@ -431,7 +435,7 @@ def position_still_open(flow_cycles: FlowCycles, asset: str) -> None:
 @then(quoted('il contesto contiene per "{asset}" una previsione a 15 minuti e una a 1 ora'))
 def forecasts_in_context(flow_cycles: FlowCycles, asset: str) -> None:
     [values] = flow_cycles.sources_in_context("forecast", asset)
-    for horizon in SHORT_HORIZONS:
+    for horizon in DEFAULT_HORIZONS:
         assert f"prezzo_previsto_{horizon.label}" in values
 
 
@@ -443,7 +447,7 @@ def forecasts_in_context(flow_cycles: FlowCycles, asset: str) -> None:
 def forecast_values(flow_cycles: FlowCycles, price: str) -> None:
     for values in flow_cycles.sources_in_context("forecast"):
         assert number(values["prezzo_attuale"]) == number(price)
-        for horizon in SHORT_HORIZONS:
+        for horizon in DEFAULT_HORIZONS:
             assert Decimal(values[f"prezzo_previsto_{horizon.label}"]) > 0
             Decimal(values[f"variazione_percentuale_{horizon.label}"])
 
@@ -465,7 +469,7 @@ def shortened_history(flow_cycles: FlowCycles, asset: str, days: str) -> None:
 def recorded_forecast(flow_cycles: FlowCycles, clock: str, flow: str, asset: str, price: str) -> None:
     recorded = flow_cycles.flow(flow)
     forecast = PriceForecast(
-        recorded.id.value, asset, ForecastHorizon.MINUTES_15, at(clock), Decimal(100), number(price), 7, False
+        recorded.id.value, asset, ForecastHorizon(15), at(clock), Decimal(100), number(price), 7, False
     )
     flow_cycles.forecasts_of(recorded.tenant_id).add(forecast)
 

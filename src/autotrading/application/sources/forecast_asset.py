@@ -3,13 +3,7 @@ from datetime import datetime
 from uuid import UUID
 
 from autotrading.application.sources.ports import ForecastRepositoryPort, PriceForecasterPort, PriceHistoryPort
-from autotrading.domain.sources.price_forecast import (
-    SHORT_HORIZONS,
-    ForecastHorizon,
-    PriceForecast,
-    PriceHistory,
-    history_of,
-)
+from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast, PriceHistory, history_of
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,8 +13,9 @@ class ForecastAssetCommand:
     asset: str
     history_days: int
     now: datetime
-    # The long horizon the flow chose, none when it chose none, with the depth of its daily history (R5.1.5).
-    long_horizons: tuple[ForecastHorizon, ...]
+    # The horizons the flow chose (ADR parametri-delle-fonti-come-liste-libere), with the depth of the daily history of
+    # those of a day or more (R5.1.5).
+    horizons: tuple[ForecastHorizon, ...]
     long_history_days: int
 
 
@@ -28,8 +23,8 @@ class ForecastAssetUseCase:
     """Forecasts the price of an asset at every horizon from the history of the exchange, and records it for the flow
     that asked (R1.3.5); a trial asks for no flow and records nothing (R6.3.1).
 
-    The history comes from the exchange, the prediction from the forecasting model (ADR 0107); the long horizons on the
-    daily candles (ADR orizzonti-lunghi-del-forecast).
+    The history comes from the exchange, the prediction from the forecasting model (ADR 0107); the horizons of a day or
+    more on the daily candles (ADR orizzonti-lunghi-del-forecast). A kind of history no horizon needs is not read.
     """
 
     def __init__(
@@ -47,16 +42,18 @@ class ForecastAssetUseCase:
         return forecasts
 
     def _short_forecasts(self, command: ForecastAssetCommand) -> tuple[PriceForecast, ...]:
+        horizons = tuple(horizon for horizon in command.horizons if not horizon.on_daily_candles)
+        if not horizons:
+            return ()
         points = self._prices.history(command.asset, command.history_days, command.now)
-        history = history_of(points, command.history_days, command.now)
-        return self._forecast(command, history, SHORT_HORIZONS)
+        return self._forecast(command, history_of(points, command.history_days, command.now), horizons)
 
     def _long_forecasts(self, command: ForecastAssetCommand) -> tuple[PriceForecast, ...]:
-        if not command.long_horizons:
+        horizons = tuple(horizon for horizon in command.horizons if horizon.on_daily_candles)
+        if not horizons:
             return ()
         points = self._prices.daily_history(command.asset, command.long_history_days, command.now)
-        history = history_of(points, command.long_history_days, command.now)
-        return self._forecast(command, history, command.long_horizons)
+        return self._forecast(command, history_of(points, command.long_history_days, command.now), horizons)
 
     def _forecast(
         self, command: ForecastAssetCommand, history: PriceHistory, horizons: tuple[ForecastHorizon, ...]

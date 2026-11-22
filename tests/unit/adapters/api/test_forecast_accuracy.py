@@ -16,6 +16,8 @@ from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
 from tests.support.problems import reason_of
 
+ONE_HOUR = ForecastHorizon(60)
+
 Client = Callable[[str], TestClient]
 
 
@@ -55,7 +57,7 @@ def forecast(
     predicted: str,
     actual: str | None,
     age: timedelta,
-    horizon: ForecastHorizon = ForecastHorizon.HOUR_1,
+    horizon: ForecastHorizon = ONE_HOUR,
 ) -> None:
     made_at = platform.now - age - horizon.length
     price = None if actual is None else Decimal(actual)
@@ -73,9 +75,7 @@ def test_the_error_of_each_asset_and_horizon_answers_with_amounts_as_text(
     forecast(platform, flow, predicted="60500", actual="60000", age=timedelta(hours=1))
     forecast(platform, flow, predicted="61000", actual="61400", age=timedelta(hours=2))
     forecast(platform, flow, predicted="60000", actual=None, age=timedelta(hours=3))
-    forecast(
-        platform, flow, predicted="60100.50", actual="60000", age=timedelta(hours=1), horizon=ForecastHorizon.MINUTES_15
-    )
+    forecast(platform, flow, predicted="60100.50", actual="60000", age=timedelta(hours=1), horizon=ForecastHorizon(15))
 
     response = anna.get(f"/flows/{flow.id.value}/forecast-accuracy")
 

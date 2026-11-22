@@ -10,6 +10,7 @@ import { fakeInbox } from './notification-inbox';
 import type { FakeClosedPosition as ClosedPositionAnswer, FakeOpenPosition } from './positions';
 import { fakeReconciliation } from './reconciliation';
 import { fakeSourceCredentials } from './source-credentials';
+import type { FakeParameterValue } from './source-parameters';
 import { fakeSourceTrials } from './source-trials';
 
 /**
@@ -81,7 +82,7 @@ export type FakeVersion = {
 export type FakeAdapterChoice = {
   readonly name: string;
   readonly weight: number;
-  readonly parameters?: Readonly<Record<string, number>>;
+  readonly parameters?: Readonly<Record<string, FakeParameterValue>>;
 };
 
 /** An active source of a flow with the adapters chosen (R4.1.1). */
@@ -193,7 +194,11 @@ export type FakeFlowConfiguration = {
   model: { name: string; parameters: Record<string, string> };
   sources: {
     name: string;
-    adapters: { name: string; weight: number; parameters: Readonly<Record<string, number>> }[];
+    adapters: {
+      name: string;
+      weight: number;
+      parameters: Readonly<Record<string, FakeParameterValue>>;
+    }[];
   }[];
   instructions: string;
   risk_limits: {

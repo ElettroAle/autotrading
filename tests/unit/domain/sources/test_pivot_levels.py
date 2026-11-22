@@ -1,7 +1,9 @@
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.pivot_levels import DailyRange, NearestLevel, PivotLevels, PricePosition
 
 # The previous UTC day of the requirement: high 110, low 90, close 100 (R1.3.4).
@@ -62,3 +64,14 @@ def test_a_price_on_a_level_takes_it_as_support_and_the_next_as_resistance(
 
 def test_a_price_on_the_pivot_is_neither_above_nor_below() -> None:
     assert LEVELS.reading_at(Decimal(100)).position is PricePosition.ON
+
+
+def test_the_range_of_several_days_is_their_highest_high_lowest_low_and_last_close() -> None:
+    start = datetime(2026, 11, 20, tzinfo=UTC)
+    days = [
+        Candle(start, Decimal(100), Decimal(1), Decimal(120), Decimal(95)),
+        Candle(start + timedelta(days=1), Decimal(105), Decimal(1), Decimal(110), Decimal(80)),
+        Candle(start + timedelta(days=2), Decimal(102), Decimal(1), Decimal(108), Decimal(99)),
+    ]
+
+    assert DailyRange.over(days) == DailyRange(high=Decimal(120), low=Decimal(80), close=Decimal(102))

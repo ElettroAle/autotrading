@@ -14,7 +14,6 @@ from autotrading.adapters.outbound.hyperliquid.market_data import MARKET_DATA, H
 from autotrading.application.sources.errors import SourceUnavailableError, TimeframeNotSupportedError
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
-from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
 
@@ -150,29 +149,6 @@ def test_the_snapshot_reads_the_context_of_the_asset() -> None:
     )
 
 
-def test_the_previous_day_is_the_daily_candle_of_yesterday_utc() -> None:
-    yesterday = TODAY_MS - DAY_MS
-    sdk = FakeSdk(
-        page=[
-            candle(yesterday - DAY_MS, "1", 1440, h="2", l="0"),
-            candle(yesterday, "100", 1440, h="110", l="90"),
-            candle(TODAY_MS, "5", 1440, h="6", l="4"),
-        ]
-    )
-
-    day = adapter(sdk).previous_day("BTC", NOW)
-
-    assert day == DailyRange(high=Decimal(110), low=Decimal(90), close=Decimal(100))
-    assert sdk.calls[-1] == ("candles_snapshot", ("BTC", "1d", yesterday, TODAY_MS - 1))
-
-
-def test_a_previous_day_missing_makes_the_source_unavailable() -> None:
-    with pytest.raises(SourceUnavailableError) as raised:
-        adapter(FakeSdk(page=[candle(TODAY_MS, "5", 1440, h="6", l="4")])).previous_day("BTC", NOW)
-
-    assert raised.value.source == MARKET_DATA
-
-
 @pytest.mark.parametrize(
     "failure",
     [ClientError(429, None, "rate limited", None), ServerError(500, "down"), requests.ConnectionError("unreachable")],
@@ -183,7 +159,6 @@ def test_an_exchange_that_does_not_answer_makes_the_source_unavailable(failure: 
     for read in (
         lambda: market.candles("BTC", FIFTEEN, 1, NOW),
         lambda: market.snapshot("BTC"),
-        lambda: market.previous_day("BTC", NOW),
     ):
         with pytest.raises(SourceUnavailableError) as raised:
             read()
@@ -202,12 +177,6 @@ def test_an_exchange_that_does_not_answer_makes_the_source_unavailable(failure: 
 def test_candles_in_another_shape_make_the_source_unavailable(page: list[Any]) -> None:
     with pytest.raises(SourceUnavailableError):
         adapter(FakeSdk(page=page)).candles("BTC", FIFTEEN, 1, NOW)
-
-
-@pytest.mark.parametrize("day", [{"t": "x"}, {"t": TODAY_MS - DAY_MS, "h": "1", "l": "x", "c": "1"}])
-def test_a_previous_day_in_another_shape_makes_the_source_unavailable(day: dict[str, Any]) -> None:
-    with pytest.raises(SourceUnavailableError):
-        adapter(FakeSdk(page=[day])).previous_day("BTC", NOW)
 
 
 @pytest.mark.parametrize(

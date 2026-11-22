@@ -1,4 +1,4 @@
-import type { TrialAdapter, TrialSource } from '../api/get-trial-sources';
+import type { TrialAdapter, TrialParameter, TrialSource } from '../api/get-trial-sources';
 
 import {
   adapterNamed,
@@ -9,17 +9,20 @@ import {
   trialSchemaOf,
 } from './trial-form';
 
-const SERIES = {
+const SERIES: TrialParameter = {
   key: 'lunghezza_serie',
   label: 'lunghezza serie',
+  kind: 'number',
   default: 10,
   minimum: 1,
   maximum: 50,
   choices: [],
+  maximum_values: null,
 };
-const HORIZON = {
-  key: 'orizzonte_lungo',
-  label: 'orizzonte lungo',
+const HORIZON: TrialParameter = {
+  key: 'orizzonte',
+  label: 'orizzonte',
+  kind: 'number',
   default: 0,
   minimum: 0,
   maximum: 10080,
@@ -27,11 +30,28 @@ const HORIZON = {
     { value: 0, label: 'nessuno' },
     { value: 1440, label: '1 giorno' },
   ],
+  maximum_values: null,
+};
+const TREND_DAYS: TrialParameter = {
+  key: 'tendenza_giorni',
+  label: 'tendenza giorni',
+  kind: 'list',
+  default: [7, 30],
+  minimum: 1,
+  maximum: 3650,
+  choices: [],
+  maximum_values: 3,
 };
 const HYPERLIQUID: TrialAdapter = {
   name: 'Hyperliquid',
   description: 'mercato',
   parameters: [SERIES],
+};
+const WITH_LIST: TrialSource = {
+  name: 'indicatori',
+  description: 'indicatori tecnici',
+  per_asset: true,
+  adapters: [{ ...HYPERLIQUID, parameters: [SERIES, TREND_DAYS] }],
 };
 const INDICATORS: TrialSource = {
   name: 'indicatori',
@@ -77,7 +97,7 @@ describe('the form of a trial (ADR pagina-fonti-con-la-prova)', () => {
     const result = trialSchemaOf(forecast, prophet).safeParse({
       adapter: 'Prophet',
       asset: 'BTC',
-      parameters: { orizzonte_lungo: typed },
+      parameters: { orizzonte: typed },
     });
 
     expect(result.success ? [] : result.error.issues.map((issue) => issue.message)).toEqual(
@@ -150,6 +170,40 @@ describe('the form of a trial (ADR pagina-fonti-con-la-prova)', () => {
       asset: 'BTC',
       parameters: { lunghezza_serie: 12 },
     });
+  });
+
+  // ADR parametri-delle-fonti-come-liste-libere: a list starts at its default and follows the common rules.
+  it('starts a list parameter at its default list, as the user types it', () => {
+    expect(initialValuesOf(WITH_LIST).parameters).toEqual({
+      lunghezza_serie: '10',
+      tendenza_giorni: '7, 30',
+    });
+  });
+
+  it.each([
+    ['7, 30, 90', []],
+    ['', []],
+    ['7; 30', ['Inserisci numeri interi separati da virgole']],
+    ['7, 0', ['tendenza giorni: ogni valore tra 1 e 3650']],
+    ['1 2 3 4', ['tendenza giorni: al massimo 3 valori']],
+  ])('checks the list %j with the common rules', (typed, reasons) => {
+    expect(
+      reasonsOf(WITH_LIST, {
+        adapter: 'Hyperliquid',
+        asset: 'BTC',
+        parameters: { lunghezza_serie: '10', tendenza_giorni: typed },
+      }),
+    ).toEqual(reasons);
+  });
+
+  it('asks a list parameter as the list of numbers typed', () => {
+    expect(
+      trialRequestOf(WITH_LIST, {
+        adapter: 'Hyperliquid',
+        asset: 'BTC',
+        parameters: { lunghezza_serie: '10', tendenza_giorni: '90, 7' },
+      }).parameters,
+    ).toEqual({ lunghezza_serie: 10, tendenza_giorni: [90, 7] });
   });
 
   it('asks no asset for a source of the whole market', () => {

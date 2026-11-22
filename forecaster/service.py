@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from fastapi import FastAPI
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from forecaster import prophet_model
 from forecaster.models import ForecastModels, ModelKey
@@ -13,7 +13,6 @@ from forecaster.models import ForecastModels, ModelKey
 DEFAULT_RETRAINING_MINUTES = "15"
 # Prophet needs a trend and a change of it: fewer points describe no series.
 MINIMUM_POINTS = 3
-MINUTES_PER_DAY = 24 * 60
 
 
 class PricePointBody(BaseModel):
@@ -25,27 +24,10 @@ class ForecastRequest(BaseModel):
     asset: str = Field(min_length=1)
     history_days: int = Field(ge=1)
     points: list[PricePointBody] = Field(min_length=MINIMUM_POINTS)
-    # The short horizons on the finest candles, or the long ones in days on the daily candles: never both, as one
-    # model learns one series (ADR orizzonti-lunghi-del-forecast).
-    horizons_minutes: list[int] = Field(default_factory=list)
-    horizons_days: list[int] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def _one_kind_of_horizons(self) -> ForecastRequest:
-        if bool(self.horizons_minutes) == bool(self.horizons_days):
-            # pydantic answers a ValueError of a validator with 422, naming the request.
-            reason = "horizons_minutes or horizons_days, not both nor neither"
-            raise ValueError(reason)
-        return self
-
-    @property
-    def daily(self) -> bool:
-        return bool(self.horizons_days)
-
-    @property
-    def minutes(self) -> list[int]:
-        """Every horizon in minutes, as the answer names it."""
-        return self.horizons_minutes + [days * MINUTES_PER_DAY for days in self.horizons_days]
+    horizons_minutes: list[int] = Field(min_length=1)
+    # The points are the daily candles of the horizons of a day or more, or the finest candles of the shorter ones:
+    # never both, as one model learns one series (ADR orizzonti-lunghi-del-forecast).
+    daily_candles: bool = False
 
 
 class HorizonForecast(BaseModel):
@@ -77,8 +59,9 @@ def create_application(models: ForecastModels | None = None) -> FastAPI:
         points = sorted(
             (prophet_model.PricePoint(point.at, point.price) for point in request.points), key=lambda p: p.at
         )
-        horizons = tuple(timedelta(minutes=minutes) for minutes in request.minutes)
-        results = forecasts.forecast(ModelKey(request.asset, request.history_days, request.daily), points, horizons)
+        horizons = tuple(timedelta(minutes=minutes) for minutes in request.horizons_minutes)
+        key = ModelKey(request.asset, request.history_days, request.daily_candles)
+        results = forecasts.forecast(key, points, horizons)
         return ForecastResponse(
             forecasts=[
                 HorizonForecast(
@@ -87,7 +70,7 @@ def create_application(models: ForecastModels | None = None) -> FastAPI:
                     lower_price=result.lower,
                     upper_price=result.upper,
                 )
-                for minutes, result in zip(request.minutes, results, strict=True)
+                for minutes, result in zip(request.horizons_minutes, results, strict=True)
             ]
         )
 

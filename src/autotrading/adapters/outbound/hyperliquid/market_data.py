@@ -13,7 +13,6 @@ from autotrading.application.sources.errors import SourceUnavailableError, Timef
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
-from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.price_forecast import PricePoint
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
@@ -200,18 +199,6 @@ class HyperliquidMarketDataAdapter:
         except (*UNAVAILABLE, ValueError, IndexError) as error:
             raise SourceUnavailableError(MARKET_DATA) from error
 
-    def previous_day(self, asset: str, now: datetime) -> DailyRange:
-        today = datetime(now.year, now.month, now.day, tzinfo=UTC)
-        yesterday = _milliseconds(today - timedelta(days=1))
-        try:
-            page = self._info().candles_snapshot(asset, DAY, yesterday, _milliseconds(today) - 1)
-            days = [_range_of(candle) for candle in page if int(candle["t"]) == yesterday]
-        except (*UNAVAILABLE, ValueError) as error:
-            raise SourceUnavailableError(MARKET_DATA) from error
-        if not days:
-            raise SourceUnavailableError(MARKET_DATA)
-        return days[0]
-
     def _info(self) -> Info:
         return self._sdk.info(self._base_url, self._timeout)
 
@@ -225,7 +212,3 @@ def _candle_of(candle: _Candle) -> Candle:
         Decimal(str(candle["h"])),
         Decimal(str(candle["l"])),
     )
-
-
-def _range_of(candle: _Candle) -> DailyRange:
-    return DailyRange(high=Decimal(str(candle["h"])), low=Decimal(str(candle["l"])), close=Decimal(str(candle["c"])))

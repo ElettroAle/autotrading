@@ -1,7 +1,8 @@
 """Fibonacci retracements, Gann angles and the dominant cycle on the last candles of the long timeframe (R5.1.4).
 
-Each one is a parameter of the indicators source, off by default, computed on the last N closed candles; a history
-shorter than N is declared and used as it is (ADR indicatori-estesi-nel-domain).
+Each one is a list of windows of the indicators source, empty by default, every window computed on the last N closed
+candles; a history shorter than a window is declared and used as it is (ADR indicatori-estesi-nel-domain, ADR
+parametri-delle-fonti-come-liste-libere).
 """
 
 import math
@@ -12,14 +13,17 @@ from itertools import pairwise
 from typing import Self
 
 from autotrading.domain.sources.candle import Candle
+from autotrading.domain.sources.computed_values import ComputedValues, MissingValue, short_history
 from autotrading.domain.sources.errors import InsufficientHistoryError
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_list_parameter import MAXIMUM_CANDLES, SourceListParameter
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 
-FIBONACCI = SourceParameter("fibonacci", "fibonacci", default=0, minimum=0, maximum=1)
-GANN = SourceParameter("gann", "gann", default=0, minimum=0, maximum=1)
-CYCLE = SourceParameter("ciclo", "ciclo", default=0, minimum=0, maximum=1)
-EXTENDED_CANDLES = SourceParameter("candele_estese", "candele estese", default=100, minimum=10, maximum=500)
-EXTENDED_PARAMETERS = (FIBONACCI, GANN, CYCLE, EXTENDED_CANDLES)
+FIBONACCI_CANDLES = SourceListParameter("fibonacci_candele", "fibonacci candele", (), 10, MAXIMUM_CANDLES)
+GANN_CANDLES = SourceListParameter("gann_candele", "gann candele", (), 10, MAXIMUM_CANDLES)
+CYCLE_CANDLES = SourceListParameter("ciclo_candele", "ciclo candele", (), 10, MAXIMUM_CANDLES)
+EXTENDED_PARAMETERS = (FIBONACCI_CANDLES, GANN_CANDLES, CYCLE_CANDLES)
+HISTORY_NOTE = "nota_storico"
+CANDLES = "candele"
 
 FIBONACCI_RATIOS = (Decimal("0.236"), Decimal("0.382"), Decimal("0.5"), Decimal("0.618"), Decimal("0.786"))
 # Price units per candle of each angle: 1x2 climbs one unit every two candles, 2x1 two units every candle.
@@ -52,50 +56,33 @@ class DominantCycle:
 
 @dataclass(frozen=True, slots=True)
 class ExtendedIndicatorChoice:
-    """The extended indicators a flow switched on, and how many candles they read."""
+    """The windows, in candles, of each extended indicator the flow chose: none of any switches them off."""
 
-    fibonacci: bool
-    gann: bool
-    cycle: bool
-    candles: int
+    fibonacci: tuple[int, ...]
+    gann: tuple[int, ...]
+    cycle: tuple[int, ...]
 
     @classmethod
-    def of(cls, settings: Mapping[str, int]) -> Self:
-        def setting(parameter: SourceParameter) -> int:
-            return settings.get(parameter.key, parameter.default)
-
+    def of(cls, settings: Mapping[str, SourceParameterValue]) -> Self:
         return cls(
-            fibonacci=setting(FIBONACCI) == 1,
-            gann=setting(GANN) == 1,
-            cycle=setting(CYCLE) == 1,
-            candles=setting(EXTENDED_CANDLES),
+            FIBONACCI_CANDLES.value_in(settings), GANN_CANDLES.value_in(settings), CYCLE_CANDLES.value_in(settings)
         )
 
-    @property
-    def active(self) -> bool:
-        return self.fibonacci or self.gann or self.cycle
-
     def long_candles(self, asked: int) -> int:
-        """The candles of the long timeframe to read: N counts only when an extended indicator needs them."""
-        if not self.active:
-            return asked
-        return max(asked, self.candles)
+        """The candles of the long timeframe to read: a window counts only when it is longer than the series."""
+        return max((asked, *self.fibonacci, *self.gann, *self.cycle))
 
-    def values(self, candles: Sequence[Candle]) -> dict[str, Decimal | str]:
-        if not self.active:
-            return {}
-        window = list(candles[-self.candles :])
-        values: dict[str, Decimal | str] = {"candele_estese": Decimal(len(window))}
-        if len(window) < self.candles:
-            values["nota_storico"] = f"storico di {len(window)} candele, meno delle {self.candles} richieste"
-        if self.fibonacci:
-            values |= {f"fibonacci.{name}": level for name, level in fibonacci_levels(window).items()}
-        if self.gann:
-            values |= _gann_values(gann_angles(window))
-        if self.cycle:
-            cycle = dominant_cycle(window)
-            values |= {"ciclo.periodo_candele": Decimal(cycle.period), "ciclo.fase_gradi": cycle.phase}
-        return values
+    def values(self, candles: Sequence[Candle]) -> ComputedValues:
+        """A series of values for every window of every indicator, named after the window."""
+        computed = _history_note(candles, (*self.fibonacci, *self.gann, *self.cycle))
+        for window in self.fibonacci:
+            levels = fibonacci_levels(_window(candles, window))
+            computed |= ComputedValues({f"fibonacci{window}.{name}": level for name, level in levels.items()})
+        for window in self.gann:
+            computed |= ComputedValues(_gann_values(f"gann{window}", gann_angles(_window(candles, window))))
+        for window in self.cycle:
+            computed |= _cycle_values(f"ciclo{window}", _window(candles, window))
+        return computed
 
 
 def fibonacci_levels(candles: Sequence[Candle]) -> dict[str, Decimal]:
@@ -139,13 +126,34 @@ def dominant_cycle(candles: Sequence[Candle]) -> DominantCycle:
     return DominantCycle(period, Decimal(phase).quantize(PHASE_PLACES) % FULL_TURN)
 
 
-def _gann_values(angles: GannAngles) -> dict[str, Decimal | str]:
+def _history_note(candles: Sequence[Candle], windows: tuple[int, ...]) -> ComputedValues:
+    """The windows longer than the history, computed on the candles there are, say so."""
+    longer = sorted({window for window in windows if window > len(candles)})
+    if not longer:
+        return ComputedValues()
+    asked = ", ".join(str(window) for window in longer)
+    return ComputedValues({HISTORY_NOTE: f"storico di {len(candles)} candele, meno delle {asked} richieste"})
+
+
+def _window(candles: Sequence[Candle], window: int) -> list[Candle]:
+    return list(candles[-window:])
+
+
+def _gann_values(name: str, angles: GannAngles) -> dict[str, Decimal | str]:
     values: dict[str, Decimal | str] = {
-        "gann.perno": angles.pivot_side,
-        "gann.prezzo_perno": angles.pivot,
-        "gann.unita_per_candela": angles.unit,
+        f"{name}.perno": angles.pivot_side,
+        f"{name}.prezzo_perno": angles.pivot,
+        f"{name}.unita_per_candela": angles.unit,
     }
-    return values | {f"gann.{name}": line for name, line in angles.lines.items()}
+    return values | {f"{name}.{angle}": line for angle, line in angles.lines.items()}
+
+
+def _cycle_values(name: str, candles: list[Candle]) -> ComputedValues:
+    """The dominant cycle needs a period seen twice: a shorter history is declared missing."""
+    if len(candles) < SHORTEST_PERIOD * CYCLES_IN_HISTORY:
+        return ComputedValues(missing=(MissingValue(name, short_history(len(candles), CANDLES)),))
+    cycle = dominant_cycle(candles)
+    return ComputedValues({f"{name}.periodo_candele": Decimal(cycle.period), f"{name}.fase_gradi": cycle.phase})
 
 
 def _last_index_of(candles: Sequence[Candle], extreme: Decimal, price: Callable[[Candle], Decimal]) -> int:

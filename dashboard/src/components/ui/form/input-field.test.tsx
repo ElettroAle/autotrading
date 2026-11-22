@@ -19,6 +19,14 @@ describe('InputField', () => {
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription('nome obbligatorio');
   });
+
+  it('says beside the field what it admits', () => {
+    render(<InputField label="orizzonti" name="horizons" hint="ogni valore tra 15 e 43200" />);
+
+    expect(screen.getByLabelText('orizzonti')).toHaveAccessibleDescription(
+      'ogni valore tra 15 e 43200',
+    );
+  });
 });
 
 describe('SecretField', () => {

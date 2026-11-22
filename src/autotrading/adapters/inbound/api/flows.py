@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
+from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand
@@ -49,10 +50,10 @@ from autotrading.domain.tenancy.user_id import UserId
 class AdapterSelectionRequest(BaseModel):
     name: str
     weight: int | None = None
-    parameters: dict[str, int] = Field(default_factory=dict)
+    parameters: dict[str, ParameterBody] = Field(default_factory=dict)
 
     def request(self) -> AdapterRequest:
-        return AdapterRequest(self.name, self.weight, self.parameters)
+        return AdapterRequest(self.name, self.weight, parameters_of(self.parameters))
 
 
 class SourceSelectionRequest(BaseModel):
@@ -213,7 +214,7 @@ class ModelSelectionResponse(BaseModel):
 class AdapterSelectionResponse(BaseModel):
     name: str
     weight: int
-    parameters: dict[str, int]
+    parameters: dict[str, ParameterBody]
 
 
 class SourceSelectionResponse(BaseModel):
@@ -225,7 +226,9 @@ class SourceSelectionResponse(BaseModel):
         return cls(
             name=source.name,
             adapters=[
-                AdapterSelectionResponse(name=adapter.name, weight=adapter.weight, parameters=dict(adapter.parameters))
+                AdapterSelectionResponse(
+                    name=adapter.name, weight=adapter.weight, parameters=parameters_body(adapter.parameters)
+                )
                 for adapter in source.adapters
             ],
         )

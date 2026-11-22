@@ -76,13 +76,32 @@ def test_a_parameter_out_of_range_reaches_the_flow_with_its_label_and_the_values
     )
 
 
-def test_a_value_outside_the_choices_of_a_parameter_reaches_the_flow_with_the_choices_listed() -> None:
+@pytest.mark.parametrize(
+    ("horizons", "reason"),
+    [
+        ((15, 10), "orizzonti minuti: ogni valore tra 15 e 43200"),
+        (tuple(range(15, 24)), "orizzonti minuti: al massimo 8 valori"),
+    ],
+)
+def test_a_list_the_parameter_does_not_admit_reaches_the_flow_with_the_rule(
+    horizons: tuple[int, ...], reason: str
+) -> None:
     with pytest.raises(InvalidFlowSettingError) as raised:
         SelectSourceUseCase(platform_sources(), NOTHING_CONFIGURED).execute(
-            "forecast", [AdapterRequest("Prophet", None, {"orizzonte_lungo": 129600})]
+            "forecast", [AdapterRequest("Prophet", None, {"orizzonti_minuti": horizons})]
         )
 
-    assert str(raised.value) == "orizzonte lungo: ammessi nessuno, 1 giorno, 1 settimana"
+    assert str(raised.value) == reason
+
+
+def test_a_list_is_kept_ordered_and_without_repetitions() -> None:
+    [adapter] = (
+        SelectSourceUseCase(platform_sources(), NOTHING_CONFIGURED)
+        .execute("forecast", [AdapterRequest("Prophet", None, {"orizzonti_minuti": (60, 15, 60)})])
+        .adapters
+    )
+
+    assert adapter.parameters["orizzonti_minuti"] == (15, 60)
 
 
 def with_paid_adapter() -> ListSourcesUseCase:

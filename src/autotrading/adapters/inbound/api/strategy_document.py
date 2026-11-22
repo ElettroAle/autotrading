@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
+from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
 from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.ports import AdapterRequest
@@ -53,7 +54,7 @@ class StrategyModel(BaseModel):
 class StrategyAdapter(BaseModel):
     name: str
     weight: int | None = None
-    parameters: dict[str, int] = Field(default_factory=dict)
+    parameters: dict[str, ParameterBody] = Field(default_factory=dict)
 
 
 class StrategySource(BaseModel):
@@ -131,7 +132,7 @@ class StrategyDocument(BaseModel):
                         name=source.name,
                         adapters=[
                             StrategyAdapter(
-                                name=adapter.name, weight=adapter.weight, parameters=dict(adapter.parameters)
+                                name=adapter.name, weight=adapter.weight, parameters=parameters_body(adapter.parameters)
                             )
                             for adapter in source.adapters
                         ],
@@ -199,7 +200,8 @@ def _source_requests(
     for source in sources:
         if isinstance(source, StrategySource):
             adapters_of.setdefault(source.name, []).extend(
-                AdapterRequest(adapter.name, adapter.weight, adapter.parameters) for adapter in source.adapters
+                AdapterRequest(adapter.name, adapter.weight, parameters_of(adapter.parameters))
+                for adapter in source.adapters
             )
             continue
         name, adapter = SOURCE_AND_ADAPTER.get(source.name, (source.name, source.name))

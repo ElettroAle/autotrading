@@ -2,10 +2,12 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
+import type { FakeSourceParameter } from '@/testing/mocks/catalogs';
 import { fakeClock } from '@/testing/mocks/clock';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { problem } from '@/testing/mocks/responses';
 import { server } from '@/testing/mocks/server';
+import { fakeSourceCredentials } from '@/testing/mocks/source-credentials';
 import {
   FAKE_TRIAL_MILLISECONDS,
   fakeSourceTrials,
@@ -13,6 +15,22 @@ import {
 } from '@/testing/mocks/source-trials';
 import { renderApp } from '@/testing/test-utils';
 import { formatInstant } from '@/utils/format-instant';
+
+// A parameter with choices, as a source may declare one (ADR orizzonti-lunghi-del-forecast).
+const HORIZON: FakeSourceParameter = {
+  key: 'orizzonte',
+  label: 'orizzonte',
+  kind: 'number',
+  default: 0,
+  minimum: 0,
+  maximum: 10080,
+  choices: [
+    { value: 0, label: 'nessuno' },
+    { value: 1440, label: '1 giorno' },
+    { value: 10080, label: '1 settimana' },
+  ],
+  maximum_values: null,
+};
 
 const SOURCES_PAGE = '/fonti';
 const NOW = new Date('2026-11-19T09:00:00Z');
@@ -81,7 +99,7 @@ describe('the page Fonti with the trial of each adapter (R6.3.1, ADR pagina-font
         source: 'indicatori',
         adapter: 'Hyperliquid',
         asset: 'ETH',
-        parameters: { lunghezza_serie: 10 },
+        parameters: { lunghezza_serie: 10, medie_periodi: [20, 50], tendenza_giorni: [] },
       },
     ]);
   });
@@ -168,17 +186,18 @@ describe('the page Fonti with the trial of each adapter (R6.3.1, ADR pagina-font
 
   // ADR orizzonti-lunghi-del-forecast: a parameter with choices is a selection of their labels, as in the editor.
   it('offers a parameter with choices as a selection of their labels and tries the value chosen', async () => {
+    fakeSourceCredentials.declareParameter('forecast', HORIZON);
     await renderApp({ account: 'anna', url: SOURCES_PAGE });
     const form = await trialForm('forecast');
     await waitFor(() => expect(within(form).getByLabelText('Asset')).toHaveValue('BTC'));
-    const horizon = within(form).getByLabelText('orizzonte lungo');
+    const horizon = within(form).getByLabelText('orizzonte');
 
     expect(horizon).toHaveValue('0');
     expect(
       within(horizon)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Scegli orizzonte lungo', 'nessuno', '1 giorno', '1 settimana']);
+    ).toEqual(['Scegli orizzonte', 'nessuno', '1 giorno', '1 settimana']);
     await userEvent.selectOptions(horizon, '1 giorno');
     await tryIt('forecast');
 
@@ -189,22 +208,69 @@ describe('the page Fonti with the trial of each adapter (R6.3.1, ADR pagina-font
           source: 'forecast',
           adapter: 'Prophet',
           asset: 'BTC',
-          parameters: { profondita_storico_giorni: 7, orizzonte_lungo: 1440 },
+          parameters: {
+            profondita_storico_giorni: 7,
+            orizzonti_minuti: [15, 60],
+            orizzonte: 1440,
+          },
         },
       ]),
     );
   });
 
   it('does not start a trial without one of the choices of a parameter and says the admitted ones', async () => {
+    fakeSourceCredentials.declareParameter('forecast', HORIZON);
     await renderApp({ account: 'anna', url: SOURCES_PAGE });
     const form = await trialForm('forecast');
-    const horizon = within(form).getByLabelText('orizzonte lungo');
-    await userEvent.selectOptions(horizon, 'Scegli orizzonte lungo');
+    const horizon = within(form).getByLabelText('orizzonte');
+    await userEvent.selectOptions(horizon, 'Scegli orizzonte');
 
     await tryIt('forecast');
 
     expect(await within(form).findByText('ammessi nessuno, 1 giorno, 1 settimana')).toBeVisible();
     expect(horizon).toHaveAttribute('aria-invalid', 'true');
+    expect(fakeSourceTrials.requests()).toEqual([]);
+  });
+
+  // ADR parametri-delle-fonti-come-liste-libere: a list is a field of numbers with commas, with what it admits.
+  it('offers a list parameter at its default list with what it admits, and tries the list typed', async () => {
+    await renderApp({ account: 'anna', url: SOURCES_PAGE });
+    const form = await trialForm('forecast');
+    await waitFor(() => expect(within(form).getByLabelText('Asset')).toHaveValue('BTC'));
+    const horizons = within(form).getByLabelText('orizzonti minuti');
+
+    expect(horizons).toHaveValue('15, 60');
+    expect(horizons).toHaveAccessibleDescription('ogni valore tra 15 e 43200, al massimo 8 valori');
+    await userEvent.clear(horizons);
+    await userEvent.type(horizons, '240, 15');
+    await tryIt('forecast');
+
+    await waitFor(() =>
+      expect(fakeSourceTrials.requests()).toEqual([
+        {
+          account: 'anna',
+          source: 'forecast',
+          adapter: 'Prophet',
+          asset: 'BTC',
+          parameters: { profondita_storico_giorni: 7, orizzonti_minuti: [15, 240] },
+        },
+      ]),
+    );
+  });
+
+  it('does not start a trial with a value out of the range of a list and says the rule', async () => {
+    await renderApp({ account: 'anna', url: SOURCES_PAGE });
+    const form = await trialForm('forecast');
+    const horizons = within(form).getByLabelText('orizzonti minuti');
+    await userEvent.clear(horizons);
+    await userEvent.type(horizons, '15, 5');
+
+    await tryIt('forecast');
+
+    expect(
+      await within(form).findByText('orizzonti minuti: ogni valore tra 15 e 43200'),
+    ).toBeVisible();
+    expect(horizons).toHaveAttribute('aria-invalid', 'true');
     expect(fakeSourceTrials.requests()).toEqual([]);
   });
 

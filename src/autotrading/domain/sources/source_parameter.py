@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from autotrading.domain.sources.errors import (
@@ -5,6 +6,10 @@ from autotrading.domain.sources.errors import (
     SourceParameterNotAmongChoicesError,
     SourceParameterOutOfRangeError,
 )
+
+# What a flow sets for a parameter of a source: a whole number, or a list of them for a list parameter (ADR
+# parametri-delle-fonti-come-liste-libere).
+type SourceParameterValue = int | tuple[int, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +66,18 @@ class SourceParameter:
             raise SourceParameterNotAmongChoicesError(self.label, self.choice_labels, self.key)
         raise SourceParameterOutOfRangeError(self.label, self.minimum, self.maximum, self.key)
 
+    def value_in(self, settings: Mapping[str, SourceParameterValue]) -> int:
+        """The whole number of the flow among its settings, the default when it set none."""
+        return self.accepted(settings.get(self.key, self.default))
+
     @property
     def _values(self) -> tuple[int, ...]:
         return tuple(choice.value for choice in self.choices)
+
+
+def number_of(settings: Mapping[str, SourceParameterValue], key: str) -> int:
+    """A whole-number setting the catalog already checked: a list in its place is a defect of the source."""
+    value = settings[key]
+    if isinstance(value, tuple):
+        raise InvalidSourceParameterError(key)
+    return value

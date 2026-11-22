@@ -1,4 +1,5 @@
 import { fakeClock } from './clock';
+import type { FakeParameterValue } from './source-parameters';
 
 /** A trial as the API answers it: what the adapter read, or why it read nothing (R6.3.1). */
 export type FakeSourceTrial = {
@@ -16,7 +17,7 @@ export type FakeTrialRequest = {
   readonly source: string;
   readonly adapter: string;
   readonly asset: string | null;
-  readonly parameters: Readonly<Record<string, number>>;
+  readonly parameters: Readonly<Record<string, FakeParameterValue>>;
 };
 
 /** How long the sources of the fake platform take to answer, and the age of the data they read. */

@@ -1,8 +1,8 @@
 """The trend over several days on the closed UTC daily candles of the market (R5.1.6).
 
-Behind a parameter of the indicators source, off by default: the change of the price over 7, 14, 30 and 60 days, the
-channel of the closes of the 20 days before the last one and the last daily close with its instant; a value without
-enough history is declared among the values of the source (ADR tendenza-lunga-sulle-candele-giornaliere).
+The changes of the price over the days and the channels of the closes the flow chose, each a list of the indicators
+source, and the last daily close with its instant; a value without enough history is declared among the missing data
+and the others arrive (ADR parametri-delle-fonti-come-liste-libere).
 """
 
 from collections.abc import Mapping, Sequence
@@ -12,74 +12,81 @@ from decimal import Decimal
 from typing import Self
 
 from autotrading.domain.sources.candle import Candle
+from autotrading.domain.sources.computed_values import ComputedValues, MissingValue, short_history
 from autotrading.domain.sources.errors import TimeframeNotAvailableError
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_list_parameter import MAXIMUM_DAYS, SourceListParameter
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.timeframe import MINUTES_PER_DAY, Timeframe
 
-LONG_TREND = SourceParameter("tendenza_lunga", "tendenza lunga", default=0, minimum=0, maximum=1)
+TREND_DAYS = SourceListParameter("tendenza_giorni", "tendenza giorni", (), 1, MAXIMUM_DAYS)
+CHANNEL_DAYS = SourceListParameter("canale_giorni", "canale giorni", (), 2, MAXIMUM_DAYS)
 DAILY_TIMEFRAME = Timeframe(MINUTES_PER_DAY)
-HORIZON_DAYS = (7, 14, 30, 60)
-CHANNEL_DAYS = 20
-# The longest change compares the last close with the one 60 candles before it.
-DAILY_CANDLES = max(HORIZON_DAYS) + 1
 PREFIX = "tendenza."
-HIGH, LOW = "massimo_20g", "minimo_20g"
 LAST_CLOSE, LAST_CLOSE_AT = "ultima_chiusura", "ultima_chiusura_istante"
-MISSING = "dati_mancanti"
+DAYS = "giorni chiusi"
+TWO = Decimal(2)
 
 
 @dataclass(frozen=True, slots=True)
 class LongTrendChoice:
-    """Whether the flow switched the trend over several days on."""
+    """The days of the changes and of the channels the flow chose: none of either switches the trend off."""
 
-    active: bool
+    days: tuple[int, ...]
+    channels: tuple[int, ...]
 
     @classmethod
-    def of(cls, settings: Mapping[str, int]) -> Self:
-        return cls(active=settings.get(LONG_TREND.key, LONG_TREND.default) == 1)
+    def of(cls, settings: Mapping[str, SourceParameterValue]) -> Self:
+        return cls(TREND_DAYS.value_in(settings), CHANNEL_DAYS.value_in(settings))
+
+    @property
+    def active(self) -> bool:
+        return bool(self.days or self.channels)
+
+    @property
+    def daily_candles(self) -> int:
+        """The candles the longest value needs: the last close and the N days before it."""
+        return max((*self.days, *self.channels), default=0) + 1
+
+    def values(self, candles: Sequence[Candle]) -> ComputedValues:
+        """The values of the trend on the closed daily candles, oldest first, and the ones the history cannot give."""
+        computed = self._changes(candles) | self._channels(candles) | _last_close(candles)
+        return computed.prefixed(PREFIX)
+
+    def _changes(self, candles: Sequence[Candle]) -> ComputedValues:
+        """The change from the close N days before the last one to the last one, in percent."""
+        values: dict[str, Decimal | str] = {}
+        missing: list[MissingValue] = []
+        for days in self.days:
+            name = f"variazione_{days}g"
+            if len(candles) <= days:
+                missing.append(MissingValue(name, short_history(len(candles), DAYS)))
+                continue
+            values[name] = (candles[-1].close / candles[-1 - days].close - 1) * 100
+        return ComputedValues(values, tuple(missing))
+
+    def _channels(self, candles: Sequence[Candle]) -> ComputedValues:
+        """Highest, lowest and middle of the closes of the N days before the last one."""
+        values: dict[str, Decimal | str] = {}
+        missing: list[MissingValue] = []
+        for days in self.channels:
+            if len(candles) <= days:
+                missing.append(MissingValue(f"canale_{days}g", short_history(len(candles), DAYS)))
+                continue
+            previous = [candle.close for candle in candles[-1 - days : -1]]
+            high, low = max(previous), min(previous)
+            values |= {f"massimo_{days}g": high, f"minimo_{days}g": low, f"punto_medio_{days}g": (high + low) / TWO}
+        return ComputedValues(values, tuple(missing))
 
 
 def daily_timeframe_of(available: Sequence[Timeframe]) -> Timeframe:
-    """The daily timeframe, if the market publishes it: without it the trend cannot be read."""
+    """The daily timeframe, if the market publishes it: without it no value on the days can be read."""
     if DAILY_TIMEFRAME not in available:
         raise TimeframeNotAvailableError(DAILY_TIMEFRAME.minutes)
     return DAILY_TIMEFRAME
 
 
-def long_trend(candles: Sequence[Candle]) -> dict[str, Decimal | str]:
-    """The values of the trend on the closed daily candles, oldest first, and the ones the history cannot give."""
-    values = {**_changes(candles), **_channel(candles), **_last_close(candles)}
-    missing = [name for name in _every_name() if name not in values]
-    if missing:
-        values[MISSING] = f"{', '.join(missing)}: storico di {len(candles)} giorni chiusi"
-    return {f"{PREFIX}{name}": value for name, value in values.items()}
-
-
-def _changes(candles: Sequence[Candle]) -> dict[str, Decimal | str]:
-    return {
-        _change_name(days): (candles[-1].close / candles[-1 - days].close - 1) * 100
-        for days in HORIZON_DAYS
-        if len(candles) > days
-    }
-
-
-def _channel(candles: Sequence[Candle]) -> dict[str, Decimal | str]:
-    if len(candles) <= CHANNEL_DAYS:
-        return {}
-    previous = [candle.close for candle in candles[-1 - CHANNEL_DAYS : -1]]
-    return {HIGH: max(previous), LOW: min(previous)}
-
-
-def _last_close(candles: Sequence[Candle]) -> dict[str, Decimal | str]:
+def _last_close(candles: Sequence[Candle]) -> ComputedValues:
     if not candles:
-        return {}
+        return ComputedValues(missing=(MissingValue(LAST_CLOSE, short_history(0, DAYS)),))
     last = candles[-1]
-    return {LAST_CLOSE: last.close, LAST_CLOSE_AT: last.closed_at.astimezone(UTC).isoformat()}
-
-
-def _every_name() -> list[str]:
-    return [*(_change_name(days) for days in HORIZON_DAYS), HIGH, LOW, LAST_CLOSE]
-
-
-def _change_name(days: int) -> str:
-    return f"variazione_{days}g"
+    return ComputedValues({LAST_CLOSE: last.close, LAST_CLOSE_AT: last.closed_at.astimezone(UTC).isoformat()})

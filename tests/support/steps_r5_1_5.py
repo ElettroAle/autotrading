@@ -1,7 +1,8 @@
 """R5.1.5: the forecast source also forecasts 1 day and 1 week ahead, on the daily candles of the exchange; every long
 forecast is recorded and gets its actual price when it expires, as the short ones; a horizon outside the admitted ones
 is refused naming them. On the cycle the worker composes and on the modification of the flow (ADR
-orizzonti-lunghi-del-forecast).
+orizzonti-lunghi-del-forecast); the horizons are a list of the flow, the long one added to the default ones (ADR
+parametri-delle-fonti-come-liste-libere).
 """
 
 from datetime import timedelta
@@ -14,6 +15,7 @@ from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyCommand
 from autotrading.domain.flows.forecast_accuracy import ForecastAccuracy
+from autotrading.domain.sources.forecast import HORIZONS
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from tests.support.flow_cycles import FlowCycles, at
 from tests.support.lifecycle_steps import Lifecycle, modify
@@ -21,7 +23,6 @@ from tests.support.steps import quoted
 
 USER = "anna"
 FORECAST = "forecast"
-LONG_HORIZON = "orizzonte_lungo"
 MINUTES_PER_DAY = 24 * 60
 # What a user means by the words of a horizon, in minutes: the months as thirty days.
 UNIT_MINUTES = {
@@ -33,7 +34,6 @@ UNIT_MINUTES = {
     "mesi": 30 * MINUTES_PER_DAY,
 }
 ACTUAL_PRICE = Decimal(64250)
-HORIZONS = {horizon.label: horizon for horizon in ForecastHorizon}
 
 
 @pytest.fixture
@@ -71,7 +71,8 @@ def set_horizon(flow_cycles: FlowCycles, lifecycle: Lifecycle, user: str, horizo
     """The modification of the flow as the API makes it: the forecast with its adapter and the long horizon chosen."""
     flow = the_flow(flow_cycles)
     [adapter] = flow_cycles.platform.use_cases_of(user).list_sources.execute().find(FORECAST).adapters
-    request = SourceRequest(FORECAST, (AdapterRequest(adapter.name, None, {LONG_HORIZON: minutes_of(horizon)}),))
+    horizons = (*HORIZONS.default, minutes_of(horizon))
+    request = SourceRequest(FORECAST, (AdapterRequest(adapter.name, None, {HORIZONS.key: horizons}),))
     modify(flow_cycles.platform, lifecycle, user, flow, sources=(request,))
 
 
@@ -96,7 +97,7 @@ def recorded_yesterday(flow_cycles: FlowCycles) -> None:
     forecast = PriceForecast(
         flow.id.value,
         the_asset(flow_cycles),
-        ForecastHorizon.DAY_1,
+        ForecastHorizon(1440),
         yesterday,
         Decimal(64000),
         Decimal(64500),
@@ -141,9 +142,7 @@ def reads_accuracy(
     command = ReadForecastAccuracyCommand(flow.id.value)
     seen = platform.use_cases_of(user).read_forecast_accuracy.execute(command)
     accuracies[:] = [
-        accuracy
-        for accuracy in seen
-        if (accuracy.asset, accuracy.horizon_minutes) == (asset, HORIZONS[horizon].minutes)
+        accuracy for accuracy in seen if (accuracy.asset, accuracy.horizon_minutes) == (asset, minutes_of(horizon))
     ]
 
 
@@ -152,11 +151,11 @@ def reads_accuracy(
 
 @then(quoted('il contesto contiene la previsione di "{asset}" a {horizon} con il suo istante di riferimento'))
 def long_forecast_in_context(flow_cycles: FlowCycles, asset: str, horizon: str) -> None:
-    chosen = HORIZONS[horizon]
+    chosen = ForecastHorizon(minutes_of(horizon))
     [values] = flow_cycles.sources_in_context(FORECAST, asset)
     flow = flow_cycles.flow(the_flow(flow_cycles))
     [sample] = [kept for kept in flow_cycles.samples_of(flow.tenant_id).samples if kept.source == FORECAST]
-    [long] = [kept for kept in flow_cycles.forecasts_of(flow.tenant_id).forecasts if kept.horizon is chosen]
+    [long] = [kept for kept in flow_cycles.forecasts_of(flow.tenant_id).forecasts if kept.horizon == chosen]
     assert Decimal(values[f"prezzo_previsto_{chosen.label}"]) == long.predicted_price
     assert sample.reference_at == long.made_at == flow_cycles.clock.now()
 
@@ -175,18 +174,18 @@ def actual_price_of_today(flow_cycles: FlowCycles) -> None:
     [daily] = [
         kept
         for kept in flow_cycles.forecasts_of(flow.tenant_id).forecasts
-        if (kept.horizon, kept.made_at) == (ForecastHorizon.DAY_1, yesterday)
+        if (kept.horizon, kept.made_at) == (ForecastHorizon(1440), yesterday)
     ]
     assert daily.actual_price == ACTUAL_PRICE
 
 
-@then("la configurazione è rifiutata con il motivo che elenca gli orizzonti ammessi")
-def refused_listing_horizons(lifecycle: Lifecycle) -> None:
-    assert str(lifecycle.error) == "orizzonte lungo: ammessi nessuno, 1 giorno, 1 settimana"
+@then(quoted('la configurazione è rifiutata con motivo "{reason}"'))
+def refused_with_reason(lifecycle: Lifecycle, reason: str) -> None:
+    assert str(lifecycle.error) == reason
 
 
 @then(quoted("l'errore medio assoluto a {horizon} è {error} su {count} previsione valutata"))
 def long_accuracy(accuracies: list[ForecastAccuracy], horizon: str, error: str, count: str) -> None:
     [accuracy] = accuracies
-    assert accuracy.horizon_minutes == HORIZONS[horizon].minutes
+    assert accuracy.horizon_minutes == minutes_of(horizon)
     assert (accuracy.mean_absolute_error, accuracy.evaluated) == (Decimal(error), int(count))

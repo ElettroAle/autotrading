@@ -1,3 +1,5 @@
+import { parameterTextOf } from '@/lib/parameter-lists';
+
 import type { Configuration } from '../api/get-flow-version';
 
 export type ConfigurationRow = { readonly part: string; readonly value: string };
@@ -8,10 +10,11 @@ const NONE = 'nessuno';
 const NO_MINIMUM_CONFIDENCE = 'nessuna';
 const DEFAULT = 'predefinito';
 
-const sortedEntries = (parameters: Record<string, string | number>): string[] =>
-  Object.keys(parameters)
-    .sort()
-    .map((key) => `${key} ${parameters[key]}`);
+// A list parameter reads as the API writes it in the differences (ADR parametri-delle-fonti-come-liste-libere).
+const sortedEntries = (parameters: Record<string, string | number | readonly number[]>): string[] =>
+  Object.entries(parameters)
+    .sort(([one], [other]) => (one < other ? -1 : 1))
+    .map(([key, value]) => `${key} ${parameterTextOf(value)}`);
 
 // Every adapter of a source with its weight and parameters, «fonte · adapter», as the API names it (R4.1.1).
 const sourceText = (source: Source): string =>

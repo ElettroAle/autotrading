@@ -1606,7 +1606,7 @@ export interface components {
             weight?: number | null;
             /** Parameters */
             parameters?: {
-                [key: string]: number;
+                [key: string]: components["schemas"]["ParameterBody"];
             };
         };
         /** AdapterSelectionResponse */
@@ -1617,7 +1617,7 @@ export interface components {
             weight: number;
             /** Parameters */
             parameters: {
-                [key: string]: number;
+                [key: string]: components["schemas"]["ParameterBody"];
             };
         };
         /**
@@ -3327,6 +3327,7 @@ export interface components {
             /** Fees */
             fees: string;
         };
+        ParameterBody: number | number[];
         /** PositionLeftOpenResponse */
         PositionLeftOpenResponse: {
             /** Asset */
@@ -3559,14 +3560,20 @@ export interface components {
             key: string;
             /** Label */
             label: string;
-            /** Default */
-            default: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "number" | "list";
+            default: components["schemas"]["ParameterBody"];
             /** Minimum */
             minimum: number;
             /** Maximum */
             maximum: number;
             /** Choices */
             choices: components["schemas"]["SourceParameterChoiceResponse"][];
+            /** Maximum Values */
+            maximum_values: number | null;
         };
         /** SourceResponse */
         SourceResponse: {
@@ -3607,7 +3614,7 @@ export interface components {
             asset?: string | null;
             /** Parameters */
             parameters?: {
-                [key: string]: number;
+                [key: string]: components["schemas"]["ParameterBody"];
             };
         };
         /**
@@ -3676,7 +3683,7 @@ export interface components {
             weight?: number | null;
             /** Parameters */
             parameters?: {
-                [key: string]: number;
+                [key: string]: components["schemas"]["ParameterBody"];
             };
         };
         /**

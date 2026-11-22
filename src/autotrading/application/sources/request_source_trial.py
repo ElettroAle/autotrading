@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 
 from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.sources.ports import SourceTrialPort
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.source_trial import SourceTrial
 
 
@@ -12,7 +13,7 @@ class RequestSourceTrialCommand:
     adapter: str
     # None for a source of the whole market.
     asset: str | None = None
-    parameters: Mapping[str, int] = field(default_factory=dict)
+    parameters: Mapping[str, SourceParameterValue] = field(default_factory=dict)
 
 
 class RequestSourceTrialUseCase:
