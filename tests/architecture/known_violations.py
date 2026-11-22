@@ -29,15 +29,6 @@ KNOWN_VIOLATIONS: dict[Rule, dict[str, int]] = {
     Rule.CONFIGURATION_THROUGH_SOURCE: {},
     Rule.SETTINGS_IN_THEIR_FOLDER: {},
     Rule.BOOTSTRAP_CONFIGURES_THROUGH_COMPOSITIONS: {},
-    # The tests that send orders on the testnet wait for the secret of its credentials (ADR
-    # nessun-test-escluso-o-saltato).
-    Rule.NO_EXCLUDED_TESTS: {
-        ".github/actions/pytest-run/action.yml:testnet_credentials": 643,
-        "tests/integration/hyperliquid/test_exchange_testnet.py:test_approved_credentials_read_the_account_value": 643,
-        "tests/integration/hyperliquid/test_exchange_testnet.py:"
-        "test_a_wallet_not_approved_for_the_account_is_rejected_by_the_exchange": 643,
-        "tests/integration/hyperliquid/test_protections_testnet.py:"
-        "test_the_protections_of_the_whole_position_are_placed_read_and_cancelled": 643,
-    },
+    Rule.NO_EXCLUDED_TESTS: {},
     Rule.SCENARIOS_BY_SYSTEM: {},
 }

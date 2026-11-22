@@ -56,9 +56,8 @@ tests/
   `skipif`, `xfail`, `importorskip` né `mark.skip`; nei test della dashboard nessun `.skip`, `.todo`,
   `.fixme` né `.only`; Playwright con `missingSteps: 'fail-on-gen'`, `tags: 'not @pipeline'` e nessun `grep`,
   `grepInvert` né `testIgnore`. La pipeline (`.github/actions/pytest-run/action.yml`) esclude solo il marker
-  `pipeline`. Un test che vuole un file di credenziali lo legge e fallisce se manca. Unica eccezione
-  nota il marker `testnet_credentials` dei test che mandano ordini sulla testnet, voci di
-  `known_violations.py` col Bug 643 finché il segreto delle credenziali non esiste.
+  `pipeline`, senza eccezioni. Un test che vuole un file di credenziali lo legge e fallisce se manca. Nessun test
+  manda ordini sulla testnet né legge le credenziali di un wallet testnet (ADR test-testnet-con-ordini-cancellati).
 - **Test architetturale**: fa parte della suite di default; un contratto rotto, una regola dei
   layer violata o un test escluso è un test rosso. Le regole vivono in `tests/support/architecture.py`.
 - **Adapter finti**: implementano la porta per intero, sono deterministici e vivono solo in

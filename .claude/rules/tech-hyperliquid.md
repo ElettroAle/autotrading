@@ -29,6 +29,6 @@ paths:
 - Le credenziali non compaiono in log, errori o repr.
 - La prova firmata non basta: il ruolo del firmatario (`userRole`) lo lega all'indirizzo del conto, che firma per sé
   o tramite un API wallet approvato proprio per quell'indirizzo (ADR firmatario-autorizzato-per-l-indirizzo-del-conto).
-- I test contro testnet hanno il marker `integration` e girano nella pipeline a ogni PR; quelli che mandano ordini
-  con le credenziali del conto hanno anche `testnet_credentials`, escluso dalla pipeline fino al Bug 643 (ADR
-  nessun-test-escluso-o-saltato).
+- I test contro testnet hanno il marker `integration` e girano nella pipeline a ogni PR; sono di sola lettura e senza
+  credenziali: nessun test manda ordini sulla testnet, gli ordini si provano con gli adapter finti (ADR
+  test-testnet-con-ordini-cancellati).
