@@ -43,6 +43,8 @@ META = {
     ]
 }
 MIDS = {"BTC": "100000.0", "ETH": "4000.5"}
+CONTEXTS = [{"midPx": "100000.0", "oraclePx": "100100.0"}, {"midPx": "4000.5", "oraclePx": "4000.0"}]
+IOC = {"limit": {"tif": "Ioc"}}
 OK = {"status": "ok", "response": {"type": "default"}}
 FILLED = {
     "status": "ok",
@@ -104,8 +106,10 @@ class FakeSdk(HyperliquidSdkAdapter):
         default_factory=lambda: {"status": "order", "order": {"order": {"oid": OID}, "status": "filled"}}
     )
     meta_answer: Any = field(default_factory=lambda: META)
+    contexts: Any = field(default_factory=lambda: CONTEXTS)
     state: Any = field(default_factory=lambda: STATE)
     failure: Exception | None = None
+    order_failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
     def exchange(self, wallet: LocalAccount, base_url: str, account_address: str, timeout: float) -> FakeSdk:
@@ -131,12 +135,16 @@ class FakeSdk(HyperliquidSdkAdapter):
     def update_leverage(self, leverage: int, coin: str, is_cross: bool) -> Any:
         return self._answer("update_leverage", (leverage, coin, is_cross), self.leverage_answer)
 
-    def market_open(self, *arguments: Any) -> Any:
-        *sent, cloid = arguments
-        return self._answer("market_open", (*sent, str(cloid)), self.order_answer)
+    def meta_and_asset_ctxs(self) -> Any:
+        return self._answer("meta_and_asset_ctxs", (), [self.meta_answer, self.contexts])
 
-    def market_close(self, coin: str, size: float, px: None, slippage: float, cloid: object) -> Any:
-        return self._answer("market_close", (coin, size, px, slippage, str(cloid)), self.order_answer)
+    def order(
+        self, name: str, is_buy: bool, sz: float, limit_px: float, order_type: Any, *, reduce_only: bool, cloid: object
+    ) -> Any:
+        if self.order_failure is not None:
+            raise self.order_failure
+        sent = (name, is_buy, sz, limit_px, order_type, reduce_only, str(cloid))
+        return self._answer("order", sent, self.order_answer)
 
     def user_fills(self, address: str) -> Any:
         self.calls.append(("user_fills", address))
@@ -207,13 +215,14 @@ def test_a_refused_leverage_keeps_the_message_of_the_exchange_without_the_addres
     assert raised.value.exchange_message == "Invalid leverage for ***"
 
 
-def test_an_opening_order_is_sent_at_market_with_its_cloid_and_slippage() -> None:
+def test_an_opening_order_is_sent_immediate_or_cancel_with_its_cloid_and_the_limit_of_the_slippage() -> None:
     sdk = FakeSdk()
     order = an_order()
 
     adapter(sdk).place_market_order(ACCESS, order)
 
-    assert calls_named(sdk, "market_open") == [("BTC", False, 0.0003, None, 0.02, order.id.hex)]
+    # A sale: 2% below the higher of the book (100,000) and the oracle (100,100).
+    assert calls_named(sdk, "order") == [("BTC", False, 0.0003, 98098.0, IOC, False, order.id.hex)]
 
 
 def test_a_reduce_only_order_closes_the_position() -> None:
@@ -222,8 +231,78 @@ def test_a_reduce_only_order_closes_the_position() -> None:
 
     adapter(sdk).place_market_order(ACCESS, order)
 
-    assert calls_named(sdk, "market_close") == [("BTC", 0.0003, None, 0.02, order.id.hex)]
-    assert calls_named(sdk, "market_open") == []
+    # A purchase: 2% above the lower of the book and the oracle.
+    assert calls_named(sdk, "order") == [("BTC", True, 0.0003, 102000.0, IOC, True, order.id.hex)]
+
+
+def test_a_sale_on_a_book_far_under_the_oracle_is_limited_near_the_oracle() -> None:
+    # Bug 631: on 20/11/2026 the testnet book of BTC stood at 60,350 with the oracle near 61,930.
+    sdk = FakeSdk(contexts=[{"midPx": "60350.0", "oraclePx": "61930.0"}, CONTEXTS[1]])
+    order = MarketOrder("BTC", Direction.SHORT, Decimal("0.0003"), Slippage.default())
+
+    adapter(sdk).place_market_order(ACCESS, order)
+
+    assert calls_named(sdk, "order") == [("BTC", False, 0.0003, 58834.0, IOC, False, order.id.hex)]
+
+
+def test_the_book_and_the_oracle_are_read_in_one_reading_of_the_asset_contexts() -> None:
+    sdk = FakeSdk()
+
+    adapter(sdk).place_market_order(ACCESS, an_order())
+
+    assert calls_named(sdk, "meta_and_asset_ctxs") == [()]
+    assert calls_named(sdk, "all_mids") == []
+
+
+def test_an_asset_without_a_book_is_limited_from_the_oracle() -> None:
+    sdk = FakeSdk(contexts=[{"midPx": None, "oraclePx": "100100.0"}, CONTEXTS[1]])
+
+    adapter(sdk).place_market_order(ACCESS, an_order())
+
+    assert calls_named(sdk, "order")[0][3] == 98098.0
+
+
+def test_an_order_on_an_asset_the_exchange_does_not_list_is_refused_as_unknown() -> None:
+    sdk = FakeSdk()
+    order = MarketOrder("DOGE", Direction.LONG, Decimal(1), Slippage.default())
+
+    with pytest.raises(ExchangeRejectedOrderError) as raised:
+        adapter(sdk).place_market_order(ACCESS, order)
+
+    assert raised.value.exchange_message == "Unknown asset DOGE"
+    assert calls_named(sdk, "order") == []
+
+
+@pytest.mark.parametrize(
+    "contexts",
+    [[{"midPx": "100000.0"}], [], [{"midPx": "100000.0", "oraclePx": "x"}]],
+    ids=["no-oracle", "none", "not-a-number"],
+)
+def test_asset_contexts_of_unexpected_shape_are_unavailable(contexts: list[Any]) -> None:
+    sdk = FakeSdk(contexts=contexts)
+
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(sdk).place_market_order(ACCESS, an_order())
+
+    assert calls_named(sdk, "order") == []
+
+
+def test_a_timeout_reading_the_prices_is_an_unavailable_exchange_and_sends_nothing() -> None:
+    sdk = FakeSdk(failure=requests.ReadTimeout())
+
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(sdk).place_market_order(ACCESS, an_order())
+
+    assert calls_named(sdk, "order") == []
+
+
+def test_an_oracle_rejection_keeps_the_message_of_the_exchange() -> None:
+    message = "Order price too far from oracle. asset=3"
+
+    with pytest.raises(ExchangeRejectedOrderError) as raised:
+        adapter(FakeSdk(order_answer=answer([{"error": message}]))).place_market_order(ACCESS, an_order())
+
+    assert raised.value.exchange_message == message
 
 
 def test_the_execution_is_read_from_the_fills_of_the_order() -> None:
@@ -271,7 +350,7 @@ def test_an_order_answer_of_unexpected_shape_is_unavailable(statuses: list[Any])
 
 def test_an_order_without_answer_in_time_is_not_acknowledged() -> None:
     with pytest.raises(OrderNotAcknowledgedError):
-        adapter(FakeSdk(failure=requests.ReadTimeout())).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(order_failure=requests.ReadTimeout())).place_market_order(ACCESS, an_order())
 
 
 def test_a_timeout_outside_the_order_is_an_unavailable_exchange() -> None:
@@ -315,7 +394,7 @@ def test_an_invalid_key_is_refused_before_reaching_the_exchange() -> None:
         )
 
     assert raised.value.exchange_message == INVALID_KEY_MESSAGE
-    assert calls_named(sdk, "market_open") == []
+    assert calls_named(sdk, "order") == []
 
 
 def test_an_order_is_looked_up_by_its_cloid_and_its_fills() -> None:
@@ -396,4 +475,4 @@ def test_an_access_without_a_field_of_the_exchange_is_refused_before_reaching_it
         adapter(sdk).place_market_order(TradingAccess("Hyperliquid", fields), an_order())
 
     assert raised.value.exchange_message == MISSING_FIELD_MESSAGE
-    assert calls_named(sdk, "market_open") == []
+    assert calls_named(sdk, "order") == []

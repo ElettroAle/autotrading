@@ -10,6 +10,7 @@ from eth_account.signers.local import LocalAccount
 from hyperliquid.exchange import Exchange
 from hyperliquid.utils.constants import MAINNET_API_URL, TESTNET_API_URL
 from hyperliquid.utils.error import ClientError, ServerError
+from hyperliquid.utils.signing import OrderType
 from hyperliquid.utils.types import Cloid
 
 from autotrading.adapters.outbound.hyperliquid.exchange import (
@@ -41,6 +42,8 @@ UNKNOWN_ASSET = "Unknown asset"
 PRICE_SIGNIFICANT_FIGURES = 5
 MAX_PRICE_DECIMALS = 6
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, ArithmeticError)
+# A market order is a limit order immediate or cancel: it fills at the best of the book within its limit, never rests.
+IMMEDIATE_OR_CANCEL: OrderType = {"limit": {"tif": "Ioc"}}
 
 
 class _Filled(TypedDict):
@@ -80,6 +83,17 @@ class _QueriedStatus(TypedDict):
 
     status: str
     order: _QueriedOrder
+
+
+class _AssetContext(TypedDict):
+    """The context of an asset: the mid of its book, absent without a book, and the oracle price of the exchange."""
+
+    midPx: str | None
+    oraclePx: str
+
+
+class _AssetsMeta(TypedDict):
+    universe: list[dict[str, object]]
 
 
 class _OrderFill(TypedDict):
@@ -130,8 +144,9 @@ class HyperliquidOrderExchangeAdapter:
         _require_ok(response, access)
 
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
+        limit = self._limit_price(access, order)
         with _translated(access, on_timeout=OrderNotAcknowledgedError):
-            response = self._send(self._exchange(access), order)
+            response = self._send(self._exchange(access), order, limit)
         execution = self._execution(access, _filled_oid(response, access))
         if execution is None:
             # Filled but without fills yet: the outcome is not confirmed, so it is looked up like a silent order.
@@ -149,12 +164,25 @@ class HyperliquidOrderExchangeAdapter:
     def _exchange(self, access: TradingAccess) -> Exchange:
         return self._sdk.exchange(_wallet_of(access), self._base_url, _field(access, ACCOUNT_ADDRESS), self._timeout)
 
+    def _limit_price(self, access: TradingAccess, order: MarketOrder) -> Decimal:
+        """The limit computed here, not by the SDK from the book alone: it stays near the oracle (Bug 631, ADR
+        prezzo-limite-dell-ordine-a-mercato-vicino-all-oracolo)."""
+        with _translated(access):
+            contexts = self._sdk.info(self._base_url, self._timeout).meta_and_asset_ctxs()
+        market, oracle_price = _order_prices_of(order.coin, contexts)
+        return order.limit_price(market, oracle_price)
+
     @staticmethod
-    def _send(exchange: Exchange, order: MarketOrder) -> object:
-        size, slippage, cloid = float(order.size), float(order.slippage.fraction), _cloid_of(order)
-        if order.reduce_only:
-            return exchange.market_close(order.coin, size, None, slippage, cloid)
-        return exchange.market_open(order.coin, order.is_buy, size, None, slippage, cloid)
+    def _send(exchange: Exchange, order: MarketOrder, limit: Decimal) -> object:
+        return exchange.order(
+            order.coin,
+            order.is_buy,
+            float(order.size),
+            float(limit),
+            IMMEDIATE_OR_CANCEL,
+            reduce_only=order.reduce_only,
+            cloid=_cloid_of(order),
+        )
 
     def _execution(self, access: TradingAccess, oid: int) -> Execution | None:
         with _translated(access):
@@ -198,8 +226,7 @@ def _cloid_of(order: MarketOrder) -> Cloid:
 def _market_of(coin: str, universe: Sequence[Mapping[str, object]], mids: Mapping[str, object]) -> Market:
     asset = next((asset for asset in universe if asset.get("name") == coin), None)
     if asset is None or coin not in mids:
-        message = f"{UNKNOWN_ASSET} {coin}"
-        raise ExchangeRejectedOrderError(message)
+        raise _unknown_asset(coin)
     try:
         leverage, decimals = int(str(asset["maxLeverage"])), int(str(asset["szDecimals"]))
         return Market(
@@ -213,6 +240,29 @@ def _market_of(coin: str, universe: Sequence[Mapping[str, object]], mids: Mappin
         )
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error
+
+
+def _order_prices_of(coin: str, answer: object) -> tuple[Market, Decimal]:
+    """The market of the coin, priced at the mid of its book, and its oracle price, from one reading of the contexts.
+
+    An asset without a book has no mid: its limit comes from the oracle alone.
+    """
+    try:
+        meta, contexts = cast("tuple[_AssetsMeta, list[_AssetContext]]", answer)
+        universe = meta["universe"]
+        names = [asset.get("name") for asset in universe]
+        if coin not in names:
+            raise _unknown_asset(coin)
+        context = contexts[names.index(coin)]
+        oracle_price = _decimal(context["oraclePx"])
+        mid_price = context["midPx"] or context["oraclePx"]
+    except SHAPE_ERRORS as error:
+        raise OrderExchangeUnavailableError from error
+    return _market_of(coin, universe, {coin: mid_price}), oracle_price
+
+
+def _unknown_asset(coin: str) -> ExchangeRejectedOrderError:
+    return ExchangeRejectedOrderError(f"{UNKNOWN_ASSET} {coin}")
 
 
 def _held_position_of(answer: object, coin: str) -> HeldPosition | None:
