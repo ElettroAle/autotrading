@@ -77,7 +77,8 @@ describe('the section Fonti of the page of the keys (R4.1.2, ADR sezione-fonti-n
     await userEvent.type(within(item).getByLabelText('Account'), 'anna');
     await userEvent.click(within(item).getByRole('button', { name: 'Salva le credenziali' }));
 
-    await waitFor(() => expect(item).toHaveTextContent('configurato'));
+    // «non configurato» holds «configurato»: only the whole word says the saving has arrived (Bug 714).
+    expect(await within(item).findByText('configurato')).toBeVisible();
     expect(item).not.toHaveTextContent('non configurato');
     expect(item).toHaveTextContent('Account:anna');
     expect(item).toHaveTextContent('scadenza sconosciuta');
