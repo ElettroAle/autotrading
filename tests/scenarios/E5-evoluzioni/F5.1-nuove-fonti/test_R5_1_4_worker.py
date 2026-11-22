@@ -1,14 +1,14 @@
 """R5.1.4: Fibonacci retracements, Gann angles and the dominant cycle enter the context of the cycle as parameters of
 the indicators source, computed on the closed 4-hour candles of the exchange; a history shorter than the candles asked
 is declared and the indicators are computed on what there is. On the cycle the worker composes, with the fake market of
-the exchange (ADR indicatori-estesi-nel-domain): activating an indicator chooses for it the window of N candles, 100 if
-the scenario names none (ADR parametri-delle-fonti-come-liste-libere).
+the exchange (ADR indicatori-estesi-nel-domain): each indicator has its list of windows of N candles (ADR
+parametri-delle-fonti-come-liste-libere).
 """
 
 from decimal import Decimal
 
 import pytest
-from pytest_bdd import given, scenarios, then, when
+from pytest_bdd import given, parsers, scenarios, then, when
 
 from tests.support.flow_cycles import FlowCycles
 from tests.support.steps import quoted
@@ -18,8 +18,10 @@ scenarios("E5-evoluzioni/F5.1-nuove-fonti/R5.1.4-indicatori-estesi/worker/R5.1.4
 USER = "anna"
 INDICATORS = "indicatori"
 LONG = "4h"
-# The N of the requirement when the scenario does not name it.
+# The window the scenarios name.
 WINDOW = 100
+# A list parameter as the scenarios write it: "fibonacci_candele [100]".
+LIST_SETTING = r"(?P<key>\w+_candele) \[(?P<values>[^\]]*)\]"
 FIBONACCI_LEVELS = ("23.6%", "38.2%", "50%", "61.8%", "78.6%")
 # Ten older candles far below the window: only the last N candles may set the range of the retracements.
 OLDER = 10
@@ -64,11 +66,12 @@ def window_closes(count: int, low: Decimal, high: Decimal) -> list[Decimal]:
     return [middle + amplitude * Decimal((index * 7) % 5 - 2) / 2 for index in range(count)]
 
 
-def activate(flow_cycles: FlowCycles, flow: str, *indicators: str, window: int = WINDOW) -> None:
-    """Each indicator on the window of N candles: its list of windows holds N alone."""
-    flow_cycles.set_source_parameters(
-        flow, INDICATORS, **{f"{indicator}_candele": (window,) for indicator in indicators}
-    )
+def windows(text: str) -> tuple[int, ...]:
+    return tuple(int(piece) for piece in text.split(",") if piece.strip())
+
+
+def set_windows(flow_cycles: FlowCycles, flow: str, settings: dict[str, tuple[int, ...]]) -> None:
+    flow_cycles.set_source_parameters(flow, INDICATORS, **settings)
 
 
 # Given
@@ -99,27 +102,35 @@ def short_history(flow_cycles: FlowCycles, asset: str, count: str) -> None:
 # When
 
 
-@when(quoted('"{user}" attiva l\'indicatore "{indicator}" e parte il ciclo'))
-def activates_one(flow_cycles: FlowCycles, user: str, indicator: str) -> None:
+@when(parsers.re(rf'^"(?P<user>[^"]+)" imposta {LIST_SETTING} e parte il ciclo$'))
+def sets_one(flow_cycles: FlowCycles, user: str, key: str, values: str) -> None:
     flow = the_flow(flow_cycles)
     assert flow_cycles.users[flow] == user
-    activate(flow_cycles, flow, indicator)
+    set_windows(flow_cycles, flow, {key: windows(values)})
     flow_cycles.run(flow)
 
 
-@when(quoted('"{user}" attiva gli indicatori "{first}" e "{second}" e parte il ciclo'))
-def activates_two(flow_cycles: FlowCycles, user: str, first: str, second: str) -> None:
+@when(
+    parsers.re(
+        r'^"(?P<user>[^"]+)" imposta (?P<first>\w+_candele \[[^\]]*\]) e (?P<second>\w+_candele \[[^\]]*\]) '
+        r"e parte il ciclo$"
+    )
+)
+def sets_two(flow_cycles: FlowCycles, user: str, first: str, second: str) -> None:
     flow = the_flow(flow_cycles)
     assert flow_cycles.users[flow] == user
-    activate(flow_cycles, flow, first, second)
+    settings: dict[str, tuple[int, ...]] = {}
+    for setting in (first, second):
+        key, values = setting.split(" ", 1)
+        settings[key] = windows(values.strip("[]"))
+    set_windows(flow_cycles, flow, settings)
     flow_cycles.run(flow)
 
 
-@when(quoted("parte il ciclo con N uguale a {count}"))
-def cycle_with_candles(flow_cycles: FlowCycles, count: str) -> None:
+@when(parsers.re(rf"^parte il ciclo con {LIST_SETTING}$"))
+def cycle_with_windows(flow_cycles: FlowCycles, key: str, values: str) -> None:
     flow = the_flow(flow_cycles)
-    # N counts only for the extended indicators: all three are on, so that something is computed on the history.
-    activate(flow_cycles, flow, "fibonacci", "gann", "ciclo", window=int(count))
+    set_windows(flow_cycles, flow, {key: windows(values)})
     flow_cycles.run(flow)
 
 

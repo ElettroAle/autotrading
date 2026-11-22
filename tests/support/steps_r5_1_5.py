@@ -179,9 +179,9 @@ def actual_price_of_today(flow_cycles: FlowCycles) -> None:
     assert daily.actual_price == ACTUAL_PRICE
 
 
-@then("la configurazione è rifiutata con il motivo che elenca gli orizzonti ammessi")
-def refused_listing_horizons(lifecycle: Lifecycle) -> None:
-    assert str(lifecycle.error) == "orizzonti minuti: ogni valore tra 15 e 43200"
+@then(quoted('la configurazione è rifiutata con motivo "{reason}"'))
+def refused_with_reason(lifecycle: Lifecycle, reason: str) -> None:
+    assert str(lifecycle.error) == reason
 
 
 @then(quoted("l'errore medio assoluto a {horizon} è {error} su {count} previsione valutata"))
