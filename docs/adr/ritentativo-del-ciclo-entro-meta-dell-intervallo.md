@@ -29,7 +29,7 @@ successivo parte dopo l'intervallo del flusso.
 - L'istante corrente si legge dalla porta dell'orologio che il ciclo usa già. L'intervallo e l'istante previsto arrivano
   dal ciclo: nessuna nuova configurazione.
 - Il tetto vale per ogni passo e per gli ordini e le protezioni che passano da `TransientRetry`. La chiamata al modello
-  tiene i suoi 2 nuovi tentativi (ADR ritentativo-del-modello-nel-ciclo), perché ognuno costa.
+  tiene i suoi tentativi e le sue attese (ADR ritentativo-del-modello-nel-ciclo), perché ognuno costa.
 - Prova:
   - unit test delle attese;
   - unit test del tetto: un intervallo breve ferma i tentativi prima della metà, uno lungo li fa tutti;
