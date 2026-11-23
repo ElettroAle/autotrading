@@ -1,6 +1,6 @@
 import {
   isComplete,
-  listIntervalOf,
+  useListInterval,
   usePeriod,
   type ListInterval,
 } from '@/components/ui/period-selector/use-period';
@@ -30,10 +30,9 @@ const ChangesInInterval = ({
  */
 export const FlowCapitalChanges = ({ flowId, page }: FlowCapitalChangesProps) => {
   const [period] = usePeriod();
+  const interval = useListInterval(period);
   if (!isComplete(period)) {
     return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
-  return (
-    <ChangesInInterval flowId={flowId} page={page} interval={listIntervalOf(period, new Date())} />
-  );
+  return <ChangesInInterval flowId={flowId} page={page} interval={interval} />;
 };

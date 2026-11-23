@@ -4,7 +4,7 @@ import { Loading } from '@/components/ui/loading';
 import {
   intervalOfInstants,
   isComplete,
-  listIntervalOf,
+  useListInterval,
   usePeriod,
   usePeriodInterval,
   type Period,
@@ -36,7 +36,7 @@ const capitalChangeEvent = (flowId: string, change: CapitalChangeMark): ChartEve
 
 const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) => {
   const equity = useFlowEquity(flowId, period);
-  const interval = listIntervalOf(period, new Date());
+  const interval = useListInterval(period);
   const failed = useFailedCycles(flowId, interval);
   const changes = useCapitalChangeMarks(flowId, interval);
   const { chooseInterval } = usePeriodInterval();

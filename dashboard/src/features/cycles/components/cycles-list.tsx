@@ -6,7 +6,7 @@ import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import {
   isComplete,
-  listIntervalOf,
+  useListInterval,
   usePeriod,
   type ListInterval,
 } from '@/components/ui/period-selector/use-period';
@@ -130,10 +130,9 @@ const CyclesInInterval = ({ flowId, page, interval }: CyclesInIntervalProps) => 
  */
 export const CyclesList = ({ flowId, page }: { flowId: string; page: number }) => {
   const [period] = usePeriod();
+  const interval = useListInterval(period);
   if (!isComplete(period)) {
     return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
-  return (
-    <CyclesInInterval flowId={flowId} page={page} interval={listIntervalOf(period, new Date())} />
-  );
+  return <CyclesInInterval flowId={flowId} page={page} interval={interval} />;
 };

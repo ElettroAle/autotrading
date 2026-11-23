@@ -3,8 +3,9 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import {
-  listIntervalOf,
   PERIODS,
+  useListInterval,
+  type ListInterval,
   type PeriodKind,
 } from '@/components/ui/period-selector/use-period';
 import { useTableFilters, type TableFilter } from '@/hooks/use-table-filters';
@@ -63,17 +64,22 @@ const filtersOf = (accountId: string): TableFilter[] => [
   },
 ];
 
-/** The query of the API from the filters of the address: the period becomes the instants it starts from. */
+/** The period of the filters of the address; one the record does not offer is the default. */
+const periodKindOf = (accountId: string, values: Readonly<Record<string, string>>): PeriodKind => {
+  const chosen = values[periodFilterOf(accountId)];
+  return WIDER_PERIODS.find((wider) => wider === chosen) ?? DEFAULT_PERIOD;
+};
+
+/** The query of the API from the filters of the address and the instants the period starts from. */
 const queryOf = (
   accountId: string,
   values: Readonly<Record<string, string>>,
-  now: Date,
-): UnattributableQuery => {
-  const chosen = values[periodFilterOf(accountId)];
-  const kind = WIDER_PERIODS.find((wider) => wider === chosen) ?? DEFAULT_PERIOD;
-  const interval = listIntervalOf({ kind, from: '', to: '' }, now);
-  return { kind: values[kindFilterOf(accountId)], since: interval.from, until: interval.to };
-};
+  interval: ListInterval,
+): UnattributableQuery => ({
+  kind: values[kindFilterOf(accountId)],
+  since: interval.from,
+  until: interval.to,
+});
 
 // A change of the balance is money of the account; a position or an execution says its size, in the asset.
 const amountOf = (recorded: Unattributable, currency: string): string =>
@@ -93,7 +99,8 @@ const countOf = (total: number): string => (total === 1 ? '1 movimento' : `${tot
 const MovementsContent = ({ account }: { readonly account: Account }) => {
   const filters = filtersOf(account.id);
   const { values } = useTableFilters(filters);
-  const record = useUnattributable(account.id, queryOf(account.id, values, new Date()));
+  const interval = useListInterval({ kind: periodKindOf(account.id, values), from: '', to: '' });
+  const record = useUnattributable(account.id, queryOf(account.id, values, interval));
   if (record.isPending) {
     return <Loading />;
   }

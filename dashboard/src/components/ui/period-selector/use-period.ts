@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { useSearchChange } from '@/hooks/use-search-change';
@@ -139,6 +139,34 @@ export const listIntervalOf = (period: Period, now: Date): ListInterval => {
   }
   const duration = LAST_DURATIONS_MS[period.kind];
   return duration === undefined ? {} : { from: minuteOf(new Date(now.getTime() - duration)) };
+};
+
+const isSamePeriod = (first: Period, second: Period): boolean =>
+  first.kind === second.kind && first.from === second.from && first.to === second.to;
+
+type FixedInterval = { readonly period: Period; readonly interval: ListInterval };
+
+const fixedNow = (period: Period): FixedInterval => ({
+  period,
+  interval: listIntervalOf(period, new Date()),
+});
+
+/**
+ * The interval a list of the API is asked for in the period, counted from the instant the list receives the period: on
+ * opening and at every change of the period it is fixed, so the minutes that pass change neither the key of the query
+ * nor the pages already read, and the rereadings ask the same interval (ADR
+ * intervallo-delle-liste-fissato-alla-scelta-del-periodo). The end of a recent period stays open, so the rereadings
+ * still bring what is new.
+ */
+export const useListInterval = (period: Period): ListInterval => {
+  const [fixed, setFixed] = useState(() => fixedNow(period));
+  if (isSamePeriod(fixed.period, period)) {
+    return fixed.interval;
+  }
+  // Adjusting the state while rendering, as React advises for a value that follows a prop: no render with the old one.
+  const next = fixedNow(period);
+  setFixed(next);
+  return next.interval;
 };
 
 /** The minutes of two instants of a chart, the earlier first, in UTC (ADR periodo-al-minuto). */
