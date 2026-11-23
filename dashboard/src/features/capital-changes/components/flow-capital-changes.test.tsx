@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { aCapitalChange } from '@/testing/mocks/capital-changes';
 import { fakePlatform, type FakeFlow } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
+import { requestedFrom } from '@/testing/requested-from';
 import { renderApp } from '@/testing/test-utils';
 
 const AT = new Date('2026-11-15T09:07:00Z');
@@ -33,6 +34,10 @@ describe('FlowCapitalChanges', () => {
 
   beforeEach(() => {
     flow = fakePlatform.giveFlowTo('anna', 'alfa');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows date and time, reason, amount, capital before and after of each change, from the most recent', async () => {
@@ -107,6 +112,27 @@ describe('FlowCapitalChanges', () => {
       'href',
       '/flows/flow-alfa/capital',
     );
+  });
+
+  // ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: a minute that passes before the next page leaves the
+  // interval of the list as it was when the period was chosen.
+  it('asks the next page in the same interval when a minute passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(AT.getTime() + 60_000) });
+    const minuto = fakePlatform.giveFlowTo('anna', 'minuto');
+    Array.from({ length: 60 }, (_, index) =>
+      changed(minuto, 500, 501 + index, new Date(AT.getTime() - index * HOUR)),
+    );
+    const asked = requestedFrom('*/flows/flow-minuto/capital-changes');
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/flows/flow-minuto/capital?period=7d' });
+    expect(await rowsOf()).toHaveLength(50);
+
+    vi.setSystemTime(Date.now() + 60_000);
+    await user.click(screen.getByRole('link', { name: 'Pagina successiva' }));
+
+    await screen.findByText('Pagina 2');
+    expect(await rowsOf()).toHaveLength(10);
+    expect(new Set(asked)).toEqual(new Set(['2026-11-08T09:08Z']));
   });
 
   it('says the flow has no change of capital', async () => {

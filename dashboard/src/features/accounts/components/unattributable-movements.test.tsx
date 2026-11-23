@@ -11,7 +11,8 @@ import { formatInstant } from '@/utils/format-instant';
 // The record is in the tab Riconciliazione of the page of the account (ADR elenco-dei-conti-e-pagina-del-conto).
 const RECONCILIATION_TAB = '/accounts/account-test-1/reconciliation';
 const ACCOUNT_ID = 'account-test-1';
-const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
 
 const hoursAgo = (hours: number): string => new Date(Date.now() - hours * HOUR_MS).toISOString();
 
@@ -48,8 +49,7 @@ const rowsOf = (shown: HTMLElement): string[] =>
 
 describe('UnattributableMovements', () => {
   beforeEach(() => {
-    // The period of the record starts at the minute of the render: a minute that changes during a test reads another
-    // record, from its first page (Bug 714). The clock stands still, the timers run.
+    // The clock stands still unless a test moves it, the timers run.
     vi.useFakeTimers({ toFake: ['Date'] });
     fakePlatform.giveAccountTo('anna', 'test-1', 1000);
   });
@@ -168,6 +168,26 @@ describe('UnattributableMovements', () => {
     await userEvent.click(within(await movements()).getByRole('button', { name: 'Altri' }));
 
     // The rows already shown answer at once: the last page has arrived only when «Altri» is gone (Bug 628).
+    await waitFor(() => {
+      expect(
+        within(screen.getByRole('region', { name: MOVEMENTS })).queryByRole('button', {
+          name: 'Altri',
+        }),
+      ).toBeNull();
+    });
+    expect(rowsOf(await table())).toHaveLength(51);
+  });
+
+  // ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: the period is counted from when it was chosen, so a
+  // minute that passes before «Altri» adds the next page to those read.
+  it('adds the next page to those read when a minute passes before Altri', async () => {
+    record(...Array.from({ length: 51 }, (_, minute) => change(minute / 60, '1')));
+    await renderApp({ account: 'anna', url: RECONCILIATION_TAB });
+    expect(rowsOf(await table())).toHaveLength(50);
+
+    vi.setSystemTime(Date.now() + MINUTE_MS);
+    await userEvent.click(within(await movements()).getByRole('button', { name: 'Altri' }));
+
     await waitFor(() => {
       expect(
         within(screen.getByRole('region', { name: MOVEMENTS })).queryByRole('button', {
