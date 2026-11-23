@@ -210,7 +210,7 @@ FAILING_STEPS = [step for step in CycleStep if step not in {CycleStep.COLLECT_SO
 def test_a_transient_error_fails_the_cycle_at_its_step(cycles: Cycles, step: CycleStep) -> None:
     flow_id = cycles.id_of("alfa")
     cycles.agent.decisions[flow_id] = ["BTC"]
-    cycles.failures.fail_once(flow_id, step, FakeTransientError("timeout"))
+    cycles.failures.fail_always(flow_id, step, FakeTransientError("timeout"))
 
     record = run(cycles)
 
@@ -257,7 +257,7 @@ def test_a_defect_is_neither_recorded_nor_hidden(cycles: Cycles) -> None:
 
 def test_every_recorded_cycle_is_logged(cycles: Cycles, caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO, logger="autotrading.cycles")
-    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+    cycles.failures.fail_always(cycles.id_of("alfa"), CycleStep.RISK_CHECK, FakeTransientError("timeout"))
 
     run(cycles)
 
@@ -323,7 +323,7 @@ def test_a_completed_cycle_records_the_equity_of_the_state_at_its_end(cycles: Cy
 def test_a_cycle_failed_after_reading_the_state_records_the_equity_of_the_state_read(
     cycles: Cycles, step: CycleStep
 ) -> None:
-    cycles.failures.fail_once(cycles.id_of("alfa"), step, FakeTransientError("timeout"))
+    cycles.failures.fail_always(cycles.id_of("alfa"), step, FakeTransientError("timeout"))
 
     run(cycles)
 
@@ -340,7 +340,7 @@ def test_the_equity_of_a_failed_cycle_follows_its_record(cycles: Cycles) -> None
 
 
 def test_a_cycle_failed_reading_the_state_records_no_equity(cycles: Cycles) -> None:
-    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
+    cycles.failures.fail_always(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
 
     run(cycles)
 

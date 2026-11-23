@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
@@ -33,6 +34,22 @@ class CycleFailure:
     step: CycleStep
     error_type: str
     message: str
+
+
+@dataclass(frozen=True, slots=True)
+class FailedAttempt:
+    """An attempt of a step that failed, the first one being 1, with the original message of its error (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    """
+
+    step: CycleStep
+    attempt: int
+    error_type: str
+    message: str
+
+    @classmethod
+    def of(cls, step: CycleStep, attempt: int, error: AutotradingError) -> FailedAttempt:
+        return cls(step, attempt, type(error).__name__, str(error))
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +100,9 @@ class CycleRecord:
     model_attempts: int | None = None
     decisions: tuple[RecordedDecision, ...] = ()
     trigger: CycleTrigger = CycleTrigger.SCHEDULED
+    # Every attempt of a step that failed before the step went on or the cycle stopped (ADR
+    # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    failed_attempts: tuple[FailedAttempt, ...] = ()
 
     @classmethod
     def skipped(cls, flow_id: UUID, planned_at: datetime) -> CycleRecord:

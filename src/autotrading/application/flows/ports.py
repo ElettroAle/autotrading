@@ -23,7 +23,7 @@ from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrders
 from autotrading.domain.flows.cycle_question import CycleQuestion
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.decision_filter import DecisionFilter
@@ -896,6 +896,9 @@ class ReversedExecutions[E = object]:
 
     executions: tuple[E, ...]
     reversals: object
+    # The attempts of the readings after the closes that failed before one went through (ADR
+    # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    failed_attempts: tuple[FailedAttempt, ...] = ()
 
 
 class PlannedFlowsPort(Protocol):
@@ -1438,6 +1441,14 @@ class FailedModelCall:
     sent: bool = True
 
 
+class CycleWaitPort(Protocol):
+    """Waits before a step of the cycle calls its port again after a temporary error (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    """
+
+    def pause(self, seconds: float) -> None: ...
+
+
 class CycleJournalPort(Protocol):
     """Describes for the record what the steps produced: only the contexts behind the steps know their data."""
 
@@ -1461,6 +1472,12 @@ class CycleJournalPort(Protocol):
 
     def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
         """The decisions of the agent one by asset, as the cycle records them beside its documents (R6.5.4)."""
+        ...
+
+    def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:
+        """The attempts that failed inside the context behind the step before its result came, such as an order sent
+        again after a temporary error (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+        """
         ...
 
 

@@ -9,5 +9,5 @@ def system_clock_adapters() -> SystemClockAdapter:
 
 
 def system_clock_pause_adapters() -> SystemClockPauseAdapter:
-    """The pause of the machine, before the model is asked again in the same cycle."""
+    """The pause of the machine, before the model or the port of a step is called again in the same cycle."""
     return SystemClockPauseAdapter()

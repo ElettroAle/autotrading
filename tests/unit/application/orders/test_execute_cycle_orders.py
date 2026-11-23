@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase, FlowOrderProtection
@@ -24,6 +25,7 @@ from autotrading.domain.orders.protection_note import ProtectionNote
 from autotrading.domain.orders.slippage import Slippage
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
@@ -116,7 +118,12 @@ class Bench:
         protect = ProtectFlowPositionUseCase(exchanges, protection_exchanges, self.protections, self.orders, slippage)
         update = UpdateFlowProtectionUseCase(exchanges, protection_exchanges, self.protections)
         execute = ExecuteFlowOrdersUseCase(
-            access, exchanges, self.orders, slippage, FlowOrderProtection(protect, cancel, update)
+            access,
+            exchanges,
+            self.orders,
+            slippage,
+            FlowOrderProtection(protect, cancel, update),
+            TransientRetry(FakePauseAdapter()),
         )
         protect_open = ProtectOpenPositionsUseCase(access, exchanges, protection_exchanges, self.protections)
         return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)

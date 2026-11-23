@@ -19,6 +19,7 @@ from autotrading.domain.flows.cycle_record import (
     CycleFailure,
     CycleOutcome,
     CycleRecord,
+    FailedAttempt,
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -47,6 +48,13 @@ class _DocumentColumn(TypedDict):
     content: Mapping[str, object]
 
 
+class _FailedAttemptColumn(TypedDict):
+    step: str
+    attempt: int
+    error_type: str
+    message: str
+
+
 class _DecisionRow(TypedDict):
     planned_at: datetime
     asset: str
@@ -72,6 +80,7 @@ class _CycleRow(TypedDict):
     model_called: bool
     model_attempts: int | None
     trigger: str
+    failed_attempts: list[_FailedAttemptColumn] | None
 
 
 class SqlAlchemyCycleRepositoryAdapter:
@@ -306,6 +315,15 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
         "model_called": record.model_called,
         "model_attempts": record.model_attempts,
         "trigger": record.trigger.value,
+        "failed_attempts": [
+            {
+                "step": attempt.step.name.lower(),
+                "attempt": attempt.attempt,
+                "error_type": attempt.error_type,
+                "message": attempt.message,
+            }
+            for attempt in record.failed_attempts
+        ],
     }
 
 
@@ -364,6 +382,10 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
         call_without_usage=row["model_called"] and _cost_of(row) is None,
         model_attempts=row["model_attempts"],
         trigger=CycleTrigger(row["trigger"]),
+        failed_attempts=tuple(
+            FailedAttempt(_step(item["step"]), item["attempt"], item["error_type"], item["message"])
+            for item in row["failed_attempts"] or ()
+        ),
     )
 
 

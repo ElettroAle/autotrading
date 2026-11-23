@@ -317,6 +317,9 @@ cycles = Table(
     Column("model_attempts", Integer),
     # What started the cycle: its schedule or the user (R6.5.2); a row taken before the cycle runs is planned.
     Column("trigger", Text, nullable=False, server_default="scheduled"),
+    # Every attempt of a step that failed; empty in the cycles recorded before the attempts were kept (ADR
+    # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    Column("failed_attempts", JSON),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 

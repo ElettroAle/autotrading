@@ -4,8 +4,9 @@ from uuid import uuid4
 
 import pytest
 
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord, StepDocument
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord, FailedAttempt, StepDocument
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.errors import UnknownCycleOutcomeError
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
@@ -126,3 +127,19 @@ def test_an_absent_source_is_read_with_its_adapter() -> None:
 
 def test_an_absent_source_recorded_before_the_adapters_is_read_by_its_name_alone() -> None:
     assert AbsentSource("notizie", "giù").label == "notizie"
+
+
+class _ExchangeDownError(AutotradingError):
+    status_code = 503
+
+
+def test_a_failed_attempt_keeps_its_step_its_number_and_the_original_error() -> None:
+    attempt = FailedAttempt.of(CycleStep.READ_FLOW_STATE, 2, _ExchangeDownError("exchange non raggiungibile"))
+
+    assert attempt == FailedAttempt(CycleStep.READ_FLOW_STATE, 2, "_ExchangeDownError", "exchange non raggiungibile")
+
+
+def test_a_cycle_without_failed_attempts_records_none() -> None:
+    record = CycleRecord(uuid4(), datetime(2026, 11, 23, 2, 50, tzinfo=UTC), CycleOutcome.COMPLETED)
+
+    assert record.failed_attempts == ()
