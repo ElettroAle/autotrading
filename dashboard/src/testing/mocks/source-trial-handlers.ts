@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 import type { FakeSourceParameter } from './catalogs';
 import { problem, withUser } from './responses';
 import { fakeSourceCredentials } from './source-credentials';
+import { listOutcomeOf, type FakeParameterValue } from './source-parameters';
 import { fakeSourceTrials } from './source-trials';
 
 const UNPROCESSABLE = 'Unprocessable Content';
@@ -20,6 +21,13 @@ const refusalOfParameters = (
     const parameter = declared.find((candidate) => candidate.key === key);
     if (parameter === undefined) {
       return problem(422, UNPROCESSABLE, `parametro sconosciuto della fonte ${source}: ${key}`);
+    }
+    if (parameter.kind === 'list') {
+      const outcome = listOutcomeOf(parameter, value);
+      if ('refusal' in outcome) {
+        return problem(422, UNPROCESSABLE, outcome.refusal, { field: key });
+      }
+      continue;
     }
     if (
       parameter.choices.length > 0 &&
@@ -86,10 +94,16 @@ export const sourceTrialHandlers = [
           source: name,
           adapter: adapterName,
           asset: source.per_asset ? asset : null,
+          // A list reaches the worker as the API accepted it: ordered and without repetitions.
           parameters: Object.fromEntries(
-            Object.entries(parameters).filter(
-              (entry): entry is [string, number] => typeof entry[1] === 'number',
-            ),
+            Object.entries(parameters).flatMap(([key, value]): [string, FakeParameterValue][] => {
+              if (typeof value === 'number') {
+                return [[key, value]];
+              }
+              return Array.isArray(value)
+                ? [[key, [...new Set(value as number[])].sort((one, other) => one - other)]]
+                : [];
+            }),
           ),
         }),
       );

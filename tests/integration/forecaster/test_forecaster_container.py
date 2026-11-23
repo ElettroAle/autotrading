@@ -45,7 +45,13 @@ def test_the_container_forecasts_the_long_horizons_on_daily_candles() -> None:
         {"at": (START + timedelta(days=index)).isoformat(), "price": str(100 + index / 10 + math.sin(index))}
         for index in range(365)
     ]
-    request = {"asset": "BTC", "history_days": 365, "points": points, "horizons_days": [1, 7]}
+    request = {
+        "asset": "BTC",
+        "history_days": 365,
+        "points": points,
+        "horizons_minutes": [1440, 10080],
+        "daily_candles": True,
+    }
 
     response = httpx.post(f"{_url()}/forecast", json=request, timeout=120)
 

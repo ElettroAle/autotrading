@@ -6,16 +6,17 @@ from uuid import uuid4
 
 import pytest
 
-from autotrading.domain.sources.errors import InsufficientHistoryError, InvalidPriceForecastError
+from autotrading.domain.sources.errors import (
+    InsufficientHistoryError,
+    InvalidForecastHorizonError,
+    InvalidPriceForecastError,
+)
 from autotrading.domain.sources.price_forecast import (
-    LONG_HORIZONS,
-    SHORT_HORIZONS,
     ForecastHorizon,
     PriceForecast,
     PriceHistory,
     PricePoint,
     history_of,
-    long_horizons_of,
 )
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -28,41 +29,47 @@ def rising(days: int, spacing: timedelta = timedelta(hours=1), last: str = "100"
     return [PricePoint(NOW - spacing * (count - index), Decimal(last) - (count - index)) for index in range(count + 1)]
 
 
-BASE = PriceForecast(FLOW, "BTC", ForecastHorizon.MINUTES_15, NOW, Decimal(100), Decimal(101), 7, False)
+BASE = PriceForecast(FLOW, "BTC", ForecastHorizon(15), NOW, Decimal(100), Decimal(101), 7, False)
 
 
 def forecast(**changes: Any) -> PriceForecast:
     return replace(BASE, **changes)
 
 
-def test_the_horizons_are_15_minutes_1_hour_1_day_and_1_week() -> None:
-    assert [(horizon.length, horizon.label) for horizon in ForecastHorizon] == [
-        (timedelta(minutes=15), "15 minuti"),
-        (timedelta(hours=1), "1 ora"),
-        (timedelta(days=1), "1 giorno"),
-        (timedelta(weeks=1), "1 settimana"),
-    ]
-
-
-def test_the_short_horizons_are_always_forecast_on_the_finest_candles() -> None:
-    assert [(horizon, horizon.on_daily_candles) for horizon in SHORT_HORIZONS] == [
-        (ForecastHorizon.MINUTES_15, False),
-        (ForecastHorizon.HOUR_1, False),
-    ]
-
-
-def test_the_long_horizons_are_forecast_on_the_daily_candles_in_days() -> None:
-    assert [(horizon.on_daily_candles, horizon.days) for horizon in LONG_HORIZONS] == [(True, 1), (True, 7)]
-
-
 @pytest.mark.parametrize(
-    ("minutes", "horizons"),
-    [(0, ()), (1440, (ForecastHorizon.DAY_1,)), (10080, (ForecastHorizon.WEEK_1,)), (60, ())],
+    ("minutes", "label"),
+    [
+        (15, "15 minuti"),
+        (90, "90 minuti"),
+        (60, "1 ora"),
+        (240, "4 ore"),
+        (1440, "1 giorno"),
+        (2160, "36 ore"),
+        (4320, "3 giorni"),
+        (10080, "1 settimana"),
+        (20160, "2 settimane"),
+        (43200, "30 giorni"),
+    ],
 )
-def test_the_long_horizon_chosen_by_its_minutes_none_for_no_long_horizon(
-    minutes: int, horizons: tuple[ForecastHorizon, ...]
-) -> None:
-    assert long_horizons_of(minutes) == horizons
+def test_a_horizon_is_named_by_its_largest_whole_unit(minutes: int, label: str) -> None:
+    assert ForecastHorizon(minutes).label == label
+
+
+def test_a_horizon_lasts_its_minutes() -> None:
+    assert ForecastHorizon(240).length == timedelta(hours=4)
+
+
+@pytest.mark.parametrize(("minutes", "daily"), [(15, False), (1439, False), (1440, True), (2160, True)])
+def test_a_horizon_of_a_day_or_more_is_forecast_on_the_daily_candles(minutes: int, daily: bool) -> None:
+    assert ForecastHorizon(minutes).on_daily_candles is daily
+
+
+@pytest.mark.parametrize("minutes", [0, -15])
+def test_a_horizon_of_no_minutes_is_a_defect(minutes: int) -> None:
+    with pytest.raises(InvalidForecastHorizonError) as raised:
+        ForecastHorizon(minutes)
+
+    assert (raised.value.minutes, raised.value.status_code) == (minutes, 500)
 
 
 def test_a_history_covering_the_requested_days_is_not_shortened() -> None:
@@ -104,7 +111,7 @@ def test_fewer_than_three_points_are_not_a_history() -> None:
         PriceHistory(tuple(rising(1)[-2:]), 1, NOW)
 
 
-@pytest.mark.parametrize("horizon", list(ForecastHorizon))
+@pytest.mark.parametrize("horizon", [ForecastHorizon(15), ForecastHorizon(60), ForecastHorizon(1440)])
 def test_the_forecast_carries_the_predicted_price_of_its_horizon(horizon: ForecastHorizon) -> None:
     made = PriceForecast.of(FLOW, "BTC", history_of(rising(7), 7, NOW), horizon, Decimal("101.25"))
 
@@ -124,7 +131,7 @@ def test_the_forecast_carries_the_predicted_price_of_its_horizon(horizon: Foreca
 
 
 def test_the_forecast_declares_a_shortened_history() -> None:
-    made = PriceForecast.of(FLOW, "BTC", history_of(rising(3), 30, NOW), ForecastHorizon.HOUR_1, Decimal(101))
+    made = PriceForecast.of(FLOW, "BTC", history_of(rising(3), 30, NOW), ForecastHorizon(60), Decimal(101))
 
     assert (made.history_days, made.shortened) == (3, True)
 
@@ -132,7 +139,7 @@ def test_the_forecast_declares_a_shortened_history() -> None:
 def test_the_predicted_price_keeps_two_more_decimals_than_the_last_price() -> None:
     history = history_of(rising(7, last="100.5"), 7, NOW)
 
-    made = PriceForecast.of(FLOW, "BTC", history, ForecastHorizon.MINUTES_15, Decimal("100.123456"))
+    made = PriceForecast.of(FLOW, "BTC", history, ForecastHorizon(15), Decimal("100.123456"))
 
     assert made.predicted_price == Decimal("100.123")
 
@@ -146,7 +153,7 @@ def test_a_falling_forecast_has_a_negative_change() -> None:
 
 
 def test_the_forecast_expires_after_its_horizon() -> None:
-    assert forecast(horizon=ForecastHorizon.HOUR_1).expires_at == NOW + timedelta(hours=1)
+    assert forecast(horizon=ForecastHorizon(60)).expires_at == NOW + timedelta(hours=1)
 
 
 def test_the_actual_price_is_recorded_next_to_the_forecast() -> None:
@@ -170,7 +177,7 @@ def test_a_last_price_that_is_not_a_number_cannot_be_forecast() -> None:
     history = PriceHistory((*rising(1)[:-1], PricePoint(NOW, Decimal("Infinity"))), 1, NOW)
 
     with pytest.raises(InvalidPriceForecastError):
-        PriceForecast.of(FLOW, "BTC", history, ForecastHorizon.MINUTES_15, Decimal(101))
+        PriceForecast.of(FLOW, "BTC", history, ForecastHorizon(15), Decimal(101))
 
 
 def test_a_daily_history_shorter_than_requested_declares_the_days_it_covers() -> None:
@@ -180,4 +187,4 @@ def test_a_daily_history_shorter_than_requested_declares_the_days_it_covers() ->
 
 
 def test_a_long_forecast_expires_after_its_days() -> None:
-    assert forecast(horizon=ForecastHorizon.WEEK_1).expires_at == NOW + timedelta(days=7)
+    assert forecast(horizon=ForecastHorizon(10080)).expires_at == NOW + timedelta(days=7)

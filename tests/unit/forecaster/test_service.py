@@ -47,17 +47,18 @@ def test_the_forecast_has_the_predicted_price_and_its_interval_for_every_horizon
     }
 
 
-def daily_request(horizons_days: list[int]) -> dict[str, object]:
+def daily_request(horizons_minutes: list[int]) -> dict[str, object]:
     return {
         "asset": "BTC",
         "history_days": 365,
         # Daily closes ending at the last point of the finest candles of request(): only the key tells them apart.
         "points": [{"at": (LAST - timedelta(days=age)).isoformat(), "price": "100"} for age in (2, 1, 0)],
-        "horizons_days": horizons_days,
+        "horizons_minutes": horizons_minutes,
+        "daily_candles": True,
     }
 
 
-def test_the_long_horizons_are_asked_in_days_on_daily_candles_and_answered_in_minutes() -> None:
+def test_the_horizons_of_the_daily_candles_are_forecast_from_their_last_day() -> None:
     asked: list[datetime] = []
 
     def predict_at(_model: TrainedModel, at: datetime) -> Forecast:
@@ -65,11 +66,11 @@ def test_the_long_horizons_are_asked_in_days_on_daily_candles_and_answered_in_mi
         return predict(_model, at)
 
     response = client(ForecastModels(timedelta(minutes=15), fit, predict_at)).post(
-        "/forecast", json=daily_request([1, 7])
+        "/forecast", json=daily_request([1440, 2160])
     )
 
-    assert [entry["horizon_minutes"] for entry in response.json()["forecasts"]] == [1440, 10080]
-    assert asked == [LAST + timedelta(days=1), LAST + timedelta(days=7)]
+    assert [entry["horizon_minutes"] for entry in response.json()["forecasts"]] == [1440, 2160]
+    assert asked == [LAST + timedelta(days=1), LAST + timedelta(hours=36)]
 
 
 def test_the_daily_model_of_an_asset_is_apart_from_the_one_of_the_finest_candles() -> None:
@@ -80,18 +81,15 @@ def test_the_daily_model_of_an_asset_is_apart_from_the_one_of_the_finest_candles
         return fit(points, warm_start)
 
     service = client(ForecastModels(timedelta(minutes=15), fit_counting, predict))
-    daily = daily_request([1]) | {"history_days": 7}
+    daily = daily_request([1440]) | {"history_days": 7}
     service.post("/forecast", json=request())
     service.post("/forecast", json=daily)
 
     assert len(trained) == 2
 
 
-@pytest.mark.parametrize(
-    "horizons",
-    [{"horizons_minutes": [], "horizons_days": []}, {"horizons_minutes": [15], "horizons_days": [1]}, {}],
-)
-def test_a_request_without_horizons_or_with_both_kinds_is_refused(horizons: dict[str, list[int]]) -> None:
+@pytest.mark.parametrize("horizons", [{"horizons_minutes": []}, {}])
+def test_a_request_without_horizons_is_refused(horizons: dict[str, list[int]]) -> None:
     body = {key: value for key, value in request().items() if key != "horizons_minutes"} | horizons
 
     assert client().post("/forecast", json=body).status_code == 422

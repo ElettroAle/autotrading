@@ -69,7 +69,7 @@ def test_a_saved_flow_reads_back_with_its_whole_configuration(database: Engine) 
     configuration = replace(
         a_configuration(assets=("BTC", "ETH"), allocated_capital=Decimal("400.50")),
         model=ModelSelection("openrouter/deepseek-chat", {"temperature": Decimal("0.70"), "reasoning_effort": "alto"}),
-        sources=(a_source("notizie", 7, {"hours": 6}), a_source("indicatori")),
+        sources=(a_source("notizie", 7, {"hours": 6}), a_source("indicatori", parameters={"tendenza_giorni": (7, 30)})),
         instructions="prudente",
         risk_limits=RiskLimits(3, None, Decimal("12.5")),
     )

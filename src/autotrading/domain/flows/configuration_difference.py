@@ -10,7 +10,7 @@ from autotrading.domain.flows.risk_limits import (
     TOTAL_VALUE_EXPOSURE,
     VALUE_EXPOSURE,
 )
-from autotrading.domain.flows.selections import ActiveSource, SourceSelection
+from autotrading.domain.flows.selections import ActiveSource, AdapterParameterValue, SourceSelection
 from autotrading.domain.italian_text import money_text, number_text
 
 NONE = "nessuno"
@@ -44,10 +44,17 @@ def _source(source: SourceSelection) -> str:
     """Every adapter of the source with its weight and its parameters (R4.1.1)."""
     return "; ".join(
         f"{ActiveSource(source.name, adapter.name).label} (peso {adapter.weight}"
-        + "".join(f", {key} {adapter.parameters[key]}" for key in sorted(adapter.parameters))
+        + "".join(f", {key} {_parameter(adapter.parameters[key])}" for key in sorted(adapter.parameters))
         + ")"
         for adapter in source.adapters
     )
+
+
+def _parameter(value: AdapterParameterValue) -> str:
+    """A list as the user writes it: [7, 30, 90]."""
+    if isinstance(value, tuple):
+        return f"[{', '.join(str(each) for each in value)}]"
+    return str(value)
 
 
 def _money(amount: Decimal | None) -> str:

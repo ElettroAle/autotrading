@@ -6,7 +6,7 @@ from autotrading.domain.sources.errors import (
     SourceParameterOutOfRangeError,
     SourceParameterRefusedError,
 )
-from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter
+from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter, number_of
 
 
 def news_count() -> SourceParameter:
@@ -116,3 +116,25 @@ def test_both_refusals_are_refusals_of_a_parameter() -> None:
 
 def test_an_accepted_value_is_returned_as_it_is() -> None:
     assert (long_horizon().accepted(1440), news_count().accepted(10)) == (1440, 10)
+
+
+def test_the_number_in_the_settings_is_the_one_the_flow_set() -> None:
+    assert news_count().value_in({"numero_notizie": 5}) == 5
+
+
+def test_the_number_in_the_settings_is_the_default_when_the_flow_set_none() -> None:
+    assert news_count().value_in({}) == 10
+
+
+def test_a_list_where_a_number_is_due_is_refused() -> None:
+    with pytest.raises(SourceParameterOutOfRangeError):
+        news_count().value_in({"numero_notizie": (5,)})
+
+
+def test_a_whole_number_setting_is_read_as_it_is() -> None:
+    assert number_of({"numero_notizie": 12}, "numero_notizie") == 12
+
+
+def test_a_list_where_a_whole_number_is_expected_is_a_defect_of_the_source() -> None:
+    with pytest.raises(InvalidSourceParameterError):
+        number_of({"numero_notizie": (12,)}, "numero_notizie")

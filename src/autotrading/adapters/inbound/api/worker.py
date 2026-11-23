@@ -17,6 +17,7 @@ from autotrading.adapters.inbound.api.account_state import AccountStateResponse
 from autotrading.adapters.inbound.api.cycles import CycleDetailResponse
 from autotrading.adapters.inbound.api.errors import install_error_responses
 from autotrading.adapters.inbound.api.order_outcome import OrderOutcomeResponse
+from autotrading.adapters.inbound.api.source_parameters import parameters_of
 from autotrading.adapters.inbound.api.source_trials import SourceTrialRequest, SourceTrialResponse
 from autotrading.adapters.inbound.api.verification_run import VerificationRunResponse
 from autotrading.adapters.inbound.api.worker_model_catalog import WorkerModelCatalogResponse
@@ -358,7 +359,7 @@ def create_worker_api(
     ) -> SourceTrialResponse:
         """An adapter of a source read now with the credentials of the tenant, which only the worker opens (ADR
         prova-di-un-adapter-di-fonte-nel-worker): a source that fails is the outcome, a refusal is a Problem Details."""
-        command = TrySourceAdapterCommand(source, adapter, request.asset, request.parameters)
+        command = TrySourceAdapterCommand(source, adapter, request.asset, parameters_of(request.parameters))
         return SourceTrialResponse.of(for_tenant(TenantId(tenant_id)).try_source_adapter.execute(command))
 
     @api.post("/tenants/{tenant_id}/notifications", dependencies=[Depends(require_api)])

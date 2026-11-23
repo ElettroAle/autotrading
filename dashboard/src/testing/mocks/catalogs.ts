@@ -18,12 +18,49 @@ export type FakeModel = {
 export type FakeSourceParameter = {
   readonly key: string;
   readonly label: string;
-  readonly default: number;
+  // A whole number, or a list of them each in the range (ADR parametri-delle-fonti-come-liste-libere).
+  readonly kind: 'number' | 'list';
+  readonly default: number | readonly number[];
   readonly minimum: number;
   readonly maximum: number;
   // Empty for a parameter that admits its whole range (ADR orizzonti-lunghi-del-forecast).
   readonly choices: readonly { readonly value: number; readonly label: string }[];
+  // How many values a list admits; none for a whole number.
+  readonly maximum_values: number | null;
 };
+
+/** A whole number parameter of a source, as the API declares it. */
+export const numberParameter = (
+  key: string,
+  label: string,
+  [defaultValue, minimum, maximum]: readonly [number, number, number],
+): FakeSourceParameter => ({
+  key,
+  label,
+  kind: 'number',
+  default: defaultValue,
+  minimum,
+  maximum,
+  choices: [],
+  maximum_values: null,
+});
+
+/** A list parameter of a source, as the API declares it, with at most 8 values. */
+export const listParameter = (
+  key: string,
+  label: string,
+  defaultValues: readonly number[],
+  [minimum, maximum]: readonly [number, number],
+): FakeSourceParameter => ({
+  key,
+  label,
+  kind: 'list',
+  default: defaultValues,
+  minimum,
+  maximum,
+  choices: [],
+  maximum_values: 8,
+});
 
 /** An adapter of a source as it declares itself; no configuration field means none needed (R4.1.1). */
 export type FakeSourceAdapter = {
@@ -59,42 +96,16 @@ const adapterOf = (
   offers_history: offersHistory,
 });
 
-const SERIES_LENGTH: FakeSourceParameter = {
-  key: 'lunghezza_serie',
-  label: 'lunghezza serie',
-  default: 10,
-  minimum: 1,
-  maximum: 50,
-  choices: [],
-};
-const NEWS_COUNT: FakeSourceParameter = {
-  key: 'numero_notizie',
-  label: 'numero notizie',
-  default: 10,
-  minimum: 1,
-  maximum: 50,
-  choices: [],
-};
-const HISTORY_DAYS: FakeSourceParameter = {
-  key: 'profondita_storico_giorni',
-  label: 'profondità storico giorni',
-  default: 7,
-  minimum: 1,
-  maximum: 90,
-  choices: [],
-};
-const LONG_HORIZON: FakeSourceParameter = {
-  key: 'orizzonte_lungo',
-  label: 'orizzonte lungo',
-  default: 0,
-  minimum: 0,
-  maximum: 10080,
-  choices: [
-    { value: 0, label: 'nessuno' },
-    { value: 1440, label: '1 giorno' },
-    { value: 10080, label: '1 settimana' },
-  ],
-};
+const SERIES_LENGTH = numberParameter('lunghezza_serie', 'lunghezza serie', [10, 1, 50]);
+const AVERAGE_PERIODS = listParameter('medie_periodi', 'medie periodi', [20, 50], [2, 10000]);
+const TREND_DAYS = listParameter('tendenza_giorni', 'tendenza giorni', [], [1, 3650]);
+const NEWS_COUNT = numberParameter('numero_notizie', 'numero notizie', [10, 1, 50]);
+const HISTORY_DAYS = numberParameter(
+  'profondita_storico_giorni',
+  'profondità storico giorni',
+  [7, 1, 90],
+);
+const HORIZONS = listParameter('orizzonti_minuti', 'orizzonti minuti', [15, 60], [15, 43200]);
 
 /** The assets the exchange of the fake installation trades now, as the API lists them: by name (ADR 0147). */
 export const FAKE_TRADABLE_ASSETS: readonly string[] = ['BTC', 'ETH', 'SOL'];
@@ -156,22 +167,26 @@ export const FAKE_SOURCES: FakeSource[] = [
     name: 'indicatori',
     description: 'Prezzo e indicatori tecnici su due timeframe.',
     per_asset: true,
-    parameters: [SERIES_LENGTH],
+    parameters: [SERIES_LENGTH, AVERAGE_PERIODS, TREND_DAYS],
     adapters: [
-      adapterOf('Hyperliquid', 'Dati di mercato pubblici di Hyperliquid.', [SERIES_LENGTH], true),
+      adapterOf(
+        'Hyperliquid',
+        'Dati di mercato pubblici di Hyperliquid.',
+        [SERIES_LENGTH, AVERAGE_PERIODS, TREND_DAYS],
+        true,
+      ),
     ],
   },
   {
     name: 'forecast',
-    description:
-      'Previsione del prezzo a 15 minuti e a 1 ora e, a scelta, a 1 giorno o a 1 settimana.',
+    description: 'Previsione del prezzo agli orizzonti in minuti scelti dal flusso.',
     per_asset: true,
-    parameters: [HISTORY_DAYS, LONG_HORIZON],
+    parameters: [HISTORY_DAYS, HORIZONS],
     adapters: [
       adapterOf(
         'Prophet',
         'Previsione di Prophet dal servizio forecaster.',
-        [HISTORY_DAYS, LONG_HORIZON],
+        [HISTORY_DAYS, HORIZONS],
         true,
       ),
     ],

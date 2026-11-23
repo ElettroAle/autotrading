@@ -32,6 +32,7 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import (
+    AdapterParameterValue,
     AdapterSelection,
     ModelParameterValue,
     ModelSelection,
@@ -54,7 +55,8 @@ class _ModelDocument(TypedDict):
 class _AdapterDocument(TypedDict):
     name: str
     weight: int
-    parameters: dict[str, int]
+    # A list parameter is a JSON array (ADR parametri-delle-fonti-come-liste-libere).
+    parameters: dict[str, int | list[int]]
 
 
 class _SourceDocument(TypedDict):
@@ -326,7 +328,11 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             {
                 "name": source.name,
                 "adapters": [
-                    {"name": adapter.name, "weight": adapter.weight, "parameters": dict(adapter.parameters)}
+                    {
+                        "name": adapter.name,
+                        "weight": adapter.weight,
+                        "parameters": _adapter_parameters_document(adapter.parameters),
+                    }
                     for adapter in source.adapters
                 ],
             }
@@ -369,7 +375,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
             SourceSelection(
                 source["name"],
                 tuple(
-                    AdapterSelection(adapter["name"], adapter["weight"], dict(adapter["parameters"]))
+                    AdapterSelection(adapter["name"], adapter["weight"], _adapter_parameters_of(adapter["parameters"]))
                     for adapter in source["adapters"]
                 ),
             )
@@ -421,6 +427,14 @@ def _texts(parameters: Mapping[str, ModelParameterValue]) -> dict[str, dict[str,
 
 def _parameter(value: Mapping[str, str]) -> ModelParameterValue:
     return Decimal(value["number"]) if "number" in value else value["choice"]
+
+
+def _adapter_parameters_document(parameters: Mapping[str, AdapterParameterValue]) -> dict[str, int | list[int]]:
+    return {key: list(value) if isinstance(value, tuple) else value for key, value in parameters.items()}
+
+
+def _adapter_parameters_of(document: Mapping[str, int | list[int]]) -> dict[str, AdapterParameterValue]:
+    return {key: tuple(value) if isinstance(value, list) else value for key, value in document.items()}
 
 
 def _text(value: Decimal | None) -> str | None:

@@ -3,7 +3,8 @@ export type ParameterChoice = { readonly value: number; readonly label: string }
 
 /** A parameter of the catalog as far as its choices go: none means it admits its whole range. */
 export type ChoosableParameter = {
-  readonly default: number;
+  // A list parameter has no choices (ADR parametri-delle-fonti-come-liste-libere).
+  readonly default: number | readonly number[];
   readonly choices: readonly ParameterChoice[];
 };
 

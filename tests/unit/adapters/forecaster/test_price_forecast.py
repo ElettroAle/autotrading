@@ -12,7 +12,7 @@ from autotrading.domain.sources.source_adapter_declaration import SourceAdapterD
 
 NOW = datetime(2026, 11, 13, 10, 0, tzinfo=UTC)
 HISTORY = history_of([PricePoint(NOW - timedelta(minutes=3 * age), Decimal(100 + age)) for age in (2, 1, 0)], 7, NOW)
-HORIZONS = (ForecastHorizon.MINUTES_15, ForecastHorizon.HOUR_1)
+HORIZONS = (ForecastHorizon(15), ForecastHorizon(60))
 ANSWER = {
     "forecasts": [
         {"horizon_minutes": 15, "predicted_price": "100.25", "lower_price": "99", "upper_price": "101"},
@@ -51,7 +51,7 @@ def test_the_history_is_sent_and_the_predicted_price_of_every_horizon_returned()
 
     predicted = adapter(answering(ANSWER, requests=requests)).predict("BTC", HISTORY, HORIZONS)
 
-    assert predicted == {ForecastHorizon.MINUTES_15: Decimal("100.25"), ForecastHorizon.HOUR_1: Decimal("101.5")}
+    assert predicted == {ForecastHorizon(15): Decimal("100.25"), ForecastHorizon(60): Decimal("101.5")}
     assert requests[0].url.path == "/forecast"
     assert json.loads(requests[0].content) == {
         "asset": "BTC",
@@ -62,21 +62,22 @@ def test_the_history_is_sent_and_the_predicted_price_of_every_horizon_returned()
             {"at": "2026-11-13T10:00:00+00:00", "price": "100"},
         ],
         "horizons_minutes": [15, 60],
+        "daily_candles": False,
     }
 
 
-def test_the_long_horizons_are_asked_in_days_with_the_daily_history() -> None:
+def test_the_horizons_of_a_day_or_more_are_asked_in_minutes_with_the_daily_history() -> None:
     requests: list[httpx.Request] = []
     daily = history_of([PricePoint(NOW - timedelta(days=age), Decimal(100 + age)) for age in (2, 1, 0)], 365, NOW)
     answer = {
         "forecasts": [{"horizon_minutes": 10080, "predicted_price": "107", "lower_price": "90", "upper_price": "120"}]
     }
 
-    predicted = adapter(answering(answer, requests=requests)).predict("BTC", daily, (ForecastHorizon.WEEK_1,))
+    predicted = adapter(answering(answer, requests=requests)).predict("BTC", daily, (ForecastHorizon(10080),))
 
-    assert predicted == {ForecastHorizon.WEEK_1: Decimal(107)}
+    assert predicted == {ForecastHorizon(10080): Decimal(107)}
     sent = json.loads(requests[0].content)
-    assert (sent["history_days"], sent["horizons_days"], "horizons_minutes" in sent) == (365, [7], False)
+    assert (sent["history_days"], sent["horizons_minutes"], sent["daily_candles"]) == (365, [10080], True)
 
 
 @pytest.mark.parametrize(

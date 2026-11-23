@@ -7,6 +7,7 @@ from autotrading.application.flows.ports import AdapterRequest
 from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.domain.flows.selections import DEFAULT_WEIGHT, AdapterSelection, SourceSelection
 from autotrading.domain.sources.source_catalog import SourceCatalog
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from tests.fakes.market_data import FakeMarketDataAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
@@ -41,7 +42,7 @@ def reader_of(name: str) -> tuple[str, str]:
 def a_source(
     name: str,
     weight: int = DEFAULT_WEIGHT,
-    parameters: Mapping[str, int] | None = None,
+    parameters: Mapping[str, SourceParameterValue] | None = None,
     adapter: str | None = None,
 ) -> SourceSelection:
     """A source of the flow with one adapter, its weight and its parameters."""
@@ -74,7 +75,10 @@ PLATFORM_CATALOG: SourceCatalog = platform_sources().execute()
 
 
 def a_source_request(
-    name: str, weight: int | None = None, parameters: Mapping[str, int] | None = None, adapter: str | None = None
+    name: str,
+    weight: int | None = None,
+    parameters: Mapping[str, SourceParameterValue] | None = None,
+    adapter: str | None = None,
 ) -> SourceRequest:
     """A source the user asks for with one adapter; a name before the adapters asks for the adapter it became."""
     source, chosen = reader_of(name) if adapter is None else (name, adapter)

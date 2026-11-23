@@ -7,7 +7,7 @@ import { Loading } from '@/components/ui/loading';
 import { Pagination } from '@/components/ui/pagination';
 import {
   isComplete,
-  listIntervalOf,
+  useListInterval,
   usePeriod,
   type ListInterval,
 } from '@/components/ui/period-selector/use-period';
@@ -160,14 +160,9 @@ const PositionsInInterval = ({ flowId, page, interval }: PositionsInIntervalProp
 /** The closed positions of the flow in the period of the page (R6.4.3), as the filters of the address narrow them. */
 export const ClosedPositions = ({ flowId, page }: { flowId: string; page: number }) => {
   const [period] = usePeriod();
+  const interval = useListInterval(period);
   if (!isComplete(period)) {
     return <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>;
   }
-  return (
-    <PositionsInInterval
-      flowId={flowId}
-      page={page}
-      interval={listIntervalOf(period, new Date())}
-    />
-  );
+  return <PositionsInInterval flowId={flowId} page={page} interval={interval} />;
 };

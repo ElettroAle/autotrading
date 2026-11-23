@@ -1,4 +1,9 @@
-import { FAKE_SOURCES, type FakeSource, type FakeSourceAdapter } from './catalogs';
+import {
+  FAKE_SOURCES,
+  type FakeSource,
+  type FakeSourceAdapter,
+  type FakeSourceParameter,
+} from './catalogs';
 import { keyExpiryResponse, type FakeKeyExpiry } from './key-expiry';
 
 /** A field an adapter of a source declares for its configuration (R4.1.1). */
@@ -22,10 +27,13 @@ export type FakeSourceCredentials = {
 };
 
 type PaidAdapter = { readonly source: string; readonly adapter: FakeSourceAdapter };
+type DeclaredParameter = { readonly source: string; readonly parameter: FakeSourceParameter };
 
 const state = {
   // The adapters a scenario adds to the catalog: none by default, so the catalog of R4.1.1 stays as it is.
   paid: [] as PaidAdapter[],
+  // The parameters a scenario adds to a source, valid for every adapter of it: none by default.
+  declared: [] as DeclaredParameter[],
   credentials: new Map<string, FakeSourceCredentials[]>(),
 };
 
@@ -46,6 +54,7 @@ export const notConfiguredReason = (adapter: string): string =>
 export const fakeSourceCredentials = {
   reset(): void {
     state.paid = [];
+    state.declared = [];
     state.credentials.clear();
   },
 
@@ -67,15 +76,29 @@ export const fakeSourceCredentials = {
     });
   },
 
+  /**
+   * A parameter the source declares for every adapter of it: API, check and dashboard derive it from the declaration
+   * alone (ADR parametri-delle-fonti-come-liste-libere).
+   */
+  declareParameter(source: string, parameter: FakeSourceParameter): void {
+    state.declared.push({ source, parameter });
+  },
+
   /** Every source with its adapters, those of the platform and the paid ones a scenario added. */
   sources(): FakeSource[] {
-    return FAKE_SOURCES.map((source) => ({
-      ...source,
-      adapters: [
-        ...source.adapters,
-        ...state.paid.filter((paid) => paid.source === source.name).map((paid) => paid.adapter),
-      ],
-    }));
+    return FAKE_SOURCES.map((source) => {
+      const declared = state.declared
+        .filter((each) => each.source === source.name)
+        .map((each) => each.parameter);
+      return {
+        ...source,
+        parameters: [...source.parameters, ...declared],
+        adapters: [
+          ...source.adapters,
+          ...state.paid.filter((paid) => paid.source === source.name).map((paid) => paid.adapter),
+        ].map((adapter) => ({ ...adapter, parameters: [...adapter.parameters, ...declared] })),
+      };
+    });
   },
 
   /** The adapters that need configuration, by name, each with the sources it offers. */

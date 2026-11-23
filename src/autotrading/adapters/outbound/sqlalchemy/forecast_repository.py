@@ -12,7 +12,6 @@ from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.sources.price_forecast import ForecastHorizon, PriceForecast
 from autotrading.domain.tenancy.tenant_id import TenantId
 
-HORIZONS = {horizon.minutes: horizon for horizon in ForecastHorizon}
 EXPIRES_AT = forecasts.c.made_at + forecasts.c.horizon_minutes * literal(timedelta(minutes=1))
 
 
@@ -89,7 +88,7 @@ def _forecast_of(row: RowMapping) -> PriceForecast:
     return PriceForecast(
         flow_id=row["flow_id"],
         asset=row["asset"],
-        horizon=HORIZONS[row["horizon_minutes"]],
+        horizon=ForecastHorizon(row["horizon_minutes"]),
         made_at=row["made_at"],
         last_price=Decimal(row["last_price"]),
         predicted_price=Decimal(row["predicted_price"]),

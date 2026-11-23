@@ -20,7 +20,7 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
-from autotrading.domain.flows.selections import ModelSelection
+from autotrading.domain.flows.selections import AdapterSelection, ModelSelection, SourceSelection
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 from tests.support.source_selections import a_source
@@ -199,4 +199,22 @@ def test_several_sources_and_no_parameter_are_written_in_full() -> None:
     )
     assert differences(before, replace(before, model=ModelSelection("openrouter/deepseek-chat", {"t": "alto"}))) == (
         ConfigurationDifference("parametri del modello", "nessuno", "t alto"),
+    )
+
+
+def test_a_list_parameter_of_a_source_is_written_as_a_list() -> None:
+    before = replace(a_configuration(), model=ModelSelection("openrouter/deepseek-chat"))
+    after = replace(
+        before,
+        sources=(
+            SourceSelection(
+                "indicatori", (AdapterSelection("Hyperliquid", 5, {"lunghezza_serie": 10, "tendenza_giorni": (7, 30)}),)
+            ),
+        ),
+    )
+
+    assert differences(before, after) == (
+        ConfigurationDifference(
+            "fonti", "nessuno", "indicatori · Hyperliquid (peso 5, lunghezza_serie 10, tendenza_giorni [7, 30])"
+        ),
     )

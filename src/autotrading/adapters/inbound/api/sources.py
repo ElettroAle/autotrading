@@ -1,16 +1,17 @@
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
+from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_of
 from autotrading.adapters.inbound.api.source_trials import SourceTrialRequest, SourceTrialResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.sources.get_source import GetSourceCommand
 from autotrading.application.sources.request_source_trial import RequestSourceTrialCommand
 from autotrading.application.sources.source_offer import SourceOffer
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_list_parameter import DeclaredParameter, SourceListParameter
 
 
 class SourceParameterChoiceResponse(BaseModel):
@@ -21,24 +22,42 @@ class SourceParameterChoiceResponse(BaseModel):
 class SourceParameterResponse(BaseModel):
     key: str
     label: str
-    default: int
+    # A whole number, or a list of them, each in the range: the dashboard builds the field from this alone (ADR
+    # parametri-delle-fonti-come-liste-libere).
+    kind: Literal["number", "list"]
+    default: ParameterBody
     minimum: int
     maximum: int
     # Empty for a parameter that admits its whole range, otherwise only these values (ADR
     # orizzonti-lunghi-del-forecast).
     choices: list[SourceParameterChoiceResponse]
+    # How many values a list admits; none for a whole number.
+    maximum_values: int | None
 
     @classmethod
-    def of(cls, parameter: SourceParameter) -> SourceParameterResponse:
+    def of(cls, parameter: DeclaredParameter) -> SourceParameterResponse:
+        if isinstance(parameter, SourceListParameter):
+            return cls(
+                key=parameter.key,
+                label=parameter.label,
+                kind="list",
+                default=list(parameter.default),
+                minimum=parameter.minimum,
+                maximum=parameter.maximum,
+                choices=[],
+                maximum_values=parameter.maximum_values,
+            )
         return cls(
             key=parameter.key,
             label=parameter.label,
+            kind="number",
             default=parameter.default,
             minimum=parameter.minimum,
             maximum=parameter.maximum,
             choices=[
                 SourceParameterChoiceResponse(value=choice.value, label=choice.label) for choice in parameter.choices
             ],
+            maximum_values=None,
         )
 
 
@@ -127,7 +146,7 @@ def sources_router(use_cases_of_request: Callable[..., TenantUseCases]) -> APIRo
         use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
     ) -> SourceTrialResponse:
         """Reads the adapter now as a cycle does and records nothing: a source that fails is the outcome (R6.3.1)."""
-        command = RequestSourceTrialCommand(name, adapter, request.asset, request.parameters)
+        command = RequestSourceTrialCommand(name, adapter, request.asset, parameters_of(request.parameters))
         return SourceTrialResponse.of(use_cases.request_source_trial.execute(command))
 
     return router

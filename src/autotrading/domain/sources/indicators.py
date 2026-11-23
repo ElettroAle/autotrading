@@ -1,18 +1,28 @@
 from autotrading.domain.sources.extended_indicators import EXTENDED_PARAMETERS
-from autotrading.domain.sources.long_trend import LONG_TREND
+from autotrading.domain.sources.indicator_series import (
+    AVERAGE_PERIODS,
+    RELATIVE_VOLUME_CANDLES,
+    RSI_PERIODS,
+    SERIES_LENGTH,
+)
+from autotrading.domain.sources.long_trend import CHANNEL_DAYS, TREND_DAYS
 from autotrading.domain.sources.source_definition import SourceDefinition
-from autotrading.domain.sources.source_parameter import SourceParameter
 
 INDICATORS = SourceDefinition(
     name="indicatori",
     description=(
-        "Prezzo, mid price, open interest, funding rate e indicatori tecnici su due timeframe; a scelta livelli di "
-        "Fibonacci, angoli di Gann, ciclo dominante e tendenza su più giorni dalle candele giornaliere."
+        "Prezzo, mid price, open interest, funding rate e indicatori tecnici su due timeframe, con i periodi delle "
+        "medie e dell'RSI scelti; a scelta volume relativo, livelli di Fibonacci, angoli di Gann, ciclo dominante e "
+        "tendenza su più giorni dalle candele giornaliere."
     ),
     per_asset=True,
     parameters=(
-        SourceParameter("lunghezza_serie", "lunghezza serie", default=10, minimum=1, maximum=50),
+        SERIES_LENGTH,
+        AVERAGE_PERIODS,
+        RSI_PERIODS,
+        RELATIVE_VOLUME_CANDLES,
         *EXTENDED_PARAMETERS,
-        LONG_TREND,
+        TREND_DAYS,
+        CHANNEL_DAYS,
     ),
 )

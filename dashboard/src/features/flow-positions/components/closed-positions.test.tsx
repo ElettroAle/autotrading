@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { aClosedPosition } from '@/testing/mocks/positions';
 import { server } from '@/testing/mocks/server';
+import { requestedFrom } from '@/testing/requested-from';
 import { renderApp } from '@/testing/test-utils';
 
 const URL = '/flows/flow-alfa/closed-positions';
@@ -24,6 +25,10 @@ const rowsOf = async () => {
 describe('ClosedPositions', () => {
   beforeEach(() => {
     fakePlatform.giveFlowTo('anna', 'alfa');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows the direction with its icon (R6.5.3)', async () => {
@@ -132,6 +137,25 @@ describe('ClosedPositions', () => {
     await screen.findByText('Pagina 2');
     expect(await rowsOf()).toHaveLength(10);
     expect(screen.getByRole('link', { name: 'Pagina precedente' })).toHaveAttribute('href', URL);
+  });
+
+  // ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: a minute that passes before the next page leaves the
+  // interval of the list as it was when the period was chosen.
+  it('asks the next page in the same interval when a minute passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(LAST.getTime() + 60_000) });
+    fakePlatform.giveFlowTo('anna', 'minuto');
+    fakePlatform.recordClosedPositions('minuto', closedBack(60));
+    const asked = requestedFrom('*/flows/flow-minuto/closed-positions');
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/flows/flow-minuto/closed-positions?period=7d' });
+    expect(await rowsOf()).toHaveLength(50);
+
+    vi.setSystemTime(Date.now() + 60_000);
+    await user.click(screen.getByRole('link', { name: 'Pagina successiva' }));
+
+    await screen.findByText('Pagina 2');
+    expect(await rowsOf()).toHaveLength(10);
+    expect(new Set(asked)).toEqual(new Set(['2026-11-07T09:08Z']));
   });
 
   it('says the flow has no closed position', async () => {

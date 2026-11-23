@@ -1,9 +1,11 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { aCapitalChange, aTransfer } from '@/testing/mocks/capital-changes';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
+import { requestedFrom } from '@/testing/requested-from';
 import { renderApp } from '@/testing/test-utils';
 
 const AT = new Date('2026-11-15T09:07:00Z');
@@ -24,6 +26,34 @@ const cellsOf = (row: HTMLElement | undefined) =>
 
 // R3.4.2, ADR storico-delle-variazioni-di-capitale: the shared table and pages of the history of the capital.
 describe('AccountCapitalChanges', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: a minute that passes before the next page leaves the
+  // interval of the list as it was when the period was chosen.
+  it('asks the next page in the same interval when a minute passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(AT.getTime() + 60_000) });
+    fakePlatform.ensureUser('anna');
+    const minuto = fakePlatform.addFlow('anna', 'minuto', { accountName: 'minuto' });
+    Array.from({ length: 60 }, (_, index) =>
+      fakePlatform.recordCapitalChange(
+        aCapitalChange(minuto, 500, 501 + index, new Date(AT.getTime() - index * HOUR)),
+      ),
+    );
+    const asked = requestedFrom('*/accounts/account-minuto/capital-changes');
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/accounts/account-minuto/capital?period=7d' });
+    expect(await rowsOf()).toHaveLength(50);
+
+    vi.setSystemTime(Date.now() + 60_000);
+    await user.click(screen.getByRole('link', { name: 'Pagina successiva' }));
+
+    await screen.findByText('Pagina 2');
+    expect(await rowsOf()).toHaveLength(10);
+    expect(new Set(asked)).toEqual(new Set(['2026-11-08T09:08Z']));
+  });
+
   it('shows the changes of every flow of the account and its transfers, from the most recent', async () => {
     const alfa = fakePlatform.giveFlowTo('anna', 'alfa');
     const beta = fakePlatform.giveFlowTo('anna', 'beta');

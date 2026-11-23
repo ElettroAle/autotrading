@@ -20,7 +20,7 @@ export type SourceTrialRequest = {
   readonly adapter: string;
   /** None for a source of the whole market. */
   readonly asset: string | null;
-  readonly parameters: Readonly<Record<string, number>>;
+  readonly parameters: Readonly<Record<string, number | number[]>>;
 };
 
 /** Asks the platform to read the adapter now, as a cycle does, without recording anything (R6.3.1). */

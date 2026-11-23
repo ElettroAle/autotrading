@@ -26,19 +26,19 @@ def repository_with(*forecasts: PriceForecast) -> InMemoryForecastRepositoryAdap
 
 
 def test_the_actual_price_is_recorded_once_the_horizon_expires() -> None:
-    repository = repository_with(made("BTC", ForecastHorizon.MINUTES_15), made("BTC", ForecastHorizon.HOUR_1))
+    repository = repository_with(made("BTC", ForecastHorizon(15)), made("BTC", ForecastHorizon(60)))
     prices = FakePriceHistoryAdapter(prices={"BTC": Decimal(102)})
 
     recorded = RecordActualPricesUseCase(prices, repository).execute(
         RecordActualPricesCommand(TEN + timedelta(minutes=15))
     )
 
-    assert recorded == [made("BTC", ForecastHorizon.MINUTES_15).with_actual(Decimal(102))]
+    assert recorded == [made("BTC", ForecastHorizon(15)).with_actual(Decimal(102))]
     assert [forecast.actual_price for forecast in repository.forecasts] == [Decimal(102), None]
 
 
 def test_a_forecast_already_completed_is_not_recorded_again() -> None:
-    repository = repository_with(made("BTC", ForecastHorizon.MINUTES_15).with_actual(Decimal(102)))
+    repository = repository_with(made("BTC", ForecastHorizon(15)).with_actual(Decimal(102)))
 
     recorded = RecordActualPricesUseCase(FakePriceHistoryAdapter(prices={"BTC": Decimal(110)}), repository).execute(
         RecordActualPricesCommand(TEN + timedelta(hours=2))
@@ -49,7 +49,7 @@ def test_a_forecast_already_completed_is_not_recorded_again() -> None:
 
 
 def test_an_asset_without_price_waits_for_the_next_run(caplog: pytest.LogCaptureFixture) -> None:
-    repository = repository_with(made("BTC", ForecastHorizon.MINUTES_15), made("ETH", ForecastHorizon.MINUTES_15))
+    repository = repository_with(made("BTC", ForecastHorizon(15)), made("ETH", ForecastHorizon(15)))
     prices = FakePriceHistoryAdapter(prices={"ETH": Decimal(3000)}, missing={"BTC"})
 
     with caplog.at_level(logging.WARNING, logger="autotrading.sources"):
