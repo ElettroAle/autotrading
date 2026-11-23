@@ -12,6 +12,7 @@ from autotrading.application.flows.ports import (
     CycleEquityPort,
     CycleFailureNoticePort,
     CycleFlowActivityPort,
+    CycleNoticesPort,
     CycleRepositoryPort,
     ExpiredKeysPausePort,
     FlowLockPort,
@@ -64,12 +65,23 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     A cycle the user asks for now (R6.5.2, ADR ciclo-su-richiesta-nel-worker) answers the user where the planned one
     would pass in silence: a flow not active and a cycle in progress are refused. A permanent error fails fast as for
     the planned cycle: recorded, the flows paused, then raised, and the user reads its reason in the answer.
+
+    The notices the steps gave leave as the last step of a cycle that ran them, completed or failed, a permanent error
+    included: after its record and its equity, so each ends with the state of the flow after what it tells (ADR
+    notifiche-del-ciclo-dopo-lo-stato-registrato).
     """
 
-    def __init__(self, graph: CycleGraph[S, D, C, A, O, E], guards: CycleGuards, equity: CycleEquityPort[S]) -> None:
+    def __init__(
+        self,
+        graph: CycleGraph[S, D, C, A, O, E],
+        guards: CycleGuards,
+        equity: CycleEquityPort[S],
+        notices: CycleNoticesPort,
+    ) -> None:
         self._graph = graph
         self._guards = guards
         self._equity = equity
+        self._notices = notices
 
     def execute(self, command: RunCycleCommand) -> CycleRecord | None:
         if not self._guards.cycles.claim(command.flow_id, command.planned_at):
@@ -90,6 +102,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
             if isinstance(outcome, FailedCycle):
                 return self._failed(command, outcome)
             self._equity.execute(command.flow_id, command.planned_at, outcome.state)
+            self._notices.release()
             return outcome.record
 
     def _failed(self, command: RunCycleCommand, failed: FailedCycle[S]) -> CycleRecord:
@@ -100,8 +113,10 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         self._guards.failures.execute(flow_id, str(failed.error))
         if not failed.error.permanent:
             self._guards.consecutive_failures.execute(flow_id, failed.error)
+            self._notices.release()
             return record
         self._guards.pause.execute(PauseAffectedFlowsCommand.of_error(flow_id, failed.error))
+        self._notices.release()
         raise failed.error
 
 
