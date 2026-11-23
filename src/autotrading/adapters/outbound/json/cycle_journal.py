@@ -74,11 +74,13 @@ class JsonCycleJournalAdapter:
         return tuple(_recorded(each) for each in decision.reply.response.decisions)
 
     def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:
-        """The orders sent again after a temporary error, each attempt that failed named by its asset."""
+        """The orders and the protections sent again after a temporary error, each attempt that failed named by its
+        asset; the access to the account has none.
+        """
         if not isinstance(result, list | tuple):
             return ()
         return tuple(
-            FailedAttempt(step, item.attempt, item.error_type, f"{item.asset}: {item.message}")
+            FailedAttempt(step, item.attempt, item.error_type, _attempt_message(item))
             for item in result
             if isinstance(item, FailedOrderAttempt)
         )
@@ -101,6 +103,10 @@ class JsonCycleJournalAdapter:
             },
             "stato": _state_document(cycle_flow),
         }
+
+
+def _attempt_message(attempt: FailedOrderAttempt) -> str:
+    return attempt.message if attempt.asset is None else f"{attempt.asset}: {attempt.message}"
 
 
 def _state_document(cycle_flow: CycleFlow) -> object:

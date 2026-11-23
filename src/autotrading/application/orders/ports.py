@@ -88,6 +88,12 @@ class ProtectionExchangePort(Protocol):
         """
         ...
 
+    def find(self, access: TradingAccess, order: ProtectionOrder) -> str | None:
+        """The identifier the exchange gave the protection with the client order id of the order, or None when it does
+        not know it (ADR protezioni-ritentate-nel-ciclo).
+        """
+        ...
+
     def cancel(self, access: TradingAccess, asset: str, order_id: str) -> None:
         """Raises ExchangeRejectedOrderError when the exchange no longer has it: executed or cancelled already."""
         ...

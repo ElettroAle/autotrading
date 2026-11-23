@@ -8,7 +8,9 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.errors import OrderExchangeUnavailableError
+from autotrading.application.orders.sending import RetriedCalls
 from autotrading.application.orders.update_flow_protection import (
     UpdateFlowProtectionCommand,
     UpdateFlowProtectionUseCase,
@@ -23,6 +25,7 @@ from autotrading.domain.orders.protection_order import ProtectionOrder
 from autotrading.domain.orders.protection_request import ProtectionRequest
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
@@ -43,6 +46,8 @@ class Bench:
         self.protection_exchange = FakeProtectionExchangeAdapter()
         self.store = ProtectionStore()
         self.protections = InMemoryProtectionRepositoryAdapter(self.store, TENANT)
+        self.waits = FakePauseAdapter()
+        self.calls = RetriedCalls(TransientRetry(self.waits))
         self.use_case = UpdateFlowProtectionUseCase(
             {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}, self.protections
         )
@@ -67,7 +72,8 @@ class Bench:
             None if stop is None else Decimal(stop), None if target is None else Decimal(target), DEFAULT_STOP, None
         )
         update = FlowUpdate("BTC", request, remove_target=remove_target)
-        return self.use_case.execute(UpdateFlowProtectionCommand(self.access, self.account_id, FLOW_ID, update))
+        command = UpdateFlowProtectionCommand(self.access, self.account_id, FLOW_ID, update, self.calls)
+        return self.use_case.execute(command)
 
     def resting(self, kind: ProtectionKind) -> list[Decimal]:
         resting = self.protection_exchange.of(address(self.access), "BTC")
@@ -246,3 +252,50 @@ def test_an_exchange_that_does_not_answer_fails_the_update(bench: Bench) -> None
 
     with pytest.raises(OrderExchangeUnavailableError):
         bench.update(stop=62000)
+
+    assert bench.waits.pauses == [5.0, 15.0]
+
+
+# ADR-protezioni-ritentate-nel-ciclo: an update is retried as a placement and a cancellation, each with its own rule.
+
+
+def test_a_new_stop_the_exchange_never_got_is_placed_again_with_the_same_client_order_id(bench: Bench) -> None:
+    bench.protection_exchange.unreached_placements = 1
+
+    bench.update(stop=58000)
+
+    first, again = bench.protection_exchange.placed[2:]
+    assert first.client_order_id == again.client_order_id
+    assert bench.resting(STOP) == [Decimal(58000)]
+    assert bench.recorded(STOP) == [Decimal(58000)]
+    assert [(attempt.asset, attempt.attempt) for attempt in bench.calls.failed] == [("BTC", 1)]
+
+
+def test_a_new_stop_the_exchange_placed_without_answering_is_not_placed_twice(bench: Bench) -> None:
+    bench.protection_exchange.lost_placements = 1
+
+    bench.update(stop=58000)
+
+    assert len(bench.protection_exchange.placed) == 3
+    assert bench.resting(STOP) == [Decimal(58000)]
+
+
+def test_a_cancellation_of_the_previous_stop_whose_answer_was_lost_goes_through(bench: Bench) -> None:
+    [previous] = [each for each in bench.protections.placed(bench.account_id, "BTC") if each.kind is STOP]
+    bench.protection_exchange.lost_cancellations = 1
+
+    bench.update(stop=58000)
+
+    assert bench.protection_exchange.cancelled == [previous.exchange_order_id]
+    assert bench.resting(STOP) == [Decimal(58000)]
+    assert bench.recorded(STOP) == [Decimal(58000)]
+    assert bench.waits.pauses == [5.0]
+
+
+def test_a_refused_new_stop_is_not_tried_again(bench: Bench) -> None:
+    bench.protection_exchange.rejections[STOP] = "Invalid trigger price"
+
+    notes = bench.update(stop=58000)
+
+    assert notes == (ProtectionNote("BTC", "stop BTC non aggiornato, Invalid trigger price"),)
+    assert bench.waits.pauses == []

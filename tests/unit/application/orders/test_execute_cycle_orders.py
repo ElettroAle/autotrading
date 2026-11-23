@@ -18,6 +18,7 @@ from autotrading.application.orders.protect_flow_position import ProtectFlowPosi
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import Order
 from autotrading.domain.orders.protection_kind import ProtectionKind
@@ -28,7 +29,7 @@ from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
-from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
+from tests.fakes.trading_access import TENANT, AccountsUnavailableError, FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, new_access
 
 FLOW_ID = uuid4()
@@ -107,6 +108,7 @@ class Bench:
     )
     told: Told = field(default_factory=Told)
     account_id: UUID = field(default_factory=uuid4)
+    waits: FakePauseAdapter = field(default_factory=FakePauseAdapter)
 
     def __post_init__(self) -> None:
         self.accesses.accesses[self.account_id] = new_access()
@@ -123,9 +125,11 @@ class Bench:
             self.orders,
             slippage,
             FlowOrderProtection(protect, cancel, update),
-            TransientRetry(FakePauseAdapter()),
+            TransientRetry(self.waits),
         )
-        protect_open = ProtectOpenPositionsUseCase(access, exchanges, protection_exchanges, self.protections)
+        protect_open = ProtectOpenPositionsUseCase(
+            access, exchanges, protection_exchanges, self.protections, TransientRetry(self.waits)
+        )
         return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)
 
     def hold(self, asset: str, entry_price: Decimal = Decimal(100)) -> None:
@@ -273,3 +277,66 @@ def test_an_update_may_remove_the_take_profit(bench: Bench) -> None:
     sent = bench.use_case().execute(bench.cycle(Update("ETH", remove_target=True)))
 
     assert sent == (ProtectionNote("ETH", "obiettivo ETH da 3300 a nessuno"),)
+
+
+# ADR-protezioni-ritentate-nel-ciclo: the protection of the open positions is retried in the cycle, and a default stop
+# loss tried again is never placed twice.
+
+
+def failed_attempts(sent: tuple[object, ...]) -> list[tuple[str | None, int, str]]:
+    return [(each.asset, each.attempt, each.error_type) for each in sent if isinstance(each, FailedOrderAttempt)]
+
+
+def test_a_default_stop_loss_the_exchange_never_got_is_placed_again_with_the_same_client_order_id(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.protection_exchange.unreached_placements = 1
+
+    sent = bench.use_case().execute(bench.cycle())
+
+    first, again = bench.protection_exchange.placed
+    assert first.client_order_id == again.client_order_id
+    assert bench.protection_exchange.lookups == [first.client_order_id]
+    assert len(bench.protections.placed(bench.account_id, "ETH")) == 1
+    assert failed_attempts(sent) == [("ETH", 1, "OrderExchangeUnavailableError")]
+    assert bench.waits.pauses == [5.0]
+
+
+def test_a_default_stop_loss_the_exchange_placed_without_answering_is_not_placed_twice(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.protection_exchange.lost_placements = 1
+
+    bench.use_case().execute(bench.cycle())
+
+    [stop] = bench.protection_exchange.placed
+    [recorded] = bench.protections.placed(bench.account_id, "ETH")
+    assert recorded.exchange_order_id == bench.protection_exchange.known[stop.client_order_id]
+
+
+def test_the_protections_waiting_read_again_after_a_temporary_error(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.protection_exchange.unreached_readings = 1
+
+    sent = bench.use_case().execute(bench.cycle())
+
+    assert len(bench.protection_exchange.placed) == 1
+    assert failed_attempts(sent) == [("ETH", 1, "OrderExchangeUnavailableError")]
+
+
+def test_the_positions_and_the_market_read_again_after_a_temporary_error(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.exchange.unreached_readings = 1
+
+    sent = bench.use_case().execute(bench.cycle())
+
+    assert len(bench.protection_exchange.placed) == 1
+    assert failed_attempts(sent) == [("BTC", 1, "OrderExchangeUnavailableError")]
+
+
+def test_an_access_to_the_account_that_fails_once_is_opened_again_before_the_protection(bench: Bench) -> None:
+    bench.hold("ETH", Decimal(3000))
+    bench.accesses.unreached_openings = 1
+
+    sent = bench.use_case().execute(bench.cycle())
+
+    assert len(bench.protection_exchange.placed) == 1
+    assert failed_attempts(sent) == [(None, 1, AccountsUnavailableError.__name__)]

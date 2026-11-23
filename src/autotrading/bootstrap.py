@@ -607,7 +607,7 @@ def cycle_of(
                     retry,
                 ),
                 follow_flow_orders,
-                ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
+                ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections, retry),
             ),
             openings,
             exit_plans,
