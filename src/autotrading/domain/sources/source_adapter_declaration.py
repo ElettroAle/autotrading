@@ -2,7 +2,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 
 from autotrading.domain.sources.errors import InvalidSourceAdapterDeclarationError, SourceAdapterNotConfiguredError
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_list_parameter import DeclaredParameter
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +23,7 @@ class SourceAdapterDeclaration:
 
     name: str
     description: str
-    parameters: tuple[SourceParameter, ...]
+    parameters: tuple[DeclaredParameter, ...]
     configuration_fields: tuple[SourceConfigurationField, ...]
     offers_history: bool
 

@@ -5,7 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
+from autotrading.adapters.inbound.api.sources import SourceParameterResponse
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -85,27 +87,53 @@ def test_one_source_shows_description_scope_and_parameters(client_of: Client) ->
     assert (response.status_code, body["name"], body["per_asset"]) == (200, "notizie", False)
     assert body["description"]
     assert body["parameters"] == [
-        {"key": "numero_notizie", "label": "numero notizie", "default": 10, "minimum": 1, "maximum": 50, "choices": []},
+        {
+            "key": "numero_notizie",
+            "label": "numero notizie",
+            "kind": "number",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 50,
+            "choices": [],
+            "maximum_values": None,
+        },
         {
             "key": "eta_massima_ore",
             "label": "età massima ore",
+            "kind": "number",
             "default": 24,
             "minimum": 1,
             "maximum": 168,
             "choices": [],
+            "maximum_values": None,
         },
     ]
 
 
-def test_a_parameter_with_choices_shows_their_values_and_labels(client_of: Client) -> None:
+def test_a_list_parameter_shows_its_kind_its_default_list_and_how_many_values_it_admits(client_of: Client) -> None:
     body = client_of("anna").get("/sources/forecast").json()
 
-    [long_horizon] = [parameter for parameter in body["parameters"] if parameter["key"] == "orizzonte_lungo"]
-    assert long_horizon["choices"] == [
-        {"value": 0, "label": "nessuno"},
-        {"value": 1440, "label": "1 giorno"},
-        {"value": 10080, "label": "1 settimana"},
-    ]
+    [horizons] = [parameter for parameter in body["parameters"] if parameter["key"] == "orizzonti_minuti"]
+    assert horizons == {
+        "key": "orizzonti_minuti",
+        "label": "orizzonti minuti",
+        "kind": "list",
+        "default": [15, 60],
+        "minimum": 15,
+        "maximum": 43200,
+        "choices": [],
+        "maximum_values": 8,
+    }
+
+
+def test_a_parameter_with_choices_shows_their_values_and_labels() -> None:
+    choices = (ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno"))
+    parameter = SourceParameter.of_choices("orizzonte", "orizzonte", default=0, choices=choices)
+
+    response = SourceParameterResponse.of(parameter)
+
+    assert [(choice.value, choice.label) for choice in response.choices] == [(0, "nessuno"), (1440, "1 giorno")]
+    assert (response.kind, response.maximum_values) == ("number", None)
 
 
 def test_a_source_outside_the_catalog_is_not_found(client_of: Client) -> None:

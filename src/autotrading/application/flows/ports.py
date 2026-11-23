@@ -60,7 +60,7 @@ from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, RecordedDecision
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
-from autotrading.domain.flows.selections import ActiveSource, ModelSelection, SourceSelection
+from autotrading.domain.flows.selections import ActiveSource, AdapterParameterValue, ModelSelection, SourceSelection
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.stop_outcome import PositionOpening
@@ -310,7 +310,7 @@ class AdapterRequest:
 
     name: str
     weight: int | None = None
-    parameters: Mapping[str, int] = field(default_factory=dict)
+    parameters: Mapping[str, AdapterParameterValue] = field(default_factory=dict)
 
 
 class SourceCatalogPort(Protocol):
@@ -1049,7 +1049,7 @@ class SourceAsk:
     source: str
     adapter: str
     weight: int
-    parameters: Mapping[str, int]
+    parameters: Mapping[str, AdapterParameterValue]
     assets: tuple[str, ...]
     cycle_minutes: int
     asked_at: datetime

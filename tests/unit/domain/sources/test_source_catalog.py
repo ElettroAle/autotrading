@@ -4,6 +4,7 @@ from autotrading.domain.sources.errors import (
     SourceAdapterNotAvailableError,
     SourceAdapterNotFoundError,
     SourceAdapterWithoutConfigurationError,
+    SourceListValueOutOfRangeError,
     SourceNotAvailableError,
     SourceParameterOutOfRangeError,
     TrialAssetRequiredError,
@@ -17,6 +18,7 @@ from autotrading.domain.sources.social import SOCIAL
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration, SourceConfigurationField
 from autotrading.domain.sources.source_catalog import SOURCES, OfferedSource, SourceCatalog
 from autotrading.domain.sources.source_definition import SourceDefinition
+from autotrading.domain.sources.source_list_parameter import SourceListParameter
 from autotrading.domain.sources.source_parameter import SourceParameter
 from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
@@ -167,3 +169,13 @@ def test_a_trial_of_a_market_source_reads_the_whole_market() -> None:
     )
 
     assert market.asset_of_trial("BTC") is None
+
+
+def test_the_settings_of_a_list_parameter_are_saved_ordered_and_without_repetitions() -> None:
+    days = SourceListParameter("giorni", "giorni", (1,), 1, 30)
+    source = OfferedSource(SourceDefinition("pivot", "fonte", per_asset=True, parameters=(days,)), (adapter("primo"),))
+
+    assert source.settings("primo", {"giorni": (7, 1, 7)}) == {"giorni": (1, 7)}
+    assert source.settings("primo", {}) == {"giorni": (1,)}
+    with pytest.raises(SourceListValueOutOfRangeError, match=r"^giorni: ogni valore tra 1 e 30$"):
+        source.settings("primo", {"giorni": (31,)})

@@ -16,7 +16,8 @@ from autotrading.domain.sources.sentiment import SENTIMENT
 from autotrading.domain.sources.social import SOCIAL
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.source_definition import SourceDefinition
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_list_parameter import DeclaredParameter
+from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 
@@ -49,11 +50,11 @@ class OfferedSource:
                 return adapter
         raise SourceAdapterNotAvailableError(self.name, name)
 
-    def parameters_of(self, adapter: str) -> tuple[SourceParameter, ...]:
+    def parameters_of(self, adapter: str) -> tuple[DeclaredParameter, ...]:
         """The rules of the source hold for every adapter; an adapter may add parameters of its own (R4.1.1)."""
         return (*self.definition.parameters, *self.adapter(adapter).parameters)
 
-    def settings(self, adapter: str, requested: Mapping[str, int]) -> dict[str, int]:
+    def settings(self, adapter: str, requested: Mapping[str, SourceParameterValue]) -> dict[str, SourceParameterValue]:
         """The parameters of an adapter of the flow: the requested values checked, the defaults for the others."""
         return self.definition.settings(requested, self.adapter(adapter).parameters)
 

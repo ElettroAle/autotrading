@@ -1,27 +1,27 @@
-from autotrading.domain.sources.price_forecast import LONG_HORIZONS
 from autotrading.domain.sources.source_definition import SourceDefinition
-from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter
+from autotrading.domain.sources.source_list_parameter import SourceListParameter
+from autotrading.domain.sources.source_parameter import SourceParameter
 
-HISTORY_DAYS = "profondita_storico_giorni"
-LONG_HORIZON = "orizzonte_lungo"
-LONG_HISTORY_DAYS = "profondita_lunga_giorni"
-NO_LONG_HORIZON = ParameterChoice(0, "nessuno")
+# From 15 minutes to 30 days (ADR parametri-delle-fonti-come-liste-libere).
+SHORTEST_HORIZON_MINUTES = 15
+LONGEST_HORIZON_MINUTES = 30 * 24 * 60
+
+HISTORY_DAYS = SourceParameter(
+    "profondita_storico_giorni", "profondità storico giorni", default=7, minimum=1, maximum=90
+)
+HORIZONS = SourceListParameter(
+    "orizzonti_minuti", "orizzonti minuti", (15, 60), SHORTEST_HORIZON_MINUTES, LONGEST_HORIZON_MINUTES
+)
+LONG_HISTORY_DAYS = SourceParameter(
+    "profondita_lunga_giorni", "profondità lunga giorni", default=365, minimum=30, maximum=1000
+)
 
 FORECAST = SourceDefinition(
     name="forecast",
     description=(
-        "Previsione del prezzo a 15 minuti e a 1 ora sullo storico dei prezzi dell'exchange e, a scelta, a 1 giorno "
-        "o a 1 settimana sulle sue candele giornaliere."
+        "Previsione del prezzo agli orizzonti scelti, sullo storico dei prezzi dell'exchange; gli orizzonti di almeno "
+        "un giorno sulle sue candele giornaliere."
     ),
     per_asset=True,
-    parameters=(
-        SourceParameter(HISTORY_DAYS, "profondità storico giorni", default=7, minimum=1, maximum=90),
-        SourceParameter.of_choices(
-            LONG_HORIZON,
-            "orizzonte lungo",
-            default=NO_LONG_HORIZON.value,
-            choices=(NO_LONG_HORIZON, *(ParameterChoice(horizon.minutes, horizon.label) for horizon in LONG_HORIZONS)),
-        ),
-        SourceParameter(LONG_HISTORY_DAYS, "profondità lunga giorni", default=365, minimum=30, maximum=1000),
-    ),
+    parameters=(HISTORY_DAYS, HORIZONS, LONG_HISTORY_DAYS),
 )

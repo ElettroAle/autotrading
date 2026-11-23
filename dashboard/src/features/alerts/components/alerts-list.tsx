@@ -5,8 +5,9 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import {
-  listIntervalOf,
   PERIODS,
+  useListInterval,
+  type ListInterval,
   type PeriodKind,
 } from '@/components/ui/period-selector/use-period';
 import { paths } from '@/config/paths';
@@ -76,24 +77,22 @@ const FILTERS: readonly TableFilter[] = [
   },
 ];
 
-/** The query of the API from the filters of the address: the period becomes the instant it starts from. */
+/** The period of the filters of the address; without one the list does not limit the time. */
+const periodKindOf = (values: Readonly<Record<string, string>>): PeriodKind =>
+  PERIOD_CHOICES.find((kind) => kind === values[PERIOD]) ?? 'all';
+
+/** The query of the API from the filters of the address and the instant the period starts from. */
 const queryOf = (
   values: Readonly<Record<string, string>>,
   resourceId: string | null,
-  now: Date,
-): AlertsQuery => {
-  const state = WIDER_STATES.find((wider) => wider === values[STATE]) ?? 'open';
-  const period = PERIOD_CHOICES.find((kind) => kind === values[PERIOD]);
-  const since =
-    period === undefined ? undefined : listIntervalOf({ kind: period, from: '', to: '' }, now).from;
-  return {
-    state,
-    severity: values[SEVERITY],
-    resourceKind: values[RESOURCE_KIND],
-    resourceId: resourceId ?? undefined,
-    since,
-  };
-};
+  interval: ListInterval,
+): AlertsQuery => ({
+  state: WIDER_STATES.find((wider) => wider === values[STATE]) ?? 'open',
+  severity: values[SEVERITY],
+  resourceKind: values[RESOURCE_KIND],
+  resourceId: resourceId ?? undefined,
+  since: interval.from,
+});
 
 const COLUMNS: readonly DataTableColumn<Alert>[] = [
   { header: 'Gravità', cell: (alert) => <AlertSeverityLabel severity={alert.severity} /> },
@@ -115,7 +114,8 @@ const countOf = (total: number): string => (total === 1 ? '1 avviso' : `${total}
 export const AlertsList = () => {
   const { values } = useTableFilters(FILTERS);
   const [params] = useSearchParams();
-  const alerts = useAlerts(queryOf(values, params.get(RESOURCE_ID), new Date()));
+  const interval = useListInterval({ kind: periodKindOf(values), from: '', to: '' });
+  const alerts = useAlerts(queryOf(values, params.get(RESOURCE_ID), interval));
   if (alerts.isPending) {
     return <Loading />;
   }

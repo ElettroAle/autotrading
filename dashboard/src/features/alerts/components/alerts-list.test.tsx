@@ -11,7 +11,8 @@ import { formatInstant } from '@/utils/format-instant';
 
 const ALERTS_PAGE = '/alerts';
 const ACCOUNT_ID = 'account-test-1';
-const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
 
 const hoursAgo = (hours: number): Date => new Date(Date.now() - hours * HOUR_MS);
 
@@ -47,6 +48,10 @@ const choose = async (filter: string, choice: string) => {
 describe('AlertsList', () => {
   beforeEach(() => {
     fakePlatform.giveAccountTo('anna', 'test-1', 1000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('lists the open alerts of every source, the newest first, with severity, resource, opening and state', async () => {
@@ -181,6 +186,21 @@ describe('AlertsList', () => {
     const shown = await table();
     await waitFor(() => expect(rowsOf(shown)).toHaveLength(51));
     expect(screen.queryByRole('button', { name: 'Altri' })).toBeNull();
+  });
+
+  // ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: the period is counted from when it was chosen, so a
+  // minute that passes before «Altri» adds the next page to those read.
+  it('adds the next page to those read when a minute passes before Altri', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    Array.from({ length: 51 }, (_, index) => fillOf('anna', `A${index}`, hoursAgo(index / 60)));
+    await renderApp({ account: 'anna', url: `${ALERTS_PAGE}?period=24h` });
+    expect(rowsOf(await table())).toHaveLength(50);
+
+    vi.setSystemTime(Date.now() + MINUTE_MS);
+    await userEvent.click(screen.getByRole('button', { name: 'Altri' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Altri' })).toBeNull());
+    expect(rowsOf(await table())).toHaveLength(51);
   });
 
   it('tells when the alerts cannot be read', async () => {

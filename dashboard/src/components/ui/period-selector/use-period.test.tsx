@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, renderHook, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
 
@@ -8,6 +8,7 @@ import {
   listIntervalOf,
   localInputOf,
   PERIODS,
+  useListInterval,
   usePeriod,
   usePeriodInterval,
   usePeriodSearch,
@@ -161,6 +162,68 @@ describe('listIntervalOf, ADR periodo-al-minuto', () => {
     ['24h', '2026-11-15T09:30Z'],
   ] as const)('asks the period %s from the minute %s', (kind, from) => {
     expect(listIntervalOf(period(kind), NOW)).toEqual({ from });
+  });
+});
+
+// ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: the instant a list counts its period from is fixed when the
+// list receives the period, so a minute that passes neither changes the key of its query nor drops the pages read.
+describe('useListInterval, ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo', () => {
+  const OPENED = new Date('2026-11-16T09:30:42Z');
+  const MINUTE_MS = 60_000;
+  const period = (kind: Period['kind'], from = '', to = ''): Period => ({ kind, from, to });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: OPENED });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const renderInterval = (initial: Period) =>
+    renderHook(({ chosen }: { chosen: Period }) => useListInterval(chosen), {
+      initialProps: { chosen: initial },
+    });
+
+  it('counts the period from the minute the list opens', () => {
+    const { result } = renderInterval(period('30m'));
+
+    expect(result.current).toEqual({ from: '2026-11-16T09:00Z' });
+  });
+
+  it('keeps the same interval when a minute passes, render after render', () => {
+    const { result, rerender } = renderInterval(period('30m'));
+
+    vi.setSystemTime(OPENED.getTime() + MINUTE_MS);
+    rerender({ chosen: period('30m') });
+
+    expect(result.current).toEqual({ from: '2026-11-16T09:00Z' });
+  });
+
+  it('counts again from now when the period changes', () => {
+    const { result, rerender } = renderInterval(period('30m'));
+
+    vi.setSystemTime(OPENED.getTime() + MINUTE_MS);
+    rerender({ chosen: period('1h') });
+
+    expect(result.current).toEqual({ from: '2026-11-16T08:31Z' });
+  });
+
+  it('gives the ends of a range, and the new ones when they change', () => {
+    const { result, rerender } = renderInterval(
+      period('range', '2026-11-16T08:15Z', '2026-11-16T10:40Z'),
+    );
+    expect(result.current).toEqual({ from: '2026-11-16T08:15Z', to: '2026-11-16T10:40Z' });
+
+    rerender({ chosen: period('range', '2026-11-16T08:15Z', '2026-11-16T11:00Z') });
+
+    expect(result.current).toEqual({ from: '2026-11-16T08:15Z', to: '2026-11-16T11:00Z' });
+  });
+
+  it('asks no instant for the whole life', () => {
+    const { result } = renderInterval(period('all'));
+
+    expect(result.current).toEqual({});
   });
 });
 

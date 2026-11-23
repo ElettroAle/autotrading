@@ -17,6 +17,8 @@ export const FORM_TEXT_AREA = CONTROL_LOOK;
 
 export const errorIdOf = (id: string): string => `${id}-error`;
 
+const hintIdOf = (id: string): string => `${id}-hint`;
+
 /** The props that describe a control, or a group, by the reason its value was refused, if any. */
 export const describedBy = (id: string, error: string | undefined) =>
   error === undefined ? {} : { 'aria-describedby': errorIdOf(id), 'aria-invalid': true as const };
@@ -32,16 +34,41 @@ type FormFieldProps = {
   readonly id: string;
   readonly label: string;
   readonly error: string | undefined;
+  // What the control admits, when its label alone does not say it (ADR parametri-delle-fonti-come-liste-libere).
+  readonly hint?: string;
   readonly children: (control: ControlProps) => ReactNode;
 };
 
-/** A labelled control with the reason of a refusal beside it (R2.3.3). */
-export const FormField = ({ id, label, error, children }: FormFieldProps) => (
+const controlOf = (
+  id: string,
+  error: string | undefined,
+  hint: string | undefined,
+): ControlProps => {
+  const described = [
+    hint === undefined ? '' : hintIdOf(id),
+    error === undefined ? '' : errorIdOf(id),
+  ]
+    .filter((each) => each !== '')
+    .join(' ');
+  return {
+    id,
+    ...(described === '' ? {} : { 'aria-describedby': described }),
+    ...(error === undefined ? {} : { 'aria-invalid': true as const }),
+  };
+};
+
+/** A labelled control with what it admits and the reason of a refusal beside it (R2.3.3). */
+export const FormField = ({ id, label, error, hint, children }: FormFieldProps) => (
   <div className="flex min-w-0 flex-col gap-1">
     <label htmlFor={id} className="text-sm font-medium">
       {label}
     </label>
-    {children({ id, ...describedBy(id, error) })}
+    {children(controlOf(id, error, hint))}
+    {hint !== undefined && (
+      <p id={hintIdOf(id)} className="text-xs text-slate-600">
+        {hint}
+      </p>
+    )}
     <FieldError id={id} error={error} />
   </div>
 );

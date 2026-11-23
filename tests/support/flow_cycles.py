@@ -422,7 +422,7 @@ class FlowCycles:
         index = flows.index(self.flow(name))
         flows[index] = replace(flows[index], configuration=change(flows[index].configuration))
 
-    def set_source_parameters(self, name: str, source: str, **parameters: int) -> None:
+    def set_source_parameters(self, name: str, source: str, **parameters: int | tuple[int, ...]) -> None:
         def changed(configuration: FlowConfiguration) -> FlowConfiguration:
             selections = tuple(
                 replace(

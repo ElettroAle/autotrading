@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from autotrading.application.sources.ports import SourceRequest, WhaleTransfersPort
+from autotrading.domain.sources.source_parameter import number_of
 from autotrading.domain.sources.source_sample import SourceValue
 from autotrading.domain.sources.whale import MINIMUM_USD
 from autotrading.domain.sources.whale_transfer import WhaleTransfer, large_transfers
@@ -16,7 +17,7 @@ class ReadWhaleTransfersUseCase:
         self._interval = timedelta(minutes=cycle_minutes)
 
     def execute(self, command: SourceRequest) -> tuple[SourceValue, ...]:
-        minimum_usd = command.settings[MINIMUM_USD]
+        minimum_usd = number_of(command.settings, MINIMUM_USD)
         answered = self._whales.transfers(command.now - self._interval, command.now, minimum_usd, command.credentials)
         return tuple(_value_of(transfer) for transfer in large_transfers(answered, minimum_usd))
 

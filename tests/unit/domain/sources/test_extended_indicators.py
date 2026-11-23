@@ -48,39 +48,31 @@ def wave(count: int, period: int, phase_degrees: float = 0, trend: float = 0) ->
 # The parameters
 
 
-def test_the_extended_indicators_are_off_by_default_on_the_last_100_candles() -> None:
-    assert [(p.key, p.label, p.default, p.minimum, p.maximum) for p in EXTENDED_PARAMETERS] == [
-        ("fibonacci", "fibonacci", 0, 0, 1),
-        ("gann", "gann", 0, 0, 1),
-        ("ciclo", "ciclo", 0, 0, 1),
-        ("candele_estese", "candele estese", 100, 10, 500),
+def test_the_windows_of_the_extended_indicators_are_lists_off_by_default() -> None:
+    assert [(p.key, p.label, p.default, p.minimum, p.maximum, p.maximum_values) for p in EXTENDED_PARAMETERS] == [
+        ("fibonacci_candele", "fibonacci candele", (), 10, 10000, 8),
+        ("gann_candele", "gann candele", (), 10, 10000, 8),
+        ("ciclo_candele", "ciclo candele", (), 10, 10000, 8),
     ]
 
 
 def test_a_choice_reads_the_settings_and_the_defaults_for_what_they_do_not_say() -> None:
-    assert ExtendedIndicatorChoice.of({"gann": 1, "candele_estese": 50}) == ExtendedIndicatorChoice(
-        fibonacci=False, gann=True, cycle=False, candles=50
-    )
-    assert ExtendedIndicatorChoice.of({}) == ExtendedIndicatorChoice(
-        fibonacci=False, gann=False, cycle=False, candles=100
-    )
+    assert ExtendedIndicatorChoice.of({"gann_candele": (50, 100)}) == ExtendedIndicatorChoice((), (50, 100), ())
+    assert ExtendedIndicatorChoice.of({}) == ExtendedIndicatorChoice((), (), ())
 
 
 @pytest.mark.parametrize(
-    ("settings", "asked", "needed"),
+    ("choice", "asked", "needed"),
     [
-        ({"fibonacci": 1, "candele_estese": 300}, 110, 300),
-        ({"ciclo": 1, "candele_estese": 50}, 110, 110),
-        ({"candele_estese": 300}, 110, 110),
+        (ExtendedIndicatorChoice((100, 300), (), ()), 110, 300),
+        (ExtendedIndicatorChoice((), (), (50,)), 110, 110),
+        (ExtendedIndicatorChoice((), (), ()), 110, 110),
     ],
 )
-def test_the_long_timeframe_reads_the_most_candles_between_those_asked_and_those_of_an_active_indicator(
-    settings: dict[str, int], asked: int, needed: int
+def test_the_long_timeframe_reads_the_most_candles_between_those_asked_and_the_longest_window(
+    choice: ExtendedIndicatorChoice, asked: int, needed: int
 ) -> None:
-    assert ExtendedIndicatorChoice.of(settings).long_candles(asked) == needed
-
-
-# Fibonacci
+    assert choice.long_candles(asked) == needed
 
 
 def test_the_fibonacci_levels_retrace_from_the_high_to_the_low() -> None:
@@ -197,45 +189,53 @@ def test_the_dominant_cycle_needs_two_periods_of_the_shortest_cycle() -> None:
 # The values of a choice
 
 
-def test_no_extended_indicator_active_gives_no_value() -> None:
-    assert ExtendedIndicatorChoice.of({}).values(candles_of(wave(100, 9))) == {}
+def test_no_window_gives_no_value() -> None:
+    computed = ExtendedIndicatorChoice((), (), ()).values(candles_of(wave(100, 9)))
+
+    assert (computed.values, computed.missing) == ({}, ())
 
 
-def test_every_active_indicator_gives_its_values_on_the_last_candles_asked() -> None:
+def test_every_window_gives_its_values_on_its_last_candles_named_after_it() -> None:
     candles = candles_of([Decimal(1000)] * 20 + wave(100, 9))
-    choice = ExtendedIndicatorChoice(fibonacci=True, gann=True, cycle=True, candles=100)
+    choice = ExtendedIndicatorChoice((50, 100), (100,), (100,))
 
-    values = choice.values(candles)
+    values = choice.values(candles).values
 
     window = candles[-100:]
-    assert values["candele_estese"] == Decimal(100)
     assert "nota_storico" not in values
-    assert values["fibonacci.massimo"] == max(each.high for each in window)
-    assert values["fibonacci.50%"] == fibonacci_levels(window)["50%"]
+    assert values["fibonacci100.massimo"] == max(each.high for each in window)
+    assert values["fibonacci100.50%"] == fibonacci_levels(window)["50%"]
+    assert values["fibonacci50.50%"] == fibonacci_levels(candles[-50:])["50%"]
     angles = gann_angles(window)
-    assert values["gann.perno"] == angles.pivot_side
-    assert values["gann.prezzo_perno"] == angles.pivot
-    assert values["gann.unita_per_candela"] == angles.unit
-    assert values["gann.1x2"] == angles.lines["1x2"]
-    assert values["ciclo.periodo_candele"] == Decimal(9)
-    assert values["ciclo.fase_gradi"] == dominant_cycle(window).phase
+    assert values["gann100.perno"] == angles.pivot_side
+    assert values["gann100.prezzo_perno"] == angles.pivot
+    assert values["gann100.unita_per_candela"] == angles.unit
+    assert values["gann100.1x2"] == angles.lines["1x2"]
+    assert values["ciclo100.periodo_candele"] == Decimal(9)
+    assert values["ciclo100.fase_gradi"] == dominant_cycle(window).phase
 
 
-def test_only_the_active_indicators_give_values() -> None:
-    values = ExtendedIndicatorChoice(fibonacci=False, gann=True, cycle=False, candles=50).values(
-        candles_of(wave(60, 9))
-    )
+def test_only_the_chosen_indicators_give_values() -> None:
+    values = ExtendedIndicatorChoice((), (50,), ()).values(candles_of(wave(60, 9))).values
 
-    assert {key.partition(".")[0] for key in values} == {"candele_estese", "gann"}
+    assert {key.partition(".")[0] for key in values} == {"gann50"}
 
 
-def test_a_history_shorter_than_the_candles_asked_is_declared_and_used() -> None:
-    choice = ExtendedIndicatorChoice(fibonacci=True, gann=False, cycle=False, candles=100)
+def test_windows_longer_than_the_history_are_declared_and_computed_on_it() -> None:
+    choice = ExtendedIndicatorChoice((100, 200), (), (50,))
 
-    values = choice.values(candles_of(wave(60, 9)))
+    computed = choice.values(candles_of(wave(60, 9)))
 
-    assert values["nota_storico"] == "storico di 60 candele, meno delle 100 richieste"
-    assert values["candele_estese"] == Decimal(60)
+    assert computed.values["nota_storico"] == "storico di 60 candele, meno delle 100, 200 richieste"
+    assert computed.values["fibonacci200.massimo"] == computed.values["fibonacci100.massimo"]
+    assert computed.missing == ()
+
+
+def test_a_dominant_cycle_without_two_periods_of_the_shortest_cycle_is_missing() -> None:
+    computed = ExtendedIndicatorChoice((), (), (10,)).values(candles_of(wave(7, 4)))
+
+    assert not [key for key in computed.values if key.startswith("ciclo10.")]
+    assert computed.missing_note() == {"dati_mancanti": "ciclo10: storico di 7 candele"}
 
 
 def test_a_dominant_cycle_holds_its_period_and_phase() -> None:

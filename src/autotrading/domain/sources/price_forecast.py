@@ -3,10 +3,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from decimal import Decimal
-from enum import Enum
 from uuid import UUID
 
-from autotrading.domain.sources.errors import InsufficientHistoryError, InvalidPriceForecastError
+from autotrading.domain.sources.errors import (
+    InsufficientHistoryError,
+    InvalidForecastHorizonError,
+    InvalidPriceForecastError,
+)
 
 DAY = timedelta(days=1)
 MINUTES_PER_DAY = 24 * 60
@@ -16,21 +19,36 @@ HUNDRED = Decimal(100)
 PERCENT_PLACES = Decimal("0.01")
 # The forecast keeps two more decimals than the exchange gives: enough to see a change, not a false precision.
 EXTRA_PLACES = 2
+MINUTES_PER_HOUR = 60
+MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY
+# The units of the label of a horizon, from the largest: minutes, singular, plural.
+UNITS = (
+    (MINUTES_PER_WEEK, "settimana", "settimane"),
+    (MINUTES_PER_DAY, "giorno", "giorni"),
+    (MINUTES_PER_HOUR, "ora", "ore"),
+)
 
 
-class ForecastHorizon(Enum):
-    """The horizons of the forecast, with their label for the context of the agent: 15 minutes and 1 hour (R1.3.5),
-    1 day and 1 week (R5.1.5).
+@dataclass(frozen=True, slots=True)
+class ForecastHorizon:
+    """How far ahead the forecast looks, in minutes, as the flow chooses it (R1.3.5, R5.1.5, ADR
+    parametri-delle-fonti-come-liste-libere), with its label for the context of the agent.
     """
 
-    MINUTES_15 = (15, "15 minuti")
-    HOUR_1 = (60, "1 ora")
-    DAY_1 = (MINUTES_PER_DAY, "1 giorno")
-    WEEK_1 = (7 * MINUTES_PER_DAY, "1 settimana")
+    minutes: int
 
-    def __init__(self, minutes: int, label: str) -> None:
-        self.minutes = minutes
-        self.label = label
+    def __post_init__(self) -> None:
+        if self.minutes < 1:
+            raise InvalidForecastHorizonError(self.minutes)
+
+    @property
+    def label(self) -> str:
+        """By the largest whole unit: 15 minuti, 4 ore, 1 giorno, 1 settimana."""
+        for unit_minutes, one, many in UNITS:
+            if self.minutes % unit_minutes == 0:
+                count = self.minutes // unit_minutes
+                return f"{count} {one if count == 1 else many}"
+        return f"{self.minutes} minuti"
 
     @property
     def length(self) -> timedelta:
@@ -38,25 +56,10 @@ class ForecastHorizon(Enum):
 
     @property
     def on_daily_candles(self) -> bool:
-        """A horizon of days is forecast on the daily candles, as a step of the finest ones would be a fraction of it
-        (ADR orizzonti-lunghi-del-forecast).
+        """A horizon of a day or more is forecast on the daily candles, as a step of the finest ones would be a
+        fraction of it (ADR orizzonti-lunghi-del-forecast).
         """
         return self.minutes >= MINUTES_PER_DAY
-
-    @property
-    def days(self) -> int:
-        return self.minutes // MINUTES_PER_DAY
-
-
-# Always forecast, on the finest candles the exchange keeps for the depth (R1.3.5).
-SHORT_HORIZONS = (ForecastHorizon.MINUTES_15, ForecastHorizon.HOUR_1)
-# At most one of them, as the flow chooses (R5.1.5).
-LONG_HORIZONS = (ForecastHorizon.DAY_1, ForecastHorizon.WEEK_1)
-
-
-def long_horizons_of(minutes: int) -> tuple[ForecastHorizon, ...]:
-    """The long horizon a flow chose by its minutes; none when it chose no long horizon."""
-    return tuple(horizon for horizon in LONG_HORIZONS if horizon.minutes == minutes)
 
 
 @dataclass(frozen=True, slots=True)

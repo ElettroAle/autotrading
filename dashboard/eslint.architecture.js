@@ -4,8 +4,10 @@
 // (ADR 0121). One icon library, lucide-react, used only by the shared icons of src/components/ui/icons (ADR
 // icone-con-lucide-react-e-comandi-condivisi). The query string changes through the shared hook of src/hooks/use-search-change.ts, never with a function
 // of the last render (ADR 0166). A test creates the client of TanStack Query with the configuration of the platform (ADR
-// test-della-dashboard-deterministici). Every rule is proved red on a violating example in architecture/structure.test.ts,
-// the last in architecture/query-client-in-tests.test.ts.
+// test-della-dashboard-deterministici). A list counts its period from when it receives it, never from the clock of its
+// render (ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo). Every rule is proved red on a violating example in
+// architecture/structure.test.ts, the last two in architecture/query-client-in-tests.test.ts and
+// architecture/list-interval-fixed.test.ts.
 import { readdirSync } from 'node:fs';
 
 import checkFile from 'eslint-plugin-check-file';
@@ -64,6 +66,24 @@ const BARE_QUERY_CLIENT_IN_TESTS = {
   message:
     'nei test il QueryClient ha la configurazione della piattaforma: new QueryClient({ defaultOptions: queryConfig }) o renderApp/renderInApp di src/testing/test-utils.tsx',
 };
+
+// A list asks its interval of useListInterval, fixed when the period is chosen: an instant read in the render changes the
+// key of the query at every minute and drops the pages already read (ADR
+// intervallo-delle-liste-fissato-alla-scelta-del-periodo).
+const LIST_INTERVAL_MESSAGE =
+  "l'intervallo di una lista si fissa alla scelta del periodo: useListInterval di src/components/ui/period-selector/use-period.ts, mai l'orologio letto nel render (ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo)";
+
+const CLOCK_IN_THE_RENDER = [
+  { selector: "ImportSpecifier[imported.name='listIntervalOf']", message: LIST_INTERVAL_MESSAGE },
+  {
+    selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+    message: LIST_INTERVAL_MESSAGE,
+  },
+  {
+    selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+    message: LIST_INTERVAL_MESSAGE,
+  },
+];
 
 // The API is called only through the client generated from its OpenAPI document (ADR 0119).
 const API_CLIENT = 'src/lib/api-client.ts';
@@ -271,6 +291,11 @@ export default tseslint.config(
     ignores: [SEARCH_CHANGE],
     plugins: { search: searchPlugin },
     rules: { 'search/no-search-change-from-the-last-render': 'error' },
+  },
+  {
+    files: ['src/features/**/*.{ts,tsx}', 'src/app/**/*.{ts,tsx}'],
+    ignores: TEST_FILES,
+    rules: { 'no-restricted-syntax': ['error', ...CLOCK_IN_THE_RENDER] },
   },
   {
     files: TEST_FILES,

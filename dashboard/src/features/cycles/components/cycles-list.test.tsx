@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { aCompletedCycle, aFailedCycle, STEPS } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
+import { requestedFrom } from '@/testing/requested-from';
 import { renderApp } from '@/testing/test-utils';
 
 const LAST = new Date('2026-11-14T09:07:00Z');
@@ -23,6 +24,10 @@ const rowsOf = async () => {
 describe('CyclesList', () => {
   beforeEach(() => {
     fakePlatform.giveFlowTo('anna', 'alfa');
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('lists the cycles from the most recent, with instant, outcome and decisions', async () => {
@@ -83,6 +88,25 @@ describe('CyclesList', () => {
       'href',
       '/flows/flow-alfa/cycles',
     );
+  });
+
+  // ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo: a minute that passes before the next page leaves the
+  // interval of the list as it was when the period was chosen.
+  it('asks the next page in the same interval when a minute passes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(LAST.getTime() + 60_000) });
+    fakePlatform.giveFlowTo('anna', 'minuto');
+    fakePlatform.recordCycles('minuto', cyclesBack(60));
+    const asked = requestedFrom('*/flows/flow-minuto/cycles');
+    const user = userEvent.setup();
+    await renderApp({ account: 'anna', url: '/flows/flow-minuto/cycles?period=7d' });
+    expect(await rowsOf()).toHaveLength(50);
+
+    vi.setSystemTime(Date.now() + 60_000);
+    await user.click(screen.getByRole('link', { name: 'Pagina successiva' }));
+
+    await screen.findByText('Pagina 2');
+    expect(await rowsOf()).toHaveLength(10);
+    expect(new Set(asked)).toEqual(new Set(['2026-11-07T09:08Z']));
   });
 
   it('reads an invalid page as the first', async () => {

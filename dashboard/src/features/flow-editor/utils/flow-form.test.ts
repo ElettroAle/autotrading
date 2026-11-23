@@ -202,12 +202,19 @@ describe('formValuesOf', () => {
         indicatori: {
           active: true,
           adapters: {
-            Hyperliquid: { active: true, weight: '2', parameters: { lunghezza_serie: '10' } },
+            Hyperliquid: {
+              active: true,
+              weight: '2',
+              parameters: { lunghezza_serie: '10' },
+              lists: {},
+            },
           },
         },
         sentiment: {
           active: true,
-          adapters: { 'alternative%2Eme': { active: true, weight: '1', parameters: {} } },
+          adapters: {
+            'alternative%2Eme': { active: true, weight: '1', parameters: {}, lists: {} },
+          },
         },
       },
       instructions: 'prudente',
@@ -278,6 +285,85 @@ describe('formValuesOf', () => {
     const flow = { ...FLOW, risk_limits: { ...FLOW.risk_limits, max_leverage: null } };
 
     expect(formValuesOf(flow).max_leverage).toBe('');
+  });
+});
+
+// ADR parametri-delle-fonti-come-liste-libere: a list travels apart from the whole numbers, as typed and as saved.
+describe('the list parameters of a source', () => {
+  const WITH_LIST: Flow = {
+    ...FLOW,
+    sources: [
+      {
+        name: 'indicatori',
+        adapters: [
+          {
+            name: 'Hyperliquid',
+            weight: 2,
+            parameters: { lunghezza_serie: 10, tendenza_giorni: [7, 30], medie_periodi: [] },
+          },
+        ],
+      },
+    ],
+  };
+
+  it('fills a saved list as the user types it, an empty one as a blank field', () => {
+    expect(formValuesOf(WITH_LIST).sources.indicatori?.adapters?.Hyperliquid).toEqual({
+      active: true,
+      weight: '2',
+      parameters: { lunghezza_serie: '10' },
+      lists: { tendenza_giorni: '7, 30', medie_periodi: '' },
+    });
+  });
+
+  it('sends every list typed as its numbers, a blank one as the empty list', () => {
+    const values = filled({
+      sources: {
+        indicatori: {
+          active: true,
+          adapters: {
+            Hyperliquid: {
+              active: true,
+              weight: '2',
+              parameters: { lunghezza_serie: '20' },
+              lists: { tendenza_giorni: '7, 30 90', medie_periodi: ' ' },
+            },
+          },
+        },
+      },
+    });
+
+    expect(creationRequestOf(values).sources).toEqual([
+      {
+        name: 'indicatori',
+        adapters: [
+          {
+            name: 'Hyperliquid',
+            weight: 2,
+            parameters: { lunghezza_serie: 20, tendenza_giorni: [7, 30, 90], medie_periodi: [] },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('changes nothing when the lists stay as saved', () => {
+    expect(changesOf(WITH_LIST, formValuesOf(WITH_LIST))).toEqual({ settings: {} });
+  });
+
+  it('checks only the shape of a list, leaving its rules to the API', () => {
+    const shaped = (typed: string) =>
+      flowFormSchema.safeParse(
+        filled({
+          sources: {
+            indicatori: {
+              active: true,
+              adapters: { Hyperliquid: { active: true, lists: { tendenza_giorni: typed } } },
+            },
+          },
+        }),
+      ).success;
+
+    expect([shaped('7, 30'), shaped('0, 99999'), shaped('7; 30')]).toEqual([true, true, false]);
   });
 });
 

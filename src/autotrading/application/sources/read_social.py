@@ -1,6 +1,7 @@
 from autotrading.application.sources.errors import AssetRequiredError
 from autotrading.application.sources.ports import SocialPort, SourceRequest
 from autotrading.domain.sources.social import POSTS
+from autotrading.domain.sources.source_parameter import number_of
 from autotrading.domain.sources.source_sample import SourceValue
 
 
@@ -15,7 +16,7 @@ class ReadSocialUseCase:
     def execute(self, command: SourceRequest) -> tuple[SourceValue, ...]:
         if command.asset is None:
             raise AssetRequiredError
-        posts = command.settings[POSTS]
+        posts = number_of(command.settings, POSTS)
         snapshot = self._social.snapshot(command.asset, posts, command.credentials)
         kept = tuple(SourceValue(post.at, post.values()) for post in snapshot.most_relevant(posts))
         return (SourceValue(command.now, snapshot.values()), *kept)

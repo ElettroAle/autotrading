@@ -1,7 +1,7 @@
 """ADR-indicatori-estesi-nel-domain: Fibonacci, Gann and the dominant cycle are parameters of the indicators source,
-valid for every adapter, from 0 to 1 and off by default, with the candles they read from 10 to 500 (100 by default);
-their formulas live only in the domain of the sources, and the reader of the indicators reads the 4-hour candles in
-the number the choice of the flow asks.
+valid for every adapter; their formulas live only in the domain of the sources, and the reader of the indicators reads
+the 4-hour candles in the number the choice of the flow asks. The flags and the candles they read are replaced by the
+lists of windows of ADR-parametri-delle-fonti-come-liste-libere.
 """
 
 import ast
@@ -37,11 +37,10 @@ def reads_the_candles_of_the_choice(source: str) -> bool:
 
 
 def test_adr_indicatori_estesi_nel_domain_the_parameters_belong_to_the_source_for_every_adapter() -> None:
-    assert [(p.key, p.default, p.minimum, p.maximum) for p in EXTENDED_PARAMETERS] == [
-        ("fibonacci", 0, 0, 1),
-        ("gann", 0, 0, 1),
-        ("ciclo", 0, 0, 1),
-        ("candele_estese", 100, 10, 500),
+    assert [parameter.key for parameter in EXTENDED_PARAMETERS] == [
+        "fibonacci_candele",
+        "gann_candele",
+        "ciclo_candele",
     ]
     assert set(EXTENDED_PARAMETERS) <= set(INDICATORS.parameters)
     assert not set(EXTENDED_PARAMETERS) & set(DECLARATION.parameters)

@@ -2,13 +2,28 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
-import { FAKE_SYSTEM_PROMPT } from '@/testing/mocks/catalogs';
+import { FAKE_SYSTEM_PROMPT, type FakeSourceParameter } from '@/testing/mocks/catalogs';
 import { configurationOf, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { fakeSourceCredentials } from '@/testing/mocks/source-credentials';
 import { renderApp } from '@/testing/test-utils';
 
 const NEW_FLOW = '/flows/new';
+// A parameter with choices, as a source may declare one (ADR orizzonti-lunghi-del-forecast).
+const HORIZON: FakeSourceParameter = {
+  key: 'orizzonte',
+  label: 'orizzonte',
+  kind: 'number',
+  default: 0,
+  minimum: 0,
+  maximum: 10080,
+  choices: [
+    { value: 0, label: 'nessuno' },
+    { value: 1440, label: '1 giorno' },
+    { value: 10080, label: '1 settimana' },
+  ],
+  maximum_values: null,
+};
 const MODEL = 'openrouter/deepseek-chat';
 
 const field = (label: string) => screen.getByLabelText(label, { exact: true });
@@ -191,7 +206,13 @@ describe('CreateFlow', () => {
       sources: [
         {
           name: 'indicatori',
-          adapters: [{ name: 'Hyperliquid', weight: 2, parameters: { lunghezza_serie: 20 } }],
+          adapters: [
+            {
+              name: 'Hyperliquid',
+              weight: 2,
+              parameters: { lunghezza_serie: 20, medie_periodi: [20, 50], tendenza_giorni: [] },
+            },
+          ],
         },
         { name: 'sentiment', adapters: [{ name: 'alternative.me', weight: 5, parameters: {} }] },
       ],
@@ -475,11 +496,12 @@ describe('CreateFlow', () => {
 
   // ADR orizzonti-lunghi-del-forecast: a parameter with choices is a selection of their labels.
   it('offers a parameter with choices as a selection of their labels, sending the value chosen', async () => {
+    fakeSourceCredentials.declareParameter('forecast', HORIZON);
     const { router } = await renderApp({ account: 'anna', url: NEW_FLOW });
 
     await fillValidFlow();
     await userEvent.click(screen.getByRole('checkbox', { name: 'forecast' }));
-    const horizon = field('orizzonte lungo di forecast · Prophet');
+    const horizon = field('orizzonte di forecast · Prophet');
     expect(
       within(horizon)
         .getAllByRole('option')
@@ -496,10 +518,55 @@ describe('CreateFlow', () => {
         {
           name: 'Prophet',
           weight: 5,
-          parameters: { profondita_storico_giorni: 7, orizzonte_lungo: 1440 },
+          parameters: { profondita_storico_giorni: 7, orizzonti_minuti: [15, 60], orizzonte: 1440 },
         },
       ],
     });
+  });
+
+  // ADR parametri-delle-fonti-come-liste-libere: a list is a field of numbers with commas, from its declaration alone.
+  it('offers a list parameter at its default list with what it admits, and saves the list typed in order', async () => {
+    const { router } = await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    const days = field('tendenza giorni di indicatori · Hyperliquid');
+    expect(days).toHaveValue('');
+    expect(days).toHaveAccessibleDescription('ogni valore tra 1 e 3650, al massimo 8 valori');
+    expect(field('medie periodi di indicatori · Hyperliquid')).toHaveValue('20, 50');
+    await userEvent.type(days, '90, 7, 30');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    const { sources } = configurationOf(fakePlatform.flowNamed('alfa'));
+    expect(sources.find((source) => source.name === 'indicatori')?.adapters[0]?.parameters).toEqual(
+      { lunghezza_serie: 20, medie_periodi: [20, 50], tendenza_giorni: [7, 30, 90] },
+    );
+  });
+
+  it('shows on the sources the refusal of a list the API does not admit, with the rule', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    await userEvent.type(field('tendenza giorni di indicatori · Hyperliquid'), '7, 4000');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    expect(await screen.findByRole('group', { name: 'Fonti' })).toHaveAccessibleDescription(
+      'tendenza giorni: ogni valore tra 1 e 3650',
+    );
+  });
+
+  it('stops a list written in another shape before sending it', async () => {
+    await renderApp({ account: 'anna', url: NEW_FLOW });
+
+    await fillValidFlow();
+    const days = field('tendenza giorni di indicatori · Hyperliquid');
+    await userEvent.type(days, '7; 30');
+    await userEvent.click(screen.getByRole('button', { name: 'Crea il flusso' }));
+
+    await waitFor(() =>
+      expect(days).toHaveAccessibleDescription(/Inserisci numeri interi separati da virgole$/),
+    );
+    expect(days).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('shows on the sources the refusal of an active source without adapters', async () => {

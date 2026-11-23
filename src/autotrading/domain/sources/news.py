@@ -1,15 +1,15 @@
 from collections.abc import Mapping
 
 from autotrading.domain.sources.source_definition import SourceDefinition
-from autotrading.domain.sources.source_parameter import SourceParameter
+from autotrading.domain.sources.source_parameter import SourceParameter, SourceParameterValue, number_of
 
 COUNT = "numero_notizie"
 MAX_AGE_HOURS = "eta_massima_ore"
 
 
-def no_recent_news(settings: Mapping[str, int]) -> Mapping[str, str]:
+def no_recent_news(settings: Mapping[str, SourceParameterValue]) -> Mapping[str, str]:
     """No recent news is itself a datum for the agent (R1.3.7)."""
-    hours = settings[MAX_AGE_HOURS]
+    hours = number_of(settings, MAX_AGE_HOURS)
     window = "nell'ultima ora" if hours == 1 else f"nelle ultime {hours} ore"
     return {"nota": f"nessuna notizia {window}"}
 

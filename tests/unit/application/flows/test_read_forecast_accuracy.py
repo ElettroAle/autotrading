@@ -36,7 +36,7 @@ class Platform:
         return flow
 
     def forecast(self, flow: Flow, predicted: str, actual: str | None, expires_at: datetime) -> None:
-        horizon = ForecastHorizon.HOUR_1
+        horizon = ForecastHorizon(60)
         self.recorded.add(
             PriceForecast(
                 flow.id.value,

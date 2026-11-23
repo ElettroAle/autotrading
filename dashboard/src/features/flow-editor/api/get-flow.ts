@@ -23,7 +23,8 @@ export const flowSchema = z.object({
         z.object({
           name: z.string(),
           weight: z.number(),
-          parameters: z.record(z.string(), z.number()),
+          // A list parameter arrives as its list (ADR parametri-delle-fonti-come-liste-libere).
+          parameters: z.record(z.string(), z.union([z.number(), z.array(z.number())])),
         }),
       ),
     }),

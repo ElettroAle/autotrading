@@ -14,7 +14,6 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.sources.indicator_series import WARM_UP
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
-from autotrading.domain.sources.pivot_levels import DailyRange
 from autotrading.domain.sources.technical_indicators import exponential_moving_average
 from tests.fakes.market_data import DEFAULT_SNAPSHOT
 from tests.support.flow_cycles import FlowCycles
@@ -23,8 +22,10 @@ from tests.support.steps import quoted
 TIMEFRAMES = {"15 minuti": ("breve", "15m"), "4 ore": ("lungo", "4h")}
 # A series whose EMA20 differs from any average of the default market.
 KNOWN_CLOSES = tuple(Decimal(200) + Decimal(index * index % 37) / 10 for index in range(200))
-# Every indicator of the two timeframes is given as a series: 8 on the short one, 10 on the long one.
-SERIES_COUNT = 18
+# Every indicator of the two timeframes is given as a series: 10 on each, with the default periods of the averages.
+SERIES_COUNT = 20
+# The pivots of the previous day, the default period of the source.
+PREVIOUS_DAY = "pivot_1g."
 
 
 def number(text: str) -> Decimal:
@@ -37,8 +38,9 @@ def indicators_of(flow_cycles: FlowCycles, asset: str) -> dict[str, str]:
 
 
 def pivots_of(flow_cycles: FlowCycles, asset: str) -> dict[str, str]:
+    """The pivots of the previous day, by the names they have in that series."""
     [values] = flow_cycles.sources_in_context("pivot", asset)
-    return values
+    return {key.removeprefix(PREVIOUS_DAY): value for key, value in values.items() if key.startswith(PREVIOUS_DAY)}
 
 
 def series_of(values: dict[str, str], key: str) -> list[Decimal]:
@@ -76,7 +78,8 @@ def series_length(flow_cycles: FlowCycles, flow: str, length: str) -> None:
 
 @given(quoted('che la giornata UTC precedente di "{asset}" ha massimo {high}, minimo {low} e chiusura {close}'))
 def previous_day(flow_cycles: FlowCycles, asset: str, high: str, low: str, close: str) -> None:
-    flow_cycles.market.days[asset] = DailyRange(high=number(high), low=number(low), close=number(close))
+    flow_cycles.market.closes[asset, "1d"] = [number(close)]
+    flow_cycles.market.ranges[asset, "1d"] = [(number(high), number(low))]
 
 
 @given(quoted('che il prezzo corrente di "{asset}" è {price}'))

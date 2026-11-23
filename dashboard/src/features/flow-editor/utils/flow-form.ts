@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
+import { isListText, LIST_SHAPE, listOf, listTextOf } from '@/lib/parameter-lists';
+
 import { isDraft, type Flow } from '../api/get-flow';
 
 // The form checks only the shape of what the user types; the rules and their reasons stay with the API (ADR 0130).
 const NUMBER = /^\s*(\d+([.,]\d+)?)?\s*$/;
 const numberText = z.string().regex(NUMBER, 'Inserisci un numero');
+// A list parameter as typed: blank is the empty list, the value switched off (ADR parametri-delle-fonti-come-liste-libere).
+const listText = z.string().refine(isListText, LIST_SHAPE);
 
 // The same interval and reason as the API, so the refusal reads alike before and after sending (R3.2.2, ADR
 // perdita-massima-nella-dashboard).
@@ -21,11 +25,13 @@ const maxLossText = numberText.refine(withinMaxLoss, MAX_LOSS_RANGE);
 export const OPENINGS_RESUMES = ['manual', 'next_day'] as const;
 export type OpeningsResume = (typeof OPENINGS_RESUMES)[number];
 
-// An adapter never chosen has only its choice: weight and parameters show once it is chosen (R4.1.1).
+// An adapter never chosen has only its choice: weight and parameters show once it is chosen (R4.1.1); the list
+// parameters stay apart from the whole numbers, so their kind travels with the form and never with their key.
 const adapterValuesSchema = z.object({
   active: z.boolean(),
   weight: numberText.optional(),
   parameters: z.record(z.string(), numberText).optional(),
+  lists: z.record(z.string(), listText).optional(),
 });
 
 // A source never activated has only its choice: its adapters show once it is active (R4.1.1).
@@ -80,7 +86,7 @@ export type AdapterValues = z.infer<typeof adapterValuesSchema>;
 type AdapterRequest = {
   readonly name: string;
   readonly weight: number | null;
-  readonly parameters: Record<string, number>;
+  readonly parameters: Record<string, number | number[]>;
 };
 
 type SourceRequest = {
@@ -177,12 +183,20 @@ const adaptersOf = (adapters: Record<string, AdapterValues>): AdapterRequest[] =
     .map(([key, adapter]) => ({
       name: adapterNameOf(key),
       weight: numberOrNull(adapter.weight ?? ''),
-      parameters: Object.fromEntries(
-        Object.entries(filledOf(adapter.parameters ?? {})).map(([parameter, value]) => [
-          parameter,
-          Number(value),
-        ]),
-      ),
+      parameters: {
+        ...Object.fromEntries(
+          Object.entries(filledOf(adapter.parameters ?? {})).map(([parameter, value]) => [
+            parameter,
+            Number(value),
+          ]),
+        ),
+        ...Object.fromEntries(
+          Object.entries(adapter.lists ?? {}).map(([parameter, typed]) => [
+            parameter,
+            listOf(typed),
+          ]),
+        ),
+      },
     }));
 
 // An active source goes with the adapters chosen, none included: the API refuses it with the reason (R4.1.1).
@@ -226,6 +240,23 @@ export const creationRequestOf = (values: FlowFormValues): CreationRequest => ({
 
 const textOf = (value: number | string | null): string => (value === null ? '' : String(value));
 
+/** The saved parameters of an adapter as the form holds them: the whole numbers, and the lists apart. */
+const valuesOfParameters = (
+  parameters: Record<string, number | number[]>,
+): Pick<AdapterValues, 'parameters' | 'lists'> => {
+  const entries = Object.entries(parameters);
+  return {
+    parameters: Object.fromEntries(
+      entries.flatMap(([key, value]) => (typeof value === 'number' ? [[key, String(value)]] : [])),
+    ),
+    lists: Object.fromEntries(
+      entries.flatMap(([key, value]) =>
+        typeof value === 'number' ? [] : [[key, listTextOf(value)]],
+      ),
+    ),
+  };
+};
+
 /** The form filled with the configuration version in force of the flow. */
 export const formValuesOf = (flow: Flow): FlowFormValues => ({
   name: flow.name,
@@ -246,9 +277,7 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
             {
               active: true,
               weight: String(adapter.weight),
-              parameters: Object.fromEntries(
-                Object.entries(adapter.parameters).map(([key, value]) => [key, String(value)]),
-              ),
+              ...valuesOfParameters(adapter.parameters),
             },
           ]),
         ),
