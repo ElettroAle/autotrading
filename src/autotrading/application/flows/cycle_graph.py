@@ -163,7 +163,8 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
     errori-temporanei-ritentati-in-ogni-passo-del-ciclo): the sources stay absent instead (R1.2.5), the model has its
     own attempts (ADR tentativi-del-modello-registrati-nel-ciclo), and the orders are sent again one by one by the
     orders context, never the whole step, so an order executed is never sent twice. Every failed attempt of a run goes
-    in its record.
+    in its record. No new attempt starts beyond half the interval of the flow from the planned instant of the cycle
+    (ADR ritentativo-del-ciclo-entro-meta-dell-intervallo).
     """
 
     def __init__(
@@ -183,6 +184,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
 
     def run(self, cycle: PlannedCycle, started_at: datetime) -> CompletedCycle[S] | FailedCycle[S]:
         """Runs the cycle from its start, or resumes it from the last node done when it has a checkpoint."""
+        self._retry.limit_to(cycle.schedule.retry_limit(cycle.planned_at))
         thread = self._checkpoints.thread(cycle.flow_id, cycle.planned_at)
         # The attempts that failed in this run, whichever node they belong to: a list of its own for every run.
         failed: list[FailedAttempt] = []

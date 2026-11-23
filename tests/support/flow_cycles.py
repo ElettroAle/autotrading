@@ -262,6 +262,7 @@ class FlowCycles:
             self.readings,
         )
         order_exchanges = {HYPERLIQUID: platform.order_exchange}
+        retry = TransientRetry(self.pause, self.clock)
         execute_flow_orders = ExecuteFlowOrdersUseCase(
             access,
             order_exchanges,
@@ -274,7 +275,7 @@ class FlowCycles:
                 cancel_protections,
                 UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
             ),
-            TransientRetry(self.pause),
+            retry,
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
@@ -299,9 +300,7 @@ class FlowCycles:
                 ExecuteCycleOrdersUseCase(
                     execute_flow_orders,
                     follow_flow_orders,
-                    ProtectOpenPositionsUseCase(
-                        access, order_exchanges, protection_exchanges, protections, TransientRetry(self.pause)
-                    ),
+                    ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections, retry),
                 ),
                 openings,
                 exit_plans,

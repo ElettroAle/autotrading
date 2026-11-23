@@ -71,8 +71,8 @@ class Cycles:
         self.reversal = FakeReversalAdapter()
         self.journal = FakeCycleJournalAdapter()
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
-        # The waits before a step is retried, asked and never waited.
-        self.waits = FakePauseAdapter()
+        # The waits before a step is retried, asked and never waited, but passed on the clock of the cycle.
+        self.waits = FakePauseAdapter(clock=self.clock)
         self.failure_notices = RecordedCycleFailuresAdapter()
         self.consecutive_failures = RecordedConsecutiveFailurePausesAdapter(self.failure_notices)
         self.equity = InMemoryCycleEquityAdapter()
@@ -116,7 +116,7 @@ class Cycles:
             steps,
             self.records,
             self.checkpoints,
-            TransientRetry(self.waits),
+            TransientRetry(self.waits, self.clock),
             lambda wait: wait.total_seconds() * SECOND,
         )
 

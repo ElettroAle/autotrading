@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase, FlowOrderProtection
@@ -30,6 +29,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, AccountsUnavailableError, FakeTradingAccessAdapter
+from tests.support.retries import unlimited_retry
 from tests.support.trading import HYPERLIQUID, new_access
 
 FLOW_ID = uuid4()
@@ -125,10 +125,10 @@ class Bench:
             self.orders,
             slippage,
             FlowOrderProtection(protect, cancel, update),
-            TransientRetry(self.waits),
+            unlimited_retry(self.waits),
         )
         protect_open = ProtectOpenPositionsUseCase(
-            access, exchanges, protection_exchanges, self.protections, TransientRetry(self.waits)
+            access, exchanges, protection_exchanges, self.protections, unlimited_retry(self.waits)
         )
         return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)
 

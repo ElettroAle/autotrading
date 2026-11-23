@@ -140,7 +140,7 @@ def run_cycle_for(
 ) -> WorkerCycle:
     """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104)."""
     ports = ports_of(tenant_id)
-    retry = TransientRetry(services.pause)
+    retry = TransientRetry(services.pause, services.clock)
     check_risk = CheckRiskUseCase(services.exchange_limits)
     loss_guard = GuardFlowLossUseCase(
         ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock

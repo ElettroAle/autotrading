@@ -15,7 +15,6 @@ from autotrading.application.flows.ports import ReversedExecutions
 from autotrading.application.flows.read_cycle_flow import ReadCycleFlowCommand
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsCommand
 from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePositionsUseCase
-from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
@@ -37,6 +36,7 @@ from tests.fakes.opening_blocked_notices import FakeOpeningBlockedNoticeAdapter
 from tests.fakes.opening_reduced_notices import FakeOpeningReducedNoticeAdapter
 from tests.fakes.pause import FakePauseAdapter
 from tests.support.flows import a_configuration, a_flow
+from tests.support.retries import unlimited_retry
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
 ANCHOR = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -129,7 +129,7 @@ class Bench:
             self.reduced,
             self.blocked,
             self.sender,
-            TransientRetry(self.waits),
+            unlimited_retry(self.waits),
         )
         return use_case.execute(FLOW.id.value, PLANNED_AT, ANCHOR, orders)
 

@@ -304,7 +304,7 @@ def test_a_resumed_cycle_records_the_decisions_taken_before_it_stopped(cycles: C
     flow_id = cycles.id_of("alfa")
     cycles.agent.decisions[flow_id] = ["BTC"]
     # Every attempt of the first run fails; the run that resumes it goes through.
-    cycles.failures.fail(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"), times=3)
+    cycles.failures.fail(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"), times=6)
     graph = cycles.graph()
     graph.run(planned(cycles), at("10:00:00"))
     cycles.agent.decisions[flow_id] = []
@@ -400,7 +400,9 @@ def test_a_temporary_error_of_a_step_is_retried_and_the_cycle_completes(cycles: 
 
 
 @pytest.mark.parametrize("step", RETRIED_STEPS)
-def test_three_temporary_errors_of_a_step_fail_the_cycle_with_every_attempt(cycles: Cycles, step: CycleStep) -> None:
+def test_temporary_errors_for_the_whole_window_fail_the_cycle_with_every_attempt(
+    cycles: Cycles, step: CycleStep
+) -> None:
     cycles.add_flow("alfa")
     error = FakeTransientError("timeout")
     cycles.failures.fail_always(cycles.id_of("alfa"), step, error)
@@ -412,9 +414,33 @@ def test_three_temporary_errors_of_a_step_fail_the_cycle_with_every_attempt(cycl
     assert outcome.record.failure is not None
     assert outcome.record.failure.step is step
     assert outcome.record.failed_attempts == tuple(
-        FailedAttempt(step, attempt, "FakeTransientError", "timeout") for attempt in (1, 2, 3)
+        FailedAttempt(step, attempt, "FakeTransientError", "timeout") for attempt in range(1, 7)
     )
-    assert cycles.waits.pauses == [5.0, 15.0]
+    assert cycles.waits.pauses == [5.0, 15.0, 30.0, 60.0, 120.0]
+
+
+# ADR-ritentativo-del-ciclo-entro-meta-dell-intervallo: no new attempt starts beyond half the interval of the flow.
+@pytest.mark.parametrize("step", RETRIED_STEPS)
+def test_the_attempts_of_a_step_stop_at_half_the_interval_of_the_flow(cycles: Cycles, step: CycleStep) -> None:
+    cycles.add_flow("alfa", minutes=2)
+    cycles.failures.fail_always(cycles.id_of("alfa"), step, FakeTransientError("timeout"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert [attempt.attempt for attempt in outcome.record.failed_attempts] == [1, 2, 3, 4]
+    assert cycles.waits.pauses == [5.0, 15.0, 30.0]
+
+
+def test_the_half_interval_counts_from_the_planned_instant_of_the_cycle(cycles: Cycles) -> None:
+    cycles.add_flow("alfa", minutes=2)
+    cycles.failures.fail_always(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
+    cycles.clock.current = at("10:00:50")
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:50"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert cycles.waits.pauses == [5.0]
 
 
 def test_a_permanent_error_of_a_step_is_not_retried(cycles: Cycles) -> None:
