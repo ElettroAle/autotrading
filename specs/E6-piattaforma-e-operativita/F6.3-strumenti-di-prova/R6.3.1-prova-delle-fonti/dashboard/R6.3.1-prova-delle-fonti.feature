@@ -26,3 +26,6 @@ Funzionalità: R6.3.1 Prova delle fonti
   Scenario: Parametri non validi
     Quando "anna" prova la fonte "indicatori" con un periodo fuori dai limiti
     Allora la prova non parte e il parametro mostra il limite ammesso
+
+  Scenario: Fonti in riquadri distinti dallo sfondo
+    Allora ogni fonte sta in un riquadro con uno sfondo diverso da quello della pagina

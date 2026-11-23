@@ -1,3 +1,5 @@
+import { Card } from '@/components/ui/card';
+
 import { useAccount } from '../hooks/use-account';
 
 import { ReconciliationStatus } from './reconciliation-status';
@@ -14,9 +16,9 @@ export const AccountReconciliation = ({ accountId }: { readonly accountId: strin
     return null;
   }
   return (
-    <div className="min-w-0 space-y-4 rounded border border-slate-200 bg-white p-4">
+    <Card className="min-w-0 space-y-4">
       <ReconciliationStatus account={account} />
       <UnattributableMovements account={account} />
-    </div>
+    </Card>
   );
 };

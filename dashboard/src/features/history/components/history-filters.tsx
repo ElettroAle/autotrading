@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { FILTER, FILTER_FIELD, FILTER_ROW } from '@/components/ui/filters';
 import { PeriodSelector } from '@/components/ui/period-selector/period-selector';
 
@@ -68,7 +69,7 @@ type HistoryFiltersProps = {
 export const HistoryFilters = ({ search, change, flows, accounts }: HistoryFiltersProps) => {
   const flow = flows.find((candidate) => candidate.id === search.flow);
   return (
-    <fieldset className="mb-4 space-y-2 rounded border border-slate-200 bg-white p-3">
+    <Card as="fieldset" className="mb-4 space-y-2">
       <legend className="px-1 font-semibold">Filtri</legend>
       <Row>
         <Filter
@@ -102,6 +103,6 @@ export const HistoryFilters = ({ search, change, flows, accounts }: HistoryFilte
         />
       </Row>
       <PeriodSelector />
-    </fieldset>
+    </Card>
   );
 };

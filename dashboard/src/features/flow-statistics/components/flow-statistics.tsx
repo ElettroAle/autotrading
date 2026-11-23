@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
@@ -108,14 +109,11 @@ const StatisticsContent = ({ flowId }: { flowId: string }) => {
 export const FlowStatistics = ({ flowId }: { flowId: string }) => {
   const titleId = useId();
   return (
-    <section
-      aria-labelledby={titleId}
-      className="mt-4 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby={titleId} className="mt-4">
       <h3 id={titleId} className="mb-2 text-lg font-semibold">
         Statistiche
       </h3>
       <StatisticsContent flowId={flowId} />
-    </section>
+    </Card>
   );
 };

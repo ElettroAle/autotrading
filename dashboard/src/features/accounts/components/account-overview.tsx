@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { DETAILS_GRID } from '@/components/ui/details-list';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 
@@ -32,10 +33,7 @@ export const AccountOverview = ({ accountId }: { readonly accountId: string }) =
     return null;
   }
   return (
-    <section
-      aria-label={`Panoramica del conto ${account.name}`}
-      className="min-w-0 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-label={`Panoramica del conto ${account.name}`} className="min-w-0">
       <dl className={DETAILS_GRID}>
         {hasPublicFields(account) && (
           <Detail term="Conto sull'exchange">
@@ -55,6 +53,6 @@ export const AccountOverview = ({ accountId }: { readonly accountId: string }) =
           <CredentialsExpiry account={account} />
         </Detail>
       </dl>
-    </section>
+    </Card>
   );
 };

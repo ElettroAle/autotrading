@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { CommandButton } from '@/components/ui/command-button';
 import { DangerZone } from '@/components/ui/danger-zone';
 import { paths } from '@/config/paths';
@@ -17,10 +18,7 @@ type Replacement = 'closed' | 'open' | 'done';
 const Credentials = ({ account }: { readonly account: Account }) => {
   const [replacement, setReplacement] = useState<Replacement>('closed');
   return (
-    <section
-      aria-label={`Credenziali del conto ${account.name}`}
-      className="space-y-2 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-label={`Credenziali del conto ${account.name}`} className="space-y-2">
       <h2 className="text-lg font-semibold">Credenziali</h2>
       {replacement === 'open' ? (
         <ReplaceCredentialsForm
@@ -38,7 +36,7 @@ const Credentials = ({ account }: { readonly account: Account }) => {
           Credenziali del conto {account.name} sostituite
         </p>
       )}
-    </section>
+    </Card>
   );
 };
 

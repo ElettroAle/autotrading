@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { paths } from '@/config/paths';
 
@@ -19,14 +20,10 @@ const readinessOf = (missing: readonly string[]): string => {
  * assegnazione-della-bozza-nel-form-di-configurazione).
  */
 export const DraftReadiness = ({ flow }: { flow: Flow }) => (
-  <div
-    role="note"
-    aria-label="Da configurare"
-    className="mt-4 flex flex-wrap items-center gap-2 rounded border border-slate-200 p-3"
-  >
+  <Card role="note" aria-label="Da configurare" className="mt-4 flex flex-wrap items-center gap-2">
     <p>{readinessOf(flow.missing)}</p>
     <Link to={paths.editFlow.getHref(flow.id)} className={SECONDARY_COMMAND}>
       Configura
     </Link>
-  </div>
+  </Card>
 );

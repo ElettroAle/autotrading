@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
@@ -15,10 +16,7 @@ type Failure = NonNullable<Cycle['failure']>;
 
 /** Step, type and message of the error as the API gives them (ADR 0129). */
 const CycleFailureView = ({ failure }: { failure: Failure }) => (
-  <section
-    aria-labelledby="cycle-failure"
-    className="space-y-2 rounded border border-red-300 bg-red-50 p-4"
-  >
+  <Card as="section" tone="error" aria-labelledby="cycle-failure" className="space-y-2">
     <h2 id="cycle-failure" className="text-lg font-semibold text-red-800">
       Errore del ciclo
     </h2>
@@ -36,7 +34,7 @@ const CycleFailureView = ({ failure }: { failure: Failure }) => (
         <dd className={`${DETAIL_VALUE} whitespace-pre-wrap`}>{failure.message}</dd>
       </div>
     </dl>
-  </section>
+  </Card>
 );
 
 // The source and the adapter that gave no data, «fonte · adapter», or the source alone before the adapters (R4.1.1).

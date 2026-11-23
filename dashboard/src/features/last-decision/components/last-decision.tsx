@@ -2,6 +2,7 @@ import { useId, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import { ActionLabel } from '@/components/ui/action-label';
+import { Card } from '@/components/ui/card';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
 import { DirectionLabel } from '@/components/ui/direction-label';
 import { ErrorMessage } from '@/components/ui/error-message';
@@ -53,16 +54,13 @@ const DecisionEntry = ({ decision }: { decision: Decision }) => (
 const DecisionPanel = ({ children }: { children: ReactNode }) => {
   const titleId = useId();
   return (
-    <section
-      aria-labelledby={titleId}
-      className="mt-4 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby={titleId} className="mt-4">
       <h3 id={titleId} className="text-lg font-semibold">
         Ultima decisione
       </h3>
       <p className="mb-2 text-sm text-slate-600">indipendente dal periodo</p>
       {children}
-    </section>
+    </Card>
   );
 };
 
