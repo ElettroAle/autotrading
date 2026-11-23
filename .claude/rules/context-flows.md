@@ -156,8 +156,9 @@ Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa n
 ### Regole
 
 - **Fail fast**: un passo che non riesce solleva un errore tipizzato; il ciclo si interrompe al primo errore
-  permanente o al terzo errore temporaneo dello stesso passo, senza ordini successivi. Un errore temporaneo della porta
-  di un passo si ritenta nello stesso ciclo, 2 volte dopo 5 e 15 secondi, con `TransientRetry` di `application/flows`
+  permanente o quando i tentativi di un errore temporaneo dello stesso passo sono finiti, senza ordini successivi. Un errore temporaneo della porta
+  di un passo si ritenta nello stesso ciclo, fino a 5 volte dopo 5, 15, 30, 60 e 120 secondi e mai oltre metà
+  dell'intervallo del flusso dall'istante previsto (ADR ritentativo-del-ciclo-entro-meta-dell-intervallo), con `TransientRetry` di `application/flows`
   e l'attesa di `CycleWaitPort`; le fonti restano assenti senza ritentativo (R1.2.5), il modello ha i propri tentativi,
   e degli ordini si ritenta il solo invio fallito, con lo stesso `cloid`, solo se l'exchange non lo conosce. Ogni
   tentativo fallito si registra nel ciclo (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo). Un solo gestore

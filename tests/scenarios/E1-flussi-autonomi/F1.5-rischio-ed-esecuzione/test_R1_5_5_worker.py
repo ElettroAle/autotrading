@@ -5,7 +5,6 @@ from uuid import UUID, uuid4
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.execute_flow_orders import (
     ExecuteFlowOrdersCommand,
@@ -26,6 +25,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
+from tests.support.retries import unlimited_retry
 from tests.support.steps import quoted
 from tests.support.trading import HYPERLIQUID, Trading
 
@@ -74,7 +74,7 @@ class FlowExecution:
             trading.orders,
             trading.slippage,
             protection,
-            TransientRetry(FakePauseAdapter()),
+            unlimited_retry(FakePauseAdapter()),
         )
         command = ExecuteFlowOrdersCommand(
             trading.accounts[self.account], self.flows[flow], self.cycle(cycle), tuple(self.approved)

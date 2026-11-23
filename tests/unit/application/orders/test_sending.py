@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import pytest
 
-from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.errors import OrderExchangeUnavailableError
 from autotrading.application.orders.sending import ProtectionPlacing, RetriedCalls, cancel_protection
 from autotrading.domain.errors import AutotradingError
@@ -19,6 +18,7 @@ from autotrading.domain.orders.protection_order import ProtectionOrder
 from autotrading.domain.orders.rejection import Rejection
 from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.support.retries import unlimited_retry
 from tests.support.trading import new_access
 
 ACCESS = new_access()
@@ -36,7 +36,7 @@ class _PermanentError(AutotradingError):
 
 
 def calls_of(waits: FakePauseAdapter) -> RetriedCalls:
-    return RetriedCalls(TransientRetry(waits))
+    return RetriedCalls(unlimited_retry(waits))
 
 
 def placed(exchange: FakeProtectionExchangeAdapter) -> list[ProtectionOrder]:
@@ -77,7 +77,9 @@ def test_an_attempt_of_no_asset_is_recorded_without_one() -> None:
     with pytest.raises(OrderExchangeUnavailableError):
         calls.run(None, unavailable)
 
-    assert [(attempt.asset, attempt.attempt) for attempt in calls.failed] == [(None, 1), (None, 2), (None, 3)]
+    assert [(attempt.asset, attempt.attempt) for attempt in calls.failed] == [
+        (None, attempt) for attempt in range(1, 7)
+    ]
 
 
 def test_a_permanent_error_comes_out_at_once() -> None:

@@ -75,3 +75,15 @@ def test_a_flow_not_running_or_without_anchor_has_no_cycle_planned() -> None:
 def test_the_wait_of_a_schedule_is_the_wait_of_its_interval() -> None:
     assert CycleSchedule(ANCHOR, timedelta(minutes=2)).source_wait == source_wait_of(timedelta(minutes=2))
     assert source_wait_of(timedelta(minutes=2)) == timedelta(seconds=30)
+
+
+@pytest.mark.parametrize(
+    ("interval", "limit"),
+    [(QUARTER, timedelta(minutes=7, seconds=30)), (timedelta(minutes=1), timedelta(seconds=30))],
+)
+def test_the_attempts_of_a_cycle_end_within_half_the_interval_from_its_planned_instant(
+    interval: timedelta, limit: timedelta
+) -> None:
+    planned_at = minutes_after_anchor(45)
+
+    assert CycleSchedule(ANCHOR, interval).retry_limit(planned_at) == planned_at + limit

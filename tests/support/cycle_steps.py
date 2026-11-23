@@ -372,9 +372,9 @@ def waits_before_the_attempt(cycles: Cycles, seconds: str) -> None:
     assert cycles.waits.pauses == [float(seconds)]
 
 
-@then(parsers.re(r"^il ciclo attende (?P<first>\d+) e poi (?P<second>\d+) secondi prima dei nuovi tentativi$"))
-def waits_before_the_attempts(cycles: Cycles, first: str, second: str) -> None:
-    assert cycles.waits.pauses == [float(first), float(second)]
+@then(parsers.re(r"^il ciclo attende (?P<seconds>.+) secondi prima dei nuovi tentativi$"))
+def waits_before_the_attempts(cycles: Cycles, seconds: str) -> None:
+    assert cycles.waits.pauses == [float(each) for each in instants_of(seconds)]
 
 
 @then("il ciclo non attende nuovi tentativi")

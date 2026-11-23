@@ -7,6 +7,9 @@ PUNCTUALITY = timedelta(seconds=60)
 # A source answers within a quarter of the interval, and never later than a minute (R1.2.5).
 LONGEST_SOURCE_WAIT = timedelta(seconds=60)
 SOURCE_WAIT_SHARE = 4
+# The attempts of a cycle end well before the next one, and on data still fresh: within half the interval (ADR
+# ritentativo-del-ciclo-entro-meta-dell-intervallo).
+RETRY_WINDOW_SHARE = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +41,10 @@ class CycleSchedule:
         if now < self.anchor:
             return self.anchor
         return self.anchor + ((now - self.anchor) // self.interval + 1) * self.interval
+
+    def retry_limit(self, planned_at: datetime) -> datetime:
+        """The last instant a new attempt of the cycle planned at that instant may start after its wait."""
+        return planned_at + self.interval / RETRY_WINDOW_SHARE
 
     @property
     def source_wait(self) -> timedelta:

@@ -589,7 +589,7 @@ def cycle_of(
         )
         reduced_notice = NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
         blocked_notice = NotifyOpeningBlockedUseCase(notify_flow)
-        retry = TransientRetry(system_clock_pause_adapters())
+        retry = TransientRetry(system_clock_pause_adapters(), clock)
         send_orders = SendCycleOrdersUseCase(
             ExecuteCycleOrdersUseCase(
                 ExecuteFlowOrdersUseCase(

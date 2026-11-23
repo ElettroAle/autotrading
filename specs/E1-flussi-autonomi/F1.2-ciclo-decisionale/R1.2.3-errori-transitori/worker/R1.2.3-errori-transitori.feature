@@ -7,9 +7,10 @@ Funzionalità: R1.2.3 Ciclo fallito per un errore transitorio
 
   Un errore transitorio è un errore che può non ripetersi al ciclo successivo: rete non raggiungibile, fornitore
   IA o exchange momentaneamente indisponibile, tempo di risposta scaduto.
-  Un errore transitorio di un passo del ciclo si ritenta nello stesso ciclo, fino a 2 volte con attese di 5 e 15 secondi
-  (Bug 718). Il fornitore IA ha i propri tentativi, fino a 3 volte con attese di 2, 8 e 30 secondi (R1.4.6, R1.4.9,
-  Bug 583). Di un ordine si ritenta il solo invio fallito, mai gli ordini già eseguiti, e un ordine ritentato non si apre
+  Un errore transitorio di un passo del ciclo si ritenta nello stesso ciclo, fino a 5 volte con attese di 5, 15, 30, 60
+  e 120 secondi (Bug 718, Bug 724), senza superare metà dell'intervallo del flusso dall'istante previsto del ciclo: un
+  nuovo tentativo parte solo se dopo la sua attesa si è ancora entro quella metà. Il fornitore IA ha i propri
+  tentativi, fino a 3 volte con attese di 2, 8 e 30 secondi (R1.4.6, R1.4.9, Bug 583). Di un ordine si ritenta il solo invio fallito, mai gli ordini già eseguiti, e un ordine ritentato non si apre
   mai due volte. Lo stesso vale per l'accesso al conto e per lo stop loss e il take profit, piazzati, aggiornati o
   cancellati: una protezione ritentata non si piazza mai due volte (Bug 720). Ogni tentativo fallito si registra nel
   ciclo con il passo, il numero del tentativo e l'errore.
@@ -60,14 +61,22 @@ Funzionalità: R1.2.3 Ciclo fallito per un errore transitorio
     E il ciclo attende 5 secondi prima del nuovo tentativo
     E il ciclo registra il tentativo 1 fallito al passo "lettura dello stato del flusso" con il messaggio originale
 
-  Scenario: Tre errori temporanei dello stesso passo fanno fallire il ciclo
+  Scenario: Errori temporanei per tutta la finestra fanno fallire il ciclo
     Dato che l'exchange non risponde durante il passo "lettura dello stato del flusso" del ciclo del flusso "alfa"
     Quando il flusso "alfa" esegue un ciclo
-    Allora lo stato del flusso "alfa" è letto 3 volte
-    E il ciclo attende 5 e poi 15 secondi prima dei nuovi tentativi
-    E il ciclo registra i tentativi 1, 2 e 3 falliti al passo "lettura dello stato del flusso"
+    Allora lo stato del flusso "alfa" è letto 6 volte
+    E il ciclo attende 5, 15, 30, 60 e 120 secondi prima dei nuovi tentativi
+    E il ciclo registra i tentativi 1, 2, 3, 4, 5 e 6 falliti al passo "lettura dello stato del flusso"
     E il ciclo è registrato come fallito al passo "lettura dello stato del flusso" con il tipo di errore e il messaggio originale
     E il flusso "alfa" è nello stato "attivo"
+
+  Scenario: I nuovi tentativi non superano metà dell'intervallo del flusso
+    Dato che il flusso "alfa" ha intervallo di ciclo di 2 minuti
+    E che l'exchange non risponde durante il passo "lettura dello stato del flusso" del ciclo del flusso "alfa"
+    Quando il flusso "alfa" esegue un ciclo
+    Allora lo stato del flusso "alfa" è letto 4 volte
+    E il ciclo attende 5, 15 e 30 secondi prima dei nuovi tentativi
+    E il ciclo è registrato come fallito al passo "lettura dello stato del flusso" con il tipo di errore e il messaggio originale
 
   Schema dello scenario: Stop loss ritentato dopo un errore temporaneo
     Dato che l'agente del flusso "alfa" apre una posizione su "BTC"

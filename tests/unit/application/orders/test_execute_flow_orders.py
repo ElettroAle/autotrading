@@ -4,7 +4,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.errors import OrderExchangeUnavailableError, UnsupportedOrderExchangeError
 from autotrading.application.orders.execute_flow_orders import (
@@ -33,6 +32,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
+from tests.support.retries import unlimited_retry
 from tests.support.trading import HYPERLIQUID, new_access
 
 SLIPPAGE = Slippage.percent(Decimal(2))
@@ -111,7 +111,7 @@ def a_use_case(
             CancelProtectionsUseCase(accesses.use_case, protection_exchanges, protections),
             UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
         ),
-        TransientRetry(waits),
+        unlimited_retry(waits),
     )
 
 
@@ -316,22 +316,22 @@ def test_only_the_sending_that_failed_goes_again_never_the_orders_done_before(
     assert [order.request.market_order.coin for order in orders.orders] == ["ETH", "BTC"]
 
 
-def test_an_exchange_that_stays_unreachable_fails_after_three_sendings_of_the_same_order(
+def test_an_exchange_that_stays_unreachable_fails_after_six_sendings_of_the_same_order(
     use_case: ExecuteFlowOrdersUseCase,
     exchange: FakeOrderExchangeAdapter,
     orders: InMemoryOrderRepositoryAdapter,
     waits: FakePauseAdapter,
     account_id: UUID,
 ) -> None:
-    exchange.unreached_sendings = 3
+    exchange.unreached_sendings = 6
 
     with pytest.raises(OrderExchangeUnavailableError):
         use_case.execute(command(account_id, BTC))
 
-    assert len(exchange.sent) == 3
+    assert len(exchange.sent) == 6
     assert len({order.id for order in exchange.sent}) == 1
     assert orders.orders == []
-    assert waits.pauses == [5.0, 15.0]
+    assert waits.pauses == [5.0, 15.0, 30.0, 60.0, 120.0]
 
 
 def test_a_reading_of_the_exchange_that_fails_once_is_read_again(
@@ -681,20 +681,20 @@ def test_a_take_profit_that_fails_once_is_placed_again_and_the_stop_loss_is_not(
     ]
 
 
-def test_a_protection_the_exchange_stays_unreachable_for_fails_after_three_placements(
+def test_a_protection_the_exchange_stays_unreachable_for_fails_after_six_placements(
     use_case: ExecuteFlowOrdersUseCase,
     protection_exchange: FakeProtectionExchangeAdapter,
     waits: FakePauseAdapter,
     account_id: UUID,
 ) -> None:
-    protection_exchange.unreached_placements = 3
+    protection_exchange.unreached_placements = 6
 
     with pytest.raises(OrderExchangeUnavailableError):
         use_case.execute(command(account_id, BTC))
 
     assert len({order.client_order_id for order in protection_exchange.placed}) == 1
-    assert len(protection_exchange.placed) == 3
-    assert waits.pauses == [5.0, 15.0]
+    assert len(protection_exchange.placed) == 6
+    assert waits.pauses == [5.0, 15.0, 30.0, 60.0, 120.0]
 
 
 def test_a_closing_after_a_refused_stop_loss_is_retried_without_closing_twice(

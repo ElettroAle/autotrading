@@ -1,5 +1,6 @@
 """ADR-errori-temporanei-ritentati-in-ogni-passo-del-ciclo: a temporary error of a step of the cycle is retried in the
-same cycle, twice after 5 and 15 seconds, by one policy in application.
+same cycle by one policy in application, five times after 5, 15, 30, 60 and 120 seconds since
+ADR-ritentativo-del-ciclo-entro-meta-dell-intervallo.
 
 The graph calls the port of every step through the policy, but the sources, which stay absent instead, the model, which
 keeps its own attempts, and the orders and the reversals, which the orders context sends again one by one so that an
@@ -89,8 +90,10 @@ def _module(path: str) -> SourceModule:
     return module
 
 
-def test_adr_errori_temporanei_ritentati_in_ogni_passo_del_ciclo_two_more_calls_after_5_and_15_seconds() -> None:
-    assert RETRY_PAUSES_SECONDS == (5.0, 15.0)
+def test_adr_ritentativo_del_ciclo_entro_meta_dell_intervallo_five_more_calls_after_5_15_30_60_and_120_seconds() -> (
+    None
+):
+    assert RETRY_PAUSES_SECONDS == (5.0, 15.0, 30.0, 60.0, 120.0)
 
 
 def test_adr_errori_temporanei_ritentati_in_ogni_passo_del_ciclo_every_other_step_retried() -> None:
