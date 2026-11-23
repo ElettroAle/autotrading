@@ -287,5 +287,16 @@ def test_the_orders_sent_again_give_their_failed_attempts_named_by_asset() -> No
     )
 
 
+def test_a_failed_attempt_of_the_access_to_the_account_has_no_asset_before_its_message() -> None:
+    # ADR-protezioni-ritentate-nel-ciclo: the access to the account is retried too, and it concerns no asset.
+    attempt = FailedOrderAttempt(None, 2, "AccountsUnavailableError", "conti non raggiungibili")
+
+    attempts = JsonCycleJournalAdapter("dev").failed_attempts(CycleStep.ORDER_EXECUTION, (attempt,))
+
+    assert attempts == (
+        FailedAttempt(CycleStep.ORDER_EXECUTION, 2, "AccountsUnavailableError", "conti non raggiungibili"),
+    )
+
+
 def test_a_result_that_is_not_a_sequence_has_no_failed_attempts() -> None:
     assert JsonCycleJournalAdapter("dev").failed_attempts(CycleStep.RISK_CHECK, {"esiti": []}) == ()

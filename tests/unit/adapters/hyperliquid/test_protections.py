@@ -185,6 +185,28 @@ def test_an_answer_of_unexpected_shape_is_an_exchange_not_available_or_a_lookup(
         adapter(sdk).place(ACCESS, STOP)
 
 
+# ADR-protezioni-ritentate-nel-ciclo: before a protection goes again the exchange is asked for it by client order id.
+def test_a_protection_the_exchange_knows_is_found_by_its_client_order_id() -> None:
+    sdk = FakeSdk()
+
+    assert adapter(sdk).find(ACCESS, STOP) == "5151"
+    assert ("query_order_by_cloid", (ADDRESS, STOP.client_order_id.hex)) in sdk.calls
+
+
+def test_a_protection_the_exchange_does_not_know_is_none() -> None:
+    assert adapter(FakeSdk(order_status={"status": "unknownOid"})).find(ACCESS, STOP) is None
+
+
+def test_a_protection_found_in_an_answer_of_unexpected_shape_is_an_exchange_not_available() -> None:
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(FakeSdk(order_status={"status": "order"})).find(ACCESS, STOP)
+
+
+def test_the_lookup_of_a_protection_fails_as_the_port_says_when_the_exchange_is_down() -> None:
+    with pytest.raises(OrderExchangeUnavailableError):
+        adapter(FakeSdk(failure=requests.ConnectionError())).find(ACCESS, STOP)
+
+
 def test_a_protection_is_cancelled_by_its_identifier() -> None:
     sdk = FakeSdk()
 

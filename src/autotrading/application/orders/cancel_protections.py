@@ -2,12 +2,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
-from autotrading.application.orders.errors import ExchangeRejectedOrderError
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
 from autotrading.application.orders.ports import ProtectedPositionPort, ProtectionExchangePort, ProtectionRepositoryPort
-from autotrading.application.orders.sending import supported_exchange
-from autotrading.domain.orders.placed_protection import PlacedProtection
-from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.application.orders.sending import cancel_protection, supported_exchange
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +17,8 @@ class CancelProtectionsUseCase:
     """When a position closes, for any reason, the protections left on the exchange are cancelled and forgotten
     (R3.1.2, ADR ordini-di-protezione-sull-exchange).
 
-    A protection the exchange no longer has, executed or cancelled already, has nothing left to cancel.
+    A protection the exchange no longer has, executed or cancelled already, has nothing left to cancel: the whole
+    cancellation can go again after a temporary error (ADR protezioni-ritentate-nel-ciclo).
     """
 
     def __init__(
@@ -40,12 +38,5 @@ class CancelProtectionsUseCase:
         access = self._access.execute(OpenTradingAccessCommand(position.account_id))
         exchange = supported_exchange(self._exchanges, access.exchange)
         for protection in placed:
-            _cancel(exchange, access, protection)
+            cancel_protection(exchange, access, protection)
         self._protections.remove(position.account_id, position.asset)
-
-
-def _cancel(exchange: ProtectionExchangePort, access: TradingAccess, protection: PlacedProtection) -> None:
-    try:
-        exchange.cancel(access, protection.asset, protection.exchange_order_id)
-    except ExchangeRejectedOrderError:
-        return

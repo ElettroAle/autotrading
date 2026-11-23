@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.hyperliquid.orders import (
     _field,
     _held_position_of,
     _market_of,
+    _oid_of,
     _require_ok,
     _translated,
     _wallet_of,
@@ -52,7 +53,8 @@ class HyperliquidProtectionExchangeAdapter:
     """Stop loss and take profit on Hyperliquid with the official SDK: trigger orders at the market, reduce only, in the
     `positionTpsl` grouping that ties them to the whole position (R3.1.2, ADR ordini-di-protezione-sull-exchange).
 
-    Each carries the `cloid` the platform gave it, so its execution belongs to the flow. No retries.
+    Each carries the `cloid` the platform gave it, so its execution belongs to the flow, and by it the cycle asks for a
+    protection before placing it again (ADR protezioni-ritentate-nel-ciclo). No retries.
     """
 
     def __init__(
@@ -78,6 +80,14 @@ class HyperliquidProtectionExchangeAdapter:
             response = self._exchange(access).bulk_orders([request], grouping="positionTpsl")
         oid = _placed_oid(response, access)
         return str(oid) if oid is not None else self._oid_by_cloid(access, order)
+
+    def find(self, access: TradingAccess, order: ProtectionOrder) -> str | None:
+        with _translated(access):
+            status = self._sdk.info(self._base_url, self._timeout).query_order_by_cloid(
+                _field(access, ACCOUNT_ADDRESS), Cloid.from_str(order.client_order_id.hex)
+            )
+        oid = _oid_of(status)
+        return None if oid is None else str(oid)
 
     def cancel(self, access: TradingAccess, asset: str, order_id: str) -> None:
         with _translated(access):
@@ -114,14 +124,10 @@ class HyperliquidProtectionExchangeAdapter:
 
     def _oid_by_cloid(self, access: TradingAccess, order: ProtectionOrder) -> str:
         """A protection accepted to wait for its price without its identifier in the answer is looked up by `cloid`."""
-        with _translated(access):
-            status = self._sdk.info(self._base_url, self._timeout).query_order_by_cloid(
-                _field(access, ACCOUNT_ADDRESS), Cloid.from_str(order.client_order_id.hex)
-            )
-        try:
-            return str(int(cast("Mapping[str, Mapping[str, Mapping[str, int]]]", status)["order"]["order"]["oid"]))
-        except SHAPE_ERRORS as error:
-            raise OrderExchangeUnavailableError from error
+        oid = self.find(access, order)
+        if oid is None:
+            raise OrderExchangeUnavailableError
+        return oid
 
     def _exchange(self, access: TradingAccess) -> Exchange:
         return self._sdk.exchange(_wallet_of(access), self._base_url, _field(access, ACCOUNT_ADDRESS), self._timeout)
