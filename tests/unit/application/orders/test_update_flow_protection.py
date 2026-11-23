@@ -8,7 +8,6 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.errors import OrderExchangeUnavailableError
 from autotrading.application.orders.sending import RetriedCalls
 from autotrading.application.orders.update_flow_protection import (
@@ -29,6 +28,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
+from tests.support.retries import unlimited_retry
 from tests.support.trading import HYPERLIQUID, new_access
 
 FLOW_ID = UUID("7d0c6a52-4b0e-4f7e-9c55-2f1d0b8e6a11")
@@ -47,7 +47,7 @@ class Bench:
         self.store = ProtectionStore()
         self.protections = InMemoryProtectionRepositoryAdapter(self.store, TENANT)
         self.waits = FakePauseAdapter()
-        self.calls = RetriedCalls(TransientRetry(self.waits))
+        self.calls = RetriedCalls(unlimited_retry(self.waits))
         self.use_case = UpdateFlowProtectionUseCase(
             {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}, self.protections
         )
@@ -253,7 +253,7 @@ def test_an_exchange_that_does_not_answer_fails_the_update(bench: Bench) -> None
     with pytest.raises(OrderExchangeUnavailableError):
         bench.update(stop=62000)
 
-    assert bench.waits.pauses == [5.0, 15.0]
+    assert bench.waits.pauses == [5.0, 15.0, 30.0, 60.0, 120.0]
 
 
 # ADR-protezioni-ritentate-nel-ciclo: an update is retried as a placement and a cancellation, each with its own rule.
