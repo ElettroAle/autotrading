@@ -1,5 +1,5 @@
 // ADR-chiusura-di-emergenza-nella-dashboard (R3.2.3): one feature, emergency-closing, with one command for the three
-// scopes, built on the shared confirmation; the pages of the flow, of the accounts and «Generale» compose it, and no
+// scopes, built on the shared confirmation; the pages of the flow, of the account and «Generale» compose it, and no
 // other code calls the emergency closing of the API.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -31,11 +31,11 @@ const SHARED_CONFIRMATION = "from '@/components/ui/confirmation-dialog'";
 
 /**
  * The pages that offer the emergency closing, one per scope; every flow from «Generale» of the settings (ADR
- * voce-generale-con-la-zona-pericolosa).
+ * voce-generale-con-la-zona-pericolosa), an account from its own page (ADR zona-di-emergenza-nella-pagina-del-conto).
  */
 const PAGES = [
   'app/routes/app/flow-settings.tsx',
-  'app/routes/app/accounts.tsx',
+  'app/routes/app/account.tsx',
   'app/routes/app/general-settings.tsx',
 ];
 
@@ -108,12 +108,12 @@ describe('ADR-chiusura-di-emergenza-nella-dashboard: one command, composed by th
     const files = [
       command ?? file('', ''),
       flowPage ?? file('', ''),
-      file('app/routes/app/accounts.tsx', '<button>Chiusura di emergenza</button>'),
+      file('app/routes/app/account.tsx', '<button>Chiusura di emergenza</button>'),
       homePage ?? file('', ''),
     ];
 
     expect(pagesWithoutTheCommand(files)).toEqual([
-      'app/routes/app/accounts.tsx: non compone EmergencyClosingCommand',
+      'app/routes/app/account.tsx: non compone EmergencyClosingCommand',
     ]);
   });
 

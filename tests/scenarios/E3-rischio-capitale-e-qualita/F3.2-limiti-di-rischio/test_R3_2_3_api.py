@@ -265,16 +265,11 @@ def open_flow_settings(emergency: Emergency, user: str, name: str) -> None:
     emergency.open_page(user, {f"{EMERGENCY_COMMAND} del flusso {name}": EmergencyScope(flow_id=flow.id)})
 
 
-@when(quoted('"{user}" apre nella dashboard la pagina dei conti'))
-def open_accounts_page(emergency: Emergency, user: str) -> None:
-    accounts = emergency.platform.use_cases_of(user).list_accounts.execute()
-    emergency.open_page(
-        user,
-        {
-            f"{EMERGENCY_COMMAND} del conto {account.name.value}": EmergencyScope(account_id=account.id.value)
-            for account in accounts
-        },
-    )
+@when(quoted('"{user}" apre nella dashboard la pagina del conto "{account}"'))
+def open_account_page(emergency: Emergency, platform: Platform, user: str, account: str) -> None:
+    # The page of an account offers the emergency closing of that account only (Bug 632).
+    scope = EmergencyScope(account_id=platform.account_named(user, account).id.value)
+    emergency.open_page(user, {f"{EMERGENCY_COMMAND} del conto {account}": scope})
 
 
 @when(quoted('"{user}" apre nella dashboard le impostazioni generali'))
@@ -412,15 +407,11 @@ def all_closing_in_zone(emergency: Emergency, zone: str) -> None:
     assert emergency.zone == {f"{EMERGENCY_COMMAND} di tutti i flussi": len(emergency.owners)}
 
 
-@then(
-    quoted(
-        'il riquadro "{zone}" in fondo alla pagina contiene la chiusura di emergenza dei conti "{first}" e "{second}"'
-    )
-)
-def accounts_closing_in_zone(emergency: Emergency, zone: str, first: str, second: str) -> None:
+@then(quoted('la chiusura di emergenza del conto "{account}" sta nel riquadro "{zone}" in fondo alla pagina'))
+def account_closing_in_zone(emergency: Emergency, account: str, zone: str) -> None:
     assert zone == "Zona di emergenza"
-    # alfa and beta on the first account, gamma on the second (background).
-    assert emergency.zone == {f"{EMERGENCY_COMMAND} del conto {first}": 2, f"{EMERGENCY_COMMAND} del conto {second}": 1}
+    # alfa and beta on the account test-1 (background).
+    assert emergency.zone == {f"{EMERGENCY_COMMAND} del conto {account}": 2}
 
 
 @then(quoted('il riquadro "{zone}" non contiene altri comandi'))
@@ -445,9 +436,9 @@ def flows_list_without_emergency(emergency: Emergency) -> None:
     assert all(emergency.flow_position_open(name) for name in emergency.owners)
 
 
-@then("i comandi dei conti non contengono la chiusura di emergenza")
-def account_commands_without_emergency(emergency: Emergency) -> None:
-    # Opening the page runs no closing: only the command of the zone does, once confirmed.
+@then("l'elenco dei conti non contiene la chiusura di emergenza")
+def accounts_list_without_emergency(emergency: Emergency) -> None:
+    # The list of the accounts reads only the accounts: no closing and no count of positions to close starts from it.
     assert emergency.nothing_run()
     assert all(emergency.flow_position_open(name) for name in emergency.owners)
 
