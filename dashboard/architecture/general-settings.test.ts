@@ -66,7 +66,7 @@ const conforming = (): SourceFile[] => [
   ),
   file(LAYOUT, "{ name: 'Generale', to: paths.generalSettings.getHref(), area: [] }"),
   file(HOME, '<FlowsList />'),
-  file('app/routes/app/accounts.tsx', "<EmergencyClosingCommand scope={{ kind: 'account' }} />"),
+  file('app/routes/app/account.tsx', "<EmergencyClosingCommand scope={{ kind: 'account' }} />"),
 ];
 
 const replaced = (files: readonly SourceFile[], path: string, source: string): SourceFile[] =>

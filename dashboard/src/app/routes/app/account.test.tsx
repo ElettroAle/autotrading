@@ -2,12 +2,14 @@ import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { fakePlatform } from '@/testing/mocks/platform';
+import { anOpenPosition } from '@/testing/mocks/positions';
 import { fakeReconciliation } from '@/testing/mocks/reconciliation';
 import { partsAfter, renderApp } from '@/testing/test-utils';
 
 const ACCOUNT_ID = 'account-principale';
 const ACCOUNT_PAGE = `/accounts/${ACCOUNT_ID}`;
 const TABS = ['Panoramica', 'Riconciliazione', 'Capitale', 'Impostazioni'];
+const EMERGENCY_ZONE = 'Zona di emergenza';
 
 const tabs = (): Promise<HTMLElement> =>
   screen.findByRole('navigation', { name: 'Schede del conto' });
@@ -97,6 +99,48 @@ describe('AccountRoute', () => {
 
     expect(await screen.findByText('Conto non trovato.')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: 'Schede del conto' })).toBeNull();
+    expect(screen.queryByRole('region', { name: EMERGENCY_ZONE })).toBeNull();
+  });
+
+  // ADR zona-di-emergenza-nella-pagina-del-conto: the emergency closing of the account alone, at the bottom of its page,
+  // whichever tab is open.
+  it.each([
+    ['Panoramica', ACCOUNT_PAGE],
+    ['Riconciliazione', `${ACCOUNT_PAGE}/reconciliation`],
+    ['Capitale', `${ACCOUNT_PAGE}/capital`],
+    ['Impostazioni', `${ACCOUNT_PAGE}/settings`],
+  ])(
+    'keeps the emergency closing of the account alone at the bottom of the tab %s',
+    async (name, url) => {
+      await renderApp({ account: 'anna', url });
+      expect(await tab(name)).toHaveAttribute('aria-current', 'page');
+
+      const zone = await screen.findByRole('region', { name: EMERGENCY_ZONE });
+      expect(
+        within(zone)
+          .getAllByRole('button')
+          .map((button) => button.textContent),
+      ).toEqual(['Chiusura di emergenza del conto principale']);
+      expect(partsAfter(zone)).toEqual([]);
+    },
+  );
+
+  it('asks to confirm the emergency closing of the account, closing nothing before', async () => {
+    fakePlatform.addFlow('anna', 'alfa', { assets: ['BTC'] });
+    fakePlatform.holdPositions('alfa', [anOpenPosition({ asset: 'BTC' })]);
+    await renderApp({ account: 'anna', url: ACCOUNT_PAGE });
+    const zone = await screen.findByRole('region', { name: EMERGENCY_ZONE });
+
+    await userEvent.click(
+      within(zone).getByRole('button', { name: 'Chiusura di emergenza del conto principale' }),
+    );
+
+    expect(
+      await screen.findByRole('alertdialog', { name: 'Conferma della chiusura di emergenza' }),
+    ).toHaveTextContent(
+      'Chiudere 1 posizione dei flussi del conto principale e metterli in pausa?',
+    );
+    expect(fakePlatform.emergencyClosings()).toBe(0);
   });
 
   it('goes back to the accounts from the page the dashboard was opened on', async () => {
@@ -164,7 +208,7 @@ describe('AccountRoute', () => {
       expect(within(credentials).queryByRole('form')).toBeNull();
     });
 
-    it('keeps the removal alone in the zone of danger at the bottom of the page', async () => {
+    it('keeps the removal alone in the zone of danger, followed only by the zone of emergency', async () => {
       await renderApp({ account: 'anna', url: SETTINGS });
 
       const zone = await screen.findByRole('region', { name: 'Zona pericolosa' });
@@ -173,7 +217,8 @@ describe('AccountRoute', () => {
           .getAllByRole('button')
           .map((button) => button.textContent),
       ).toEqual(['Rimuovi']);
-      expect(partsAfter(zone)).toEqual([]);
+      const emergencyZone = screen.getByRole('region', { name: EMERGENCY_ZONE });
+      expect(partsAfter(zone).every((part) => emergencyZone.contains(part))).toBe(true);
     });
 
     it('removes the account once confirmed and goes back to the accounts', async () => {
