@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
+import { Card } from '@/components/ui/card';
 import { CommandButton } from '@/components/ui/command-button';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
@@ -75,10 +76,7 @@ export const RegisterAccountForm = () => {
   });
 
   return (
-    <section
-      aria-labelledby="register-account-title"
-      className="rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby="register-account-title">
       <h2 id="register-account-title" className="mb-2 text-xl font-semibold">
         Nuovo conto
       </h2>
@@ -132,6 +130,6 @@ export const RegisterAccountForm = () => {
           </p>
         )}
       </form>
-    </section>
+    </Card>
   );
 };

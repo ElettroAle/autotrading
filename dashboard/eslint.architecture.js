@@ -5,9 +5,10 @@
 // icone-con-lucide-react-e-comandi-condivisi). The query string changes through the shared hook of src/hooks/use-search-change.ts, never with a function
 // of the last render (ADR 0166). A test creates the client of TanStack Query with the configuration of the platform (ADR
 // test-della-dashboard-deterministici). A list counts its period from when it receives it, never from the clock of its
-// render (ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo). Every rule is proved red on a violating example in
-// architecture/structure.test.ts, the last two in architecture/query-client-in-tests.test.ts and
-// architecture/list-interval-fixed.test.ts.
+// render (ADR intervallo-delle-liste-fissato-alla-scelta-del-periodo). A box of a feature or a route is the shared Card,
+// never a border and a padding without a background (ADR card-condivisa-distinta-dallo-sfondo). Every rule is proved red
+// on a violating example in architecture/structure.test.ts, the last three in architecture/query-client-in-tests.test.ts,
+// architecture/list-interval-fixed.test.ts and architecture/card-distinct-from-the-background.test.ts.
 import { readdirSync } from 'node:fs';
 
 import checkFile from 'eslint-plugin-check-file';
@@ -82,6 +83,27 @@ const CLOCK_IN_THE_RENDER = [
   {
     selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
     message: LIST_INTERVAL_MESSAGE,
+  },
+];
+
+// A box of a feature or a route is the shared Card of src/components/ui/card.tsx, filled apart from the slate background
+// of the page: classes with a border and an inner padding but no background give a box that shows the page through
+// it (ADR card-condivisa-distinta-dallo-sfondo).
+const CARD_MESSAGE =
+  'un riquadro con bordo e spaziatura interna è la Card di src/components/ui/card.tsx, con uno sfondo distinto da quello della pagina (ADR card-condivisa-distinta-dallo-sfondo)';
+
+const BORDER_CLASS = String.raw`/(^|\s)border(-[0-9]+)?(\s|$)/`;
+const PADDING_CLASS = String.raw`/(^|\s)p-[0-9]/`;
+const BACKGROUND_CLASS = String.raw`/(^|\s)bg-/`;
+
+const BOX_WITHOUT_BACKGROUND = [
+  {
+    selector: `Literal[value=${BORDER_CLASS}][value=${PADDING_CLASS}]:not([value=${BACKGROUND_CLASS}])`,
+    message: CARD_MESSAGE,
+  },
+  {
+    selector: `TemplateElement[value.raw=${BORDER_CLASS}][value.raw=${PADDING_CLASS}]:not([value.raw=${BACKGROUND_CLASS}])`,
+    message: CARD_MESSAGE,
   },
 ];
 
@@ -295,7 +317,7 @@ export default tseslint.config(
   {
     files: ['src/features/**/*.{ts,tsx}', 'src/app/**/*.{ts,tsx}'],
     ignores: TEST_FILES,
-    rules: { 'no-restricted-syntax': ['error', ...CLOCK_IN_THE_RENDER] },
+    rules: { 'no-restricted-syntax': ['error', ...CLOCK_IN_THE_RENDER, ...BOX_WITHOUT_BACKGROUND] },
   },
   {
     files: TEST_FILES,

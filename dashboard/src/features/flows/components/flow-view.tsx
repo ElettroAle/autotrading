@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Icon } from '@/components/ui/icons/icon';
@@ -88,7 +89,7 @@ export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) =>
   const realMoney = isRealMoney(account?.network);
   return (
     <>
-      <section aria-label={flow.name} className="mb-4 rounded border border-slate-200 bg-white p-4">
+      <Card as="section" aria-label={flow.name} className="mb-4">
         {/* One gap between the status and the notice of the network, with no margin of their own (ADR
             spaziatura-tra-stato-e-avviso-della-rete). */}
         <div className="flex items-start gap-2">
@@ -114,7 +115,7 @@ export const FlowView = ({ flowId, renderCommands, children }: FlowViewProps) =>
           )}
         </div>
         <FlowCommandsOf flow={flow} realMoney={realMoney} renderCommands={renderCommands} />
-      </section>
+      </Card>
       {children}
     </>
   );
