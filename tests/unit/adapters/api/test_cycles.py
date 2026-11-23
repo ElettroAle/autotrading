@@ -290,6 +290,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             },
             "model": flow.configuration.model.name,
             "version": flow.configuration.version,
+            "assets": ["BTC"],
             "last_cycle": {"planned_at": "2026-11-12T10:07:00Z", "outcome": "concluso"},
             "next_cycle_at": "2026-11-12T10:22:00Z",
             "currency": "USDC",
@@ -320,6 +321,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
             "openings_suspension": None,
             "model": paused.configuration.model.name,
             "version": paused.configuration.version,
+            "assets": ["BTC"],
             "last_cycle": None,
             "next_cycle_at": None,
             "currency": "USDC",
@@ -341,7 +343,7 @@ def test_the_flows_in_use_answer_with_their_last_and_next_cycle(client_of: Clien
 
 
 def test_a_flow_without_initial_capital_answers_without_a_return() -> None:
-    summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None, 1)
+    summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None, 1, ("BTC",))
     state = FlowState(FlowId.new(), "USDC", Decimal(0), (), Decimal("12.50"), Decimal(0), Decimal(0))
     overview = FlowOverview(summary, "dev", (), None, FlowResults(state, Decimal(0), 0))
 
@@ -350,6 +352,23 @@ def test_a_flow_without_initial_capital_answers_without_a_return() -> None:
     assert (response.initial_capital, response.current_capital, response.return_percent) == ("0", "12.5", None)
     assert response.summary is not None
     assert (response.summary.total_gain_percent, response.summary.period_gain_percent) == (None, None)
+
+
+def test_a_flow_answers_its_assets_in_the_order_of_the_configuration() -> None:
+    summary = FlowSummary(uuid4(), "alfa", "test-1", "fermo", None, "openrouter/deepseek-chat", None, 1, ("ETH", "SOL"))
+    state = FlowState(FlowId.new(), "USDC", Decimal(100), (), Decimal(100), Decimal(0), Decimal(0))
+
+    response = FlowOverviewResponse.of(FlowOverview(summary, "dev", (), None, FlowResults(state, Decimal(0), 0)))
+
+    assert response.assets == ["ETH", "SOL"]
+
+
+def test_a_draft_without_assets_answers_an_empty_list() -> None:
+    summary = FlowSummary(uuid4(), "gamma", "", "bozza", None, "openrouter/deepseek-chat", None, 1, ())
+
+    response = FlowOverviewResponse.of(FlowOverview(summary, "dev", (), None, None))
+
+    assert response.assets == []
 
 
 def test_the_flows_in_use_answer_their_results_in_the_period_asked_for(client_of: Client, platform: Platform) -> None:

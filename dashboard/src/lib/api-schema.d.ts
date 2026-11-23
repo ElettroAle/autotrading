@@ -2511,6 +2511,8 @@ export interface components {
             model: string;
             /** Version */
             version: number;
+            /** Assets */
+            assets: string[];
             last_cycle: components["schemas"]["LastCycleResponse"] | null;
             /** Next Cycle At */
             next_cycle_at: string | null;

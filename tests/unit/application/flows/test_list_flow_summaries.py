@@ -8,7 +8,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.support.accounts import an_account
-from tests.support.flows import a_flow
+from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
 STARTED = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -68,3 +68,21 @@ def test_a_draft_has_no_account_and_plans_nothing() -> None:
     [summary] = summaries_of(flows, AccountStore()).execute()
 
     assert (summary.name, summary.status, summary.account, summary.schedule) == ("alfa (copia)", "bozza", "", None)
+
+
+def test_a_flow_carries_the_assets_of_its_version_in_force_in_the_order_of_the_configuration() -> None:
+    flows = FlowStore()
+    flows.flows.append(a_flow(TENANT, configuration=a_configuration(assets=("ETH", "SOL", "BTC"))))
+
+    [summary] = summaries_of(flows, AccountStore()).execute()
+
+    assert summary.assets == ("ETH", "SOL", "BTC")
+
+
+def test_a_draft_without_assets_carries_none() -> None:
+    flows = FlowStore()
+    flows.flows.append(a_flow(TENANT, status=FlowStatus.STOPPED).duplicated())
+
+    [summary] = summaries_of(flows, AccountStore()).execute()
+
+    assert summary.assets == ()

@@ -130,3 +130,36 @@ Then(
     await expect(dashboard.flowFact(flow, 'Rendimento')).toHaveClass(/text-slate-/);
   },
 );
+
+// Bug 731: the assets of the version in force, in the order of the configuration.
+Given(
+  'che il flusso {string} opera su {string}, {string} e {string}',
+  async ({}, flow: string, first: string, second: string, third: string) => {
+    fakePlatform.changeFlow(flow, { assets: [first, second, third] });
+  },
+);
+
+Given('una bozza {string} senza asset configurati', async ({ memory }, flow: string) => {
+  fakePlatform.giveFlowTo(memory.account, flow);
+  fakePlatform.changeFlow(flow, {
+    status: 'bozza',
+    accountId: null,
+    allocatedCapital: null,
+    assets: [],
+  });
+});
+
+Then(
+  "il flusso {string} mostra gli asset {string} nell'ordine della configurazione",
+  async ({ dashboard }, flow: string, assets: string) => {
+    await expect(dashboard.flowFact(flow, 'Asset')).toHaveText(assets);
+  },
+);
+
+Then(
+  'la bozza {string} mostra gli asset {string}',
+  async ({ dashboard }, flow: string, assets: string) => {
+    await expect(dashboard.flowFact(flow, 'Stato')).toHaveText('bozza');
+    await expect(dashboard.flowFact(flow, 'Asset')).toHaveText(assets);
+  },
+);
