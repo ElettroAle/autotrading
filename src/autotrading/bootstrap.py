@@ -49,6 +49,15 @@ from autotrading.adapters.outbound.openrouter.model_catalog import OpenRouterMod
 from autotrading.adapters.outbound.process_memory.composition import (
     RememberedAccountActivity,
     process_memory_adapters,
+    process_memory_cycle_notices_adapters,
+)
+from autotrading.adapters.outbound.process_memory.cycle_notices import (
+    ProcessMemoryOpeningBlockedNoticeAdapter,
+    ProcessMemoryOpeningReducedNoticeAdapter,
+    ProcessMemoryOpeningsSuspendedNoticeAdapter,
+    ProcessMemoryOrderRejectedNoticeAdapter,
+    ProcessMemoryPositionClosedNoticeAdapter,
+    ProcessMemoryPositionOpenedNoticeAdapter,
 )
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.smtp.composition import smtp_adapters
@@ -526,7 +535,10 @@ def cycle_of(
             notify, SqlAlchemyFlowStatusAdapter(engine, tenant_id, HYPERLIQUID_SETTLEMENT_CURRENCY)
         )
         closed_positions = SqlAlchemyClosedPositionRepositoryAdapter(engine, tenant_id)
-        closing_notice = NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        notices = process_memory_cycle_notices_adapters()
+        closing_notice = ProcessMemoryPositionClosedNoticeAdapter(
+            NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY), notices
+        )
         activity = ReadAccountActivityUseCase(accounts, opener, activity_readers)
         ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         protections = SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)
@@ -575,8 +587,10 @@ def cycle_of(
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
-                NotifyOrderRejectedUseCase(notify_flow),
-                NotifyPositionOpenedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                ProcessMemoryOrderRejectedNoticeAdapter(NotifyOrderRejectedUseCase(notify_flow), notices),
+                ProcessMemoryPositionOpenedNoticeAdapter(
+                    NotifyPositionOpenedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY), notices
+                ),
                 RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
@@ -584,11 +598,13 @@ def cycle_of(
         loss_guard = GuardFlowLossUseCase(
             SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
             SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
-            NotifyOpeningsSuspendedUseCase(notify_flow),
+            ProcessMemoryOpeningsSuspendedNoticeAdapter(NotifyOpeningsSuspendedUseCase(notify_flow), notices),
             clock,
         )
-        reduced_notice = NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
-        blocked_notice = NotifyOpeningBlockedUseCase(notify_flow)
+        reduced_notice = ProcessMemoryOpeningReducedNoticeAdapter(
+            NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY), notices
+        )
+        blocked_notice = ProcessMemoryOpeningBlockedNoticeAdapter(NotifyOpeningBlockedUseCase(notify_flow), notices)
         retry = TransientRetry(system_clock_pause_adapters(), clock)
         send_orders = SendCycleOrdersUseCase(
             ExecuteCycleOrdersUseCase(
@@ -677,7 +693,7 @@ def cycle_of(
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
         equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))
-        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints, retry), guards, equity)
+        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints, retry), guards, equity, notices)
 
     return cycle_for
 

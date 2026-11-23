@@ -1016,6 +1016,16 @@ class CycleEquityPort[S = object](Protocol):
         ...
 
 
+class CycleNoticesPort(Protocol):
+    """The notices the steps of one cycle gave, held until the cycle recorded its state (ADR
+    notifiche-del-ciclo-dopo-lo-stato-registrato).
+    """
+
+    def release(self) -> None:
+        """Delivers every notice held, in the order the steps gave them, and holds none after."""
+        ...
+
+
 class EquitySnapshotRepositoryPort(Protocol):
     """Bound to the tenant of the request or of the cycle: it never shows the equity of a flow of another tenant."""
 
