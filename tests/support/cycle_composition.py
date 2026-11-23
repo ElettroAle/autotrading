@@ -51,6 +51,7 @@ from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCa
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
 from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
@@ -139,6 +140,7 @@ def run_cycle_for(
 ) -> WorkerCycle:
     """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104)."""
     ports = ports_of(tenant_id)
+    retry = TransientRetry(services.pause)
     check_risk = CheckRiskUseCase(services.exchange_limits)
     loss_guard = GuardFlowLossUseCase(
         ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock
@@ -178,6 +180,7 @@ def run_cycle_for(
             ports.opening_reduced_notice,
             ports.opening_blocked_notice,
             ports.send_orders,
+            retry,
         ),
         end=ports.end_cycle,
         journal=JsonCycleJournalAdapter(services.environment),
@@ -194,7 +197,7 @@ def run_cycle_for(
         consecutive_failures=PauseAfterConsecutiveFailuresUseCase(ports.flows, ports.consecutive_failures, pause),
         expired_keys=PauseFlowsOnExpiredKeysUseCase(ports.flow_keys, ports.flows, pause, services.clock),
     )
-    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
+    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints, retry), guards, ports.equity)
 
 
 def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:

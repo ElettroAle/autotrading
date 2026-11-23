@@ -20,7 +20,14 @@ from autotrading.application.flows.errors import (
 )
 from autotrading.application.flows.run_cycle import RunCycleCommand
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord, StepDocument
+from autotrading.domain.flows.cycle_record import (
+    AbsentSource,
+    CycleFailure,
+    CycleOutcome,
+    CycleRecord,
+    FailedAttempt,
+    StepDocument,
+)
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.flow import Flow
@@ -70,6 +77,7 @@ def everything_recorded(command: RunCycleCommand) -> CycleRecord:
         cost=CallCost(2000, 500, Decimal("0.0031")),
         model_attempts=2,
         trigger=command.trigger,
+        failed_attempts=(FailedAttempt(CycleStep.READ_FLOW_STATE, 1, "FlowExchangeUnavailableError", "riprovare"),),
     )
 
 

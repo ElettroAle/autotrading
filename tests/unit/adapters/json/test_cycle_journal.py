@@ -28,12 +28,14 @@ from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_account import CycleAccount
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
+from autotrading.domain.flows.cycle_record import FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.risk_outcome import BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
@@ -273,3 +275,17 @@ def test_an_opening_without_its_fields_is_recorded_without_direction() -> None:
 
 def test_a_result_other_than_the_decisions_of_the_agent_records_none() -> None:
     assert journal().recorded_decisions(object()) == ()
+
+
+def test_the_orders_sent_again_give_their_failed_attempts_named_by_asset() -> None:
+    attempt = FailedOrderAttempt("BTC", 1, "OrderExchangeUnavailableError", "exchange non raggiungibile")
+
+    attempts = JsonCycleJournalAdapter("dev").failed_attempts(CycleStep.ORDER_EXECUTION, ("ordine BTC", attempt))
+
+    assert attempts == (
+        FailedAttempt(CycleStep.ORDER_EXECUTION, 1, "OrderExchangeUnavailableError", "BTC: exchange non raggiungibile"),
+    )
+
+
+def test_a_result_that_is_not_a_sequence_has_no_failed_attempts() -> None:
+    assert JsonCycleJournalAdapter("dev").failed_attempts(CycleStep.RISK_CHECK, {"esiti": []}) == ()

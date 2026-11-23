@@ -19,7 +19,7 @@ from autotrading.application.flows.read_flow_cost import ReadFlowCostCommand
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_page import CyclePage
-from autotrading.domain.flows.cycle_record import CycleFailure, CycleRecord
+from autotrading.domain.flows.cycle_record import CycleFailure, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import FlowCost
 
@@ -34,6 +34,23 @@ class FailureResponse(BaseModel):
         if failure is None:
             return None
         return cls(step=failure.step.value, error_type=failure.error_type, message=failure.message)
+
+
+class FailedAttemptResponse(BaseModel):
+    """An attempt of a step that failed, the first one being 1 (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    """
+
+    step: str
+    attempt: int
+    error_type: str
+    message: str
+
+    @classmethod
+    def of(cls, attempt: FailedAttempt) -> FailedAttemptResponse:
+        return cls(
+            step=attempt.step.value, attempt=attempt.attempt, error_type=attempt.error_type, message=attempt.message
+        )
 
 
 class CallCostResponse(BaseModel):
@@ -120,6 +137,9 @@ class CycleDetailResponse(BaseModel):
     model_attempts: int | None
     # scheduled or on_demand: what started the cycle (R6.5.2).
     trigger: str
+    # Every attempt of a step that failed, retried in the same cycle or the one that stopped it (ADR
+    # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    failed_attempts: list[FailedAttemptResponse]
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleDetailResponse:
@@ -141,6 +161,7 @@ class CycleDetailResponse(BaseModel):
             cost=CallCostResponse.of(record.cost),
             model_attempts=record.model_attempts,
             trigger=record.trigger.value,
+            failed_attempts=[FailedAttemptResponse.of(attempt) for attempt in record.failed_attempts],
         )
 
 

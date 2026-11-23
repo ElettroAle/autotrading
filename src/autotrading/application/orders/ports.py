@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.margin_mode import MarginMode
@@ -60,6 +61,18 @@ class ExchangePort(Protocol):
 
     def find_order(self, access: TradingAccess, order: MarketOrder) -> Execution | None:
         """The execution of an order looked up by its client order id, or None if the exchange has none."""
+
+
+class SendingRetryPort(Protocol):
+    """Calls again, after a wait, what failed with a temporary error, in the cycle that sends the orders (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    """
+
+    def run[T](self, call: Callable[[], T], failed: Callable[[int, AutotradingError], None]) -> T:
+        """The answer of the first attempt that goes through; a permanent error at once, or the last temporary one
+        when none goes through. Every failed attempt is told to `failed` with its number, the first being 1.
+        """
+        ...
 
 
 class ProtectionExchangePort(Protocol):

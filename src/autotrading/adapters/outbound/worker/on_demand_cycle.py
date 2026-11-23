@@ -13,7 +13,14 @@ from autotrading.application.flows.errors import (
     OnDemandCycleFailedError,
 )
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleFailure, CycleOutcome, CycleRecord, StepDocument
+from autotrading.domain.flows.cycle_record import (
+    AbsentSource,
+    CycleFailure,
+    CycleOutcome,
+    CycleRecord,
+    FailedAttempt,
+    StepDocument,
+)
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -116,6 +123,10 @@ def _record_of(flow_id: UUID, response: httpx.Response) -> CycleRecord:
             else CallCost(cost["input_tokens"], cost["output_tokens"], _decimal(cost["cost_usd"])),
             model_attempts=body["model_attempts"],
             trigger=CycleTrigger(body["trigger"]),
+            failed_attempts=tuple(
+                FailedAttempt(CycleStep(item["step"]), item["attempt"], item["error_type"], item["message"])
+                for item in body["failed_attempts"]
+            ),
         )
     except (KeyError, TypeError, ValueError, InvalidOperation) as error:
         raise CycleWorkerUnavailableError from error

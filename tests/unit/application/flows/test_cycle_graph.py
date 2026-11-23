@@ -8,11 +8,11 @@ import pytest
 from autotrading.application.flows.cycle_graph import CompletedCycle, FailedCycle, PlannedCycle, real_seconds
 from autotrading.application.flows.ports import FailedModelCall, ReversedExecutions, SourceReading
 from autotrading.domain.flows.call_cost import CallCost
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.trade_side import TradeSide
-from tests.fakes.cycles import FakeTransientError
+from tests.fakes.cycles import FakePermanentError, FakeTransientError
 from tests.support.cycles import Cycles, at
 
 
@@ -150,7 +150,7 @@ def test_a_completed_cycle_gives_the_state_of_the_flow_at_its_end(cycles: Cycles
 
 def test_a_failed_cycle_gives_the_last_state_of_the_flow_it_read(cycles: Cycles) -> None:
     cycles.add_flow("alfa")
-    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.UPDATE_FLOW_STATE, FakeTransientError("timeout"))
+    cycles.failures.fail_always(cycles.id_of("alfa"), CycleStep.UPDATE_FLOW_STATE, FakeTransientError("timeout"))
 
     outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
 
@@ -172,7 +172,7 @@ def test_a_cycle_failed_recording_itself_gives_the_state_of_the_flow_at_its_end(
 
 def test_a_cycle_failed_reading_the_flow_gives_no_state(cycles: Cycles) -> None:
     cycles.add_flow("alfa")
-    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
+    cycles.failures.fail_always(cycles.id_of("alfa"), CycleStep.READ_FLOW_STATE, FakeTransientError("timeout"))
 
     outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
 
@@ -236,7 +236,7 @@ def test_a_cycle_failed_in_the_decision_before_any_call_records_no_call(cycles: 
 
 def test_a_cycle_failed_after_the_decision_keeps_the_cost_of_the_answered_call(cycles: Cycles) -> None:
     cycles.add_flow("alfa")
-    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+    cycles.failures.fail_always(cycles.id_of("alfa"), CycleStep.RISK_CHECK, FakeTransientError("timeout"))
     cycles.journal.failed = FailedModelCall(None, attempts=1)
     cycles.journal.attempts = 3
 
@@ -279,7 +279,7 @@ def test_a_cycle_failed_after_the_decision_keeps_its_decisions(cycles: Cycles) -
     cycles.add_flow("alfa")
     flow_id = cycles.id_of("alfa")
     cycles.agent.decisions[flow_id] = ["BTC"]
-    cycles.failures.fail_once(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+    cycles.failures.fail_always(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"))
 
     outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
 
@@ -303,7 +303,8 @@ def test_a_resumed_cycle_records_the_decisions_taken_before_it_stopped(cycles: C
     cycles.add_flow("alfa")
     flow_id = cycles.id_of("alfa")
     cycles.agent.decisions[flow_id] = ["BTC"]
-    cycles.failures.fail_once(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"))
+    # Every attempt of the first run fails; the run that resumes it goes through.
+    cycles.failures.fail(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"), times=3)
     graph = cycles.graph()
     graph.run(planned(cycles), at("10:00:00"))
     cycles.agent.decisions[flow_id] = []
@@ -375,3 +376,107 @@ def test_an_interrupted_reversal_resumes_without_sending_the_orders_again(cycles
     assert len(cycles.orders.sent) == 1
     assert len(cycles.reversal.calls) == 1
     assert record.steps == tuple(CycleStep)
+
+
+RETRIED_STEPS = (
+    CycleStep.READ_FLOW_STATE,
+    CycleStep.COMPOSE_CONTEXT,
+    CycleStep.RISK_CHECK,
+    CycleStep.UPDATE_FLOW_STATE,
+)
+
+
+# ADR-errori-temporanei-ritentati-in-ogni-passo-del-ciclo: the port of a step is called again in the same cycle.
+@pytest.mark.parametrize("step", RETRIED_STEPS)
+def test_a_temporary_error_of_a_step_is_retried_and_the_cycle_completes(cycles: Cycles, step: CycleStep) -> None:
+    cycles.add_flow("alfa")
+    cycles.failures.fail_once(cycles.id_of("alfa"), step, FakeTransientError("exchange non raggiungibile"))
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert record.steps == tuple(CycleStep)
+    assert record.failed_attempts == (FailedAttempt(step, 1, "FakeTransientError", "exchange non raggiungibile"),)
+    assert cycles.waits.pauses == [5.0]
+
+
+@pytest.mark.parametrize("step", RETRIED_STEPS)
+def test_three_temporary_errors_of_a_step_fail_the_cycle_with_every_attempt(cycles: Cycles, step: CycleStep) -> None:
+    cycles.add_flow("alfa")
+    error = FakeTransientError("timeout")
+    cycles.failures.fail_always(cycles.id_of("alfa"), step, error)
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.error is error
+    assert outcome.record.failure is not None
+    assert outcome.record.failure.step is step
+    assert outcome.record.failed_attempts == tuple(
+        FailedAttempt(step, attempt, "FakeTransientError", "timeout") for attempt in (1, 2, 3)
+    )
+    assert cycles.waits.pauses == [5.0, 15.0]
+
+
+def test_a_permanent_error_of_a_step_is_not_retried(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    cycles.failures.fail_once(
+        flow_id, CycleStep.READ_FLOW_STATE, FakePermanentError("credenziali del conto non valide")
+    )
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert cycles.flows.reads == [flow_id]
+    assert cycles.waits.pauses == []
+    assert outcome.record.failed_attempts == (
+        FailedAttempt(CycleStep.READ_FLOW_STATE, 1, "FakePermanentError", "credenziali del conto non valide"),
+    )
+
+
+def test_the_decision_of_the_agent_keeps_its_own_attempts_and_is_not_retried_by_the_cycle(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    cycles.failures.fail_once(flow_id, CycleStep.AGENT_DECISION, FakeTransientError("timeout del modello"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert cycles.agent.calls == [flow_id]
+    assert (outcome.record.failed_attempts, cycles.waits.pauses) == ((), [])
+
+
+def test_an_order_that_fails_is_never_retried_by_the_cycle(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC", "ETH"]
+    cycles.orders.unanswered.add("ETH")
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert [order for _flow, _planned, order in cycles.orders.sent] == ["BTC"]
+    assert cycles.waits.pauses == []
+
+
+def test_the_attempts_that_failed_inside_the_orders_go_in_the_record(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    retried = FailedAttempt(CycleStep.ORDER_EXECUTION, 1, "OrderExchangeUnavailableError", "BTC: non risponde")
+    cycles.agent.decisions[flow_id] = ["BTC"]
+    cycles.orders.failed_attempts = (retried,)
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert record.failed_attempts == (retried,)
+
+
+def test_the_attempts_that_failed_in_the_reversal_go_in_the_record(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.agent.decisions[cycles.id_of("alfa")] = ["BTC"]
+    cycles.risk.reversing = True
+    retried = FailedAttempt(CycleStep.ORDER_EXECUTION, 1, "FlowExchangeUnavailableError", "exchange non raggiungibile")
+    cycles.reversal.failed_attempts = (retried,)
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert record.failed_attempts == (retried,)

@@ -38,6 +38,7 @@ from autotrading.application.flows.record_outside_closing import RecordOutsideCl
 from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
@@ -273,6 +274,7 @@ class FlowCycles:
                 cancel_protections,
                 UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
             ),
+            TransientRetry(self.pause),
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(

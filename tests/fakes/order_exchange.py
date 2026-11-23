@@ -59,6 +59,11 @@ class FakeOrderExchangeAdapter:
         self.fill_at: tuple[Decimal, Decimal] | None = None
         # The exchange stops answering once this many orders are executed.
         self.unreachable_after_orders: int | None = None
+        # The next readings of a position or a market that fail, the next sendings that never reach the exchange,
+        # and the next ones it executes but whose answer is lost.
+        self.unreached_readings = 0
+        self.unreached_sendings = 0
+        self.lost_answers = 0
         # The PnL every closing realizes, when a scenario fixes it.
         self.realized_on_close = REALIZED_ON_CLOSE
         # Who hears every execution, as the account of the address shows it after the order.
@@ -70,11 +75,13 @@ class FakeOrderExchangeAdapter:
     def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
         self.signers.append(access)
         self._require_reachable()
+        self._fail_reading()
         return self.positions.get((access.value("account_address"), coin))
 
     def market(self, access: TradingAccess, coin: str) -> Market:
         self.signers.append(access)
         self._require_reachable()
+        self._fail_reading()
         market = self.markets.get(coin)
         if market is None:
             raise ExchangeRejectedOrderError(UNKNOWN_ASSET)
@@ -90,6 +97,13 @@ class FakeOrderExchangeAdapter:
     def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
         self.sent.append(order)
         self._require_reachable()
+        if self.unreached_sendings > 0:
+            self.unreached_sendings -= 1
+            raise OrderExchangeUnavailableError
+        if self.lost_answers > 0:
+            self.lost_answers -= 1
+            self._execute(access, order)
+            raise OrderExchangeUnavailableError
         if self.rejection is not None:
             raise ExchangeRejectedOrderError(self.rejection)
         if order.reduce_only and self.closing_rejection is not None:
@@ -140,6 +154,11 @@ class FakeOrderExchangeAdapter:
         self.positions[key] = HeldPosition(
             order.coin, order.direction, held + size, self.leverages.get(key, 1), entry_price
         )
+
+    def _fail_reading(self) -> None:
+        if self.unreached_readings > 0:
+            self.unreached_readings -= 1
+            raise OrderExchangeUnavailableError
 
     def _require_reachable(self) -> None:
         exhausted = self.unreachable_after_orders is not None and len(self.executions) >= self.unreachable_after_orders

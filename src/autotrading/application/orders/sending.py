@@ -18,6 +18,29 @@ def supported_exchange[E](exchanges: Mapping[str, E], exchange_name: str) -> E:
     return exchange
 
 
+class OrderSending:
+    """One order of a cycle sent until the exchange answers, always with the same client order id (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+
+    An attempt that failed may have reached the exchange: before the order goes again the exchange is asked for it by
+    its client order id, and an order it knows is never sent twice. Only an order it does not know goes again.
+    """
+
+    def __init__(self, exchange: ExchangePort, access: TradingAccess, request: OrderRequest) -> None:
+        self._exchange = exchange
+        self._access = access
+        self._request = request
+        self._tried = False
+
+    def attempt(self) -> Order:
+        if self._tried:
+            known = self._exchange.find_order(self._access, self._request.market_order)
+            if known is not None:
+                return Order.executed(self._request, known)
+        self._tried = True
+        return send_order(self._exchange, self._access, self._request)
+
+
 def send_order(exchange: ExchangePort, access: TradingAccess, request: OrderRequest) -> Order:
     """Sends the order once, never again: a refusal is an outcome, an order without answer is looked up (R0.3.3)."""
     try:
