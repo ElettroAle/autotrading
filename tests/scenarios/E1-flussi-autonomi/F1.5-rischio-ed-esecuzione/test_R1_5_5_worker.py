@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.orders.cancel_protections import CancelProtectionsUseCase
 from autotrading.application.orders.execute_flow_orders import (
     ExecuteFlowOrdersCommand,
@@ -21,6 +22,7 @@ from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderStatus
 from autotrading.domain.orders.protection_request import ProtectionRequest
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
@@ -67,7 +69,12 @@ class FlowExecution:
             UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
         )
         use_case = ExecuteFlowOrdersUseCase(
-            trading.accesses.use_case, exchanges, trading.orders, trading.slippage, protection
+            trading.accesses.use_case,
+            exchanges,
+            trading.orders,
+            trading.slippage,
+            protection,
+            TransientRetry(FakePauseAdapter()),
         )
         command = ExecuteFlowOrdersCommand(
             trading.accounts[self.account], self.flows[flow], self.cycle(cycle), tuple(self.approved)

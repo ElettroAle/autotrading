@@ -2027,6 +2027,8 @@ export interface components {
             model_attempts: number | null;
             /** Trigger */
             trigger: string;
+            /** Failed Attempts */
+            failed_attempts: components["schemas"]["FailedAttemptResponse"][];
         };
         /**
          * CyclePageResponse
@@ -2260,6 +2262,21 @@ export interface components {
          * @enum {string}
          */
         ExpiryStatus: "unknown" | "valid" | "expiring" | "expired";
+        /**
+         * FailedAttemptResponse
+         * @description An attempt of a step that failed, the first one being 1 (ADR
+         *     errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+         */
+        FailedAttemptResponse: {
+            /** Step */
+            step: string;
+            /** Attempt */
+            attempt: number;
+            /** Error Type */
+            error_type: string;
+            /** Message */
+            message: string;
+        };
         /** FailureResponse */
         FailureResponse: {
             /** Step */

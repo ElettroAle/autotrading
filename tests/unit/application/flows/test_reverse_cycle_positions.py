@@ -8,14 +8,20 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
+import pytest
+
 from autotrading.application.flows.check_risk import CheckRiskUseCase
 from autotrading.application.flows.ports import ReversedExecutions
 from autotrading.application.flows.read_cycle_flow import ReadCycleFlowCommand
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsCommand
 from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePositionsUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrder
+from autotrading.domain.flows.cycle_record import FailedAttempt
+from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
@@ -25,9 +31,11 @@ from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening
 from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.cycles import FakePermanentError, FakeTransientError
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.opening_blocked_notices import FakeOpeningBlockedNoticeAdapter
 from tests.fakes.opening_reduced_notices import FakeOpeningReducedNoticeAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.support.flows import a_configuration, a_flow
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
@@ -57,11 +65,16 @@ def reversal(asset: str = "BTC", side: TradeSide = TradeSide.LONG, fraction: str
 
 
 class ExecutionsRecorder:
+    """Records the executions of the account; it fails first with the errors the test gives it, one per call."""
+
     def __init__(self) -> None:
         self.commands: list[RecordAccountExecutionsCommand] = []
+        self.failing: list[AutotradingError] = []
 
     def execute(self, command: RecordAccountExecutionsCommand) -> object:
         self.commands.append(command)
+        if self.failing:
+            raise self.failing.pop(0)
         return ()
 
 
@@ -105,6 +118,7 @@ class Bench:
         self.limits = FakeExchangeLimitsAdapter()
         self.reduced = FakeOpeningReducedNoticeAdapter()
         self.blocked = FakeOpeningBlockedNoticeAdapter()
+        self.waits = FakePauseAdapter()
 
     def reverse(self, *orders: CycleOrder) -> ReversedExecutions:
         use_case = ReverseCyclePositionsUseCase(
@@ -115,6 +129,7 @@ class Bench:
             self.reduced,
             self.blocked,
             self.sender,
+            TransientRetry(self.waits),
         )
         return use_case.execute(FLOW.id.value, PLANNED_AT, ANCHOR, orders)
 
@@ -210,3 +225,34 @@ def test_orders_without_reversals_have_no_second_step() -> None:
 
     assert reversed_ == ReversedExecutions((), ())
     assert (bench.recorder.commands, bench.reader.commands, bench.sender.sent) == ([], [], [])
+
+
+# ADR-errori-temporanei-ritentati-in-ogni-passo-del-ciclo: the readings after the closes are retried, never the orders.
+def test_a_temporary_error_of_the_readings_after_the_closes_is_retried_and_recorded() -> None:
+    bench = Bench(cycle_flow())
+    bench.recorder.failing = [FakeTransientError("exchange non raggiungibile")]
+
+    reversed_ = bench.reverse(reversal())
+
+    assert len(bench.recorder.commands) == 2
+    assert len(bench.sender.sent) == 1
+    assert bench.waits.pauses == [5.0]
+    assert reversed_.failed_attempts == (
+        FailedAttempt(CycleStep.ORDER_EXECUTION, 1, "FakeTransientError", "exchange non raggiungibile"),
+    )
+
+
+def test_a_permanent_error_of_the_readings_after_the_closes_sends_nothing() -> None:
+    bench = Bench(cycle_flow())
+    bench.recorder.failing = [FakePermanentError("credenziali del conto non valide")]
+
+    with pytest.raises(FakePermanentError):
+        bench.reverse(reversal())
+
+    assert (len(bench.recorder.commands), bench.sender.sent, bench.waits.pauses) == (1, [], [])
+
+
+def test_a_reversal_without_failures_records_no_failed_attempt() -> None:
+    reversed_ = Bench(cycle_flow()).reverse(reversal())
+
+    assert reversed_.failed_attempts == ()

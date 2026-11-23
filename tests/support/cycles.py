@@ -9,6 +9,7 @@ from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFl
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleCommand, RunCycleUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
@@ -40,6 +41,7 @@ from tests.fakes.cycles import (
     RecordedConsecutiveFailurePausesAdapter,
     RecordedCycleFailuresAdapter,
 )
+from tests.fakes.pause import FakePauseAdapter
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 # One second of the cycle lasts ten milliseconds of the test.
@@ -69,6 +71,8 @@ class Cycles:
         self.reversal = FakeReversalAdapter()
         self.journal = FakeCycleJournalAdapter()
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
+        # The waits before a step is retried, asked and never waited.
+        self.waits = FakePauseAdapter()
         self.failure_notices = RecordedCycleFailuresAdapter()
         self.consecutive_failures = RecordedConsecutiveFailurePausesAdapter(self.failure_notices)
         self.equity = InMemoryCycleEquityAdapter()
@@ -108,7 +112,13 @@ class Cycles:
             FakeCycleEndAdapter(self.flows),
             self.journal,
         )
-        return CycleGraph(steps, self.records, self.checkpoints, lambda wait: wait.total_seconds() * SECOND)
+        return CycleGraph(
+            steps,
+            self.records,
+            self.checkpoints,
+            TransientRetry(self.waits),
+            lambda wait: wait.total_seconds() * SECOND,
+        )
 
     def _executor(self) -> PlanFlowCyclesUseCase:
         run_cycle = self.run_cycle()

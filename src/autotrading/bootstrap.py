@@ -192,6 +192,7 @@ from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.notifications.answer_bot_messages import AnswerBotMessagesUseCase
 from autotrading.application.notifications.check_key_expiries import CheckKeyExpiriesUseCase
 from autotrading.application.notifications.deliver_outbox_message import DeliverOutboxMessageUseCase
@@ -588,6 +589,7 @@ def cycle_of(
         )
         reduced_notice = NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
         blocked_notice = NotifyOpeningBlockedUseCase(notify_flow)
+        retry = TransientRetry(system_clock_pause_adapters())
         send_orders = SendCycleOrdersUseCase(
             ExecuteCycleOrdersUseCase(
                 ExecuteFlowOrdersUseCase(
@@ -602,6 +604,7 @@ def cycle_of(
                         cancel_protections,
                         UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
                     ),
+                    retry,
                 ),
                 follow_flow_orders,
                 ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
@@ -651,6 +654,7 @@ def cycle_of(
                 reduced_notice,
                 blocked_notice,
                 send_orders,
+                retry,
             ),
             end=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             journal=JsonCycleJournalAdapter(environment),
@@ -673,7 +677,7 @@ def cycle_of(
         )
         checkpoints = SqlAlchemyCycleCheckpointsAdapter(engine, tenant_id)
         equity = RecordCycleEquityUseCase(SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id))
-        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints), guards, equity)
+        return RunCycleUseCase(CycleGraph(steps, cycles, checkpoints, retry), guards, equity)
 
     return cycle_for
 

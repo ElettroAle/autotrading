@@ -23,7 +23,7 @@ paths:
 - Leva massima e passo della dimensione dell'asset vengono dall'exchange; le regole di controllo e
   di arrotondamento stanno nel domain. La quantità si arrotonda per difetto, ma per eccesso di un passo quando un
   valore che rispetta il minimo dell'exchange scenderebbe sotto di esso (ADR 0066).
-- Nessun nuovo tentativo automatico di un ordine fallito (R0.3.3).
+- Nessun nuovo tentativo automatico di un ordine rifiutato dall'exchange (R0.3.3). Nel ciclo un invio fallito per un errore temporaneo si ritenta con lo stesso `cloid`, dopo aver chiesto all'exchange se lo conosce (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
 - Ogni posizione si apre con margine isolato (`MarginMode.per_position()`, ADR 0095): il caso d'uso lo passa
   alla porta con la leva.
 

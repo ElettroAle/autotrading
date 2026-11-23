@@ -8,6 +8,7 @@ from autotrading.application.orders.protect_open_positions import (
     ProtectOpenPositionsUseCase,
 )
 from autotrading.domain.orders.direction import Direction
+from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, FlowUpdate
 from autotrading.domain.orders.order import Order
 from autotrading.domain.orders.protection_note import ProtectionNote
@@ -19,7 +20,8 @@ class ExecuteCycleOrdersUseCase:
     (R1.5.5, R1.7.2, R1.8.2).
 
     First every position of the flow without a stop loss gets the default one (R3.1.2). What the step returns is what
-    the cycle records: the orders sent and the notes of the protection.
+    the cycle records: the orders sent, the notes of the protection and the attempts that failed before an order went
+    through (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
     """
 
     def __init__(
@@ -32,7 +34,7 @@ class ExecuteCycleOrdersUseCase:
         self._follow = follow
         self._protect_open = protect_open
 
-    def execute(self, cycle: CycleOrdersPort) -> tuple[Order | ProtectionNote, ...]:
+    def execute(self, cycle: CycleOrdersPort) -> tuple[Order | ProtectionNote | FailedOrderAttempt, ...]:
         protected = self._protect_open.execute(
             ProtectOpenPositionsCommand(
                 cycle.account_id, cycle.flow_id, tuple(cycle.assets), cycle.default_stop_loss_percent
@@ -49,7 +51,7 @@ class ExecuteCycleOrdersUseCase:
                 cycle.flow_id, cycle.flow_name, cycle.planned_at, sent.orders, sent.unprotected, reversals
             )
         )
-        return (*sent.orders, *protected, *sent.notes)
+        return (*sent.orders, *protected, *sent.notes, *sent.failed_attempts)
 
 
 class _FlowOrderOf:

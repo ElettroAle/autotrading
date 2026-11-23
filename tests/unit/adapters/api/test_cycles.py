@@ -20,6 +20,7 @@ from autotrading.domain.flows.cycle_record import (
     CycleFailure,
     CycleOutcome,
     CycleRecord,
+    FailedAttempt,
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -84,6 +85,7 @@ def a_completed_cycle(flow_id: UUID, planned_at: datetime = PLANNED) -> CycleRec
         ),
         cost=CallCost(2000, 500, Decimal("0.0031")),
         model_attempts=2,
+        failed_attempts=(FailedAttempt(CycleStep.READ_FLOW_STATE, 1, "FlowExchangeUnavailableError", "riprovare"),),
     )
 
 
@@ -168,6 +170,14 @@ def test_the_detail_of_a_cycle_answers_with_everything_recorded(client_of: Clien
         "cost": {"input_tokens": 2000, "output_tokens": 500, "cost_usd": "0.0031"},
         "model_attempts": 2,
         "trigger": "scheduled",
+        "failed_attempts": [
+            {
+                "step": "lettura dello stato del flusso",
+                "attempt": 1,
+                "error_type": "FlowExchangeUnavailableError",
+                "message": "riprovare",
+            }
+        ],
     }
 
 
