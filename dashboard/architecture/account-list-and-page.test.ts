@@ -30,10 +30,12 @@ const importsOf = (source: string): string[] =>
   [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1] ?? '');
 
 // What the element of the list may show of the account: its link, its network and state, its two amounts, its menu,
-// and the expiry of its credentials (ADR-scadenza-nelle-pagine-chiavi-e-conti).
+// and the expiry of its credentials (ADR-scadenza-nelle-pagine-chiavi-e-conti). The element is drawn in the shared Card,
+// which shows nothing of the account (ADR-card-condivisa-distinta-dallo-sfondo).
 const ITEM_PARTS = [
   'react',
   'react-router',
+  '@/components/ui/card',
   '@/components/ui/details-list',
   '@/components/ui/network-notice',
   '@/config/paths',

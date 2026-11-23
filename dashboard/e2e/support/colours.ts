@@ -53,3 +53,24 @@ export const isAmber = ({ red, green, blue }: Rgb): boolean =>
 /** How light a colour looks, from 0 (black) to 255 (white). */
 export const lightnessOf = ({ red, green, blue }: Rgb): number =>
   0.2126 * red + 0.7152 * green + 0.0722 * blue;
+
+/** The colour of the page behind an element: the background of its nearest ancestor that paints one. */
+export const backdropColourOf = async (locator: Locator): Promise<Rgb> => {
+  const [red = 0, green = 0, blue = 0, alpha = 0] = await locator.evaluate((element) => {
+    const context = document.createElement('canvas').getContext('2d');
+    if (context === null) {
+      return [];
+    }
+    const painted = (candidate: Element): boolean =>
+      getComputedStyle(candidate).backgroundColor !== 'rgba(0, 0, 0, 0)';
+    let ancestor = element.parentElement;
+    while (ancestor !== null && !painted(ancestor)) {
+      ancestor = ancestor.parentElement;
+    }
+    context.fillStyle =
+      ancestor === null ? 'rgb(255, 255, 255)' : getComputedStyle(ancestor).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    return [...context.getImageData(0, 0, 1, 1).data];
+  });
+  return { red, green, blue, alpha };
+};

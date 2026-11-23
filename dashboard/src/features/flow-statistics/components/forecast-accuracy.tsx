@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { usePeriod } from '@/components/ui/period-selector/use-period';
@@ -70,15 +71,12 @@ const AccuracyEntry = ({ accuracy }: { accuracy: Accuracy }) => {
 const AccuracyPanel = ({ children }: { children: ReactNode }) => {
   const titleId = useId();
   return (
-    <section
-      aria-labelledby={titleId}
-      className="mt-4 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby={titleId} className="mt-4">
       <h3 id={titleId} className="mb-2 text-lg font-semibold">
         Errore della previsione
       </h3>
       {children}
-    </section>
+    </Card>
   );
 };
 

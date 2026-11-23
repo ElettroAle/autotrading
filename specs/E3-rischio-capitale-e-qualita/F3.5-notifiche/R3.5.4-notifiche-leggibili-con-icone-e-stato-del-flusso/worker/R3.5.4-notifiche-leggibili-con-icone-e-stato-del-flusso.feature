@@ -14,15 +14,16 @@ Funzionalità: R3.5.4 Notifiche leggibili con icone e stato del flusso
 
   Contesto:
     Dato che "anna" ha la chat Telegram collegata
-    E che il flusso "alfa" vale 312,40 USDC, ha PnL dall'avvio +12,40 USDC, 2 posizioni aperte ed è attivo
 
   Scenario: Posizione aperta
+    Dato che il flusso "alfa" vale 312,40 USDC, ha PnL dall'avvio +12,40 USDC, 2 posizioni aperte ed è attivo
     Quando "alfa" apre una posizione long su BTC
     Allora "anna" riceve una notifica che inizia con "🟢 alfa: posizione aperta"
     E i valori della posizione uno per riga
     E in fondo "Flusso: 312,40 USDC · PnL +12,40 USDC · 2 posizioni aperte · attivo"
 
   Schema dello scenario: Icona per evento
+    Dato che il flusso "alfa" vale 312,40 USDC, ha PnL dall'avvio +12,40 USDC, 2 posizioni aperte ed è attivo
     Quando accade <evento> nel flusso "alfa"
     Allora la notifica inizia con "<icona>"
 
@@ -36,11 +37,39 @@ Funzionalità: R3.5.4 Notifiche leggibili con icone e stato del flusso
       | pausa per errore permanente | ⏸️    |
 
   Scenario: Stessa notifica per email
-    Dato che "anna" riceve le notifiche anche per email
+    Dato che il flusso "alfa" vale 312,40 USDC, ha PnL dall'avvio +12,40 USDC, 2 posizioni aperte ed è attivo
+    E che "anna" riceve le notifiche anche per email
     Quando "alfa" apre una posizione
     Allora l'email ha oggetto "🟢 alfa: posizione aperta" e lo stesso contenuto del messaggio Telegram
 
   Scenario: Allarme del conto senza stato del flusso
+    Dato che il flusso "alfa" vale 312,40 USDC, ha PnL dall'avvio +12,40 USDC, 2 posizioni aperte ed è attivo
     Quando sul conto "test-1" si apre un allarme di riconciliazione
     Allora "anna" riceve una notifica che inizia con "🚨 test-1: allarme di riconciliazione"
     E la notifica non ha lo stato del flusso
+
+  Scenario: Apertura al primo ciclo
+    Dato un flusso "alfa" avviato che non ha ancora concluso un ciclo
+    Quando al primo ciclo "alfa" apre una posizione su "AVAX"
+    Allora la notifica "posizione aperta" termina con lo stato "1 posizione aperta"
+    E la riga di stato riporta il valore del flusso dopo l'apertura
+
+  Scenario: Apertura con posizioni già presenti
+    Dato che "alfa" ha 1 posizione aperta
+    Quando in un ciclo "alfa" apre una posizione su "DOGE"
+    Allora la notifica "posizione aperta" termina con lo stato "2 posizioni aperte"
+
+  Scenario: Chiusura dell'unica posizione
+    Dato che "alfa" ha 1 posizione aperta
+    Quando in un ciclo "alfa" chiude la posizione
+    Allora la notifica "posizione chiusa" termina con lo stato "nessuna posizione aperta"
+
+  Scenario: Ordine rifiutato
+    Dato che "alfa" ha 1 posizione aperta
+    Quando in un ciclo un ordine di "alfa" è rifiutato dall'exchange
+    Allora la notifica "ordine rifiutato" termina con lo stato "1 posizione aperta"
+
+  Scenario: Flusso senza alcun valore letto
+    Dato un flusso "beta" fermo che non ha mai girato
+    Quando parte una notifica di "beta"
+    Allora la riga di stato dice "valore non disponibile"

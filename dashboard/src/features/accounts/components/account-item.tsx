@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { Link } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { DETAILS_GRID } from '@/components/ui/details-list';
 import { NetworkBadge } from '@/components/ui/network-notice';
 import { paths } from '@/config/paths';
@@ -22,10 +23,7 @@ import { ReconciliationState } from './reconciliation-state';
 export const AccountItem = ({ account }: { readonly account: Account }) => {
   const titleId = useId();
   return (
-    <article
-      aria-labelledby={titleId}
-      className="relative min-w-0 rounded border border-slate-200 bg-white p-4 hover:border-blue-300"
-    >
+    <Card as="article" aria-labelledby={titleId} className="relative min-w-0 hover:border-blue-300">
       {/* Room on the right of the head for the menu «Azioni» in the corner. */}
       <header className="flex flex-wrap items-center gap-x-3 gap-y-1 pr-28">
         <h2 id={titleId} className="min-w-0 text-lg font-semibold wrap-anywhere">
@@ -52,6 +50,6 @@ export const AccountItem = ({ account }: { readonly account: Account }) => {
         </Detail>
       </dl>
       <AccountActions account={account} />
-    </article>
+    </Card>
   );
 };
