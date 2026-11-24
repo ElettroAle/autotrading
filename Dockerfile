@@ -32,7 +32,7 @@ CMD ["forecaster.service:create_application", "--factory", "--host", "0.0.0.0", 
 
 # The dashboard has its own image (ADR 0116, ADR 0117): the Vite build, served read only by the small Node server of
 # dashboard/server as the non-root user of the image. No secret: the configuration comes from public variables.
-FROM cgr.dev/chainguard/node:latest-dev@sha256:cd4a4e8d9b0c3aec45b824a15956cae875410419b01649f6672bfb2d9264f35a AS dashboard-build
+FROM cgr.dev/chainguard/node:latest-dev@sha256:87726d08ac62e749ca00666c6b6497e635d0d1baceb3b31ebcdf72f0c922038e AS dashboard-build
 USER root
 WORKDIR /app
 COPY dashboard/package.json dashboard/package-lock.json ./
@@ -40,7 +40,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY dashboard ./
 RUN npx vite build
 
-FROM cgr.dev/chainguard/node:latest@sha256:b643ef822c6540e857516915b51e8fdbe9e8d30bd5df82f0d29dff646bae3527 AS dashboard
+FROM cgr.dev/chainguard/node:latest@sha256:efeb9fd6c61fd20b7c634531e0a746d26204bdc2df13e7ea57ab69aad349a900 AS dashboard
 ARG REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading"       org.opencontainers.image.revision="${REVISION}"
 COPY dashboard/package.json /app/package.json
