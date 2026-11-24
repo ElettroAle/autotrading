@@ -1,5 +1,6 @@
 import base64
 from collections.abc import Callable
+from dataclasses import fields
 from functools import partial
 from pathlib import Path
 from uuid import uuid4
@@ -53,7 +54,9 @@ from autotrading.application.verification.errors import VerificationAccountNotFo
 from autotrading.application.verification.run_verification import RunVerificationCommand
 from autotrading.bootstrap import (
     create_application,
+    create_mcp_application,
     create_worker_application,
+    mcp_use_cases,
     source_systems,
     tenant_use_cases,
     worker_use_cases,
@@ -202,6 +205,43 @@ def test_an_issuer_without_the_rest_of_the_login_refuses_to_start(tmp_path: Path
         create_application(installation_configuration(tmp_path, **{**AUTHENTICATION, name: " "}))
 
     assert raised.value.name == name
+
+
+MCP_SERVER = {**AUTHENTICATION, "MCP_PUBLIC_URL": "https://autotrading.example.ts.net/mcp"}
+
+
+def test_the_mcp_server_starts_with_the_configuration_of_the_api_and_its_public_address(tmp_path: Path) -> None:
+    client = TestClient(create_mcp_application(installation_configuration(tmp_path, APP_VERSION="1.2.1", **MCP_SERVER)))
+
+    assert client.get("/health").json() == {"name": "AutoTrading", "version": "1.2.1"}
+
+
+@pytest.mark.parametrize("name", ["AUTH_ISSUER", "MCP_PUBLIC_URL"])
+def test_the_mcp_server_refuses_to_start_without_the_directory_or_its_address(tmp_path: Path, name: str) -> None:
+    with pytest.raises(MissingConfigurationError) as raised:
+        create_mcp_application(installation_configuration(tmp_path, **{**MCP_SERVER, name: " "}))
+
+    assert raised.value.name == name
+
+
+def test_the_tools_of_the_mcp_server_call_the_use_cases_of_the_api_for_the_tenant(tmp_path: Path) -> None:
+    configuration = installation_configuration(tmp_path)
+    public_key = base64.b64decode(Path(configuration["CREDENTIALS_PUBLIC_KEY_FILE"]).read_text(encoding="utf-8"))
+    worker = worker_adapters(ConfigurationSource(configuration))
+    factory = tenant_use_cases(
+        create_engine("sqlite://"),
+        _sealers(public_key),
+        dev_installation_on_testnet(),
+        (worker, process_memory_adapters()),
+        providers_of(),
+    )
+    tenant_id = TenantId.new()
+    api = factory(tenant_id)
+
+    mcp = mcp_use_cases(lambda asked: api if asked == tenant_id else factory(asked))(tenant_id)
+
+    names = [field.name for field in fields(mcp)]
+    assert [getattr(mcp, name) for name in names] == [getattr(api, name) for name in names]
 
 
 def test_application_refuses_to_start_without_the_credentials_key(tmp_path: Path) -> None:

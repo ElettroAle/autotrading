@@ -11,9 +11,9 @@ SERVICE = re.compile(r"^  ([a-z_-]+):\n((?:    .*\n|\s*\n)*)", re.MULTILINE)
 # A one-shot service is ready when it exits successfully, as its dependants require; it has no health to check.
 ONE_SHOT = 'restart: "no"'
 MEMORY_LIMIT = re.compile(r"^    mem_limit: (\d+)([mg])$", re.MULTILINE)
-# ADR 0165: the long-running services leave about 1.5 GiB of the 4 GiB machine to the system, Docker, Tailscale and
-# the pull of the images.
-LONG_RUNNING_MEMORY_BUDGET_MIB = 2560
+# ADR 0165, raised by ADR budget-di-memoria-alzato-per-il-server-mcp: the long-running services leave about 1.2 GiB of
+# the 4 GiB machine to the system, Docker, Tailscale and the pull of the images.
+LONG_RUNNING_MEMORY_BUDGET_MIB = 2816
 
 
 def _services() -> dict[str, str]:
@@ -36,7 +36,7 @@ def test_every_start_of_the_installation_waits_for_the_services_to_be_healthy() 
 
 
 def test_the_services_are_found_in_the_compose_file() -> None:
-    assert {"postgres", "migrate", "forecaster", "worker", "api"} <= set(_services())
+    assert {"postgres", "migrate", "forecaster", "worker", "api", "mcp"} <= set(_services())
 
 
 def test_the_installation_runs_no_litellm_proxy_and_keeps_none_of_its_secrets() -> None:
@@ -106,4 +106,5 @@ def test_adr_0165_every_limit_is_the_one_tuned_on_the_measured_consumption() -> 
         "worker": 768,
         "api": 384,
         "dashboard": 128,
+        "mcp": 384,
     }

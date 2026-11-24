@@ -30,6 +30,9 @@ class ApiSession:
     def post_as(self, user: str, path: str, body: object = None) -> Response:
         return self._client_of(user).post(path, json=body)
 
+    def put_as(self, user: str, path: str, body: object = None) -> Response:
+        return self._client_of(user).put(path, json=body)
+
     def _client_of(self, user: str) -> TestClient:
         person = self._platform.directory.person(user)
         person.roles.add(USER_ROLE)

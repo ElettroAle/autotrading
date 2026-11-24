@@ -126,6 +126,7 @@ jobs:
           auth-client-id: ${{ vars.AUTH_CLIENT_ID }}
           auth-scope: ${{ vars.AUTH_SCOPE }}
           dashboard-url: ${{ vars.DASHBOARD_URL }}
+          mcp-public-url: ${{ vars.MCP_PUBLIC_URL }}
           telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           grafana-otlp-endpoint: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
           grafana-instance-id: ${{ vars.GRAFANA_INSTANCE_ID }}
@@ -205,6 +206,7 @@ jobs:
           auth-client-id: ${{ vars.AUTH_CLIENT_ID }}
           auth-scope: ${{ vars.AUTH_SCOPE }}
           dashboard-url: ${{ vars.DASHBOARD_URL }}
+          mcp-public-url: ${{ vars.MCP_PUBLIC_URL }}
           telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           grafana-otlp-endpoint: ${{ vars.GRAFANA_OTLP_ENDPOINT }}
           grafana-instance-id: ${{ vars.GRAFANA_INSTANCE_ID }}

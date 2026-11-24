@@ -76,6 +76,7 @@ src/autotrading/
       <verbo>_<oggetto>.py      un caso d'uso per modulo
   adapters/                     livello 3: tecnologie, ognuna incapsulata
     inbound/api/                FastAPI
+    inbound/mcp/                server MCP degli strumenti dei flussi (container mcp)
     outbound/<tecnologia>/      un sistema integrato per cartella: hyperliquid/, libsodium/, sqlalchemy/,
                                 json/, oidc/, threads/, system_clock/, telegram/, worker/, rss/,
                                 alternative_me/, coinmarketcap/, arkham/, binance/, lunarcrush/, litellm/,
@@ -316,6 +317,7 @@ Feature `F<n>.<m>`, User Story `R<n>.<m>.<k>`; il tag di ogni elemento è il suo
 | `context-agent.md` | contesto `agent` (F1.4) |
 | `context-notifications.md` | contesto `notifications` (F1.8) |
 | `tech-fastapi.md` | `adapters/inbound/api/**` |
+| `tech-mcp.md` | `adapters/inbound/mcp/**` |
 | `tech-hyperliquid.md` | `adapters/outbound/hyperliquid/**` |
 | `tech-libsodium.md` | `adapters/outbound/libsodium/**` |
 | `tech-json.md` | `adapters/outbound/json/**` |
