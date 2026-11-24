@@ -1,4 +1,5 @@
 import { EquityChart, type ChartEvent } from '@/components/charts/equity-chart';
+import { Card } from '@/components/ui/card';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import {
@@ -72,10 +73,7 @@ const EquityPoints = ({ flowId, period }: { flowId: string; period: Period }) =>
 export const EquityCurve = ({ flowId }: { flowId: string }) => {
   const [period] = usePeriod();
   return (
-    <section
-      aria-labelledby="equity-curve"
-      className="mt-4 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby="equity-curve" className="mt-4">
       <h3 id="equity-curve" className="mb-3 text-lg font-semibold">
         Equity curve
       </h3>
@@ -84,6 +82,6 @@ export const EquityCurve = ({ flowId }: { flowId: string }) => {
       ) : (
         <p className="text-slate-600">Scegli l&apos;inizio e la fine dell&apos;intervallo.</p>
       )}
-    </section>
+    </Card>
   );
 };

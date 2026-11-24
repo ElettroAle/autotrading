@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { NetworkBadge } from '@/components/ui/network-notice';
@@ -35,13 +36,14 @@ export const AccountView = ({ accountId, children }: AccountViewProps) => {
   return (
     <>
       <ExpiringCredentialsNotice accounts={[account]} />
-      <section
+      <Card
+        as="section"
         aria-label={account.name}
-        className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded border border-slate-200 bg-white p-4"
+        className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2"
       >
         <NetworkBadge network={account.network} networkName={account.network_name} />
         <ReconciliationState account={account} />
-      </section>
+      </Card>
       {children}
     </>
   );

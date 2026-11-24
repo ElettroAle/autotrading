@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { ErrorMessage } from '@/components/ui/error-message';
 
 import { useRequestLinkCode, type LinkCode } from '../api/request-link-code';
@@ -37,10 +38,7 @@ const IssuedCode = ({ issued }: { issued: LinkCode }) => (
 export const LinkCodePanel = () => {
   const linkCode = useRequestLinkCode();
   return (
-    <section
-      aria-labelledby="link-code-title"
-      className="rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby="link-code-title">
       <h3 id="link-code-title" className="text-lg font-semibold">
         Collegamento
       </h3>
@@ -54,6 +52,6 @@ export const LinkCodePanel = () => {
       </button>
       {linkCode.isError && <ErrorMessage error={linkCode.error} prefix="Operazione non riuscita" />}
       {linkCode.isSuccess && <IssuedCode issued={linkCode.data} />}
-    </section>
+    </Card>
   );
 };

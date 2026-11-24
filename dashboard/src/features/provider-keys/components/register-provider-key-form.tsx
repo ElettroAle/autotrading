@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
+import { Card } from '@/components/ui/card';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
@@ -71,10 +72,7 @@ export const RegisterProviderKeyForm = () => {
   });
 
   return (
-    <section
-      aria-labelledby="register-provider-key-title"
-      className="rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby="register-provider-key-title">
       <h2 id="register-provider-key-title" className="mb-2 text-xl font-semibold">
         Nuova chiave
       </h2>
@@ -120,6 +118,6 @@ export const RegisterProviderKeyForm = () => {
           </p>
         )}
       </form>
-    </section>
+    </Card>
   );
 };

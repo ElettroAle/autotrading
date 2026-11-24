@@ -20,6 +20,7 @@ from autotrading.domain.flows.cycle_record import (
     CycleFailure,
     CycleOutcome,
     CycleRecord,
+    FailedAttempt,
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -62,6 +63,7 @@ def a_failed_cycle(flow_id: UUID, planned_at: datetime = PLANNED) -> CycleRecord
         documents=(StepDocument(CycleStep.COMPOSE_CONTEXT, {"messaggi": ["regole"], "margine": "50.10"}),),
         cost=CallCost(2000, 500, Decimal("0.0031")),
         model_attempts=4,
+        failed_attempts=(FailedAttempt(CycleStep.READ_FLOW_STATE, 1, "FlowExchangeUnavailableError", "riprovare"),),
     )
 
 

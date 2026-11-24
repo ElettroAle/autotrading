@@ -62,8 +62,9 @@ class CycleOrderClosesFlowError(DomainError):
 
 
 class SimulatedOrderRefusedError(DomainError):
-    """An order the simulated exchange refuses, as the real exchange refuses it: the adapter answers it with the error of
-    the contract of the port (R6.3.2)."""
+    """An order the simulated exchange refuses, as the real exchange refuses it: the adapter answers it with the error
+    of the contract of the port (R6.3.2).
+    """
 
 
 class OrderBelowMinimumValueError(SimulatedOrderRefusedError):

@@ -6,7 +6,8 @@ Funzionalità: R2.2.2 Stato e riepilogo dei flussi
   Perché capisca subito quali flussi vanno bene e quali richiedono attenzione
 
   Per ogni flusso non archiviato la dashboard mostra: nome, stato (attivo, in pausa, fermo) con il motivo
-  dell'eventuale pausa automatica, conto, modello, ultima esecuzione con il suo esito, prossima esecuzione
+  dell'eventuale pausa automatica, conto, modello, asset della versione in vigore nell'ordine della
+  configurazione (Bug 731), ultima esecuzione con il suo esito, prossima esecuzione
   prevista, capitale iniziale, capitale attuale e rendimento complessivo in percentuale (RF-23.02). L'esito degli
   ultimi 10 cicli e l'ambiente non sono più nella scheda: il riepilogo dei risultati li sostituisce (R6.4.2). Il
   capitale attuale è quello dello stato del flusso (R1.6.1); un rendimento negativo è in rosso, uno positivo in
@@ -41,3 +42,13 @@ Funzionalità: R2.2.2 Stato e riepilogo dei flussi
     Dato che il flusso "alfa" ha capitale attuale 300 USDC
     Quando "anna" apre la pagina dei flussi
     Allora il flusso "alfa" mostra rendimento 0,00% in grigio
+
+  Scenario: Asset di un flusso attivo
+    Dato che il flusso "alfa" opera su "ETH", "SOL" e "BTC"
+    Quando "anna" apre la pagina dei flussi
+    Allora il flusso "alfa" mostra gli asset "ETH · SOL · BTC" nell'ordine della configurazione
+
+  Scenario: Bozza senza asset
+    Dato una bozza "gamma" senza asset configurati
+    Quando "anna" apre la pagina dei flussi
+    Allora la bozza "gamma" mostra gli asset "nessuno"

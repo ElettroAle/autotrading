@@ -8,8 +8,9 @@ import { problem } from '@/testing/mocks/responses';
 import { server } from '@/testing/mocks/server';
 import { renderApp } from '@/testing/test-utils';
 
-// ADR chiusura-di-emergenza-nella-dashboard: one command for the three scopes, on the page of the flow, on the page of
-// the accounts and on the list of the flows, with the shared confirmation. The command names its scope, so the zone it
+// ADR chiusura-di-emergenza-nella-dashboard: one command for the three scopes, on the settings of the flow, on the page
+// of the account (ADR zona-di-emergenza-nella-pagina-del-conto) and on the general settings, with the shared
+// confirmation. The command names its scope, so the zone it
 // sits in reads by itself (ADR zona-di-emergenza-in-fondo-alla-pagina).
 const COMMAND = 'Chiusura di emergenza di tutti i flussi';
 const FLOW_COMMAND = 'Chiusura di emergenza del flusso alfa';
@@ -78,7 +79,7 @@ describe('the emergency closing', () => {
   });
 
   it('of an account names the account and the positions of its flows', async () => {
-    await renderApp({ account: 'anna', url: '/accounts' });
+    await renderApp({ account: 'anna', url: '/accounts/account-test-1' });
 
     await click(ACCOUNT_COMMAND);
 

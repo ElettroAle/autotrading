@@ -23,7 +23,7 @@ from autotrading.domain.flows.cycle_filter import CycleFilter
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_order import CycleOrders
 from autotrading.domain.flows.cycle_question import CycleQuestion
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.decision_filter import DecisionFilter
@@ -896,6 +896,9 @@ class ReversedExecutions[E = object]:
 
     executions: tuple[E, ...]
     reversals: object
+    # The attempts of the readings after the closes that failed before one went through (ADR
+    # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    failed_attempts: tuple[FailedAttempt, ...] = ()
 
 
 class PlannedFlowsPort(Protocol):
@@ -1010,6 +1013,16 @@ class CycleEndPort[S = object, E = object](Protocol):
 class CycleEquityPort[S = object](Protocol):
     def execute(self, flow_id: UUID, planned_at: datetime, state: S) -> None:
         """Records the equity of the flow at the cycle, from the last state of the flow the cycle read (R2.2.3)."""
+        ...
+
+
+class CycleNoticesPort(Protocol):
+    """The notices the steps of one cycle gave, held until the cycle recorded its state (ADR
+    notifiche-del-ciclo-dopo-lo-stato-registrato).
+    """
+
+    def release(self) -> None:
+        """Delivers every notice held, in the order the steps gave them, and holds none after."""
         ...
 
 
@@ -1438,6 +1451,14 @@ class FailedModelCall:
     sent: bool = True
 
 
+class CycleWaitPort(Protocol):
+    """Waits before a step of the cycle calls its port again after a temporary error (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    """
+
+    def pause(self, seconds: float) -> None: ...
+
+
 class CycleJournalPort(Protocol):
     """Describes for the record what the steps produced: only the contexts behind the steps know their data."""
 
@@ -1461,6 +1482,12 @@ class CycleJournalPort(Protocol):
 
     def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
         """The decisions of the agent one by asset, as the cycle records them beside its documents (R6.5.4)."""
+        ...
+
+    def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:
+        """The attempts that failed inside the context behind the step before its result came, such as an order sent
+        again after a temporary error (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+        """
         ...
 
 
@@ -1518,7 +1545,11 @@ class DecisionHistoryPort(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class FlowSummary:
-    """A flow in use as the consultation shows it; the schedule is None unless the flow is active (R1.7.3)."""
+    """A flow in use as the consultation shows it; the schedule is None unless the flow is active (R1.7.3).
+
+    The assets are those of the version in force, in the order of the configuration: none for a draft without assets
+    (Bug 731, ADR asset-del-flusso-nel-riepilogo-dei-flussi).
+    """
 
     flow_id: UUID
     name: str
@@ -1528,6 +1559,7 @@ class FlowSummary:
     model: str
     schedule: CycleSchedule | None
     version: int
+    assets: tuple[str, ...]
 
 
 class FlowSummaryPort(Protocol):

@@ -8,6 +8,7 @@ import pytest
 
 from autotrading.adapters.outbound.openrouter.model_call import OpenRouterModelCallAdapter
 from autotrading.application.agent.errors import (
+    ModelAnswerTruncatedError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -298,3 +299,46 @@ def test_a_request_that_never_went_out_was_not_sent(failure: type[httpx.Transpor
         adapter.call(MODEL, KEY, {}, MESSAGES, FORMAT)
 
     assert not raised.value.sent
+
+
+# ADR-risposta-del-modello-interrotta-dal-limite-di-token: an answer cut at the token limit says so, with its usage.
+def cut(content: str | None) -> dict[str, object]:
+    return {
+        "choices": [{"finish_reason": "length", "message": {"role": "assistant", "content": content}}],
+        "usage": {"prompt_tokens": 2000, "completion_tokens": 2048, "cost": 0.004},
+    }
+
+
+@pytest.mark.parametrize("content", [None, "", '{"decisioni": [{"asset": "BT'], ids=["no-text", "empty", "partial"])
+def test_an_answer_cut_at_the_token_limit_names_the_limit_of_the_call(content: str | None) -> None:
+    with pytest.raises(ModelAnswerTruncatedError) as raised:
+        call(OpenRouter(200, cut(content)))
+
+    assert raised.value.max_tokens == 2048
+    assert str(raised.value) == (
+        "risposta del modello interrotta dal limite di 2048 token: alza max_tokens o abbassa il ragionamento del flusso"
+    )
+    assert (raised.value.usage, raised.value.sent) == (ModelUsage(2000, 2048, Decimal("0.004")), True)
+    assert not raised.value.permanent
+
+
+def test_an_answer_cut_without_settings_names_the_default_limit() -> None:
+    with pytest.raises(ModelAnswerTruncatedError) as raised:
+        call(OpenRouter(200, cut(None)), {})
+
+    assert raised.value.max_tokens == 4096
+
+
+def test_an_answer_finished_by_the_model_is_not_cut() -> None:
+    body = {"choices": [{"finish_reason": "stop", "message": {"content": ANSWER}}], "usage": USAGE}
+
+    assert call(OpenRouter(200, body)).text == ANSWER
+
+
+def test_an_answer_cut_without_a_readable_usage_is_an_unexpected_answer() -> None:
+    body = {"choices": [{"finish_reason": "length", "message": {"content": None}}]}
+
+    with pytest.raises(ModelUnavailableError, match="risposta del fornitore inattesa") as raised:
+        call(OpenRouter(200, body))
+
+    assert not isinstance(raised.value, ModelAnswerTruncatedError)

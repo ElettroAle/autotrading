@@ -95,7 +95,7 @@ class ModelUnavailableError(ApplicationError):
         cost_usd: Decimal | None = None,
         attempts: int = 1,
     ) -> None:
-        super().__init__(f"fornitore IA non raggiungibile: {provider.value}: {original}")
+        super().__init__(self._reason(provider, original))
         self.provider = provider
         self.original = original
         self.usage = usage
@@ -106,9 +106,7 @@ class ModelUnavailableError(ApplicationError):
     def priced(self, prices: ModelPrices | None) -> ModelUnavailableError:
         """The same error with the cost of the reported usage, priced as every answered call is (R1.4.6)."""
         cost = None if self.usage is None else self.usage.cost_usd(prices)
-        return ModelUnavailableError(
-            self.provider, self.original, usage=self.usage, sent=self.sent, cost_usd=cost, attempts=self.attempts
-        )
+        return self._spent(self.usage, sent=self.sent, cost_usd=cost, attempts=self.attempts)
 
     def spent_after(self, spend: ModelSpend) -> ModelSpend:
         """What the calls before this one spent, with this call when it went out; tried, it is an attempt anyway
@@ -122,13 +120,55 @@ class ModelUnavailableError(ApplicationError):
         """The same error carrying what every call of the question consumed and how many it tried, the retried ones
         included (R1.4.6, R1.4.9, ADR tentativi-del-modello-registrati-nel-ciclo).
         """
+        return self._spent(spend.usage, sent=spend.sent, cost_usd=spend.cost_usd, attempts=spend.attempts)
+
+    @staticmethod
+    def _reason(provider: ProviderName, original: str) -> str:
+        return f"fornitore IA non raggiungibile: {provider.value}: {original}"
+
+    def _spent(
+        self, usage: ModelUsage | None, *, sent: bool, cost_usd: Decimal | None, attempts: int
+    ) -> ModelUnavailableError:
+        """The same error with what the calls spent: every subclass keeps its own class and data through it."""
         return ModelUnavailableError(
-            self.provider,
-            self.original,
-            usage=spend.usage,
-            sent=spend.sent,
-            cost_usd=spend.cost_usd,
-            attempts=spend.attempts,
+            self.provider, self.original, usage=usage, sent=sent, cost_usd=cost_usd, attempts=attempts
+        )
+
+
+class ModelAnswerTruncatedError(ModelUnavailableError):
+    """The model spent the whole token limit of the flow, often on its reasoning, before it finished the answer.
+
+    The provider was reached and charged the call: the reason is the limit and its remedy, which is in the
+    configuration of the flow. Asked again like any temporary failure, since the next answer is often shorter (Bug 733,
+    ADR risposta-del-modello-interrotta-dal-limite-di-token).
+    """
+
+    def __init__(  # noqa: PLR0913 - the provider and the limit, then what the calls spent, each by name
+        self,
+        provider: ProviderName,
+        max_tokens: int,
+        *,
+        usage: ModelUsage | None = None,
+        sent: bool = False,
+        cost_usd: Decimal | None = None,
+        attempts: int = 1,
+    ) -> None:
+        reason = (
+            f"risposta del modello interrotta dal limite di {max_tokens} token: "
+            "alza max_tokens o abbassa il ragionamento del flusso"
+        )
+        super().__init__(provider, reason, usage=usage, sent=sent, cost_usd=cost_usd, attempts=attempts)
+        self.max_tokens = max_tokens
+
+    @staticmethod
+    def _reason(provider: ProviderName, original: str) -> str:  # noqa: ARG004 - reached, so no provider to name
+        return original
+
+    def _spent(
+        self, usage: ModelUsage | None, *, sent: bool, cost_usd: Decimal | None, attempts: int
+    ) -> ModelUnavailableError:
+        return ModelAnswerTruncatedError(
+            self.provider, self.max_tokens, usage=usage, sent=sent, cost_usd=cost_usd, attempts=attempts
         )
 
 

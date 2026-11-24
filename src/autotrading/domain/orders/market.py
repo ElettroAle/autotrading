@@ -26,7 +26,13 @@ class Market:
     taker_fee_rate: Decimal = Decimal(0)
 
     def __post_init__(self) -> None:
-        if self.max_leverage < 1 or self.size_decimals < 0 or self.mid_price <= 0 or self.min_order_value < 0 or self.taker_fee_rate < 0:
+        if (
+            self.max_leverage < 1
+            or self.size_decimals < 0
+            or self.mid_price <= 0
+            or self.min_order_value < 0
+            or self.taker_fee_rate < 0
+        ):
             raise InvalidMarketError(self.coin)
 
     @property

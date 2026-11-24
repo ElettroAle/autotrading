@@ -148,17 +148,22 @@ Il ciclo decisionale: quando parte, che passi esegue, come fallisce e che cosa n
   decisione dell'agente, controllo del rischio, esecuzione degli ordini, aggiornamento dello stato,
   registrazione.
 - **Transient error**: può non ripetersi al ciclo successivo (rete, fornitore o exchange indisponibile,
-  timeout). Fa fallire solo il ciclo (R1.2.3).
+  timeout). Si ritenta nello stesso ciclo; se nessun tentativo riesce fa fallire solo il ciclo (R1.2.3).
 - **Permanent error**: si ripete finché l'utente non interviene (credito esaurito, chiave IA o credenziali
   revocate). Fa fallire il ciclo e mette in pausa i flussi coinvolti (R1.2.4).
 - **Cycle record**: tutto ciò che il ciclo ha prodotto fino all'ultimo passo eseguito (R1.7.1).
 
 ### Regole
 
-- **Fail fast**: un passo che non riesce solleva un errore tipizzato; il ciclo si interrompe in quel punto,
-  senza nuovi tentativi e senza ordini successivi. Un solo gestore centrale degli errori del ciclo
-  registra il ciclo fallito e, per un errore permanente, mette in pausa i flussi e rilancia comunque
-  (ADR della gestione degli errori).
+- **Fail fast**: un passo che non riesce solleva un errore tipizzato; il ciclo si interrompe al primo errore
+  permanente o quando i tentativi di un errore temporaneo dello stesso passo sono finiti, senza ordini successivi. Un errore temporaneo della porta
+  di un passo si ritenta nello stesso ciclo, fino a 5 volte dopo 5, 15, 30, 60 e 120 secondi e mai oltre metà
+  dell'intervallo del flusso dall'istante previsto (ADR ritentativo-del-ciclo-entro-meta-dell-intervallo), con `TransientRetry` di `application/flows`
+  e l'attesa di `CycleWaitPort`; le fonti restano assenti senza ritentativo (R1.2.5), il modello ha i propri tentativi,
+  e degli ordini si ritenta il solo invio fallito, con lo stesso `cloid`, solo se l'exchange non lo conosce. Ogni
+  tentativo fallito si registra nel ciclo (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo). Un solo gestore
+  centrale degli errori del ciclo registra il ciclo fallito e, per un errore permanente, mette in pausa i flussi e
+  rilancia comunque (ADR della gestione degli errori).
 - La natura transitoria o permanente la calcola l'errore base dal codice del sistema esterno conservato nella causa
   (ADR permanenza-decisa-dall-errore-base), non il punto che lo intercetta.
 - **Nessuna sovrapposizione**: due cicli dello stesso flusso non sono mai in corso insieme, anche tra più

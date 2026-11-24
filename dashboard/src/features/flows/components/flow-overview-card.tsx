@@ -34,6 +34,10 @@ const Fact = ({
 const capitalOf = (amount: string | null, currency: string | null): string =>
   amount === null || currency === null ? 'non disponibile' : `${formatAmount(amount)} ${currency}`;
 
+// The assets of the version in force, in the order of the configuration (ADR asset-del-flusso-nel-riepilogo-dei-flussi).
+const assetsOf = ({ assets }: FlowOverview): string =>
+  assets.length === 0 ? 'nessuno' : assets.join(' · ');
+
 const lastCycleOf = ({ last_cycle }: FlowOverview): string =>
   last_cycle === null
     ? 'nessuna'
@@ -72,6 +76,7 @@ export const FlowOverviewCard = ({ flow }: { flow: FlowOverview }) => (
     >
       <Fact term="Conto">{flow.account}</Fact>
       <Fact term="Modello">{flow.model}</Fact>
+      <Fact term="Asset">{assetsOf(flow)}</Fact>
       <Fact term="Versione">{flow.version}</Fact>
       <Fact term="Ultima esecuzione">{lastCycleOf(flow)}</Fact>
       {flow.next_cycle_at !== null && (

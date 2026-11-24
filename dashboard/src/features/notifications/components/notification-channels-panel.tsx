@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { FormAlert } from '@/components/ui/form/input-field';
@@ -262,10 +263,7 @@ export const NotificationChannelsPanel = () => {
   const channels = useNotificationChannels();
   const reasonsId = useId();
   return (
-    <section
-      aria-labelledby="notification-channels-title"
-      className="space-y-4 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby="notification-channels-title" className="space-y-4">
       <h2 id="notification-channels-title" className="text-xl font-semibold">
         Canali per tipo di evento
       </h2>
@@ -278,6 +276,6 @@ export const NotificationChannelsPanel = () => {
           <Exceptions channels={channels.data} reasonsId={reasonsId} />
         </>
       )}
-    </section>
+    </Card>
   );
 };

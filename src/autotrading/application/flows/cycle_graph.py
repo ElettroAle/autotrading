@@ -33,6 +33,7 @@ from autotrading.application.flows.ports import (
     SourceReading,
     SourceRequest,
 )
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import (
@@ -40,6 +41,7 @@ from autotrading.domain.flows.cycle_record import (
     CycleFailure,
     CycleOutcome,
     CycleRecord,
+    FailedAttempt,
     StepDocument,
 )
 from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
@@ -156,6 +158,13 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
     Every node calls the port of its step; the checkpointer keeps the state after each node, so a cycle resumes from
     the last node done.
     The two executions of a cycle with a reversal are one step of its record (ADR inversione-in-due-passi-nel-ciclo).
+
+    A temporary error of the port of a step is retried in the same cycle by the one policy of the cycle (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo): the sources stay absent instead (R1.2.5), the model has its
+    own attempts (ADR tentativi-del-modello-registrati-nel-ciclo), and the orders are sent again one by one by the
+    orders context, never the whole step, so an order executed is never sent twice. Every failed attempt of a run goes
+    in its record. No new attempt starts beyond half the interval of the flow from the planned instant of the cycle
+    (ADR ritentativo-del-ciclo-entro-meta-dell-intervallo).
     """
 
     def __init__(
@@ -163,19 +172,24 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         steps: CycleSteps[S, D, C, A, O, E],
         cycles: CycleRepositoryPort,
         checkpoints: GraphCheckpoints,
+        retry: TransientRetry,
         seconds_of: Callable[[timedelta], float] = real_seconds,
     ) -> None:
         self._steps = steps
         self._cycles = cycles
         self._checkpoints = checkpoints
+        self._retry = retry
         # The tests compress time; the cycle waits for real seconds.
         self._seconds_of = seconds_of
 
     def run(self, cycle: PlannedCycle, started_at: datetime) -> CompletedCycle[S] | FailedCycle[S]:
         """Runs the cycle from its start, or resumes it from the last node done when it has a checkpoint."""
+        self._retry.limit_to(cycle.schedule.retry_limit(cycle.planned_at))
         thread = self._checkpoints.thread(cycle.flow_id, cycle.planned_at)
+        # The attempts that failed in this run, whichever node they belong to: a list of its own for every run.
+        failed: list[FailedAttempt] = []
         with self._checkpoints.opened() as checkpointer:
-            graph = self._graph(cycle).compile(checkpointer=checkpointer)
+            graph = self._graph(cycle, failed).compile(checkpointer=checkpointer)
             unfinished = bool(graph.get_state({"configurable": {"thread_id": thread}}).next)
             start: CycleState[S, D, C, A, O, E] | None = None if unfinished else {"started_at": started_at}
             # The state after every node: when a node fails, the last one is what the steps before it produced.
@@ -187,21 +201,22 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
                     if part["type"] == "values":
                         state = part["data"]
             except AutotradingError as error:
-                return FailedCycle(self._failed_record(cycle, state, error), error, _last_state(state))
+                return FailedCycle(self._failed_record(cycle, state, error, failed), error, _last_state(state))
         return CompletedCycle(state["record"], state["ended"])
 
-    def _graph(self, cycle: PlannedCycle) -> StateGraph[CycleState[S, D, C, A, O, E]]:
+    def _graph(self, cycle: PlannedCycle, failed: list[FailedAttempt]) -> StateGraph[CycleState[S, D, C, A, O, E]]:
         graph: StateGraph[CycleState[S, D, C, A, O, E]] = StateGraph(CycleState)
-        graph.add_node("load_state", lambda state: self._load_state(cycle))  # noqa: ARG005 - the flow comes first
+        # The flow comes first.
+        graph.add_node("load_state", lambda state: self._load_state(cycle, failed))  # noqa: ARG005
         graph.add_node("source", lambda task: self._source(cycle, task), input_schema=SourceTask)
         graph.add_node("collect_sources", self._collect_sources)
-        graph.add_node("compose_context", lambda state: self._compose_context(cycle, state))
+        graph.add_node("compose_context", lambda state: self._compose_context(cycle, state, failed))
         graph.add_node("decide", lambda state: self._decide(cycle, state))
-        graph.add_node("risk_filter", lambda state: self._risk_filter(cycle, state))
-        graph.add_node("execute", lambda state: self._execute(cycle, state))
-        graph.add_node("reverse", lambda state: self._reverse(cycle, state))
-        graph.add_node("update_ledger", lambda state: self._update_ledger(cycle, state))
-        graph.add_node("persist", lambda state: self._persist(cycle, state))
+        graph.add_node("risk_filter", lambda state: self._risk_filter(cycle, state, failed))
+        graph.add_node("execute", lambda state: self._execute(cycle, state, failed))
+        graph.add_node("reverse", lambda state: self._reverse(cycle, state, failed))
+        graph.add_node("update_ledger", lambda state: self._update_ledger(cycle, state, failed))
+        graph.add_node("persist", lambda state: self._persist(cycle, state, failed))
         graph.add_edge(START, "load_state")
         graph.add_conditional_edges("load_state", _active_sources, ["source", "collect_sources"])
         graph.add_edge("source", "collect_sources")
@@ -215,8 +230,10 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         graph.add_edge("persist", END)
         return graph
 
-    def _load_state(self, cycle: PlannedCycle) -> CycleState[S, D, C, A, O, E]:
-        snapshot = self._steps.start.execute(cycle.flow_id, cycle.schedule.anchor)
+    def _load_state(self, cycle: PlannedCycle, failed: list[FailedAttempt]) -> CycleState[S, D, C, A, O, E]:
+        snapshot = self._retried(
+            CycleStep.READ_FLOW_STATE, lambda: self._steps.start.execute(cycle.flow_id, cycle.schedule.anchor), failed
+        )
         return {"snapshot": snapshot, **self._done(CycleStep.READ_FLOW_STATE, snapshot.state)}
 
     def _source(self, cycle: PlannedCycle, task: SourceTask[S]) -> CycleState[S, D, C, A, O, E]:
@@ -235,10 +252,14 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         return self._done(CycleStep.COLLECT_SOURCES, state.get("readings", []))
 
     def _compose_context(
-        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], failed: list[FailedAttempt]
     ) -> CycleState[S, D, C, A, O, E]:
         readings, absent = state.get("readings", []), state.get("absent", [])
-        context = self._steps.context.execute(cycle.flow_id, state["snapshot"], readings, absent)
+        context = self._retried(
+            CycleStep.COMPOSE_CONTEXT,
+            lambda: self._steps.context.execute(cycle.flow_id, state["snapshot"], readings, absent),
+            failed,
+        )
         return {"context": context, **self._done(CycleStep.COMPOSE_CONTEXT, context)}
 
     def _decide(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
@@ -254,39 +275,67 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
             **self._done(CycleStep.AGENT_DECISION, decisions),
         }
 
-    def _risk_filter(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
-        review = self._steps.risk.execute(cycle.flow_id, state["snapshot"], state["decisions"])
+    def _risk_filter(
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], failed: list[FailedAttempt]
+    ) -> CycleState[S, D, C, A, O, E]:
+        review = self._retried(
+            CycleStep.RISK_CHECK,
+            lambda: self._steps.risk.execute(cycle.flow_id, state["snapshot"], state["decisions"]),
+            failed,
+        )
         return {"review": review, **self._done(CycleStep.RISK_CHECK, review)}
 
-    def _execute(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
+    def _execute(
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], failed: list[FailedAttempt]
+    ) -> CycleState[S, D, C, A, O, E]:
         review = state["review"]
         executions = self._steps.orders.execute(cycle.flow_id, cycle.planned_at, review.orders)
+        failed.extend(self._steps.journal.failed_attempts(CycleStep.ORDER_EXECUTION, executions))
         if review.reversing:
             # The execution of the orders is done when the openings of the reversals are sent too.
             return {"executions": executions}
         return {"executions": executions, **self._done(CycleStep.ORDER_EXECUTION, executions)}
 
-    def _reverse(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
+    def _reverse(
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], failed: list[FailedAttempt]
+    ) -> CycleState[S, D, C, A, O, E]:
         reversed_ = self._steps.reversal.execute(
             cycle.flow_id, cycle.planned_at, cycle.schedule.anchor, state["review"].orders
         )
+        failed.extend(reversed_.failed_attempts)
+        failed.extend(self._steps.journal.failed_attempts(CycleStep.ORDER_EXECUTION, reversed_.executions))
         executed = ReversedExecutions((*state["executions"], *reversed_.executions), reversed_.reversals)
         return {"executions": executed.executions, **self._done(CycleStep.ORDER_EXECUTION, executed)}
 
-    def _update_ledger(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
-        updated = self._steps.end.execute(cycle.flow_id, cycle.schedule.anchor, state["executions"])
+    def _update_ledger(
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], failed: list[FailedAttempt]
+    ) -> CycleState[S, D, C, A, O, E]:
+        updated = self._retried(
+            CycleStep.UPDATE_FLOW_STATE,
+            lambda: self._steps.end.execute(cycle.flow_id, cycle.schedule.anchor, state["executions"]),
+            failed,
+        )
         return {"ended": updated, **self._done(CycleStep.UPDATE_FLOW_STATE, updated)}
 
-    def _persist(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
+    def _persist(
+        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], failed: list[FailedAttempt]
+    ) -> CycleState[S, D, C, A, O, E]:
         steps = [*state["steps"], CycleStep.RECORD_CYCLE]
-        record = _record_of(cycle, state, CycleOutcome.COMPLETED, steps)
+        record = replace(_record_of(cycle, state, CycleOutcome.COMPLETED, steps), failed_attempts=tuple(failed))
         return {"record": recorded(self._cycles, record)}
+
+    def _retried[T](self, step: CycleStep, call: Callable[[], T], failed: list[FailedAttempt]) -> T:
+        return self._retry.run(call, lambda attempt, error: failed.append(FailedAttempt.of(step, attempt, error)))
 
     def _done(self, step: CycleStep, result: object) -> CycleState[S, D, C, A, O, E]:
         return {"steps": [step], "documents": [StepDocument(step, self._steps.journal.describe(step, result))]}
 
     def _failed_record(
-        self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E], error: AutotradingError
+        self,
+        cycle: PlannedCycle,
+        state: CycleState[S, D, C, A, O, E],
+        error: AutotradingError,
+        attempts: list[FailedAttempt],
     ) -> CycleRecord:
         """A decision that failed after its call went out keeps the call, which the provider may have charged (R1.4.6,
         ADR costo-della-decisione-fallita-nel-registro-del-ciclo).
@@ -295,7 +344,7 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
         # The nodes run in the order of the steps: the failed step is the first one not done.
         failed = next(step for step in CycleStep if step not in done)
         failure = CycleFailure(failed, type(error).__name__, str(error))
-        record = _record_of(cycle, state, CycleOutcome.FAILED, done, failure)
+        record = replace(_record_of(cycle, state, CycleOutcome.FAILED, done, failure), failed_attempts=tuple(attempts))
         if failed is not CycleStep.AGENT_DECISION:
             return record
         return _with_call(record, self._steps.journal.failed_call(error))

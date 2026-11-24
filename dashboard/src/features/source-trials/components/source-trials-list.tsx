@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { useTradableAssets } from '@/hooks/use-tradable-assets';
@@ -35,21 +36,9 @@ export const SourceTrialsList = () => {
     <ul className="space-y-4">
       {sources.data.map((source) => (
         <li key={source.name}>
-          <article
-            aria-labelledby={`source-trial-${source.name}`}
-            className="space-y-3 rounded border border-slate-200 p-4"
-          >
-            <header>
-              <h2
-                id={`source-trial-${source.name}`}
-                className="text-lg font-semibold wrap-anywhere"
-              >
-                {source.name}
-              </h2>
-              <p className="text-sm text-slate-600">{source.description}</p>
-            </header>
+          <Card as="article" title={source.name} description={source.description}>
             <SourceTrialForm source={source} assets={assets} />
-          </article>
+          </Card>
         </li>
       ))}
     </ul>

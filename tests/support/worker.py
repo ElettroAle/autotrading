@@ -66,12 +66,12 @@ from tests.fakes.source_credentials import (
 )
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
 from tests.support.accounts import an_account
+from tests.support.exchange_connections import connection_of
 from tests.support.mail_servers import MailServers
 from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.platform import HYPERLIQUID, new_credentials
 from tests.support.procedure_orders import procedure_orders
 from tests.support.source_selections import platform_systems
-from tests.support.exchange_connections import connection_of
 
 TOKEN = token_hex(16)
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)

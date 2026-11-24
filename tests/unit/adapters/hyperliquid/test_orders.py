@@ -321,7 +321,9 @@ def test_an_invalid_key_is_refused_before_reaching_the_exchange() -> None:
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
         adapter(sdk).place_market_order(
-            TradingAccess("Hyperliquid", {"account_address": ADDRESS, "secret_key": "not-a-key"}), an_order(), BTC_MARKET
+            TradingAccess("Hyperliquid", {"account_address": ADDRESS, "secret_key": "not-a-key"}),
+            an_order(),
+            BTC_MARKET,
         )
 
     assert raised.value.exchange_message == INVALID_KEY_MESSAGE

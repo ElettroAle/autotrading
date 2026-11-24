@@ -6,7 +6,7 @@ from collections.abc import Iterator
 import pytest
 from pytest_bdd import given, parsers, then, when
 
-from autotrading.domain.flows.cycle_record import CycleOutcome
+from autotrading.domain.flows.cycle_record import CycleOutcome, FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.selections import ActiveSource
 from tests.fakes.cycles import ACTIVE, FakePermanentError, FakeTransientError
@@ -168,7 +168,12 @@ def cycle_will_fail(cycles: Cycles, flow: str) -> None:
 
 @given(quoted('che {system} non risponde durante il passo "{step}" del ciclo del flusso "{flow}"'))
 def system_not_answering(cycles: Cycles, system: str, step: str, flow: str) -> None:
-    cycles.failures.fail_once(cycles.id_of(flow), CycleStep(step), FakeTransientError(f"{system} non risponde"))
+    cycles.failures.fail_always(cycles.id_of(flow), CycleStep(step), FakeTransientError(f"{system} non risponde"))
+
+
+@given(quoted('che l\'exchange non risponde una volta durante il passo "{step}" del ciclo del flusso "{flow}"'))
+def exchange_not_answering_once(cycles: Cycles, step: str, flow: str) -> None:
+    cycles.failures.fail_once(cycles.id_of(flow), CycleStep(step), FakeTransientError("l'exchange non risponde"))
 
 
 @given(quoted('che l\'agente decide di aprire su "{first}" e su "{second}"'))
@@ -347,6 +352,53 @@ def failed_with_original_message(cycles: Cycles, step: str) -> None:
     assert failure is not None
     assert (failure.step.value, failure.error_type) == (step, "FakeTransientError")
     assert failure.message.endswith(" non risponde")
+
+
+# Then: the attempts of a step (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo)
+
+
+@then(parsers.re(r'^lo stato del flusso "(?P<flow>[^"]+)" è letto (?P<times>\d+) volte$'))
+def flow_read_times(cycles: Cycles, flow: str, times: str) -> None:
+    assert cycles.flows.reads.count(cycles.id_of(flow)) == int(times)
+
+
+@then(quoted('lo stato del flusso "{flow}" è letto una sola volta'))
+def flow_read_once(cycles: Cycles, flow: str) -> None:
+    assert cycles.flows.reads.count(cycles.id_of(flow)) == 1
+
+
+@then(parsers.re(r"^il ciclo attende (?P<seconds>\d+) secondi prima del nuovo tentativo$"))
+def waits_before_the_attempt(cycles: Cycles, seconds: str) -> None:
+    assert cycles.waits.pauses == [float(seconds)]
+
+
+@then(parsers.re(r"^il ciclo attende (?P<seconds>.+) secondi prima dei nuovi tentativi$"))
+def waits_before_the_attempts(cycles: Cycles, seconds: str) -> None:
+    assert cycles.waits.pauses == [float(each) for each in instants_of(seconds)]
+
+
+@then("il ciclo non attende nuovi tentativi")
+def no_wait(cycles: Cycles) -> None:
+    assert cycles.waits.pauses == []
+
+
+@then(
+    parsers.re(
+        r'^il ciclo registra il tentativo (?P<attempt>\d+) fallito al passo "(?P<step>[^"]+)"'
+        r" con il messaggio originale$"
+    )
+)
+def failed_attempt_recorded(cycles: Cycles, attempt: str, step: str) -> None:
+    expected = FailedAttempt(CycleStep(step), int(attempt), "FakeTransientError", "l'exchange non risponde")
+    assert cycles.last_record("alfa").failed_attempts == (expected,)
+
+
+@then(parsers.re(r'^il ciclo registra i tentativi (?P<attempts>.+) falliti al passo "(?P<step>[^"]+)"$'))
+def failed_attempts_recorded(cycles: Cycles, attempts: str, step: str) -> None:
+    recorded = cycles.last_record("alfa").failed_attempts
+    assert [(attempt.step.value, attempt.attempt) for attempt in recorded] == [
+        (step, int(number)) for number in instants_of(attempts)
+    ]
 
 
 @then(quoted('il ciclo è registrato come fallito al passo "{step}"'))

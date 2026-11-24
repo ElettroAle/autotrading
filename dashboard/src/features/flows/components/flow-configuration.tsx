@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 
+import { Card } from '@/components/ui/card';
 import { SECONDARY_COMMAND } from '@/components/ui/commands';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
@@ -31,7 +32,7 @@ export const FlowConfiguration = ({ flowId }: { flowId: string }) => {
     return <p>Flusso non trovato.</p>;
   }
   return (
-    <section aria-label={flow.name} className="mb-4 rounded border border-slate-200 bg-white p-4">
+    <Card as="section" aria-label={flow.name} className="mb-4">
       <div className="flex flex-wrap gap-2">
         <Link to={paths.editFlow.getHref(flow.id)} className={SECONDARY_COMMAND}>
           Modifica
@@ -40,6 +41,6 @@ export const FlowConfiguration = ({ flowId }: { flowId: string }) => {
         <ExportStrategyButton flowId={flow.id} />
       </div>
       <FlowDetails flow={flow} accounts={accounts.data ?? []} />
-    </section>
+    </Card>
   );
 };

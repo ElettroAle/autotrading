@@ -7203,6 +7203,13 @@
           "trigger": {
             "type": "string",
             "title": "Trigger"
+          },
+          "failed_attempts": {
+            "items": {
+              "$ref": "#/components/schemas/FailedAttemptResponse"
+            },
+            "type": "array",
+            "title": "Failed Attempts"
           }
         },
         "type": "object",
@@ -7217,7 +7224,8 @@
           "documents",
           "cost",
           "model_attempts",
-          "trigger"
+          "trigger",
+          "failed_attempts"
         ],
         "title": "CycleDetailResponse",
         "description": "A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2)."
@@ -7792,6 +7800,35 @@
         ],
         "title": "ExpiryStatus",
         "description": "The state of the expiry of a key as of today, the same names for every key (R6.2.2)."
+      },
+      "FailedAttemptResponse": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "title": "Step"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "error_type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "attempt",
+          "error_type",
+          "message"
+        ],
+        "title": "FailedAttemptResponse",
+        "description": "An attempt of a step that failed, the first one being 1 (ADR\nerrori-temporanei-ritentati-in-ogni-passo-del-ciclo)."
       },
       "FailureResponse": {
         "properties": {
@@ -8594,6 +8631,13 @@
             "type": "integer",
             "title": "Version"
           },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
           "last_cycle": {
             "anyOf": [
               {
@@ -8689,6 +8733,7 @@
           "openings_suspension",
           "model",
           "version",
+          "assets",
           "last_cycle",
           "next_cycle_at",
           "currency",

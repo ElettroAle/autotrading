@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 
@@ -87,10 +88,7 @@ const LinkSteps = () => (
 export const LinkedChatPanel = () => {
   const chat = useLinkedChat();
   return (
-    <section
-      aria-labelledby="linked-chat-title"
-      className="rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby="linked-chat-title">
       <h3 id="linked-chat-title" className="mb-2 text-lg font-semibold">
         Chat
       </h3>
@@ -111,6 +109,6 @@ export const LinkedChatPanel = () => {
           <UnlinkChat />
         </div>
       )}
-    </section>
+    </Card>
   );
 };

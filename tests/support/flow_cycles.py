@@ -9,6 +9,15 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY as HYPERLIQUID_SETTLEMENT_CURRENCY
+from autotrading.adapters.outbound.process_memory.cycle_notices import (
+    ProcessMemoryCycleNoticesAdapter,
+    ProcessMemoryOpeningBlockedNoticeAdapter,
+    ProcessMemoryOpeningReducedNoticeAdapter,
+    ProcessMemoryOpeningsSuspendedNoticeAdapter,
+    ProcessMemoryOrderRejectedNoticeAdapter,
+    ProcessMemoryPositionClosedNoticeAdapter,
+    ProcessMemoryPositionOpenedNoticeAdapter,
+)
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
@@ -19,6 +28,10 @@ from autotrading.application.flows.notify_unattributable import (
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.ports import (
     CycleJob,
+    OpeningBlockedNoticePort,
+    OpeningReducedNoticePort,
+    OpeningsSuspendedNoticePort,
+    PositionClosedNoticePort,
     ReconciliationAlarmPorts,
     ScheduledFlow,
     TenantScheduledFlow,
@@ -38,6 +51,7 @@ from autotrading.application.flows.record_outside_closing import RecordOutsideCl
 from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.notifications.notify_cycle_failed import NotifyCycleFailedUseCase
 from autotrading.application.notifications.notify_flow_event import NotifyFlowEventUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
@@ -55,10 +69,12 @@ from autotrading.application.notifications.notify_unattributable_fill import Not
 from autotrading.application.notifications.notify_unattributable_position import (
     NotifyUnattributablePositionUseCase,
 )
+from autotrading.application.notifications.ports import FlowStatusPort
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase, FlowOrderProtection
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
+from autotrading.application.orders.ports import OrderRejectedNoticePort, PositionOpenedNoticePort
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
@@ -127,11 +143,11 @@ from tests.support.cycle_composition import (
     record_actual_prices,
     run_cycle_for,
 )
+from tests.support.exchange_connections import connection_of
 from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 from tests.support.provider_key import api_key_of
 from tests.support.source_selections import BEFORE_THE_ADAPTERS, reader_of
-from tests.support.exchange_connections import connection_of
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 ACCOUNT = "test-1"
@@ -156,6 +172,35 @@ class ImmediateCycleScheduler:
                 job.run()
             except AutotradingError as error:
                 self.raised.append(error)
+
+
+class CycleNoticeHold:
+    """The notices of a flow as the worker composes them for a cycle: held until it records its state (ADR
+    notifiche-del-ciclo-dopo-lo-stato-registrato); without a cycle, told at once, as the tests that call one step read
+    them."""
+
+    def __init__(self, notices: ProcessMemoryCycleNoticesAdapter | None) -> None:
+        self._notices = notices
+
+    def opened(self, notice: PositionOpenedNoticePort) -> PositionOpenedNoticePort:
+        return notice if self._notices is None else ProcessMemoryPositionOpenedNoticeAdapter(notice, self._notices)
+
+    def rejected(self, notice: OrderRejectedNoticePort) -> OrderRejectedNoticePort:
+        return notice if self._notices is None else ProcessMemoryOrderRejectedNoticeAdapter(notice, self._notices)
+
+    def closed(self, notice: PositionClosedNoticePort) -> PositionClosedNoticePort:
+        return notice if self._notices is None else ProcessMemoryPositionClosedNoticeAdapter(notice, self._notices)
+
+    def suspended(self, notice: OpeningsSuspendedNoticePort) -> OpeningsSuspendedNoticePort:
+        if self._notices is None:
+            return notice
+        return ProcessMemoryOpeningsSuspendedNoticeAdapter(notice, self._notices)
+
+    def reduced(self, notice: OpeningReducedNoticePort) -> OpeningReducedNoticePort:
+        return notice if self._notices is None else ProcessMemoryOpeningReducedNoticeAdapter(notice, self._notices)
+
+    def blocked(self, notice: OpeningBlockedNoticePort) -> OpeningBlockedNoticePort:
+        return notice if self._notices is None else ProcessMemoryOpeningBlockedNoticeAdapter(notice, self._notices)
 
 
 class FlowCycles:
@@ -196,14 +241,18 @@ class FlowCycles:
         self.running: threading.Thread | None = None
         self.readings = self.platform.readings
         self.equity_snapshots = EquitySnapshotStore()
+        # The state of the flows their notices end with: the fake of the platform unless a scenario reads the stores.
+        self.flow_status: FlowStatusPort = self.platform.flow_status
         self.platform.worker_clock = self.clock
         # Composed when a cycle is asked for: the cycle uses the worker, which holds this run.
         self.platform.cycle_run_of = lambda tenant_id: lambda command: self.run_cycle_of(tenant_id).execute(command)
 
     # The platform
 
-    def ports_of(self, tenant_id: TenantId) -> TenantCyclePorts:
-        platform = self.platform
+    def ports_of(
+        self, tenant_id: TenantId, notices: ProcessMemoryCycleNoticesAdapter | None = None
+    ) -> TenantCyclePorts:
+        platform, hold = self.platform, CycleNoticeHold(notices)
         accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
         opener = FakeCredentialOpenerAdapter(platform.vault, platform.openings)
         access = OpenTradingAccessUseCase(accounts, opener)
@@ -211,9 +260,9 @@ class FlowCycles:
         openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
         exit_plans = InMemoryExitPlanRepositoryAdapter(platform.exit_plans, tenant_id)
         notify = platform.worker_for(tenant_id).notify
-        notify_flow = NotifyFlowEventUseCase(notify, platform.flow_status)
+        notify_flow = NotifyFlowEventUseCase(notify, self.flow_status)
         closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
-        closing_notice = NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        closing_notice = hold.closed(NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY))
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         protections = InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
         cancel_protections = platform.cancel_protections(tenant_id)
@@ -261,6 +310,7 @@ class FlowCycles:
             self.readings,
         )
         order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
+        retry = TransientRetry(self.pause, self.clock)
         execute_flow_orders = ExecuteFlowOrdersUseCase(
             access,
             order_exchanges,
@@ -273,11 +323,12 @@ class FlowCycles:
                 cancel_protections,
                 UpdateFlowProtectionUseCase(order_exchanges, protections),
             ),
+            retry,
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
             FlowOrderFollowers(
-                NotifyOrderRejectedUseCase(notify_flow),
-                NotifyPositionOpenedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
+                hold.rejected(NotifyOrderRejectedUseCase(notify_flow)),
+                hold.opened(NotifyPositionOpenedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)),
                 RecordFlowClosingUseCase(flows, openings, closed_positions, closing_notice, exit_plans),
             )
         )
@@ -297,7 +348,7 @@ class FlowCycles:
                 ExecuteCycleOrdersUseCase(
                     execute_flow_orders,
                     follow_flow_orders,
-                    ProtectOpenPositionsUseCase(access, order_exchanges, protections),
+                    ProtectOpenPositionsUseCase(access, order_exchanges, protections, retry),
                 ),
                 openings,
                 exit_plans,
@@ -316,9 +367,11 @@ class FlowCycles:
             consecutive_failures=InMemoryConsecutiveFailuresAdapter(self.records, platform.flows),
             openings_suspensions=InMemoryOpeningsSuspensionAdapter(platform.flows, tenant_id),
             loss_references=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
-            openings_suspended_notice=NotifyOpeningsSuspendedUseCase(notify_flow),
-            opening_reduced_notice=NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY),
-            opening_blocked_notice=NotifyOpeningBlockedUseCase(notify_flow),
+            openings_suspended_notice=hold.suspended(NotifyOpeningsSuspendedUseCase(notify_flow)),
+            opening_reduced_notice=hold.reduced(
+                NotifyOpeningReducedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
+            opening_blocked_notice=hold.blocked(NotifyOpeningBlockedUseCase(notify_flow)),
             flow_keys=InMemoryKeyExpiriesAdapter(
                 platform.accounts, platform.provider_keys, platform.flows, tenant_id, platform.source_credentials
             ),

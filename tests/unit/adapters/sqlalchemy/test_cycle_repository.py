@@ -24,6 +24,7 @@ from autotrading.domain.flows.cycle_record import (
     CycleFailure,
     CycleOutcome,
     CycleRecord,
+    FailedAttempt,
     StepDocument,
 )
 from autotrading.domain.flows.cycle_step import CycleStep
@@ -50,6 +51,10 @@ FAILED = CycleRecord(
     documents=(StepDocument(CycleStep.READ_FLOW_STATE, {"versione": 3, "pesi": {"notizie": 7}}),),
     cost=CallCost(2000, 500, Decimal("0.0031")),
     model_attempts=4,
+    failed_attempts=(
+        FailedAttempt(CycleStep.READ_FLOW_STATE, 1, "FlowExchangeUnavailableError", "exchange non raggiungibile"),
+        FailedAttempt(CycleStep.COMPOSE_CONTEXT, 1, "FakeTransientError", "timeout"),
+    ),
 )
 
 
@@ -73,6 +78,15 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
         "model_called": True,
         "model_attempts": 4,
         "trigger": "scheduled",
+        "failed_attempts": [
+            {
+                "step": "read_flow_state",
+                "attempt": 1,
+                "error_type": "FlowExchangeUnavailableError",
+                "message": "exchange non raggiungibile",
+            },
+            {"step": "compose_context", "attempt": 1, "error_type": "FakeTransientError", "message": "timeout"},
+        ],
     }
 
 
@@ -277,3 +291,9 @@ def test_the_saved_decisions_read_back_with_the_instant_of_their_cycle() -> None
         DatedDecision(PLANNED, OPENING),
         DatedDecision(PLANNED, HOLDING),
     ]
+
+
+def test_a_cycle_recorded_before_the_attempts_were_kept_reads_back_without_failed_attempts() -> None:
+    row = row_of(FAILED, TENANT) | {"failed_attempts": None}
+
+    assert record_of(row).failed_attempts == ()

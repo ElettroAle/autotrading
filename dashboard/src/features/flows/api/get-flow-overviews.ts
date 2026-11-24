@@ -23,6 +23,8 @@ const flowOverviewSchema = z.object({
   openings_suspension: z.object({ reason: z.string(), suspended_at: z.string() }).nullable(),
   model: z.string(),
   version: z.number(),
+  // The assets of the version in force, in the order of the configuration; empty for a draft without assets (Bug 731).
+  assets: z.array(z.string()),
   last_cycle: cycleOutcomeSchema.nullable(),
   next_cycle_at: z.string().nullable(),
   currency: z.string().nullable(),

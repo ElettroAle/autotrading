@@ -7,6 +7,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
+from autotrading.adapters.outbound.process_memory.composition import process_memory_cycle_notices_adapters
+from autotrading.adapters.outbound.process_memory.cycle_notices import ProcessMemoryCycleNoticesAdapter
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
 from autotrading.application.agent.ask_agent import AskAgentUseCase
 from autotrading.application.agent.ask_flow_agent import AskFlowAgentUseCase
@@ -38,6 +40,9 @@ from autotrading.application.flows.ports import (
     FlowOpeningsPort,
     FlowRepositoryPort,
     LossReferencesPort,
+    OpeningBlockedNoticePort,
+    OpeningReducedNoticePort,
+    OpeningsSuspendedNoticePort,
     OpeningsSuspensionPort,
     PlannedFlowsPort,
 )
@@ -51,11 +56,9 @@ from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCa
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.application.flows.start_cycle_flow import StartCycleFlowUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.application.notifications.notify import NotifyUseCase
 from autotrading.application.notifications.notify_flow_paused import NotifyFlowPausedUseCase
-from autotrading.application.notifications.notify_opening_blocked import NotifyOpeningBlockedUseCase
-from autotrading.application.notifications.notify_opening_reduced import NotifyOpeningReducedUseCase
-from autotrading.application.notifications.notify_openings_suspended import NotifyOpeningsSuspendedUseCase
 from autotrading.application.orders.follow_flow_orders import FollowFlowOrdersUseCase
 from autotrading.application.sources.aggregate_cycle_sources import AggregateCycleSourcesUseCase
 from autotrading.application.sources.collect_cycle_source import CollectCycleSourceUseCase, SourceCredentialServices
@@ -103,9 +106,9 @@ class TenantCyclePorts:
     consecutive_failures: ConsecutiveFailuresPort
     openings_suspensions: OpeningsSuspensionPort
     loss_references: LossReferencesPort
-    openings_suspended_notice: NotifyOpeningsSuspendedUseCase
-    opening_reduced_notice: NotifyOpeningReducedUseCase
-    opening_blocked_notice: NotifyOpeningBlockedUseCase
+    openings_suspended_notice: OpeningsSuspendedNoticePort
+    opening_reduced_notice: OpeningReducedNoticePort
+    opening_blocked_notice: OpeningBlockedNoticePort
     flow_keys: FlowKeysPort
 
 
@@ -127,7 +130,8 @@ type SourcesData = tuple[SourceData, ...]
 
 
 type WorkerCycle = RunCycleUseCase[CycleFlow, SourcesData, CycleContext, CycleDecisions, CycleOrder, object]
-type CyclePortsOf = Callable[[TenantId], TenantCyclePorts]
+# The ports of a tenant, their notices held by those of the cycle, or told at once outside any cycle.
+type CyclePortsOf = Callable[[TenantId, ProcessMemoryCycleNoticesAdapter | None], TenantCyclePorts]
 
 
 def run_cycle_for(
@@ -137,8 +141,11 @@ def run_cycle_for(
     lock: FlowLockPort,
     tenant_id: TenantId,
 ) -> WorkerCycle:
-    """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104)."""
-    ports = ports_of(tenant_id)
+    """The cycle of a flow of the tenant, every node on the adapters of that tenant (ADR 0042, ADR 0104); its notices
+    leave once it recorded its state (ADR notifiche-del-ciclo-dopo-lo-stato-registrato)."""
+    notices = process_memory_cycle_notices_adapters()
+    ports = ports_of(tenant_id, notices)
+    retry = TransientRetry(services.pause, services.clock)
     check_risk = CheckRiskUseCase(services.exchange_limits)
     loss_guard = GuardFlowLossUseCase(
         ports.openings_suspensions, ports.loss_references, ports.openings_suspended_notice, services.clock
@@ -178,6 +185,7 @@ def run_cycle_for(
             ports.opening_reduced_notice,
             ports.opening_blocked_notice,
             ports.send_orders,
+            retry,
         ),
         end=ports.end_cycle,
         journal=JsonCycleJournalAdapter(services.environment),
@@ -194,12 +202,12 @@ def run_cycle_for(
         consecutive_failures=PauseAfterConsecutiveFailuresUseCase(ports.flows, ports.consecutive_failures, pause),
         expired_keys=PauseFlowsOnExpiredKeysUseCase(ports.flow_keys, ports.flows, pause, services.clock),
     )
-    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints), guards, ports.equity)
+    return RunCycleUseCase(CycleGraph(steps, cycles, ports.checkpoints, retry), guards, ports.equity, notices)
 
 
 def record_actual_prices(planned: PlannedFlowsPort, ports_of: CyclePortsOf, services: CycleServices) -> None:
     """The actual price beside every expired forecast of the tenants the worker plans for (R1.3.5)."""
     record = RecordActualPricesOfTenantsUseCase(
-        services.sources.prices, planned.tenants, lambda tenant_id: ports_of(tenant_id).forecasts
+        services.sources.prices, planned.tenants, lambda tenant_id: ports_of(tenant_id, None).forecasts
     )
     record.execute(RecordActualPricesCommand(services.clock.now()))

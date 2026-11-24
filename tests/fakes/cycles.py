@@ -28,7 +28,7 @@ from autotrading.application.flows.ports import (
 from autotrading.domain.errors import AutotradingError, ErrorScope
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_filter import CycleFilter
-from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.decision_filter import DecisionFilter
@@ -289,18 +289,28 @@ class FakeFlow:
 
 
 class Failures:
-    """Errors a step raises once, for one flow."""
+    """Errors a step raises for one flow: once, a number of times in a row, or at every call."""
 
     def __init__(self) -> None:
-        self._failures: dict[tuple[UUID, CycleStep], AutotradingError] = {}
+        self._failures: dict[tuple[UUID, CycleStep], list[AutotradingError]] = {}
+        self._always: dict[tuple[UUID, CycleStep], AutotradingError] = {}
 
     def fail_once(self, flow_id: UUID, step: CycleStep, error: AutotradingError) -> None:
-        self._failures[flow_id, step] = error
+        self.fail(flow_id, step, error, times=1)
+
+    def fail(self, flow_id: UUID, step: CycleStep, error: AutotradingError, *, times: int) -> None:
+        self._failures[flow_id, step] = [error] * times
+
+    def fail_always(self, flow_id: UUID, step: CycleStep, error: AutotradingError) -> None:
+        self._always[flow_id, step] = error
 
     def raise_if_failing(self, flow_id: UUID, step: CycleStep) -> None:
-        error = self._failures.pop((flow_id, step), None)
-        if error is not None:
-            raise error
+        always = self._always.get((flow_id, step))
+        if always is not None:
+            raise always
+        pending = self._failures.get((flow_id, step), [])
+        if pending:
+            raise pending.pop(0)
 
 
 class FakeCycleStartAdapter:
@@ -494,6 +504,8 @@ class FakeReversalAdapter:
     def __init__(self) -> None:
         self.calls: list[tuple[UUID, datetime, datetime, tuple[object, ...]]] = []
         self.failing: AutotradingError | None = None
+        # The attempts the reversal tells it retried before its readings went through.
+        self.failed_attempts: tuple[FailedAttempt, ...] = ()
 
     def execute(
         self, flow_id: UUID, planned_at: datetime, anchor: datetime, orders: Sequence[object]
@@ -503,7 +515,9 @@ class FakeReversalAdapter:
             raise failing
         self.calls.append((flow_id, planned_at, anchor, tuple(orders)))
         return ReversedExecutions(
-            tuple({"reopened": order} for order in orders), {order: "riaperta" for order in orders}
+            tuple({"reopened": order} for order in orders),
+            {order: "riaperta" for order in orders},
+            self.failed_attempts,
         )
 
 
@@ -511,11 +525,13 @@ class FakeOrderAdapter:
     def __init__(self, failures: Failures) -> None:
         self.sent: list[tuple[UUID, datetime, object]] = []
         self.unanswered: set[str] = set()
+        # The attempts the orders context tells it retried, among the executions as the real one gives them.
+        self.failed_attempts: tuple[FailedAttempt, ...] = ()
         self._failures = failures
 
     def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[object]) -> Sequence[object]:
         self._failures.raise_if_failing(flow_id, CycleStep.ORDER_EXECUTION)
-        return [self._executed(flow_id, planned_at, order) for order in orders]
+        return [*(self._executed(flow_id, planned_at, order) for order in orders), *self.failed_attempts]
 
     def _executed(self, flow_id: UUID, planned_at: datetime, order: object) -> object:
         if order in self.unanswered:
@@ -547,6 +563,11 @@ class FakeCycleJournalAdapter:
         """The same failed call for every error, keeping the errors it was asked about."""
         self.failures.append(error)
         return self.failed
+
+    def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:  # noqa: ARG002
+        """The failed attempts the fake orders put among their executions, as they are."""
+        items = result if isinstance(result, list | tuple) else ()
+        return tuple(item for item in items if isinstance(item, FailedAttempt))
 
     def recorded_decisions(self, decision: object) -> tuple[RecordedDecision, ...]:
         """Every asset the fake agent decided is a long opening, with the confidence of the fake."""

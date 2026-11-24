@@ -70,6 +70,8 @@ def test_a_position_never_read_again_is_shown_at_its_entry() -> None:
 
 
 def test_a_position_is_shown_at_the_last_price_read() -> None:
-    position = SimulatedPosition("BTC", Direction.LONG, Decimal(1), 2, Decimal(90000), Decimal(1), Decimal("0.01"), Decimal(91000))
+    position = SimulatedPosition(
+        "BTC", Direction.LONG, Decimal(1), 2, Decimal(90000), Decimal(1), Decimal("0.01"), Decimal(91000)
+    )
 
     assert position.mark == Decimal(91000)

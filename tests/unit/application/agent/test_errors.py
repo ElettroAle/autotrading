@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from autotrading.application.agent.errors import ModelUnavailableError
+from autotrading.application.agent.errors import ModelAnswerTruncatedError, ModelUnavailableError
 from autotrading.domain.agent.model_usage import ModelPrices, ModelSpend, ModelUsage
 from autotrading.domain.agent.provider_name import ProviderName
 
@@ -86,3 +86,47 @@ def test_the_priced_error_keeps_its_attempts() -> None:
     error = ModelUnavailableError(OPENROUTER, "503", usage=ModelUsage(1, 1, None), sent=True, attempts=4)
 
     assert error.priced(PRICES).attempts == 4
+
+
+# ADR-risposta-del-modello-interrotta-dal-limite-di-token: an answer cut at the token limit says so and how to fix it.
+CUT_REASON = (
+    "risposta del modello interrotta dal limite di 4096 token: alza max_tokens o abbassa il ragionamento del flusso"
+)
+
+
+def test_an_answer_cut_at_the_token_limit_names_the_limit_and_the_remedy() -> None:
+    error = ModelAnswerTruncatedError(OPENROUTER, 4096, usage=ModelUsage(2000, 4096, None), sent=True)
+
+    assert str(error) == CUT_REASON
+    assert "fornitore IA non raggiungibile" not in str(error)
+    assert (error.provider, error.max_tokens, error.original) == (OPENROUTER, 4096, CUT_REASON)
+    assert (error.usage, error.sent, error.attempts) == (ModelUsage(2000, 4096, None), True, 1)
+
+
+def test_an_answer_cut_at_the_token_limit_is_a_temporary_unavailable_model() -> None:
+    error = ModelAnswerTruncatedError(OPENROUTER, 4096, sent=True)
+
+    assert isinstance(error, ModelUnavailableError)
+    assert error.status_code == 503
+    assert not error.permanent
+
+
+def test_the_priced_cut_answer_keeps_its_class_and_its_limit() -> None:
+    error = ModelAnswerTruncatedError(OPENROUTER, 2048, usage=ModelUsage(1000, 1000, None), sent=True, attempts=2)
+
+    priced = error.priced(PRICES)
+
+    assert isinstance(priced, ModelAnswerTruncatedError)
+    assert priced.max_tokens == 2048
+    assert str(priced) == str(error)
+    assert (priced.usage, priced.sent, priced.cost_usd, priced.attempts) == (error.usage, True, Decimal("0.003"), 2)
+
+
+def test_the_cut_answer_with_the_spend_keeps_its_class_and_its_limit() -> None:
+    spend = ModelSpend(ModelUsage(4000, 16384, None), Decimal("0.008"), sent=True, attempts=4)
+
+    spent = ModelAnswerTruncatedError(OPENROUTER, 4096, sent=True).with_spend(spend)
+
+    assert isinstance(spent, ModelAnswerTruncatedError)
+    assert (spent.max_tokens, str(spent)) == (4096, CUT_REASON)
+    assert (spent.usage, spent.cost_usd, spent.sent, spent.attempts) == (spend.usage, Decimal("0.008"), True, 4)

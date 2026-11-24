@@ -38,7 +38,9 @@ def an_account(*positions: SimulatedPosition, balance: Decimal = Decimal(1000)) 
 
 
 def a_long(size: str = "0.00222", leverage: int = 2) -> SimulatedPosition:
-    return SimulatedPosition("BTC", Direction.LONG, Decimal(size), leverage, Decimal(90000), Decimal("99.9"), Decimal("0.0125"))
+    return SimulatedPosition(
+        "BTC", Direction.LONG, Decimal(size), leverage, Decimal(90000), Decimal("99.9"), Decimal("0.0125")
+    )
 
 
 def test_an_opening_buys_at_the_current_price_with_the_slippage() -> None:
@@ -121,7 +123,9 @@ def test_a_reduce_only_order_without_a_position_is_refused() -> None:
 
 
 def test_a_reduce_only_order_in_the_direction_of_the_position_finds_nothing_to_reduce() -> None:
-    account = an_account(SimulatedPosition("BTC", Direction.SHORT, Decimal("0.001"), 2, Decimal(90000), Decimal(45), Decimal("0.0125")))
+    account = an_account(
+        SimulatedPosition("BTC", Direction.SHORT, Decimal("0.001"), 2, Decimal(90000), Decimal(45), Decimal("0.0125"))
+    )
 
     with pytest.raises(ReduceOnlyWithoutPositionError):
         ENGINE.market_order(account, a_market(), an_order(reduce_only=True), 2, AT)

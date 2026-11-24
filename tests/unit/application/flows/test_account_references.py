@@ -42,6 +42,7 @@ class RecordingReader:
         return ExecutionsWindow((), (), complete=since is None)
 
     def transfers(self, reference: AccountReference, window: TimeWindow) -> tuple[AccountTransfer, ...]:
+        del window
         self.references.append(reference)
         return ()
 

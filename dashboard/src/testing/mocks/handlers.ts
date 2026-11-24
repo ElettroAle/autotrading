@@ -319,6 +319,7 @@ const overviewOf = (user: FakeUser, flow: FakeFlow, request: Request) => {
     openings_suspension: openingsSuspensionOf(user, flow),
     model: flow.model,
     version: flow.version,
+    assets: flow.assets,
     last_cycle: newest === undefined ? null : outcomeOf(newest),
     next_cycle_at: nextCycleOf(flow),
     // A draft has no account yet, so no currency nor capital (ADR 0124).

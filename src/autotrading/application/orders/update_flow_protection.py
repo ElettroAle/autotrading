@@ -3,9 +3,13 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.orders.errors import ExchangeRejectedOrderError
 from autotrading.application.orders.ports import ExchangeConnection, ProtectionExchangePort, ProtectionRepositoryPort
-from autotrading.application.orders.sending import supported_exchange
+from autotrading.application.orders.sending import (
+    ProtectionPlacing,
+    RetriedCalls,
+    cancel_protection,
+    supported_exchange,
+)
 from autotrading.domain.italian_text import number_text
 from autotrading.domain.orders.flow_order import FlowUpdate
 from autotrading.domain.orders.held_position import HeldPosition
@@ -14,6 +18,7 @@ from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.orders.protection_note import ProtectionNote
 from autotrading.domain.orders.protection_order import ProtectionOrder
+from autotrading.domain.orders.rejection import Rejection
 from autotrading.domain.orders.trading_access import TradingAccess
 
 LEVEL_LABELS = {ProtectionKind.STOP_LOSS: "stop", ProtectionKind.TAKE_PROFIT: "obiettivo"}
@@ -22,12 +27,15 @@ NO_LEVEL = "nessuno"
 
 @dataclass(frozen=True, slots=True)
 class UpdateFlowProtectionCommand:
-    """An update of the exit plan of an open position of a flow, for the account of the flow."""
+    """An update of the exit plan of an open position of a flow, for the account of the flow, with the calls of the
+    cycle that retry what fails with a temporary error (ADR protezioni-ritentate-nel-ciclo).
+    """
 
     access: TradingAccess
     account_id: UUID
     flow_id: UUID
     update: FlowUpdate
+    calls: RetriedCalls
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,10 +55,10 @@ class _Replacement:
         order = ProtectionOrder(self.position.coin, kind, self.position.direction, self.market.rounded_price(price))
         if previous is not None and previous.trigger_price == order.trigger_price:
             return ()
-        try:
-            order_id = self.exchange.place(self.command.access, order)
-        except ExchangeRejectedOrderError as error:
-            return (f"{LEVEL_LABELS[kind]} {order.asset} non aggiornato, {error.exchange_message}",)
+        placing = ProtectionPlacing(self.exchange, self.command.access, order)
+        order_id = self.command.calls.run(order.asset, placing.attempt)
+        if isinstance(order_id, Rejection):
+            return (f"{LEVEL_LABELS[kind]} {order.asset} non aggiornato, {order_id.exchange_message}",)
         self.removed(kind, previous)
         self.protections.add(
             PlacedProtection(
@@ -68,7 +76,8 @@ class _Replacement:
     def removed(self, kind: ProtectionKind, previous: PlacedProtection | None) -> None:
         if previous is None:
             return
-        _cancel(self.exchange, self.command.access, previous)
+        access = self.command.access
+        self.command.calls.run(previous.asset, lambda: cancel_protection(self.exchange, access, previous))
         self.protections.remove(self.command.account_id, previous.asset, kind)
 
 
@@ -78,7 +87,9 @@ class UpdateFlowProtectionUseCase:
 
     A new stop goes back to the default stop of the flow on the entry price of the position when it lies farther; a
     removed target cancels the take profit; the stop loss is never removed. Each change is noted with the level before
-    and after, each refusal with the message of the exchange: one stop loss and at most one take profit stay.
+    and after, each refusal with the message of the exchange: one stop loss and at most one take profit stay. A
+    temporary error is retried in the cycle, the placement and the cancellation each on its own, and a protection tried
+    again is never placed twice (ADR protezioni-ritentate-nel-ciclo).
     """
 
     def __init__(
@@ -90,16 +101,16 @@ class UpdateFlowProtectionUseCase:
         self._protections = protections
 
     def execute(self, command: UpdateFlowProtectionCommand) -> tuple[ProtectionNote, ...]:
-        update = command.update
-        exchange = supported_exchange(self._exchanges, command.access.exchange)
-        position = exchange.account.position(command.access, update.asset)
+        update, access, calls = command.update, command.access, command.calls
+        exchange = supported_exchange(self._exchanges, access.exchange)
+        position = calls.run(update.asset, lambda: exchange.account.position(access, update.asset))
         if position is None:
             # Closed meanwhile, by its protection or by hand: there is nothing left to protect.
             return ()
         replacement = _Replacement(
             command,
             position,
-            exchange.market.market(update.asset),
+            calls.run(update.asset, lambda: exchange.market.market(update.asset)),
             exchange.protections,
             self._protections,
         )
@@ -122,14 +133,6 @@ class UpdateFlowProtectionUseCase:
             return texts
         replacement.removed(take_profit, previous)
         return (*texts, _change(take_profit, update.asset, previous, None))
-
-
-def _cancel(exchange: ProtectionExchangePort, access: TradingAccess, protection: PlacedProtection) -> None:
-    """A protection executed or cancelled already has nothing left to cancel, only to forget."""
-    try:
-        exchange.cancel(access, protection.asset, protection.exchange_order_id)
-    except ExchangeRejectedOrderError:
-        return
 
 
 def _change(kind: ProtectionKind, asset: str, previous: PlacedProtection | None, price: Decimal | None) -> str:

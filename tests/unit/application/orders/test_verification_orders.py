@@ -25,11 +25,10 @@ from autotrading.domain.verification.order_result import OrderResult
 from autotrading.domain.verification.procedure import Opening
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
-from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
-from tests.support.trading import HYPERLIQUID, new_access
 from tests.support.exchange_connections import connection_of
+from tests.support.trading import HYPERLIQUID, new_access
 
 ANNA = UserId("oid-anna")
 VERIFICATION = OrderSource(OrderOrigin.VERIFICATION, "oid-anna")

@@ -6,6 +6,7 @@ import { fakePlatform } from '@/testing/mocks/platform';
 import { fakeSourceTrials, type FakeSourceTrial } from '@/testing/mocks/source-trials';
 import { formatInstant } from '@/utils/format-instant';
 
+import { backdropColourOf, isTransparent, paintedColourOf } from '../../../support/colours';
 import type { DashboardPages } from '../../../support/dashboard-pages';
 import { Given, Then, When } from '../../../support/fixtures';
 
@@ -136,5 +137,21 @@ Then(
       `ammesso da ${String(parameter?.minimum)} a ${String(parameter?.maximum)}`,
     );
     expect(fakeSourceTrials.requests()).toEqual([]);
+  },
+);
+
+// Bug 726: the card of a source is filled with a colour of its own, not the background of the page seen through it.
+Then(
+  'ogni fonte sta in un riquadro con uno sfondo diverso da quello della pagina',
+  async ({ dashboard }) => {
+    const cards = await dashboard.page.getByRole('article').all();
+    expect(cards.length, 'la pagina mostra le fonti').toBeGreaterThan(0);
+    for (const sourceCard of cards) {
+      const background = await paintedColourOf(sourceCard, 'backgroundColor');
+      expect(isTransparent(background), 'il riquadro ha uno sfondo proprio').toBe(false);
+      expect(background, 'lo sfondo del riquadro non è quello della pagina').not.toEqual(
+        await backdropColourOf(sourceCard),
+      );
+    }
   },
 );

@@ -21,8 +21,8 @@ from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
-from tests.support.trading import HYPERLIQUID, new_access
 from tests.support.exchange_connections import connection_of
+from tests.support.trading import HYPERLIQUID, new_access
 
 MANUAL = OrderSource(OrderOrigin.MANUAL, "oid-anna")
 SLIPPAGE = Slippage.percent(Decimal(3))

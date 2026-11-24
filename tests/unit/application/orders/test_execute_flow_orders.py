@@ -16,6 +16,7 @@ from autotrading.application.orders.protect_flow_position import ProtectFlowPosi
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.errors import LeverageAboveMaximumError
+from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 from autotrading.domain.orders.flow_link import FlowLink
 from autotrading.domain.orders.flow_order import FlowClosing, FlowOpening, FlowOrder, FlowUpdate
 from autotrading.domain.orders.held_position import HeldPosition
@@ -27,11 +28,13 @@ from autotrading.domain.orders.protection_request import ProtectionRequest
 from autotrading.domain.orders.slippage import Slippage
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
-from tests.support.trading import HYPERLIQUID, new_access
 from tests.support.exchange_connections import connection_of
+from tests.support.retries import unlimited_retry
+from tests.support.trading import HYPERLIQUID, new_access
 
 SLIPPAGE = Slippage.percent(Decimal(2))
 FLOW_ID = UUID("7d0c6a52-4b0e-4f7e-9c55-2f1d0b8e6a11")
@@ -74,14 +77,20 @@ def protections() -> InMemoryProtectionRepositoryAdapter:
 
 
 @pytest.fixture
-def use_case(
+def waits() -> FakePauseAdapter:
+    return FakePauseAdapter()
+
+
+@pytest.fixture
+def use_case(  # noqa: PLR0917 - the fakes behind the use case
     accesses: FakeTradingAccessAdapter,
     exchange: FakeOrderExchangeAdapter,
     orders: InMemoryOrderRepositoryAdapter,
     protection_exchange: FakeProtectionExchangeAdapter,
     protections: InMemoryProtectionRepositoryAdapter,
+    waits: FakePauseAdapter,
 ) -> ExecuteFlowOrdersUseCase:
-    return a_use_case(accesses, exchange, orders, (protection_exchange, protections))
+    return a_use_case(accesses, exchange, orders, (protection_exchange, protections), waits)
 
 
 def a_use_case(
@@ -89,6 +98,7 @@ def a_use_case(
     exchange: FakeOrderExchangeAdapter,
     orders: InMemoryOrderRepositoryAdapter,
     protection: tuple[FakeProtectionExchangeAdapter, InMemoryProtectionRepositoryAdapter],
+    waits: FakePauseAdapter,
 ) -> ExecuteFlowOrdersUseCase:
     protections = protection[1]
     exchanges = {HYPERLIQUID: connection_of(exchange, protection[0])}
@@ -102,6 +112,7 @@ def a_use_case(
             CancelProtectionsUseCase(accesses.use_case, exchanges, protections),
             UpdateFlowProtectionUseCase(exchanges, protections),
         ),
+        unlimited_retry(waits),
     )
 
 
@@ -252,6 +263,125 @@ def test_an_unreachable_exchange_stops_the_orders_and_keeps_the_ones_already_sen
     assert [order.request.market_order.coin for order in orders.orders] == ["ETH"]
 
 
+# ADR-errori-temporanei-ritentati-in-ogni-passo-del-ciclo: the sending that failed goes again, never the orders done.
+def test_an_order_the_exchange_never_got_is_sent_again_with_the_same_client_order_id(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    orders: InMemoryOrderRepositoryAdapter,
+    waits: FakePauseAdapter,
+    account_id: UUID,
+) -> None:
+    exchange.unreached_sendings = 1
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    first, again = exchange.sent
+    assert first.id == again.id
+    assert exchange.lookups == [first.id]
+    assert [order.status for order in orders.orders] == [OrderStatus.FILLED]
+    assert waits.pauses == [5.0]
+    assert outcome.failed_attempts == (
+        FailedOrderAttempt("BTC", 1, "OrderExchangeUnavailableError", str(OrderExchangeUnavailableError())),
+    )
+
+
+def test_an_order_the_exchange_already_executed_is_not_sent_again(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    orders: InMemoryOrderRepositoryAdapter,
+    account_id: UUID,
+) -> None:
+    exchange.lost_answers = 1
+
+    use_case.execute(command(account_id, BTC))
+
+    (sent,) = exchange.sent
+    assert exchange.lookups == [sent.id]
+    (order,) = orders.orders
+    assert (order.status, order.execution) == (OrderStatus.FILLED, exchange.executions[sent.id])
+
+
+def test_only_the_sending_that_failed_goes_again_never_the_orders_done_before(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    orders: InMemoryOrderRepositoryAdapter,
+    account_id: UUID,
+) -> None:
+    hold_eth(exchange, accesses, account_id)
+    exchange.observers.append(lambda _access, order, _execution: _fail_next_if(exchange, order.coin == "ETH"))
+
+    use_case.execute(command(account_id, FlowClosing("ETH"), BTC))
+
+    assert [order.coin for order in exchange.sent] == ["ETH", "BTC", "BTC"]
+    assert [order.request.market_order.coin for order in orders.orders] == ["ETH", "BTC"]
+
+
+def test_an_exchange_that_stays_unreachable_fails_after_six_sendings_of_the_same_order(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    orders: InMemoryOrderRepositoryAdapter,
+    waits: FakePauseAdapter,
+    account_id: UUID,
+) -> None:
+    exchange.unreached_sendings = 6
+
+    with pytest.raises(OrderExchangeUnavailableError):
+        use_case.execute(command(account_id, BTC))
+
+    assert len(exchange.sent) == 6
+    assert len({order.id for order in exchange.sent}) == 1
+    assert orders.orders == []
+    assert waits.pauses == [5.0, 15.0, 30.0, 60.0, 120.0]
+
+
+def test_a_reading_of_the_exchange_that_fails_once_is_read_again(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    account_id: UUID,
+) -> None:
+    hold_eth(exchange, accesses, account_id)
+    exchange.unreached_readings = 1
+
+    outcome = use_case.execute(command(account_id, FlowClosing("ETH")))
+
+    assert [order.coin for order in exchange.sent] == ["ETH"]
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("ETH", 1)]
+
+
+def test_a_market_that_fails_once_is_read_again_before_the_opening(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    account_id: UUID,
+) -> None:
+    exchange.unreached_readings = 1
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    assert [order.coin for order in exchange.sent] == ["BTC"]
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("BTC", 1)]
+
+
+def test_a_refused_leverage_is_not_asked_again(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    waits: FakePauseAdapter,
+    account_id: UUID,
+) -> None:
+    exchange.leverage_rejection = "Invalid leverage value"
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    assert (waits.pauses, outcome.failed_attempts) == ([], ())
+
+
+def _fail_next_if(exchange: FakeOrderExchangeAdapter, condition: bool) -> None:
+    """After the order that meets the condition the next sending never reaches the exchange, once."""
+    if condition:
+        exchange.unreached_sendings = 1
+
+
 def test_an_exchange_the_platform_does_not_support_sends_nothing(
     exchange: FakeOrderExchangeAdapter,
     orders: InMemoryOrderRepositoryAdapter,
@@ -260,7 +390,7 @@ def test_an_exchange_the_platform_does_not_support_sends_nothing(
     account_id = uuid4()
     accesses.accesses[account_id] = new_access("Binance")
     unprotected = (FakeProtectionExchangeAdapter(), InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT))
-    use_case = a_use_case(accesses, exchange, orders, unprotected)
+    use_case = a_use_case(accesses, exchange, orders, unprotected, FakePauseAdapter())
 
     with pytest.raises(UnsupportedOrderExchangeError):
         use_case.execute(command(account_id, BTC))
@@ -464,3 +594,207 @@ def test_an_update_goes_after_the_closings_and_before_the_openings(
     use_case.execute(command(account_id, BTC, update))
 
     assert [order.asset for order in protection_exchange.placed] == ["ETH", "BTC"]
+
+
+# ADR-protezioni-ritentate-nel-ciclo: the access, the protections and their cancellations are retried in the cycle,
+# and a protection retried is never placed twice.
+
+
+def test_an_access_to_the_account_that_fails_once_is_opened_again(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    waits: FakePauseAdapter,
+    account_id: UUID,
+) -> None:
+    accesses.unreached_openings = 1
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    assert [order.coin for order in exchange.sent] == ["BTC"]
+    assert waits.pauses == [5.0]
+    assert outcome.failed_attempts == (
+        FailedOrderAttempt(None, 1, "AccountsUnavailableError", "conti non raggiungibili"),
+    )
+
+
+def test_a_stop_loss_the_exchange_never_got_is_placed_again_with_the_same_client_order_id(  # noqa: PLR0917 - fakes
+    use_case: ExecuteFlowOrdersUseCase,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    protections: InMemoryProtectionRepositoryAdapter,
+    accesses: FakeTradingAccessAdapter,
+    waits: FakePauseAdapter,
+    account_id: UUID,
+) -> None:
+    protection_exchange.unreached_placements = 1
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    first, again = protection_exchange.placed
+    assert first.client_order_id == again.client_order_id
+    assert protection_exchange.lookups == [first.client_order_id]
+    assert protection_exchange.of(address(accesses, account_id), "BTC") == (first,)
+    [recorded] = protections.placed(account_id, "BTC")
+    assert recorded.exchange_order_id == protection_exchange.known[first.client_order_id]
+    assert waits.pauses == [5.0]
+    assert outcome.failed_attempts == (
+        FailedOrderAttempt("BTC", 1, "OrderExchangeUnavailableError", str(OrderExchangeUnavailableError())),
+    )
+    assert outcome.unprotected == frozenset()
+
+
+def test_a_stop_loss_the_exchange_placed_without_answering_is_not_placed_twice(
+    use_case: ExecuteFlowOrdersUseCase,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    protections: InMemoryProtectionRepositoryAdapter,
+    accesses: FakeTradingAccessAdapter,
+    account_id: UUID,
+) -> None:
+    protection_exchange.lost_placements = 1
+
+    use_case.execute(command(account_id, BTC))
+
+    [stop] = protection_exchange.placed
+    assert protection_exchange.of(address(accesses, account_id), "BTC") == (stop,)
+    [recorded] = protections.placed(account_id, "BTC")
+    assert recorded.exchange_order_id == protection_exchange.known[stop.client_order_id]
+
+
+def test_a_take_profit_that_fails_once_is_placed_again_and_the_stop_loss_is_not(
+    use_case: ExecuteFlowOrdersUseCase,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    protections: InMemoryProtectionRepositoryAdapter,
+    account_id: UUID,
+) -> None:
+    defaults = ProtectionRequest(None, None, Decimal(5), Decimal(8))
+    protection_exchange.unreached_kinds = [ProtectionKind.TAKE_PROFIT]
+
+    use_case.execute(command(account_id, FlowOpening("BTC", Direction.LONG, Decimal(200), 3, defaults)))
+
+    assert [order.kind for order in protection_exchange.placed] == [
+        ProtectionKind.STOP_LOSS,
+        ProtectionKind.TAKE_PROFIT,
+        ProtectionKind.TAKE_PROFIT,
+    ]
+    assert [protection.kind for protection in protections.placed(account_id, "BTC")] == [
+        ProtectionKind.STOP_LOSS,
+        ProtectionKind.TAKE_PROFIT,
+    ]
+
+
+def test_a_protection_the_exchange_stays_unreachable_for_fails_after_six_placements(
+    use_case: ExecuteFlowOrdersUseCase,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    waits: FakePauseAdapter,
+    account_id: UUID,
+) -> None:
+    protection_exchange.unreached_placements = 6
+
+    with pytest.raises(OrderExchangeUnavailableError):
+        use_case.execute(command(account_id, BTC))
+
+    assert len({order.client_order_id for order in protection_exchange.placed}) == 1
+    assert len(protection_exchange.placed) == 6
+    assert waits.pauses == [5.0, 15.0, 30.0, 60.0, 120.0]
+
+
+def test_a_closing_after_a_refused_stop_loss_is_retried_without_closing_twice(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    account_id: UUID,
+) -> None:
+    protection_exchange.rejections[ProtectionKind.STOP_LOSS] = "Invalid trigger price"
+    exchange.observers.append(lambda _access, order, _execution: _lose_next_if(exchange, not order.reduce_only))
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    opening, closing = outcome.orders
+    assert [order.reduce_only for order in exchange.sent] == [False, True]
+    assert closing.execution == exchange.executions[closing.request.market_order.id]
+    assert exchange.positions == {}
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("BTC", 1)]
+    assert opening.execution is not None
+
+
+def test_a_reading_of_the_position_to_close_after_a_refused_stop_loss_is_read_again(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    account_id: UUID,
+) -> None:
+    protection_exchange.rejections[ProtectionKind.STOP_LOSS] = "Invalid trigger price"
+    exchange.observers.append(lambda _access, order, _execution: _fail_reading_if(exchange, not order.reduce_only))
+
+    outcome = use_case.execute(command(account_id, BTC))
+
+    assert [order.reduce_only for order in exchange.sent] == [False, True]
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("BTC", 1)]
+
+
+def test_a_cancellation_whose_answer_was_lost_is_tried_again_and_goes_through(
+    use_case: ExecuteFlowOrdersUseCase,
+    accesses: FakeTradingAccessAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    protections: InMemoryProtectionRepositoryAdapter,
+    account_id: UUID,
+) -> None:
+    use_case.execute(command(account_id, ETH))
+    [stop_id] = [each.order_id for each in protection_exchange.resting[address(accesses, account_id), "ETH"]]
+    protection_exchange.lost_cancellations = 1
+
+    outcome = use_case.execute(command(account_id, FlowClosing("ETH")))
+
+    assert protection_exchange.cancelled == [stop_id]
+    assert protections.placed(account_id, "ETH") == ()
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("ETH", 1)]
+
+
+def test_an_update_whose_new_stop_fails_once_is_placed_once_and_the_previous_cancelled(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    account_id: UUID,
+) -> None:
+    use_case.execute(command(account_id, ETH))
+    protection_exchange.unreached_placements = 1
+    protection_exchange.lost_cancellations = 1
+    update = FlowUpdate("ETH", ProtectionRequest(Decimal(3900), None, Decimal(5), None), remove_target=False)
+
+    outcome = use_case.execute(command(account_id, update))
+
+    [resting] = protection_exchange.of(address(accesses, account_id), "ETH")
+    assert (resting.kind, resting.trigger_price) == (ProtectionKind.STOP_LOSS, Decimal(3900))
+    assert len(protection_exchange.cancelled) == 1
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("ETH", 1), ("ETH", 1)]
+    assert len(exchange.sent) == 1
+
+
+def test_an_update_that_reads_the_position_and_the_market_again_after_a_failure(
+    use_case: ExecuteFlowOrdersUseCase,
+    exchange: FakeOrderExchangeAdapter,
+    protection_exchange: FakeProtectionExchangeAdapter,
+    accesses: FakeTradingAccessAdapter,
+    account_id: UUID,
+) -> None:
+    hold_eth(exchange, accesses, account_id)
+    exchange.unreached_readings = 2
+    update = FlowUpdate("ETH", ProtectionRequest(Decimal(98), None, Decimal(5), None), remove_target=False)
+
+    outcome = use_case.execute(command(account_id, update))
+
+    assert [order.trigger_price for order in protection_exchange.placed] == [Decimal(98)]
+    assert [(attempt.asset, attempt.attempt) for attempt in outcome.failed_attempts] == [("ETH", 1), ("ETH", 2)]
+
+
+def _lose_next_if(exchange: FakeOrderExchangeAdapter, condition: bool) -> None:
+    """After the order that meets the condition the answer of the next execution is lost, once."""
+    if condition:
+        exchange.lost_answers = 1
+
+
+def _fail_reading_if(exchange: FakeOrderExchangeAdapter, condition: bool) -> None:
+    """After the order that meets the condition the next reading of the exchange fails, once."""
+    if condition:
+        exchange.unreached_readings = 1

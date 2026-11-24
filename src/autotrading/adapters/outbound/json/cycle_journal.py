@@ -15,9 +15,11 @@ from autotrading.application.flows.ports import (
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
+from autotrading.domain.flows.cycle_record import FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.recorded_decision import RecordedDecision
 from autotrading.domain.flows.selections import ActiveSource
+from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 
 
 class JsonCycleJournalAdapter:
@@ -71,6 +73,18 @@ class JsonCycleJournalAdapter:
             return ()
         return tuple(_recorded(each) for each in decision.reply.response.decisions)
 
+    def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:
+        """The orders and the protections sent again after a temporary error, each attempt that failed named by its
+        asset; the access to the account has none.
+        """
+        if not isinstance(result, list | tuple):
+            return ()
+        return tuple(
+            FailedAttempt(step, item.attempt, item.error_type, _attempt_message(item))
+            for item in result
+            if isinstance(item, FailedOrderAttempt)
+        )
+
     def _flow_of(self, cycle_flow: CycleFlow) -> dict[str, object]:
         configuration = cycle_flow.configuration
         return {
@@ -89,6 +103,10 @@ class JsonCycleJournalAdapter:
             },
             "stato": _state_document(cycle_flow),
         }
+
+
+def _attempt_message(attempt: FailedOrderAttempt) -> str:
+    return attempt.message if attempt.asset is None else f"{attempt.asset}: {attempt.message}"
 
 
 def _state_document(cycle_flow: CycleFlow) -> object:

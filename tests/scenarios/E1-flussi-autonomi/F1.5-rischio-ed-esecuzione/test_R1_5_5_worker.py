@@ -21,12 +21,13 @@ from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderStatus
 from autotrading.domain.orders.protection_request import ProtectionRequest
-from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
+from tests.support.exchange_connections import connection_of
+from tests.support.retries import unlimited_retry
 from tests.support.steps import quoted
 from tests.support.trading import HYPERLIQUID, Trading
-from tests.support.exchange_connections import connection_of
 
 scenarios(
     "E1-flussi-autonomi/F1.5-rischio-ed-esecuzione/R1.5.5-esecuzione-delle-decisioni/worker/R1.5.5-esecuzione-delle-decisioni.feature"
@@ -65,7 +66,12 @@ class FlowExecution:
             UpdateFlowProtectionUseCase(exchanges, protections),
         )
         use_case = ExecuteFlowOrdersUseCase(
-            trading.accesses.use_case, exchanges, trading.orders, trading.slippage, protection
+            trading.accesses.use_case,
+            exchanges,
+            trading.orders,
+            trading.slippage,
+            protection,
+            unlimited_retry(FakePauseAdapter()),
         )
         command = ExecuteFlowOrdersCommand(
             trading.accounts[self.account], self.flows[flow], self.cycle(cycle), tuple(self.approved)

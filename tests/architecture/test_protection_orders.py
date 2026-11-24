@@ -44,7 +44,8 @@ def parameters(cls: type) -> list[str]:
 
 
 def test_adr_ordini_di_protezione_the_exchange_and_the_record_of_the_protections_are_ports_of_the_orders() -> None:
-    assert public_methods(order_ports.ProtectionExchangePort) == ["active", "cancel", "place"]
+    # The lookup by client order id is the one ADR-protezioni-ritentate-nel-ciclo adds, for the protections retried.
+    assert public_methods(order_ports.ProtectionExchangePort) == ["active", "cancel", "find", "place"]
     assert public_methods(order_ports.ProtectionRepositoryPort) == ["add", "placed", "remove"]
     assert get_type_hints(FlowOpening)["protection"] is ProtectionRequest
 

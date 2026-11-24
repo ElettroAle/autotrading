@@ -10,6 +10,10 @@ Funzionalità: R1.4.9 Nuovi tentativi della chiamata al modello
   Esauriti i tentativi, il ciclo fallisce come in R1.2.3. Un errore permanente non si ritenta (R1.2.4). Il costo di
   ogni tentativo che ne ha uno e il numero dei tentativi sono registrati nel ciclo.
 
+  Una risposta che il modello non finisce perché esaurisce il limite di token del flusso è un errore temporaneo come gli
+  altri (Bug 733): si ritenta allo stesso modo, e se si interrompe in ogni tentativo il motivo dice il limite e il
+  rimedio, non un fornitore irraggiungibile.
+
   Fuori ambito: nuovi tentativi degli altri passi del ciclo; una risposta arrivata ma non conforme (R1.4.5).
 
   Contesto:
@@ -39,3 +43,16 @@ Funzionalità: R1.4.9 Nuovi tentativi della chiamata al modello
     Dato che il primo tentativo ha risposto 500 con un costo di 0,001 USD e il secondo una decisione con 0,004 USD
     Quando il ciclo di "alfa" si conclude
     Allora il costo del ciclo è 0,005 USD
+
+  Scenario: Risposta interrotta in ogni tentativo
+    Dato un flusso "alfa" con max_tokens 4096
+    E che il modello esaurisce i 4096 token prima di finire la risposta in ogni tentativo
+    Quando parte un ciclo di "alfa"
+    Allora il ciclo fallisce con il motivo "risposta del modello interrotta dal limite di 4096 token: alza max_tokens o abbassa il ragionamento del flusso"
+    E il motivo non dice "fornitore IA non raggiungibile"
+    E il ciclo registra il costo e i tentativi delle chiamate interrotte
+
+  Scenario: Risposta interrotta al primo tentativo e completa al secondo
+    Dato che il modello esaurisce i token solo al primo tentativo
+    Quando parte un ciclo di "alfa"
+    Allora il ciclo è concluso con 2 tentativi del modello

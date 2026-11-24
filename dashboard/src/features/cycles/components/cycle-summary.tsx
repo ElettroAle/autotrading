@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { formatInstant } from '@/utils/format-instant';
 
@@ -34,10 +35,7 @@ const Term = ({ term, children }: { term: string; children: string }) => (
  * steps it ran (R1.7.1, R6.5.2).
  */
 export const CycleSummaryView = ({ cycle }: { cycle: Cycle }) => (
-  <section
-    aria-labelledby="cycle-summary"
-    className="space-y-3 rounded border border-slate-200 bg-white p-4"
-  >
+  <Card as="section" aria-labelledby="cycle-summary" className="space-y-3">
     <h2 id="cycle-summary" className="text-lg font-semibold">
       Riepilogo del ciclo
     </h2>
@@ -55,5 +53,5 @@ export const CycleSummaryView = ({ cycle }: { cycle: Cycle }) => (
         ))}
       </ol>
     )}
-  </section>
+  </Card>
 );

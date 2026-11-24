@@ -161,13 +161,13 @@ from tests.fakes.verification_run_repository import InMemoryVerificationRunRepos
 from tests.support.activity import an_activity
 from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
+from tests.support.exchange_connections import connection_of
 from tests.support.mail_servers import MailServers
 from tests.support.model_catalog import PLATFORM_MODELS
 from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.openings import OpeningRegister
 from tests.support.procedure_orders import procedure_orders
 from tests.support.source_selections import platform_systems
-from tests.support.exchange_connections import connection_of
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)

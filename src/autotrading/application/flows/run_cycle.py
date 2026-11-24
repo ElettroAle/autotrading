@@ -12,6 +12,7 @@ from autotrading.application.flows.ports import (
     CycleEquityPort,
     CycleFailureNoticePort,
     CycleFlowActivityPort,
+    CycleNoticesPort,
     CycleRepositoryPort,
     ExpiredKeysPausePort,
     FlowLockPort,
@@ -49,9 +50,11 @@ class CycleGuards:
 
 
 class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object, E = object]:
-    """Runs one planned cycle of a flow on its graph, stopping at the first failure (R1.2.1-R1.2.5, ADR 0104).
+    """Runs one planned cycle of a flow on its graph, stopping at the first failure the graph gives up on
+    (R1.2.1-R1.2.5, ADR 0104).
 
-    Fail fast: no retry and no node after the failing one. The only handler of the errors of the cycle records the
+    Fail fast: no node after the failing one, once the graph retried its temporary errors (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo). The only handler of the errors of the cycle records the
     failed cycle and, for a permanent error, pauses the flows involved and raises the error anyway (R1.2.4); any other
     error counts towards the maximum of failed cycles in a row of the flow (R3.2.4).
     Every cycle that read the state of its flow, completed or failed, records the equity of the last state it read
@@ -62,12 +65,23 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
     A cycle the user asks for now (R6.5.2, ADR ciclo-su-richiesta-nel-worker) answers the user where the planned one
     would pass in silence: a flow not active and a cycle in progress are refused. A permanent error fails fast as for
     the planned cycle: recorded, the flows paused, then raised, and the user reads its reason in the answer.
+
+    The notices the steps gave leave as the last step of a cycle that ran them, completed or failed, a permanent error
+    included: after its record and its equity, so each ends with the state of the flow after what it tells (ADR
+    notifiche-del-ciclo-dopo-lo-stato-registrato).
     """
 
-    def __init__(self, graph: CycleGraph[S, D, C, A, O, E], guards: CycleGuards, equity: CycleEquityPort[S]) -> None:
+    def __init__(
+        self,
+        graph: CycleGraph[S, D, C, A, O, E],
+        guards: CycleGuards,
+        equity: CycleEquityPort[S],
+        notices: CycleNoticesPort,
+    ) -> None:
         self._graph = graph
         self._guards = guards
         self._equity = equity
+        self._notices = notices
 
     def execute(self, command: RunCycleCommand) -> CycleRecord | None:
         if not self._guards.cycles.claim(command.flow_id, command.planned_at):
@@ -88,6 +102,7 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
             if isinstance(outcome, FailedCycle):
                 return self._failed(command, outcome)
             self._equity.execute(command.flow_id, command.planned_at, outcome.state)
+            self._notices.release()
             return outcome.record
 
     def _failed(self, command: RunCycleCommand, failed: FailedCycle[S]) -> CycleRecord:
@@ -98,8 +113,10 @@ class RunCycleUseCase[S = object, D = object, C = object, A = object, O = object
         self._guards.failures.execute(flow_id, str(failed.error))
         if not failed.error.permanent:
             self._guards.consecutive_failures.execute(flow_id, failed.error)
+            self._notices.release()
             return record
         self._guards.pause.execute(PauseAffectedFlowsCommand.of_error(flow_id, failed.error))
+        self._notices.release()
         raise failed.error
 
 

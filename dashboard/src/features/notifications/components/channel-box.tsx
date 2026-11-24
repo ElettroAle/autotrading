@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 
+import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icons/icon';
 
 type ChannelBoxProps = {
@@ -19,10 +20,7 @@ export const ChannelBox = ({ title, linkedTo, children }: ChannelBoxProps) => {
   const titleId = useId();
   const linked = linkedTo !== undefined;
   return (
-    <section
-      aria-labelledby={titleId}
-      className="space-y-4 rounded border border-slate-200 bg-white p-4"
-    >
+    <Card as="section" aria-labelledby={titleId} className="space-y-4">
       <h2 id={titleId} className="text-xl font-semibold">
         {title}
       </h2>
@@ -35,6 +33,6 @@ export const ChannelBox = ({ title, linkedTo, children }: ChannelBoxProps) => {
         {linked ? `Collegato: ${linkedTo}` : TO_CONFIGURE}
       </p>
       {children}
-    </section>
+    </Card>
   );
 };

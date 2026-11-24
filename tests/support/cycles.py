@@ -9,10 +9,12 @@ from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFl
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps
 from autotrading.application.flows.plan_flow_cycles import PlanFlowCyclesUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleCommand, RunCycleUseCase
+from autotrading.application.flows.transient_retry import TransientRetry
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.cycle_record import CycleRecord
 from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.cycle_notices import FakeCycleNoticesAdapter
 from tests.fakes.cycles import (
     ACTIVE,
     PAUSED,
@@ -40,6 +42,7 @@ from tests.fakes.cycles import (
     RecordedConsecutiveFailurePausesAdapter,
     RecordedCycleFailuresAdapter,
 )
+from tests.fakes.pause import FakePauseAdapter
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 # One second of the cycle lasts ten milliseconds of the test.
@@ -69,9 +72,13 @@ class Cycles:
         self.reversal = FakeReversalAdapter()
         self.journal = FakeCycleJournalAdapter()
         self.checkpoints = InMemoryCycleCheckpointsAdapter()
+        # The waits before a step is retried, asked and never waited, but passed on the clock of the cycle.
+        self.waits = FakePauseAdapter(clock=self.clock)
         self.failure_notices = RecordedCycleFailuresAdapter()
         self.consecutive_failures = RecordedConsecutiveFailurePausesAdapter(self.failure_notices)
         self.equity = InMemoryCycleEquityAdapter()
+        # What the cycle had done when it released its notices: recorded cycles, equities, failures told, flows paused.
+        self.notices = FakeCycleNoticesAdapter(self.done)
         self.expired_keys = FakeExpiredKeysAdapter(self.flows)
         self.scheduler = FakeCycleSchedulerAdapter()
         self.raised: AutotradingError | None = None
@@ -80,7 +87,11 @@ class Cycles:
         self.executors = [self._executor()]
 
     def run_cycle(self) -> RunCycleUseCase:
-        return RunCycleUseCase(self.graph(), self.guards(), self.equity)
+        return RunCycleUseCase(self.graph(), self.guards(), self.equity, self.notices)
+
+    def done(self) -> tuple[int, int, int, list[str]]:
+        paused = [flow.name for flow in self.flows.flows.values() if flow.status == PAUSED]
+        return len(self.records.records), len(self.equity.recorded), len(self.failure_notices.told), paused
 
     def guards(self) -> CycleGuards:
         activity = FakeFlowActivityAdapter(self.flows)
@@ -108,7 +119,13 @@ class Cycles:
             FakeCycleEndAdapter(self.flows),
             self.journal,
         )
-        return CycleGraph(steps, self.records, self.checkpoints, lambda wait: wait.total_seconds() * SECOND)
+        return CycleGraph(
+            steps,
+            self.records,
+            self.checkpoints,
+            TransientRetry(self.waits, self.clock),
+            lambda wait: wait.total_seconds() * SECOND,
+        )
 
     def _executor(self) -> PlanFlowCyclesUseCase:
         run_cycle = self.run_cycle()

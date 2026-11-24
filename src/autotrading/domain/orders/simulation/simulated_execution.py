@@ -175,7 +175,9 @@ def _opening(held: SimulatedPosition | None, execution: _Execution) -> Simulated
     if held is None:
         maintenance = ONE / (MAINTENANCE_SHARE * execution.market.max_leverage)
         order = execution.order
-        return SimulatedPosition(order.coin, order.direction, opened, execution.leverage, execution.price, margin, maintenance)
+        return SimulatedPosition(
+            order.coin, order.direction, opened, execution.leverage, execution.price, margin, maintenance
+        )
     size = held.size + opened
     entry = (held.entry_price * held.size + execution.price * opened) / size
     return _resized(held, size, held.margin + margin, entry)

@@ -18,8 +18,8 @@ from autotrading.domain.orders.slippage import Slippage
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.trading_access import FakeTradingAccessAdapter
-from tests.support.trading import HYPERLIQUID, VERIFICATION, new_access
 from tests.support.exchange_connections import connection_of
+from tests.support.trading import HYPERLIQUID, VERIFICATION, new_access
 
 SLIPPAGE = Slippage.percent(Decimal(2))
 

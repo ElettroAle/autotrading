@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Protocol
 from uuid import UUID
 
+from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.execution import Execution
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.margin_mode import MarginMode
@@ -81,6 +82,18 @@ class OrderExchangePort(Protocol):
         ...
 
 
+class SendingRetryPort(Protocol):
+    """Calls again, after a wait, what failed with a temporary error, in the cycle that sends the orders (ADR
+    errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
+    """
+
+    def run[T](self, call: Callable[[], T], failed: Callable[[int, AutotradingError], None]) -> T:
+        """The answer of the first attempt that goes through; a permanent error at once, or the last temporary one
+        when none goes through. Every failed attempt is told to `failed` with its number, the first being 1.
+        """
+        ...
+
+
 class ProtectionExchangePort(Protocol):
     """Stop loss and take profit on the exchange, over the whole position of an asset (R3.1.2).
 
@@ -91,6 +104,12 @@ class ProtectionExchangePort(Protocol):
         """The identifier the exchange gave the protection, waiting for its price.
 
         Raises ExchangeRejectedOrderError with the message of the exchange when it refuses it.
+        """
+        ...
+
+    def find(self, access: TradingAccess, order: ProtectionOrder) -> str | None:
+        """The identifier the exchange gave the protection with the client order id of the order, or None when it does
+        not know it (ADR protezioni-ritentate-nel-ciclo).
         """
         ...
 

@@ -1,3 +1,4 @@
+import { Card } from '@/components/ui/card';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { Loading } from '@/components/ui/loading';
 import { usePeriod } from '@/components/ui/period-selector/use-period';
@@ -23,9 +24,9 @@ export const FlowsList = () => {
   return (
     <ul aria-label="Flussi" className="space-y-3">
       {flows.data.map((flow) => (
-        <li key={flow.id} className="rounded border border-slate-200 bg-white p-4">
+        <Card as="li" key={flow.id}>
           <FlowOverviewCard flow={flow} />
-        </li>
+        </Card>
       ))}
     </ul>
   );
