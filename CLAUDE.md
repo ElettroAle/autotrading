@@ -233,7 +233,15 @@ allenta e l'elenco non cresce senza approvazione del proprietario.
 - **Nomi auto esplicativi ed espressivi.** Il nome dice l'intenzione; niente abbreviazioni inventate.
 - **Commenti solo se indispensabili, e solo per il razionale** (il perché), mai per descrivere cosa
   fa il codice.
-- Pochi parametri; SOLID dove cambia una scelta, non citato.
+- **SOLID e Clean Code sempre** (decisione del proprietario, 24 novembre 2026): responsabilità singola per classe e
+  per metodo, estensione senza modificare ciò che funziona, sottotipi sostituibili, interfacce piccole e specifiche,
+  dipendenze dalle astrazioni (le porte). Funzioni corte, pochi parametri, un livello di astrazione per funzione,
+  nessun effetto nascosto.
+- **Nessuna duplicazione.** La stessa conoscenza (elenco di campi, mappatura, regola, sequenza di passi) vive in un
+  solo punto: si estrae in un tipo, una funzione o una classe base condivisa nel livello giusto, mai copiata. Fra due
+  cartelle adapter che non si importano, ciò che entrambe ripetono va nel livello interno che entrambe usano (il
+  comando o il caso d'uso), non duplicato nei due adapter. Il controllo di duplicazione della pipeline (soglia 3% sul
+  codice nuovo) è un minimo, non un obiettivo.
 - Una cartella di ruolo contiene solo tipi di quel ruolo. Nessuna cartella `common`/`utils`/`shared`.
 - Tipizzazione completa, mypy strict senza `Any` e senza `type: ignore` non motivati.
 
