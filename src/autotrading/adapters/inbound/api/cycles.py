@@ -210,6 +210,8 @@ class FlowOverviewResponse(BaseModel):
     openings_suspension: OpeningsSuspensionResponse | None
     model: str
     version: int
+    # The assets of the version in force in the order of the configuration, empty for a draft without assets (Bug 731).
+    assets: list[str]
     last_cycle: LastCycleResponse | None
     next_cycle_at: datetime | None
     # Empty for a draft, which has no account yet (ADR 0124).
@@ -235,6 +237,7 @@ class FlowOverviewResponse(BaseModel):
             openings_suspension=OpeningsSuspensionResponse.of(overview.openings_suspension),
             model=summary.model,
             version=summary.version,
+            assets=list(summary.assets),
             last_cycle=LastCycleResponse.of(overview.last_cycle),
             next_cycle_at=overview.next_cycle_at,
             currency=overview.currency,

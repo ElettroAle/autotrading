@@ -1545,7 +1545,11 @@ class DecisionHistoryPort(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class FlowSummary:
-    """A flow in use as the consultation shows it; the schedule is None unless the flow is active (R1.7.3)."""
+    """A flow in use as the consultation shows it; the schedule is None unless the flow is active (R1.7.3).
+
+    The assets are those of the version in force, in the order of the configuration: none for a draft without assets
+    (Bug 731, ADR asset-del-flusso-nel-riepilogo-dei-flussi).
+    """
 
     flow_id: UUID
     name: str
@@ -1555,6 +1559,7 @@ class FlowSummary:
     model: str
     schedule: CycleSchedule | None
     version: int
+    assets: tuple[str, ...]
 
 
 class FlowSummaryPort(Protocol):

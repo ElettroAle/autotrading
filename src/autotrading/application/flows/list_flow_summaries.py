@@ -45,4 +45,5 @@ def _summary_of(flow: Flow, account: str, timing: FlowTiming) -> FlowSummary:
         model=configuration.model.name,
         schedule=flow.planned_schedule(timing.anchor),
         version=configuration.version,
+        assets=configuration.assets,
     )

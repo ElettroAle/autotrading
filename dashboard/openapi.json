@@ -8631,6 +8631,13 @@
             "type": "integer",
             "title": "Version"
           },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
           "last_cycle": {
             "anyOf": [
               {
@@ -8726,6 +8733,7 @@
           "openings_suspension",
           "model",
           "version",
+          "assets",
           "last_cycle",
           "next_cycle_at",
           "currency",

@@ -129,6 +129,23 @@ describe('FlowsList', () => {
     ).not.toBeInTheDocument();
   });
 
+  // Bug 731, ADR asset-del-flusso-nel-riepilogo-dei-flussi.
+  it('shows the assets of a flow in the order of its configuration', async () => {
+    fakePlatform.addFlow('anna', 'alfa');
+    fakePlatform.changeFlow('alfa', { assets: ['ETH', 'SOL', 'BTC'] });
+    await renderApp({ account: 'anna' });
+
+    expect(factOf(await summaryOf('alfa'), 'Asset')).toHaveTextContent('ETH · SOL · BTC');
+  });
+
+  it('shows no asset for a draft without assets', async () => {
+    fakePlatform.addFlow('anna', 'bozza', { status: 'bozza', allocatedCapital: null });
+    fakePlatform.changeFlow('bozza', { accountId: null, assets: [] });
+    await renderApp({ account: 'anna' });
+
+    expect(factOf(await summaryOf('bozza'), 'Asset')).toHaveTextContent('nessuno');
+  });
+
   it('shows why a flow paused, a loss in red and no next cycle', async () => {
     fakePlatform.addFlow('anna', 'beta');
     fakePlatform.changeFlow('beta', {
