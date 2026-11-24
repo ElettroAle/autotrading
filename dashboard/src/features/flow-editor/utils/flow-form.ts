@@ -1,3 +1,4 @@
+import type { Path } from 'react-hook-form';
 import { z } from 'zod';
 
 import { isListText, LIST_SHAPE, listOf, listTextOf } from '@/lib/parameter-lists';
@@ -51,6 +52,13 @@ export const adapterKeyOf = (name: string): string =>
 
 const adapterNameOf = (key: string): string => decodeURIComponent(key);
 
+// Decisions and days are disabled while the memory is off, and a disabled field gives no value (R5.3.4).
+const memoryValuesSchema = z.object({
+  active: z.boolean(),
+  decisions: numberText.optional(),
+  days: numberText.optional(),
+});
+
 export const flowFormSchema = z.object({
   name: z.string(),
   account_id: z.string(),
@@ -77,11 +85,13 @@ export const flowFormSchema = z.object({
   max_daily_loss_percent: maxLossText,
   max_drawdown_percent: maxLossText,
   openings_resume: z.enum(OPENINGS_RESUMES, 'Scegli la ripresa delle aperture'),
+  memory: memoryValuesSchema,
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
 export type SourceValues = z.infer<typeof sourceValuesSchema>;
 export type AdapterValues = z.infer<typeof adapterValuesSchema>;
+type MemoryValues = z.infer<typeof memoryValuesSchema>;
 
 type AdapterRequest = {
   readonly name: string;
@@ -123,6 +133,8 @@ type SettingsRequest = {
   max_daily_loss_percent: string | null;
   max_drawdown_percent: string | null;
   openings_resume: OpeningsResume;
+  // Null decisions or days keep those in force, or the defaults of the platform at creation (R5.3.4).
+  memory: { active: boolean; decisions: number | null; days: number | null };
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -158,6 +170,7 @@ export const emptyFormValues = (): FlowFormValues => ({
   max_daily_loss_percent: '',
   max_drawdown_percent: '',
   openings_resume: 'manual',
+  memory: { active: false, decisions: '', days: '' },
 });
 
 const decimalOf = (text: string): string => text.trim().replace(',', '.');
@@ -205,6 +218,16 @@ const sourcesOf = (sources: Record<string, SourceValues>): SourceRequest[] =>
     .filter(([, source]) => source.active)
     .map(([name, source]) => ({ name, adapters: adaptersOf(source.adapters ?? {}) }));
 
+// Off, the memory sends no decisions nor days: the API keeps those in force, or its defaults at creation (R5.3.4).
+const memoryOf = (memory: MemoryValues): SettingsRequest['memory'] =>
+  memory.active
+    ? {
+        active: true,
+        decisions: numberOrNull(memory.decisions ?? ''),
+        days: numberOrNull(memory.days ?? ''),
+      }
+    : { active: false, decisions: null, days: null };
+
 const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   account_id: values.account_id,
   assets: values.assets,
@@ -227,6 +250,7 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   max_daily_loss_percent: decimalOrNull(values.max_daily_loss_percent),
   max_drawdown_percent: decimalOrNull(values.max_drawdown_percent),
   openings_resume: values.openings_resume,
+  memory: memoryOf(values.memory),
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -301,6 +325,11 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
   max_daily_loss_percent: textOf(flow.max_daily_loss_percent),
   max_drawdown_percent: textOf(flow.max_drawdown_percent),
   openings_resume: flow.openings_resume,
+  memory: {
+    active: flow.memory.active,
+    decisions: String(flow.memory.decisions),
+    days: String(flow.memory.days),
+  },
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>
@@ -357,8 +386,9 @@ export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
     : { settings, capital };
 };
 
-const FORM_FIELDS = new Set<string>(Object.keys(flowFormSchema.shape));
+const MEMORY_FIELDS: readonly Path<FlowFormValues>[] = ['memory.decisions', 'memory.days'];
+const FORM_FIELDS = new Set<string>([...Object.keys(flowFormSchema.shape), ...MEMORY_FIELDS]);
 
 /** The field of the form a setting named by the API is typed in, when the form has it. */
-export const formFieldOf = (setting: string): keyof FlowFormValues | undefined =>
-  FORM_FIELDS.has(setting) ? (setting as keyof FlowFormValues) : undefined;
+export const formFieldOf = (setting: string): Path<FlowFormValues> | undefined =>
+  FORM_FIELDS.has(setting) ? (setting as Path<FlowFormValues>) : undefined;

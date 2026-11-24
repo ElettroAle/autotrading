@@ -15,6 +15,7 @@ import type { Source } from '../api/get-sources';
 import type { DefaultSystemPrompt } from '../api/get-system-prompt';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
+import { MemoryFields } from './memory-fields';
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
 import { SystemPromptField } from './system-prompt-field';
@@ -330,6 +331,7 @@ export const FlowForm = ({
             <input type="checkbox" {...register('bring_to_minimum')} />
             Porta le aperture al minimo dell&apos;exchange
           </label>
+          <MemoryFields />
           <button
             type="submit"
             disabled={isSubmitting || !tradable.isSuccess}

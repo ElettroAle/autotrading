@@ -3397,6 +3397,55 @@
         }
       }
     },
+    "/flows/{flow_id}/memory": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Flow Memory",
+        "description": "The memory the agent of the flow would receive if its cycle started now (R5.3.4).",
+        "operationId": "read_flow_memory_flows__flow_id__memory_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowMemoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/archive": {
       "post": {
         "tags": [
@@ -6498,6 +6547,27 @@
         ],
         "title": "AmountResponse"
       },
+      "AssetMemoryResponse": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntryResponse"
+            },
+            "type": "array",
+            "title": "Decisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "decisions"
+        ],
+        "title": "AssetMemoryResponse"
+      },
       "BalanceComparisonResponse": {
         "properties": {
           "compared_at": {
@@ -7105,6 +7175,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemorySettingsResponse"
           }
         },
         "type": "object",
@@ -7127,7 +7200,8 @@
           "openings_resume",
           "default_stop_loss_percent",
           "default_take_profit_percent",
-          "minimum_confidence"
+          "minimum_confidence",
+          "memory"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -7276,6 +7350,20 @@
             },
             "type": "array",
             "title": "Failed Attempts"
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AssetMemoryResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory"
           }
         },
         "type": "object",
@@ -7291,7 +7379,8 @@
           "cost",
           "model_attempts",
           "trigger",
-          "failed_attempts"
+          "failed_attempts",
+          "memory"
         ],
         "title": "CycleDetailResponse",
         "description": "A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2)."
@@ -8231,6 +8320,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemoryBody"
           }
         },
         "type": "object",
@@ -8346,6 +8438,91 @@
         ],
         "title": "FlowForecastAccuracyResponse",
         "description": "The error of the forecasts of a flow in the period, one for every asset and horizon it forecast (ADR\nerrore-medio-della-previsione-nell-api)."
+      },
+      "FlowMemoryBody": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "decisions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisions"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "title": "FlowMemoryBody",
+        "description": "The memory of a flow as the user sets it: a part left out keeps the one in force, or the default (R5.3.4)."
+      },
+      "FlowMemoryResponse": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetMemoryResponse"
+            },
+            "type": "array",
+            "title": "Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "assets"
+        ],
+        "title": "FlowMemoryResponse",
+        "description": "What the agent of the flow would receive if its cycle started now; nothing when its memory is off (R5.3.4)."
+      },
+      "FlowMemorySettingsResponse": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "decisions": {
+            "type": "integer",
+            "title": "Decisions"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "decisions",
+          "days"
+        ],
+        "title": "FlowMemorySettingsResponse"
       },
       "FlowModificationRequest": {
         "properties": {
@@ -8644,6 +8821,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemoryBody"
           }
         },
         "type": "object",
@@ -9138,6 +9318,9 @@
             ],
             "title": "Minimum Confidence"
           },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemorySettingsResponse"
+          },
           "missing": {
             "items": {
               "type": "string"
@@ -9171,6 +9354,7 @@
           "default_stop_loss_percent",
           "default_take_profit_percent",
           "minimum_confidence",
+          "memory",
           "missing"
         ],
         "title": "FlowResponse",
@@ -10341,6 +10525,84 @@
         ],
         "title": "MailServerResponse",
         "description": "The mail server of the user: never its password, only that one is saved (ADR server-di-posta-per-tenant)."
+      },
+      "MemoryEntryResponse": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "reasoning": {
+            "type": "string",
+            "title": "Reasoning"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryOutcomeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "action",
+          "direction",
+          "price",
+          "reasoning",
+          "outcome"
+        ],
+        "title": "MemoryEntryResponse",
+        "description": "A previous operative decision of the flow: no price without an execution, no outcome without a position."
+      },
+      "MemoryOutcomeResponse": {
+        "properties": {
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "realized": {
+            "type": "boolean",
+            "title": "Realized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pnl",
+          "realized"
+        ],
+        "title": "MemoryOutcomeResponse"
       },
       "ModelCatalogResponse": {
         "properties": {
@@ -12136,6 +12398,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemoryBody"
           }
         },
         "type": "object",
@@ -12272,6 +12537,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemoryBody"
           }
         },
         "type": "object",

@@ -14,5 +14,6 @@ def test_the_default_is_the_template_of_the_platform_with_every_declared_placeho
             PromptPlaceholder.MAX_LEVERAGE,
             PromptPlaceholder.ASSETS,
             PromptPlaceholder.SOURCE_WEIGHTS,
+            PromptPlaceholder.MEMORY,
         ),
     )

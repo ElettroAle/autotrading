@@ -31,8 +31,10 @@ from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
-from autotrading.domain.flows.recorded_decision import RecordedDecision
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.flows import a_configuration, a_flow
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -178,7 +180,45 @@ def test_the_detail_of_a_cycle_answers_with_everything_recorded(client_of: Clien
                 "message": "riprovare",
             }
         ],
+        "memory": None,
     }
+
+
+def test_the_detail_of_a_cycle_answers_with_the_memory_the_agent_received(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    flow_id = flow_of(platform, "anna")
+    entry = MemoryEntry(
+        PLANNED - timedelta(hours=1),
+        "BTC",
+        DecisionAction.OPEN,
+        TradeSide.LONG,
+        Decimal(95000),
+        "rottura",
+        MemoryOutcome(Decimal("12.5"), realized=False),
+    )
+    memory = (AssetMemory("BTC", (entry,)), AssetMemory("ETH", ()))
+    platform.cycles.record(replace(a_completed_cycle(flow_id), memory=memory))
+
+    response = anna.get(f"/flows/{flow_id}/cycles/2026-11-12T10:07:00Z")
+
+    assert response.json()["memory"] == [
+        {
+            "asset": "BTC",
+            "decisions": [
+                {
+                    "planned_at": "2026-11-12T09:07:00Z",
+                    "action": "apri",
+                    "direction": "long",
+                    "price": "95000",
+                    "reasoning": "rottura",
+                    "outcome": {"pnl": "12.5", "realized": False},
+                }
+            ],
+        },
+        {"asset": "ETH", "decisions": []},
+    ]
 
 
 def test_a_cycle_without_a_model_call_has_no_cost(client_of: Client, platform: Platform) -> None:

@@ -1,10 +1,13 @@
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 
 from autotrading.domain.flows.errors import MalformedSystemPromptError, UnknownPromptPlaceholderError
 from autotrading.domain.flows.flow_setting import FlowSetting
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
+from autotrading.domain.flows.recorded_decision import DecisionAction
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.system_prompt import (
     DEFAULT_SYSTEM_PROMPT,
@@ -13,10 +16,31 @@ from autotrading.domain.flows.system_prompt import (
     checked_system_prompt,
     rendered_system_prompt,
 )
+from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.flows import a_configuration
 from tests.support.source_selections import a_source
 
 ACTIONS = ("apri", "chiudi", "mantieni")
+AT = datetime(2026, 11, 24, 10, 0, tzinfo=UTC)
+OPENING = MemoryEntry(
+    AT,
+    "BTC",
+    DecisionAction.OPEN,
+    TradeSide.LONG,
+    Decimal(95000),
+    "rottura",
+    MemoryOutcome(Decimal(12), realized=False),
+)
+UPDATE = MemoryEntry(AT - timedelta(days=1), "BTC", DecisionAction.UPDATE, None, None, "stop più alto", None)
+MEMORY = (AssetMemory("BTC", (OPENING, UPDATE)), AssetMemory("ETH", ()))
+MEMORY_TEXT = "\n".join(
+    (
+        "Memoria del flusso, le tue decisioni operative precedenti per asset, dalla più recente:",
+        "BTC:",
+        "- 2026-11-24T10:00+00:00 apri long, prezzo 95000, PnL non realizzato 12: rottura",
+        "- 2026-11-23T10:00+00:00 aggiorna: stop più alto",
+    )
+)
 CONFIGURATION = replace(
     a_configuration(assets=("BTC", "ETH")),
     instructions="Sei prudente",
@@ -45,6 +69,7 @@ def test_every_placeholder_declares_its_name_and_what_it_means() -> None:
         ("max_leverage", "{max_leverage}"),
         ("assets", "{assets}"),
         ("source_weights", "{source_weights}"),
+        ("memory", "{memory}"),
     ]
     assert all(placeholder.description for placeholder in PromptPlaceholder)
 
@@ -59,7 +84,25 @@ def test_every_placeholder_reads_its_value_from_the_flow() -> None:
         "assets": "BTC, ETH",
         "source_weights": WEIGHT_RULE
         + "\n- pesi delle fonti attive del flusso: forecast · Prophet 10, indicatori · Hyperliquid 2;",
+        "memory": "",
     }
+
+
+def test_the_memory_is_a_block_for_every_asset_with_previous_decisions_from_the_most_recent() -> None:
+    assert PromptPlaceholder.MEMORY.value_of(PromptSubject(CONFIGURATION, ACTIONS, MEMORY)) == MEMORY_TEXT
+
+
+@pytest.mark.parametrize("memory", [None, (AssetMemory("BTC", ()), AssetMemory("ETH", ()))])
+def test_the_memory_off_or_without_decisions_is_an_empty_text(memory: tuple[AssetMemory, ...] | None) -> None:
+    assert PromptPlaceholder.MEMORY.value_of(PromptSubject(CONFIGURATION, ACTIONS, memory)) == ""
+
+
+def test_the_default_gives_the_memory_in_a_section_after_the_rules_and_before_the_format() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS, MEMORY))
+    rules, _, answer_format = rendered.partition("Rispondi solo con")
+
+    assert rules.endswith("servono solo a stimare la direzione del mercato.\n\n" + MEMORY_TEXT + "\n\n")
+    assert "Memoria" not in answer_format
 
 
 def test_the_weights_follow_the_order_of_the_configuration() -> None:
@@ -189,6 +232,13 @@ def test_a_configuration_follows_the_default_until_the_user_writes_a_template() 
 
     assert own.system_prompt_template == "{instructions} su {assets}"
     assert own.rendered_system_prompt(ACTIONS) == "Sei prudente su BTC, ETH"
+
+
+def test_a_configuration_renders_the_memory_it_is_given() -> None:
+    own = replace(CONFIGURATION, system_prompt="{instructions}\n{memory}")
+
+    assert own.rendered_system_prompt(ACTIONS, MEMORY) == "Sei prudente\n" + MEMORY_TEXT
+    assert own.rendered_system_prompt(ACTIONS) == "Sei prudente\n"
 
 
 def test_a_configuration_with_an_unknown_placeholder_cannot_exist() -> None:

@@ -5,7 +5,13 @@ from uuid import uuid4
 
 import pytest
 
-from autotrading.application.flows.create_flow import CreateFlowCommand, CreateFlowUseCase, FlowChecks, SourceRequest
+from autotrading.application.flows.create_flow import (
+    CreateFlowCommand,
+    CreateFlowUseCase,
+    FlowChecks,
+    MemoryRequest,
+    SourceRequest,
+)
 from autotrading.application.flows.errors import (
     AssetNotTradableError,
     FlowAccountNotFoundError,
@@ -22,6 +28,7 @@ from autotrading.domain.flows.errors import (
     FlowNameRequiredError,
     MaxLeverageRequiredError,
 )
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
@@ -175,6 +182,16 @@ def test_the_minimum_confidence_given_is_saved(flows: Flows) -> None:
     flow = flows.create.execute(flows.command(minimum_confidence=60))
 
     assert flow.configuration.minimum_confidence == MinimumConfidence(60)
+
+
+def test_a_flow_created_without_the_memory_has_it_off_with_10_decisions_and_30_days(flows: Flows) -> None:
+    assert flows.create.execute(flows.command()).configuration.memory == FlowMemory(False, 10, 30)
+
+
+def test_the_memory_given_is_saved_with_the_defaults_for_the_parts_not_given(flows: Flows) -> None:
+    flow = flows.create.execute(flows.command(memory=MemoryRequest(active=True, days=14)))
+
+    assert flow.configuration.memory == FlowMemory(active=True, decisions=10, days=14)
 
 
 def test_the_creation_is_logged_with_the_flow_and_nothing_of_its_configuration(

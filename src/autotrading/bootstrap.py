@@ -121,6 +121,7 @@ from autotrading.adapters.outbound.sqlalchemy.notified_flows import SqlAlchemyNo
 from autotrading.adapters.outbound.sqlalchemy.openings_suspension import SqlAlchemyOpeningsSuspensionAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.outbox import SqlAlchemyOutboxAdapter
+from autotrading.adapters.outbound.sqlalchemy.past_decisions import SqlAlchemyPastDecisionsAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.protection_repository import SqlAlchemyProtectionRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
@@ -421,6 +422,7 @@ def tenant_use_cases(
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             flow_timing=SqlAlchemyFlowTimingAdapter(engine, tenant_id),
+            past_decisions=SqlAlchemyPastDecisionsAdapter(engine, tenant_id),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
             openings_suspensions=SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
             flow_forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
@@ -671,7 +673,11 @@ def cycle_of(
             ),
             calls=ThreadPoolConcurrentCallsAdapter(),
             context=ComposeCycleContextUseCase(
-                ComposeAgentContextUseCase(), ListAgentActionsUseCase(), AggregateCycleSourcesUseCase(), clock
+                ComposeAgentContextUseCase(),
+                ListAgentActionsUseCase(),
+                AggregateCycleSourcesUseCase(),
+                clock,
+                SqlAlchemyPastDecisionsAdapter(engine, tenant_id),
             ),
             agent=DecideCycleUseCase(
                 AskFlowAgentUseCase(

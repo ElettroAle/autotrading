@@ -1024,6 +1024,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Flow Memory
+         * @description The memory the agent of the flow would receive if its cycle started now (R5.3.4).
+         */
+        get: operations["read_flow_memory_flows__flow_id__memory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/archive": {
         parameters: {
             query?: never;
@@ -1773,6 +1793,13 @@ export interface components {
             /** Currency */
             currency: string;
         };
+        /** AssetMemoryResponse */
+        AssetMemoryResponse: {
+            /** Asset */
+            asset: string;
+            /** Decisions */
+            decisions: components["schemas"]["MemoryEntryResponse"][];
+        };
         /**
          * BalanceComparisonResponse
          * @description The last comparison of the balance of the account; amounts as strings (ADR 0018).
@@ -2003,6 +2030,7 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
+            memory: components["schemas"]["FlowMemorySettingsResponse"];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -2052,6 +2080,8 @@ export interface components {
             trigger: string;
             /** Failed Attempts */
             failed_attempts: components["schemas"]["FailedAttemptResponse"][];
+            /** Memory */
+            memory: components["schemas"]["AssetMemoryResponse"][] | null;
         };
         /**
          * CyclePageResponse
@@ -2411,6 +2441,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["FlowMemoryBody"];
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2453,6 +2484,37 @@ export interface components {
         FlowForecastAccuracyResponse: {
             /** Forecasts */
             forecasts: components["schemas"]["ForecastAccuracyResponse"][];
+        };
+        /**
+         * FlowMemoryBody
+         * @description The memory of a flow as the user sets it: a part left out keeps the one in force, or the default (R5.3.4).
+         */
+        FlowMemoryBody: {
+            /** Active */
+            active?: boolean | null;
+            /** Decisions */
+            decisions?: number | null;
+            /** Days */
+            days?: number | null;
+        };
+        /**
+         * FlowMemoryResponse
+         * @description What the agent of the flow would receive if its cycle started now; nothing when its memory is off (R5.3.4).
+         */
+        FlowMemoryResponse: {
+            /** Active */
+            active: boolean;
+            /** Assets */
+            assets: components["schemas"]["AssetMemoryResponse"][];
+        };
+        /** FlowMemorySettingsResponse */
+        FlowMemorySettingsResponse: {
+            /** Active */
+            active: boolean;
+            /** Decisions */
+            decisions: number;
+            /** Days */
+            days: number;
         };
         /**
          * FlowModificationRequest
@@ -2509,6 +2571,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["FlowMemoryBody"];
         };
         /**
          * FlowOverviewResponse
@@ -2662,6 +2725,7 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
+            memory: components["schemas"]["FlowMemorySettingsResponse"];
             /** Missing */
             missing: string[];
         };
@@ -3130,6 +3194,33 @@ export interface components {
             sender: string;
             /** Password Saved */
             password_saved: boolean;
+        };
+        /**
+         * MemoryEntryResponse
+         * @description A previous operative decision of the flow: no price without an execution, no outcome without a position.
+         */
+        MemoryEntryResponse: {
+            /**
+             * Planned At
+             * Format: date-time
+             */
+            planned_at: string;
+            /** Action */
+            action: string;
+            /** Direction */
+            direction: string | null;
+            /** Price */
+            price: string | null;
+            /** Reasoning */
+            reasoning: string;
+            outcome: components["schemas"]["MemoryOutcomeResponse"] | null;
+        };
+        /** MemoryOutcomeResponse */
+        MemoryOutcomeResponse: {
+            /** Pnl */
+            pnl: string;
+            /** Realized */
+            realized: boolean;
         };
         /** ModelCatalogResponse */
         ModelCatalogResponse: {
@@ -3769,6 +3860,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["FlowMemoryBody"];
         };
         /**
          * StrategyBody
@@ -3809,6 +3901,7 @@ export interface components {
             default_take_profit_percent?: string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["FlowMemoryBody"];
         };
         /**
          * StrategyDocument
@@ -6105,6 +6198,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DifferenceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_flow_memory_flows__flow_id__memory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowMemoryResponse"];
                 };
             };
             /** @description Validation Error */

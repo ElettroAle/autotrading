@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Literal, TypedDict
 from uuid import UUID
 
-from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
+from autotrading.application.flows.create_flow import CreateFlowCommand, MemoryRequest, SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import AdapterRequest
@@ -54,6 +54,18 @@ class SourceChoice:
         return SourceRequest(self.name, tuple(adapter.request() for adapter in self.adapters))
 
 
+@dataclass(frozen=True)
+class MemoryChoice:
+    """The memory of the flow: a part not given keeps the one in force, or the default (R5.3.4)."""
+
+    active: bool | None = None
+    decisions: int | None = None
+    days: int | None = None
+
+    def request(self) -> MemoryRequest:
+        return MemoryRequest(active=self.active, decisions=self.decisions, days=self.days)
+
+
 class _StrategyArguments(TypedDict):
     max_leverage: int | None
     max_margin_exposure_percent: Decimal | None
@@ -73,6 +85,7 @@ class _StrategyArguments(TypedDict):
     default_stop_loss_percent: Decimal | None
     default_take_profit_percent: Decimal | None
     minimum_confidence: int | None
+    memory: MemoryRequest
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -97,6 +110,7 @@ class FlowStrategy:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
+    memory: MemoryChoice = field(default_factory=MemoryChoice)
 
     def _strategy_arguments(self) -> _StrategyArguments:
         return _StrategyArguments(
@@ -118,6 +132,7 @@ class FlowStrategy:
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
+            memory=self.memory.request(),
         )
 
 
@@ -183,6 +198,7 @@ class FlowModification:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
+    memory: MemoryChoice = field(default_factory=MemoryChoice)
     remove: list[RemovablePart] = field(default_factory=list)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
@@ -222,4 +238,5 @@ class FlowModification:
             remove_default_take_profit="default_take_profit_percent" in removed,
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence="minimum_confidence" in removed,
+            memory=self.memory.request(),
         )

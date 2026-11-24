@@ -3,11 +3,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from autotrading.application.flows.create_flow import SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
 from autotrading.application.flows.errors import FlowNameInUseError
 from autotrading.application.flows.ports import FlowRepositoryPort, ModelSettingsPort, SourceSettingsPort
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
@@ -44,6 +45,7 @@ class ImportFlowStrategyCommand:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
 
 
 class ImportFlowStrategyUseCase:
@@ -100,4 +102,5 @@ class ImportFlowStrategyUseCase:
                 command.default_stop_loss_percent, command.default_take_profit_percent
             ),
             minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
+            memory=command.memory.applied_to(FlowMemory()),
         )

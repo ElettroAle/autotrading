@@ -1,10 +1,10 @@
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
+from autotrading.application.flows.create_flow import FlowChecks, MemoryRequest, SourceRequest
 from autotrading.application.flows.errors import AssetWithOpenPositionError, FlowNameInUseError
 from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
@@ -75,6 +75,7 @@ class ModifyFlowCommand:
     minimum_confidence: int | None = None
     # The minimum confidence taken away: every opening goes on again whatever the confidence (R3.1.4).
     remove_minimum_confidence: bool = False
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
 
 
 class ModifyFlowUseCase:
@@ -177,6 +178,7 @@ class ModifyFlowUseCase:
             openings_resume=current.openings_resume if command.openings_resume is None else command.openings_resume,
             protection_defaults=_protection_defaults(current.protection_defaults, command),
             minimum_confidence=_minimum_confidence(current.minimum_confidence, command),
+            memory=command.memory.applied_to(current.memory),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

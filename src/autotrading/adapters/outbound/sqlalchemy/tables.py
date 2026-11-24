@@ -320,6 +320,9 @@ cycles = Table(
     # Every attempt of a step that failed; empty in the cycles recorded before the attempts were kept (ADR
     # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
     Column("failed_attempts", JSON),
+    # The memory the context gave the agent, asset by asset; empty with the memory of the flow off, or in the cycles
+    # recorded before the memory (R5.3.4).
+    Column("memory", JSON),
     ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
 )
 

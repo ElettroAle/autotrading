@@ -24,6 +24,7 @@ from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import allocated_capital_of_account
@@ -73,6 +74,12 @@ class _RiskLimitsDocument(TypedDict):
     max_total_value_exposure_percent: NotRequired[str | None]
 
 
+class _MemoryDocument(TypedDict):
+    active: bool
+    decisions: int
+    days: int
+
+
 class _ConfigurationDocument(TypedDict):
     """A configuration version as saved in JSON; a wrong shape fails while it is read."""
 
@@ -96,6 +103,8 @@ class _ConfigurationDocument(TypedDict):
     default_take_profit_percent: str | None
     # Every version has it: the migration gave the versions saved before none (R3.1.4).
     minimum_confidence: int | None
+    # Every version has it: the migration gave the versions saved before it off, with 10 decisions and 30 days (R5.3.4).
+    memory: _MemoryDocument
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -358,6 +367,11 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         "minimum_confidence": None
         if configuration.minimum_confidence is None
         else configuration.minimum_confidence.value,
+        "memory": {
+            "active": configuration.memory.active,
+            "decisions": configuration.memory.decisions,
+            "days": configuration.memory.days,
+        },
     }
 
 
@@ -403,6 +417,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
             Decimal(document["default_stop_loss_percent"]), _decimal(document["default_take_profit_percent"])
         ),
         minimum_confidence=MinimumConfidence.optional(document["minimum_confidence"]),
+        memory=FlowMemory(**document["memory"]),
     )
 
 

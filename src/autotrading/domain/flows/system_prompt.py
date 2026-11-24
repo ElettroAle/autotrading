@@ -5,6 +5,7 @@ from string import Formatter
 from typing import TYPE_CHECKING
 
 from autotrading.domain.flows.errors import MalformedSystemPromptError, UnknownPromptPlaceholderError
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.risk_limits import LOWEST_LEVERAGE
 from autotrading.domain.flows.selections import (
     DEFAULT_WEIGHT,
@@ -30,6 +31,7 @@ SOURCE_WEIGHTS_RULE = (
     "- una voce senza peso è un aggregato: riassume gli adapter elencati della sua fonte, ciascuno col suo peso;",
 )
 NO_ACTIVE_SOURCE = "nessuna fonte attiva"
+MEMORY_HEADING = "Memoria del flusso, le tue decisioni operative precedenti per asset, dalla più recente:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +42,8 @@ class PromptSubject:
 
     configuration: FlowConfiguration
     actions: tuple[str, ...]
+    # None with the memory of the flow off (R5.3.4).
+    memory: tuple[AssetMemory, ...] | None = None
 
 
 def _source_weights(sources: tuple[SourceSelection, ...]) -> str:
@@ -55,6 +59,17 @@ def _source_weights(sources: tuple[SourceSelection, ...]) -> str:
         or NO_ACTIVE_SOURCE
     )
     return "\n".join((*SOURCE_WEIGHTS_RULE, f"- pesi delle fonti attive del flusso: {weights};"))
+
+
+def _memory(memory: tuple[AssetMemory, ...] | None) -> str:
+    """A block for every asset with previous decisions; an empty text with the memory off or without any (R5.3.4, ADR
+    memoria-del-flusso-dalle-decisioni-operative-precedenti).
+    """
+    remembered = tuple(asset for asset in memory or () if asset.entries)
+    if not remembered:
+        return ""
+    blocks = ("\n".join((f"{asset.asset}:", *(f"- {entry.text}" for entry in asset.entries))) for asset in remembered)
+    return "\n".join((MEMORY_HEADING, *blocks))
 
 
 class PromptPlaceholder(StrEnum):
@@ -99,6 +114,11 @@ class PromptPlaceholder(StrEnum):
         "la regola del peso delle fonti e i pesi delle fonti attive del flusso",
         lambda subject: _source_weights(subject.configuration.sources),
     )
+    MEMORY = (
+        "memory",
+        "la memoria del flusso: le decisioni operative precedenti per asset con il loro esito, vuota se non attiva",
+        lambda subject: _memory(subject.memory),
+    )
 
     @property
     def slot(self) -> str:
@@ -128,6 +148,8 @@ DEFAULT_SYSTEM_PROMPT = "\n".join(
         "- le posizioni aperte si valutano e si gestiscono solo con prezzo di mercato e PnL non realizzato dello stato"
         " del flusso, letti dall'exchange del conto: i prezzi delle fonti possono venire da un'altra rete o piazza e"
         " servono solo a stimare la direzione del mercato.",
+        "",
+        PromptPlaceholder.MEMORY.slot,
         "",
         "Rispondi solo con un oggetto JSON in questo formato:",
         '{{"decisioni": [{{"asset": "<asset>", "azione": "<una delle azioni ammesse>", "direzione": "long|short",'

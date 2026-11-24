@@ -12,7 +12,9 @@ from autotrading.domain.flows.errors import (
     RepeatedSourceError,
     SourceNotSelectedError,
 )
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_setting import FlowSetting
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
@@ -72,6 +74,8 @@ class FlowConfiguration:
     protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
     # None unless the user sets one: every opening goes on whatever the confidence of the agent (R3.1.4).
     minimum_confidence: MinimumConfidence | None = None
+    # Off unless the user turns it on: the agent decides on the data of the cycle alone (R5.3.4).
+    memory: FlowMemory = field(default_factory=FlowMemory)
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]
@@ -123,9 +127,11 @@ class FlowConfiguration:
         """The template in force: the user's own, or the default of the platform (R1.4.8)."""
         return DEFAULT_SYSTEM_PROMPT if self.system_prompt is None else self.system_prompt
 
-    def rendered_system_prompt(self, actions: tuple[str, ...]) -> str:
-        """The system prompt the agent receives, with the values of this configuration (R1.4.8)."""
-        return rendered_system_prompt(self.system_prompt_template, PromptSubject(self, actions))
+    def rendered_system_prompt(self, actions: tuple[str, ...], memory: tuple[AssetMemory, ...] | None = None) -> str:
+        """The system prompt the agent receives, with the values of this configuration and the memory of the flow,
+        None with the memory off (R1.4.8, R5.3.4).
+        """
+        return rendered_system_prompt(self.system_prompt_template, PromptSubject(self, actions, memory))
 
     @property
     def risk_policy(self) -> RiskPolicy:

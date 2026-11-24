@@ -23,6 +23,7 @@ from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_statistics import FlowStatistics
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 
 
@@ -350,6 +351,51 @@ class FailedAttemptView:
 
 
 @dataclass(frozen=True)
+class MemoryOutcomeView:
+    pnl: str
+    realized: bool
+
+    @classmethod
+    def of(cls, outcome: MemoryOutcome | None) -> MemoryOutcomeView | None:
+        if outcome is None:
+            return None
+        return cls(pnl=str(outcome.pnl), realized=outcome.realized)
+
+
+@dataclass(frozen=True)
+class MemoryEntryView:
+    planned_at: str
+    action: str
+    direction: str | None
+    price: str | None
+    reasoning: str
+    outcome: MemoryOutcomeView | None
+
+    @classmethod
+    def of(cls, entry: MemoryEntry) -> MemoryEntryView:
+        return cls(
+            planned_at=instant_text(entry.planned_at),
+            action=entry.action.value,
+            direction=None if entry.direction is None else entry.direction.value,
+            price=optional_text(entry.price),
+            reasoning=entry.reasoning,
+            outcome=MemoryOutcomeView.of(entry.outcome),
+        )
+
+
+@dataclass(frozen=True)
+class AssetMemoryView:
+    """The previous operative decisions of the flow on one asset that the agent received (R5.3.4)."""
+
+    asset: str
+    decisions: list[MemoryEntryView]
+
+    @classmethod
+    def of(cls, memory: AssetMemory) -> AssetMemoryView:
+        return cls(asset=memory.asset, decisions=[MemoryEntryView.of(entry) for entry in memory.entries])
+
+
+@dataclass(frozen=True)
 class CycleDetailView:
     """A cycle with everything recorded about it, the decisions of the agent among its documents (R1.7.1)."""
 
@@ -364,6 +410,7 @@ class CycleDetailView:
     model_attempts: int | None
     trigger: str
     failed_attempts: list[FailedAttemptView]
+    memory: list[AssetMemoryView] | None
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleDetailView:
@@ -385,6 +432,7 @@ class CycleDetailView:
             model_attempts=record.model_attempts,
             trigger=record.trigger.value,
             failed_attempts=[FailedAttemptView.of(attempt) for attempt in record.failed_attempts],
+            memory=None if record.memory is None else [AssetMemoryView.of(asset) for asset in record.memory],
         )
 
 

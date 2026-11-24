@@ -33,6 +33,7 @@ from autotrading.domain.flows.cycle_schedule import CycleSchedule
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.flow_cost import CycleCost
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.flows.statistics_period import TimeWindow
@@ -549,6 +550,7 @@ class FakeCycleJournalAdapter:
         self.attempts: int | None = 1
         self.failed: FailedModelCall | None = None
         self.failures: list[AutotradingError] = []
+        self.memory: tuple[AssetMemory, ...] | None = None
 
     def describe(self, step: CycleStep, result: object) -> dict[str, object]:
         return {"step": step.value, "result": repr(result)}
@@ -576,6 +578,10 @@ class FakeCycleJournalAdapter:
             RecordedDecision(asset, DecisionAction.OPEN, TradeSide.LONG, FAKE_CONFIDENCE, f"apertura di {asset}")
             for asset in assets
         )
+
+    def received_memory(self, context: object) -> tuple[AssetMemory, ...] | None:  # noqa: ARG002 - one for every context
+        """The same memory for every context, the one the test gives."""
+        return self.memory
 
 
 class InMemoryCycleEquityAdapter:

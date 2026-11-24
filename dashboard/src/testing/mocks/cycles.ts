@@ -28,6 +28,21 @@ export type FakeCycle = {
   } | null;
   /** What started the cycle: its schedule, or the user who asked for it now (R6.5.2). */
   readonly trigger: 'scheduled' | 'on_demand';
+  /** The memory the agent received, for every asset; null with the memory of the flow off (R5.3.4). */
+  readonly memory: FakeCycleMemory[] | null;
+};
+
+/** The previous operative decisions of the flow on an asset the agent received in a cycle (R5.3.4). */
+export type FakeCycleMemory = {
+  readonly asset: string;
+  readonly decisions: {
+    readonly planned_at: string;
+    readonly action: string;
+    readonly direction: string | null;
+    readonly price: string | null;
+    readonly reasoning: string;
+    readonly outcome: { readonly pnl: string; readonly realized: boolean } | null;
+  }[];
 };
 
 export const STEPS = {
@@ -182,6 +197,7 @@ export const aCompletedCycle = (
   documents: documentsOf(asset, exitPlan, confidence),
   cost: { input_tokens: 1200, output_tokens: 300, cost_usd: '0.0125' },
   trigger: 'scheduled',
+  memory: null,
 });
 
 /** The same cycle stopped at the step: it keeps only what the steps before it produced (R1.2.3). */

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
+from autotrading.adapters.inbound.api.flow_memory import FlowMemoryBody, FlowMemoryResponse, FlowMemorySettingsResponse
 from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
@@ -27,6 +28,7 @@ from autotrading.application.flows.list_flow_versions import ListFlowVersionsCom
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import AdapterRequest, FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
+from autotrading.application.flows.read_flow_memory import ReadFlowMemoryCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleCommand
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
@@ -98,6 +100,8 @@ class FlowCreationRequest(BaseModel):
     default_take_profit_percent: Decimal | None = None
     # Null or missing: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
+    # Missing: off, with 10 decisions and 30 days (R5.3.4).
+    memory: FlowMemoryBody = Field(default_factory=FlowMemoryBody)
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -124,6 +128,7 @@ class FlowCreationRequest(BaseModel):
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
+            memory=self.memory.request(),
         )
 
 
@@ -162,6 +167,8 @@ class FlowModificationRequest(BaseModel):
     default_take_profit_percent: Decimal | None = None
     # A null sent on purpose removes the minimum confidence; a missing one keeps the version in force (R3.1.4).
     minimum_confidence: int | None = None
+    # Only the parts of the memory sent change; the others keep the version in force (R5.3.4).
+    memory: FlowMemoryBody = Field(default_factory=FlowMemoryBody)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -199,6 +206,7 @@ class FlowModificationRequest(BaseModel):
             remove_default_take_profit=self._sent_as_null("default_take_profit_percent"),
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence=self._sent_as_null("minimum_confidence"),
+            memory=self.memory.request(),
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -305,6 +313,7 @@ class ConfigurationResponse(BaseModel):
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
+    memory: FlowMemorySettingsResponse
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -331,6 +340,7 @@ class ConfigurationResponse(BaseModel):
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
+            memory=FlowMemorySettingsResponse.of(configuration.memory),
         )
 
 
@@ -381,6 +391,7 @@ class FlowResponse(BaseModel):
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
+    memory: FlowMemorySettingsResponse
     missing: list[str]
 
     @classmethod
@@ -413,6 +424,7 @@ class FlowResponse(BaseModel):
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
+            memory=FlowMemorySettingsResponse.of(configuration.memory),
             missing=list(flow.missing_before_start),
         )
 
@@ -556,6 +568,13 @@ def flows_router(
     ) -> list[DifferenceResponse]:
         command = CompareFlowVersionsCommand(FlowId(flow_id), first, second)
         return [DifferenceResponse.of(difference) for difference in use_cases.compare_flow_versions.execute(command)]
+
+    @router.get("/flows/{flow_id}/memory")
+    def read_flow_memory(
+        flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
+    ) -> FlowMemoryResponse:
+        """The memory the agent of the flow would receive if its cycle started now (R5.3.4)."""
+        return FlowMemoryResponse.of(use_cases.read_flow_memory.execute(ReadFlowMemoryCommand(FlowId(flow_id))))
 
     @router.post("/flows/{flow_id}/archive")
     def archive_flow(

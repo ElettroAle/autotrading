@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy
@@ -43,6 +44,7 @@ CONFIGURATION = replace(
     openings_resume=OpeningsResume.NEXT_DAY,
     protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
     minimum_confidence=MinimumConfidence(60),
+    memory=FlowMemory(active=True, decisions=5, days=14),
 )
 
 
@@ -73,6 +75,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "default_stop_loss_percent": "2.5",
         "default_take_profit_percent": "10",
         "minimum_confidence": 60,
+        "memory": {"active": True, "decisions": 5, "days": 14},
     }
 
 
@@ -200,6 +203,12 @@ def test_a_version_without_minimum_confidence_reads_back_without_it() -> None:
 
     assert document["minimum_confidence"] is None
     assert configuration_of(1, document).minimum_confidence is None
+
+
+def test_the_memory_reads_back_as_saved() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+
+    assert configuration_of(1, document).memory == FlowMemory(active=True, decisions=5, days=14)
 
 
 def a_draft() -> Flow:

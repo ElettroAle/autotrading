@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 from pydantic import BaseModel, Field
 
+from autotrading.adapters.inbound.api.flow_memory import FlowMemoryBody
 from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
 from autotrading.application.flows.create_flow import SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
@@ -106,6 +107,8 @@ class StrategyBody(BaseModel):
     default_take_profit_percent: Decimal | None = None
     # Missing in the files written before it: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
+    # Missing in the files written before it: off, with 10 decisions and 30 days (R5.3.4).
+    memory: FlowMemoryBody = Field(default_factory=FlowMemoryBody)
 
 
 class StrategyDocument(BaseModel):
@@ -156,6 +159,9 @@ class StrategyDocument(BaseModel):
                 default_stop_loss_percent=strategy.protection_defaults.stop_loss_percent,
                 default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
                 minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
+                memory=FlowMemoryBody(
+                    active=strategy.memory.active, decisions=strategy.memory.decisions, days=strategy.memory.days
+                ),
             ),
         )
 
@@ -184,6 +190,7 @@ class StrategyDocument(BaseModel):
             default_stop_loss_percent=strategy.default_stop_loss_percent,
             default_take_profit_percent=strategy.default_take_profit_percent,
             minimum_confidence=strategy.minimum_confidence,
+            memory=strategy.memory.request(),
         )
 
     def _require_supported(self) -> None:

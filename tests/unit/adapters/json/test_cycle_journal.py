@@ -31,6 +31,7 @@ from autotrading.domain.flows.cycle_question import CycleQuestion
 from autotrading.domain.flows.cycle_record import FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.risk_outcome import BlockedDecision
 from autotrading.domain.flows.source_data import SourceData
@@ -152,6 +153,17 @@ def test_the_context_is_recorded_as_the_messages_the_agent_receives() -> None:
     assert journal().describe(CycleStep.COMPOSE_CONTEXT, CycleContext(CYCLE_FLOW, question, Prompt())) == {
         "messaggi": [{"ruolo": "system", "contenuto": "regole"}, {"ruolo": "user", "contenuto": "dati"}]
     }
+
+
+def test_the_memory_the_agent_received_is_the_one_of_the_question_of_the_context() -> None:
+    memory = (AssetMemory("BTC", ()),)
+    question = CycleQuestion("m", {}, "i", ("BTC",), READ_AT, READ_AT, CYCLE_FLOW.state_view(), (), (), memory)
+
+    assert journal().received_memory(CycleContext(CYCLE_FLOW, question, Prompt())) == memory
+
+
+def test_a_result_other_than_the_context_received_no_memory() -> None:
+    assert journal().received_memory(object()) is None
 
 
 def test_the_decisions_are_recorded_with_the_raw_answer_the_discarded_and_the_missing() -> None:

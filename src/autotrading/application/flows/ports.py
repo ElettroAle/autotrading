@@ -54,6 +54,7 @@ from autotrading.domain.flows.ledger import (
     PlatformOrders,
 )
 from autotrading.domain.flows.loss_guard import LossReferences
+from autotrading.domain.flows.memory_entry import AssetMemory, PastDecision
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
@@ -1484,6 +1485,12 @@ class CycleJournalPort(Protocol):
         """The decisions of the agent one by asset, as the cycle records them beside its documents (R6.5.4)."""
         ...
 
+    def received_memory(self, context: object) -> tuple[AssetMemory, ...] | None:
+        """The memory the context gave the agent, as the cycle records it beside its documents; None with the memory
+        of the flow off (R5.3.4).
+        """
+        ...
+
     def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:
         """The attempts that failed inside the context behind the step before its result came, such as an order sent
         again after a temporary error (ADR errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
@@ -1523,6 +1530,17 @@ class CycleHistoryPort(Protocol):
     def last_decided(self, flow_id: UUID) -> DecidedCycle | None:
         """The most recent completed cycle of the flow in which the agent decided, with its decisions; None without
         one (R6.5.4).
+        """
+        ...
+
+
+class PastDecisionsPort(Protocol):
+    """Bound to the tenant of the request: the decisions of one of its flows, never those of another flow (R5.3.4)."""
+
+    def past_decisions(self, flow_id: UUID, window: TimeWindow) -> list[PastDecision]:
+        """The decisions of the completed cycles of the flow planned in the window, with the price their order was
+        executed at, the PnL of the position they opened once closed, or of the one they closed, and whether the
+        position they opened is still open.
         """
         ...
 

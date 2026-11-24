@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from autotrading.adapters.inbound.api.amounts import amount_text
+from autotrading.adapters.inbound.api.flow_memory import AssetMemoryResponse
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
 from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.openings_suspension_response import OpeningsSuspensionResponse
@@ -140,6 +141,8 @@ class CycleDetailResponse(BaseModel):
     # Every attempt of a step that failed, retried in the same cycle or the one that stopped it (ADR
     # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
     failed_attempts: list[FailedAttemptResponse]
+    # The memory the agent received in the cycle; None when the memory of the flow was off (R5.3.4).
+    memory: list[AssetMemoryResponse] | None
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleDetailResponse:
@@ -162,6 +165,7 @@ class CycleDetailResponse(BaseModel):
             model_attempts=record.model_attempts,
             trigger=record.trigger.value,
             failed_attempts=[FailedAttemptResponse.of(attempt) for attempt in record.failed_attempts],
+            memory=None if record.memory is None else AssetMemoryResponse.all_of(record.memory),
         )
 
 

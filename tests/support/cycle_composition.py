@@ -44,6 +44,7 @@ from autotrading.application.flows.ports import (
     OpeningReducedNoticePort,
     OpeningsSuspendedNoticePort,
     OpeningsSuspensionPort,
+    PastDecisionsPort,
     PlannedFlowsPort,
 )
 from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
@@ -110,6 +111,7 @@ class TenantCyclePorts:
     opening_reduced_notice: OpeningReducedNoticePort
     opening_blocked_notice: OpeningBlockedNoticePort
     flow_keys: FlowKeysPort
+    past_decisions: PastDecisionsPort
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +167,11 @@ def run_cycle_for(
         ),
         calls=ThreadPoolConcurrentCallsAdapter(),
         context=ComposeCycleContextUseCase(
-            ComposeAgentContextUseCase(), ListAgentActionsUseCase(), AggregateCycleSourcesUseCase(), services.clock
+            ComposeAgentContextUseCase(),
+            ListAgentActionsUseCase(),
+            AggregateCycleSourcesUseCase(),
+            services.clock,
+            ports.past_decisions,
         ),
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(

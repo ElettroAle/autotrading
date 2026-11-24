@@ -55,6 +55,30 @@ export type FakeForecast = {
   readonly actualPrice: number | null;
 };
 
+/** The memory of a flow: off unless the user turns it on, with the decisions per asset and the days (R5.3.4). */
+export type FakeMemory = {
+  readonly active: boolean;
+  readonly decisions: number;
+  readonly days: number;
+};
+
+export const DEFAULT_MEMORY: FakeMemory = { active: false, decisions: 10, days: 30 };
+
+/** A previous operative decision of a flow on an asset, as the API gives it in its memory (R5.3.4). */
+export type FakeRememberedDecision = {
+  readonly planned_at: string;
+  readonly action: string;
+  readonly direction: string | null;
+  readonly price: string | null;
+  readonly reasoning: string;
+  readonly outcome: { readonly pnl: string; readonly realized: boolean } | null;
+};
+
+export type FakeAssetMemory = {
+  readonly asset: string;
+  readonly decisions: FakeRememberedDecision[];
+};
+
 export type FakeConfiguration = {
   readonly assets: string[];
   readonly cycleMinutes: number;
@@ -70,6 +94,7 @@ export type FakeConfiguration = {
   readonly defaultStopLossPercent: string;
   readonly defaultTakeProfitPercent: string | null;
   readonly minimumConfidence: number | null;
+  readonly memory: FakeMemory;
 };
 
 export type FakeVersion = {
@@ -134,6 +159,9 @@ export type FakeFlow = {
   maxDailyLossPercent: string | null;
   maxDrawdownPercent: string | null;
   openingsResume: FakeOpeningsResume;
+  memory: FakeMemory;
+  /** What the agent would receive of the memory if the cycle started now, for every asset (R5.3.4). */
+  remembered: FakeAssetMemory[];
   /** The suspension of the openings in force, null when the flow may open (R3.2.2). */
   openingsSuspension: FakeOpeningsSuspension | null;
   /** How many cycles the worker ran for the flow since the scenario started it (R2.4.1). */
@@ -223,6 +251,7 @@ export type FakeFlowConfiguration = {
   max_daily_loss_percent: string | null;
   max_drawdown_percent: string | null;
   openings_resume: FakeOpeningsResume;
+  memory: FakeMemory;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -256,6 +285,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   max_daily_loss_percent: flow.maxDailyLossPercent,
   max_drawdown_percent: flow.maxDrawdownPercent,
   openings_resume: flow.openingsResume,
+  memory: { ...flow.memory },
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -438,6 +468,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   defaultStopLossPercent: DEFAULT_STOP_LOSS_PERCENT,
   defaultTakeProfitPercent: null,
   minimumConfidence: null,
+  memory: DEFAULT_MEMORY,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -560,6 +591,8 @@ const draftOf = (
   maxDailyLossPercent: null,
   maxDrawdownPercent: null,
   openingsResume: 'manual',
+  memory: DEFAULT_MEMORY,
+  remembered: [],
   openingsSuspension: null,
   cycles: 0,
   pauseReason: null,
@@ -758,6 +791,8 @@ export const fakePlatform = {
       maxDailyLossPercent: null,
       maxDrawdownPercent: null,
       openingsResume: 'manual',
+      memory: DEFAULT_MEMORY,
+      remembered: [],
       openingsSuspension: null,
       cycles: 0,
       pauseReason: null,

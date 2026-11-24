@@ -9,6 +9,7 @@ from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.errors import UnknownCycleOutcomeError
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.recorded_decision import RecordedDecision
 from autotrading.domain.flows.selections import ActiveSource
 
@@ -103,6 +104,8 @@ class CycleRecord:
     # Every attempt of a step that failed before the step went on or the cycle stopped (ADR
     # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
     failed_attempts: tuple[FailedAttempt, ...] = ()
+    # The memory the context gave the agent; None with the memory of the flow off, or before the context (R5.3.4).
+    memory: tuple[AssetMemory, ...] | None = None
 
     @classmethod
     def skipped(cls, flow_id: UUID, planned_at: datetime) -> CycleRecord:
