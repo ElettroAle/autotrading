@@ -15,6 +15,9 @@ from autotrading.adapters.inbound.api.worker import (
     WorkerUseCases,
     bot_polling,
 )
+from autotrading.adapters.inbound.mcp.composition import mcp_adapters
+from autotrading.adapters.inbound.mcp.server import McpApplication
+from autotrading.adapters.inbound.mcp.use_cases import McpUseCases
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
 from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters, apscheduler_daily_check_adapters
 from autotrading.adapters.outbound.arkham.composition import arkham_adapters
@@ -827,25 +830,85 @@ def create_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -
     grafana_cloud_telemetry_adapters(source, "autotrading-api")
     engine = sqlalchemy_adapters(source)
     resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
+    for_tenant = api_tenant_use_cases(
+        engine,
+        libsodium_sealing_adapters(source),
+        (source.environment(), forecaster_adapters(source), sqlalchemy_simulation_adapters(source)),
+        (worker_adapters(source), process_memory_adapters()),
+        worker_model_catalog_adapters(source),
+    )
+    return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
+
+
+def create_mcp_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> McpApplication:
+    """The MCP server: the use cases of the API for the tenant of the request, in a container of its own (ADR
+    server-mcp-in-un-container-proprio-con-accesso-entra)."""
+    source = ConfigurationSource(configuration)
+    engine = sqlalchemy_adapters(source)
+    resolve_tenant = ResolveTenantUseCase(SqlAlchemyTenantRepositoryAdapter(engine))
+    for_tenant = api_tenant_use_cases(
+        engine,
+        libsodium_sealing_adapters(source),
+        (source.environment(), forecaster_adapters(source), sqlalchemy_simulation_adapters(source)),
+        (worker_adapters(source), process_memory_adapters()),
+        worker_model_catalog_adapters(source),
+    )
+    return mcp_adapters(source, resolve_tenant, mcp_use_cases(for_tenant), oidc_adapters(source))
+
+
+def api_tenant_use_cases(
+    engine: SqlAlchemyEngine,
+    sealers: SealersOfTenant,
+    installation: tuple[str, PriceForecasterPort, SimulatedExecution],
+    worker: tuple[Callable[[TenantId], WorkerAdaptersOfTenant], RememberedAccountActivity],
+    worker_catalogs: Mapping[str, WorkerModelCatalogAdapter],
+) -> Callable[[TenantId], TenantUseCases]:
+    """The use cases of the API for each tenant, with the exchanges and the models of the installation."""
+    environment, forecaster, simulation = installation
     # The API never loads the LiteLLM library: it asks the worker for its catalog (ADR 0148, ADR 0149).
     catalogs: dict[str, WorkerModelCatalogAdapter | OpenRouterModelCatalogAdapter] = {
-        **worker_model_catalog_adapters(source),
+        **worker_catalogs,
         **{name: gateway.model_catalog() for name, gateway in openrouter_adapters().items()},
     }
     hyperliquid = hyperliquid_adapters()
-    for_tenant = tenant_use_cases(
+    return tenant_use_cases(
         engine,
-        libsodium_sealing_adapters(source),
-        (
-            source.environment(),
-            hyperliquid,
-            source_systems(hyperliquid, forecaster_adapters(source)),
-            sqlalchemy_simulation_adapters(source),
-        ),
-        (worker_adapters(source), process_memory_adapters()),
+        sealers,
+        (environment, hyperliquid, source_systems(hyperliquid, forecaster), simulation),
+        worker,
         (catalogs, catalogs),
     )
-    return api_adapters(source, resolve_tenant, for_tenant, oidc_adapters(source))
+
+
+def mcp_use_cases(for_tenant: Callable[[TenantId], TenantUseCases]) -> Callable[[TenantId], McpUseCases]:
+    """The use cases of the API the tools of the MCP server call, the same instances for the same tenant."""
+
+    def mcp_for_tenant(tenant_id: TenantId) -> McpUseCases:
+        use_cases = for_tenant(tenant_id)
+        return McpUseCases(
+            list_flow_overviews=use_cases.list_flow_overviews,
+            get_flow=use_cases.get_flow,
+            read_flow_results=use_cases.read_flow_results,
+            list_closed_positions=use_cases.list_closed_positions,
+            list_cycles=use_cases.list_cycles,
+            read_cycle=use_cases.read_cycle,
+            read_flow_statistics=use_cases.read_flow_statistics,
+            rank_flows=use_cases.rank_flows,
+            list_accounts=use_cases.list_accounts,
+            create_flow=use_cases.create_flow,
+            import_flow_strategy=use_cases.import_flow_strategy,
+            duplicate_flow=use_cases.duplicate_flow,
+            modify_flow=use_cases.modify_flow,
+            change_flow_status=use_cases.change_flow_status,
+            stop_flow=use_cases.stop_flow,
+            archive_flow=use_cases.archive_flow,
+            cash_out_profits=use_cases.cash_out_profits,
+            change_allocated_capital=use_cases.change_allocated_capital,
+            request_on_demand_cycle=use_cases.request_on_demand_cycle,
+            resume_flow_openings=use_cases.resume_flow_openings,
+        )
+
+    return mcp_for_tenant
 
 
 def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRONMENT) -> ApiApplication:

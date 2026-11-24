@@ -170,6 +170,55 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
 
+  # Il server MCP (ADR server-mcp-in-un-container-proprio-con-accesso-entra): stessa immagine e stessi casi d'uso di api,
+  # resource server di Entra con la stessa configurazione OIDC; nessun segreto nuovo e mai la chiave privata delle
+  # credenziali, che resta al worker. Ascolta solo sull'interfaccia locale: Tailscale Serve lo espone su /mcp, e i suoi
+  # metadati RFC 9728 sul loro percorso, dello stesso nome HTTPS dell'API. Limite di memoria per ADR
+  # budget-di-memoria-alzato-per-il-server-mcp.
+  mcp:
+    image: ${API_IMAGE:-}
+    command: ["autotrading.bootstrap:create_mcp_application", "--factory", "--host", "0.0.0.0", "--port", "8000", "--log-config", "/app/logging.json"]
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-}
+      APP_VERSION: ${APP_VERSION:-}
+      DATABASE_HOST: postgres
+      DATABASE_NAME: autotrading
+      DATABASE_USER: autotrading_app
+      DATABASE_PASSWORD_FILE: /run/secrets/postgres_app_password
+      CREDENTIALS_PUBLIC_KEY_FILE: /run/secrets/credentials_public_key
+      CREDENTIALS_KEY_VERSION: "1"
+      AUTH_ISSUER: ${AUTH_ISSUER:-}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
+      AUTH_SCOPE: ${AUTH_SCOPE:-}
+      # The address the clients of the tailnet reach, the resource the metadata declare: https://<nome>/mcp.
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}
+      WORKER_URL: http://worker:8000
+      WORKER_TOKEN_FILE: /run/secrets/worker_token
+      FORECASTER_URL: http://forecaster:8000
+    secrets:
+      - postgres_app_password
+      - credentials_public_key
+      - worker_token
+    read_only: true
+    tmpfs:
+      - /tmp
+    mem_limit: 384m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      worker:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8090:8000"
+
   # La dashboard (ADR 0116, ADR 0117): build statica servita da un server Node non privilegiato, in sola lettura e senza
   # segreti; la configurazione pubblica dell'installazione diventa il suo config.json all'avvio. Ascolta solo
   # sull'interfaccia locale: Tailscale Serve la espone sul percorso /dashboard dello stesso nome HTTPS dell'API, quindi

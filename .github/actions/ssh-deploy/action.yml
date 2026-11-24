@@ -42,6 +42,10 @@ inputs:
     description: Indirizzo HTTPS della dashboard per i link delle notifiche; vuoto, notifiche senza link
     required: false
     default: ""
+  mcp-public-url:
+    description: Indirizzo HTTPS del server MCP, https://<nome>/mcp, la risorsa dei suoi metadati RFC 9728
+    required: false
+    default: ""
   telegram-bot-token:
     description: Token del bot Telegram dal segreto dell'environment; vuoto lascia il bot com'è (ADR 0071)
     required: false
@@ -79,6 +83,7 @@ runs:
         AUTH_CLIENT_ID: ${{ inputs.auth-client-id }}
         AUTH_SCOPE: ${{ inputs.auth-scope }}
         DASHBOARD_URL: ${{ inputs.dashboard-url }}
+        MCP_PUBLIC_URL: ${{ inputs.mcp-public-url }}
         TELEGRAM_BOT_TOKEN: ${{ inputs.telegram-bot-token }}
         GRAFANA_OTLP_ENDPOINT: ${{ inputs.grafana-otlp-endpoint }}
         GRAFANA_INSTANCE_ID: ${{ inputs.grafana-instance-id }}
@@ -89,15 +94,16 @@ runs:
         ssh_options=(-o StrictHostKeyChecking=accept-new -o "UserKnownHostsFile=${RUNNER_TEMP}/known_hosts"
           -o BatchMode=yes)
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/compose.yaml' < deploy/compose.yaml
-        # Public configuration only: issuer, audience, client id, scope, the address of the dashboard and the endpoint and
-        # instance of Grafana Cloud are not secrets (ADR 0016, ADR destinazioni-delle-notifiche-nella-dashboard, ADR
+        # Public configuration only: issuer, audience, client id, scope, the addresses of the dashboard and of the MCP
+        # server and the endpoint and instance of Grafana Cloud are not secrets (ADR 0016, ADR
+        # destinazioni-delle-notifiche-nella-dashboard, ADR server-mcp-in-un-container-proprio-con-accesso-entra, ADR
         # telemetria-opentelemetry-verso-grafana-cloud).
         {
           printf 'API_IMAGE=%s\nAPP_ENVIRONMENT=%s\nAPP_VERSION=%s\n' "$API_IMAGE" "$APP_ENVIRONMENT" "$APP_VERSION"
           printf 'FORECASTER_IMAGE=%s\nDASHBOARD_IMAGE=%s\n' "$FORECASTER_IMAGE" "$DASHBOARD_IMAGE"
           printf 'AUTH_ISSUER=%s\nAUTH_AUDIENCE=%s\n' "$AUTH_ISSUER" "$AUTH_AUDIENCE"
           printf 'AUTH_CLIENT_ID=%s\nAUTH_SCOPE=%s\n' "$AUTH_CLIENT_ID" "$AUTH_SCOPE"
-          printf 'DASHBOARD_URL=%s\n' "$DASHBOARD_URL"
+          printf 'DASHBOARD_URL=%s\nMCP_PUBLIC_URL=%s\n' "$DASHBOARD_URL" "$MCP_PUBLIC_URL"
           printf 'GRAFANA_OTLP_ENDPOINT=%s\nGRAFANA_INSTANCE_ID=%s\n' "$GRAFANA_OTLP_ENDPOINT" "$GRAFANA_INSTANCE_ID"
         } | ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/.env'
         # Memory and disk of the installation, sampled from before the pull until the services are up, go to the summary
@@ -128,7 +134,8 @@ runs:
           < deploy/prepare-installation.sh
         ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/prepare-installation.sh' \
           < deploy/postgres/10-application-role.sh
-        # The dashboard on /dashboard of the same HTTPS name as the API, applied at every release (ADR 0117).
+        # The dashboard and the MCP server on their paths of the same HTTPS name as the API, applied at every release
+        # (ADR 0117, ADR server-mcp-in-un-container-proprio-con-accesso-entra).
         ssh "${ssh_options[@]}" "$target" 'cat > /opt/autotrading/configure-serve.sh' < deploy/configure-serve.sh
         ssh "${ssh_options[@]}" "$target" 'bash /opt/autotrading/configure-serve.sh'
         # The token of the bot is created outside the machine: it travels only inside SSH, on stdin (ADR 0071).

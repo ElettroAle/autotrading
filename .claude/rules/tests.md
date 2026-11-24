@@ -19,7 +19,7 @@ tests/
     bootstrap/test_bootstrap.py                   composition root
     tools/test_<modulo>.py                        script della pipeline
   integration/<tecnologia>/test_<adapter>.py      adapter contro la tecnologia vera
-  scenarios/<E..>/<F..>/test_<Rx_y_z>_<sistema>.py  scenari di specs/ di api, worker e forecaster con pytest-bdd
+  scenarios/<E..>/<F..>/test_<Rx_y_z>_<sistema>.py  scenari di specs/ di api, worker, forecaster e mcp con pytest-bdd
   fakes/<nome_porta>.py                           Fake*/InMemory*Adapter, uno per porta
   support/<modulo>.py                             aiuti condivisi dai test che non sono finti di porte
 ```
@@ -28,9 +28,10 @@ tests/
 
 - **Unit test per ogni tipo di produzione** che nasce o cambia, sui comportamenti e sui casi limite.
   Uno scenario che attraversa un tipo non lo copre.
-- **Scenari**: un modulo per file `.feature` dei sistemi `api`, `worker` e `forecaster`,
+- **Scenari**: un modulo per file `.feature` dei sistemi `api`, `worker`, `forecaster` e `mcp`,
   `tests/scenarios/<E>/<F>/test_<R>_<sistema>.py` (punti del requisito sostituiti da `_`), che lo lega con
-  `scenarios(...)`; `bdd_features_base_dir` punta a `specs/`. Eseguiti sui casi d'uso costruiti con gli adapter finti.
+  `scenarios(...)`; `bdd_features_base_dir` punta a `specs/`. Eseguiti sui casi d'uso costruiti con gli adapter finti;
+  quelli di `mcp` con il client MCP dell'SDK sull'applicazione del server in memoria.
   I passi che due file della stessa User Story condividono stanno in `tests/support/`. I file `dashboard` li esegue
   Playwright (`.claude/rules/tech-dashboard.md`). Ogni `Allora` e ogni `E` ha una propria asserzione.
 - **Copertura degli scenari per sistema** (`tools/scenario_coverage.py`): ogni scenario non `@pipeline` dei file

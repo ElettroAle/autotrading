@@ -132,6 +132,9 @@ TRANSPORT_LIBRARIES = frozenset({"httpx"})
 # The external libraries each technology folder may import: one system per folder.
 TECHNOLOGY_LIBRARIES: dict[str, frozenset[str]] = {
     "adapters/inbound/api": frozenset({"fastapi", "pydantic", "starlette"}),
+    # The official SDK of the Model Context Protocol, the server of the tools of the flows (ADR
+    # server-mcp-in-un-container-proprio-con-accesso-entra).
+    "adapters/inbound/mcp": frozenset({"mcp"}),
     "adapters/outbound/alternative_me": frozenset({"httpx"}),
     # The scheduler of the cycles of the worker (docs/architecture.md:144, ADR 0112).
     "adapters/outbound/apscheduler": frozenset({"apscheduler"}),
@@ -279,7 +282,8 @@ PLAYWRIGHT_EXCLUDING_OPTION = re.compile(r"\b(grep|grepInvert|testIgnore)\s*:")
 FAILING_MISSING_STEPS = "fail-on-gen"
 PIPELINE_ONLY_TAGS = "not @pipeline"
 SPECS_FOLDER = "specs/"
-SYSTEMS = ("api", "worker", "dashboard", "forecaster")
+# mcp: the server of the tools of the flows (ADR server-mcp-in-un-container-proprio-con-accesso-entra).
+SYSTEMS = ("api", "worker", "dashboard", "forecaster", "mcp")
 FEATURE_PATH = re.compile(
     r"specs/E(?P<epic>\d+)-[a-z0-9-]+/F(?P=epic)\.(?P<feature>\d+)-[a-z0-9-]+/"
     r"(?P<story>R(?P=epic)\.(?P=feature)\.\d+-[a-z0-9-]+)/(?:" + "|".join(SYSTEMS) + r")/(?P=story)\.feature"
