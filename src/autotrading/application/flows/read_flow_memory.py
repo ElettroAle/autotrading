@@ -1,10 +1,10 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort, PastDecisionsPort
 from autotrading.application.flows.remembered_decisions import remembered_decisions
+from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.memory_entry import AssetMemory
@@ -36,16 +36,12 @@ class ReadFlowMemoryUseCase:
 
     def execute(self, command: ReadFlowMemoryCommand) -> tuple[AssetMemory, ...] | None:
         flow = self._flows.get(command.flow_id)
-        if not flow.configuration.memory.active:
-            return None
         return remembered_decisions(
-            self._decisions, flow.id.value, flow.configuration, self._clock(), self._unrealized_pnl(flow)
+            self._decisions, flow.id.value, flow.configuration, self._clock(), lambda: self._open_positions(flow)
         )
 
-    def _unrealized_pnl(self, flow: Flow) -> dict[str, Decimal]:
+    def _open_positions(self, flow: Flow) -> tuple[AccountPosition, ...]:
         """A draft without an account holds no position."""
         if flow.account_id is None:
-            return {}
-        positions = self._activity.execute(flow.account_id).positions
-        held = flow.configuration.held(positions, lambda position: position.asset)
-        return {position.asset: position.unrealized_pnl for position in held}
+            return ()
+        return self._activity.execute(flow.account_id).positions

@@ -7,7 +7,7 @@ import { FlowMemoryTable } from './flow-memory-table';
 const MEMORY: AssetMemory[] = [
   {
     asset: 'BTC',
-    decisions: [
+    entries: [
       {
         planned_at: '2026-11-24T09:00:00Z',
         action: 'apri',
@@ -26,7 +26,7 @@ const MEMORY: AssetMemory[] = [
       },
     ],
   },
-  { asset: 'ETH', decisions: [] },
+  { asset: 'ETH', entries: [] },
 ];
 
 describe('FlowMemoryTable', () => {
@@ -49,7 +49,7 @@ describe('FlowMemoryTable', () => {
   it('says realized the PnL of a position closed', () => {
     const closed: AssetMemory = {
       asset: 'SOL',
-      decisions: [
+      entries: [
         {
           planned_at: '2026-11-24T09:00:00Z',
           action: 'chiudi',

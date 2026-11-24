@@ -1,7 +1,7 @@
 import { fakeAlerts } from './alerts';
 import { FAKE_SYSTEM_PROMPT } from './catalogs';
 import { fakeClock } from './clock';
-import { aCompletedCycle, type FakeCycle } from './cycles';
+import { aCompletedCycle, type FakeAssetMemory, type FakeCycle } from './cycles';
 // The closed positions as the API lists them; FakeClosedPosition here is the history the statistics read (R2.2.6).
 import { emptyRecords, type FakeRecords } from './history';
 import type { FakeKeyExpiry } from './key-expiry';
@@ -63,21 +63,6 @@ export type FakeMemory = {
 };
 
 export const DEFAULT_MEMORY: FakeMemory = { active: false, decisions: 10, days: 30 };
-
-/** A previous operative decision of a flow on an asset, as the API gives it in its memory (R5.3.4). */
-export type FakeRememberedDecision = {
-  readonly planned_at: string;
-  readonly action: string;
-  readonly direction: string | null;
-  readonly price: string | null;
-  readonly reasoning: string;
-  readonly outcome: { readonly pnl: string; readonly realized: boolean } | null;
-};
-
-export type FakeAssetMemory = {
-  readonly asset: string;
-  readonly decisions: FakeRememberedDecision[];
-};
 
 export type FakeConfiguration = {
   readonly assets: string[];

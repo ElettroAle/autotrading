@@ -29,14 +29,18 @@ export type FakeCycle = {
   /** What started the cycle: its schedule, or the user who asked for it now (R6.5.2). */
   readonly trigger: 'scheduled' | 'on_demand';
   /** The memory the agent received, for every asset; null with the memory of the flow off (R5.3.4). */
-  readonly memory: FakeCycleMemory[] | null;
+  readonly memory: FakeAssetMemory[] | null;
 };
 
-/** The previous operative decisions of the flow on an asset the agent received in a cycle (R5.3.4). */
-export type FakeCycleMemory = {
+/**
+ * The previous operative decisions of the flow on an asset, as the API gives them: on the flow what the agent will
+ * receive, in a cycle what it received (R5.3.4).
+ */
+export type FakeAssetMemory = {
   readonly asset: string;
-  readonly decisions: {
+  readonly entries: {
     readonly planned_at: string;
+    readonly asset: string;
     readonly action: string;
     readonly direction: string | null;
     readonly price: string | null;

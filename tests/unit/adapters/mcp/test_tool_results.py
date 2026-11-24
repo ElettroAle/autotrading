@@ -1,6 +1,9 @@
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal
+from enum import StrEnum
 
 import pytest
 from mcp.types import TextContent
@@ -13,6 +16,22 @@ from autotrading.domain.errors import AutotradingError
 class Reading:
     name: str
     values: list[str]
+
+
+class Side(StrEnum):
+    LONG = "long"
+
+
+@dataclass(frozen=True)
+class Fill:
+    side: Side
+    price: Decimal
+    at: datetime
+
+
+@dataclass(frozen=True)
+class Fills:
+    fills: tuple[Fill, ...]
 
 
 class FlowGoneError(AutotradingError):
@@ -49,6 +68,14 @@ def test_a_reading_is_the_structured_view_and_its_text() -> None:
     assert not result.is_error
     assert result.structured_content == {"name": "alfa", "values": ["1.5"]}
     assert [text_of(content) for content in result.content] == [{"name": "alfa", "values": ["1.5"]}]
+
+
+def test_a_type_of_the_domain_reads_with_the_texts_of_the_api() -> None:
+    result = answer_of(lambda: Fills((Fill(Side.LONG, Decimal("95000.5"), datetime(2026, 11, 14, 8, 7, tzinfo=UTC)),)))
+
+    expected = {"fills": [{"side": "long", "price": "95000.5", "at": "2026-11-14T08:07:00Z"}]}
+    assert result.structured_content == expected
+    assert [text_of(content) for content in result.content] == [expected]
 
 
 def test_an_error_of_the_project_is_the_problem_the_api_answers() -> None:

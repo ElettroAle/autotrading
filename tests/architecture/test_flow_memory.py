@@ -24,7 +24,7 @@ COMPOSING_ELSEWHERE = SourceModule.parse(
 from autotrading.application.flows.remembered_decisions import remembered_decisions
 
 def context(decisions, flow_id, configuration, now):
-    return remembered_decisions(decisions, flow_id, configuration, now, {})
+    return remembered_decisions(decisions, flow_id, configuration, now, lambda: ())
 """,
 )
 COMPOSING_IN_THE_CYCLE = SourceModule.parse(
@@ -33,7 +33,7 @@ COMPOSING_IN_THE_CYCLE = SourceModule.parse(
 from autotrading.application.flows.remembered_decisions import remembered_decisions
 
 def context(decisions, flow_id, configuration, now):
-    return remembered_decisions(decisions, flow_id, configuration, now, {})
+    return remembered_decisions(decisions, flow_id, configuration, now, lambda: ())
 """,
 )
 PORT_ELSEWHERE = SourceModule.parse(

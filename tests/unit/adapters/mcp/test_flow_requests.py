@@ -5,7 +5,6 @@ from autotrading.adapters.inbound.mcp.flow_requests import (
     AdapterChoice,
     FlowCreation,
     FlowModification,
-    MemoryChoice,
     SourceChoice,
     StrategyImport,
 )
@@ -37,7 +36,7 @@ def test_a_creation_is_the_command_of_the_api() -> None:
         max_leverage=5,
         max_margin_exposure_percent=Decimal(10),
         minimum_confidence=60,
-        memory=MemoryChoice(active=True, decisions=5, days=14),
+        memory=MemoryRequest(active=True, decisions=5, days=14),
     )
 
     command = creation.command()
@@ -91,7 +90,7 @@ def test_a_modification_changes_only_the_parts_given() -> None:
 
 
 def test_a_modification_changes_only_the_parts_of_the_memory_given() -> None:
-    command = FlowModification(memory=MemoryChoice(active=True)).command(uuid4())
+    command = FlowModification(memory=MemoryRequest(active=True)).command(uuid4())
 
     assert command.memory == MemoryRequest(active=True)
 

@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.flows.ports import (
@@ -51,7 +50,9 @@ class ComposeCycleContextUseCase:
         data = tuple(data for reading in readings for data in reading.data)
         configuration = cycle_flow.configuration
         now = self._clock.now()
-        memory = remembered_decisions(self._decisions, flow_id, configuration, now, _unrealized_pnl(cycle_flow))
+        memory = remembered_decisions(
+            self._decisions, flow_id, configuration, now, lambda: cycle_flow.account.positions
+        )
         question = CycleQuestion(
             model=configuration.model.name,
             settings=configuration.model.parameters,
@@ -71,8 +72,3 @@ class ComposeCycleContextUseCase:
             SourceData(aggregate.source, aggregate.adapter, None, aggregate.asset, aggregate.values)
             for aggregate in self._aggregates.execute(data)
         )
-
-
-def _unrealized_pnl(cycle_flow: CycleFlow) -> dict[str, Decimal]:
-    """The PnL of the positions of the flow now, as the exchange of the account shows it (R1.4.7)."""
-    return {position.asset: position.unrealized_pnl for position in cycle_flow.positions}

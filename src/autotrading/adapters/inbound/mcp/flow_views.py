@@ -64,17 +64,6 @@ class RiskLimitsView:
 
 
 @dataclass(frozen=True)
-class MemoryView:
-    active: bool
-    decisions: int
-    days: int
-
-    @classmethod
-    def of(cls, memory: FlowMemory) -> MemoryView:
-        return cls(active=memory.active, decisions=memory.decisions, days=memory.days)
-
-
-@dataclass(frozen=True)
 class FlowView:
     """A flow with the configuration version in force; a draft may have no account, capital or assets (ADR 0124)."""
 
@@ -100,7 +89,7 @@ class FlowView:
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
-    memory: MemoryView
+    memory: FlowMemory
     missing: list[str]
 
     @classmethod
@@ -131,7 +120,7 @@ class FlowView:
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=optional_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=None if confidence is None else confidence.value,
-            memory=MemoryView.of(configuration.memory),
+            memory=configuration.memory,
             missing=list(flow.missing_before_start),
         )
 

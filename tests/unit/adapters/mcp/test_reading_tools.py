@@ -1,6 +1,7 @@
 """Each reading tool answers what the reading of the API answers, on the same use case of the tenant."""
 
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 from typing import Any
@@ -8,6 +9,8 @@ from typing import Any
 import pytest
 
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
+from autotrading.domain.flows.recorded_decision import DecisionAction
 from autotrading.domain.flows.trade_side import TradeSide
 from tests.support.activity import a_position, an_activity
 from tests.support.api_session import ApiSession
@@ -107,6 +110,27 @@ def test_a_cycle_is_read_with_the_decisions_of_the_agent(flows: Flows) -> None:
 
     assert detail == {name: value for name, value in shown.items() if name != "cost"}
     assert "decisione dell'agente" in detail["steps"]
+
+
+def test_a_cycle_is_read_with_the_memory_the_agent_received_as_the_api_gives_it() -> None:
+    flows = Flows()
+    records = flows.cycles.platform.cycles.records
+    entry = MemoryEntry(
+        at("09:00"),
+        "BTC",
+        DecisionAction.OPEN,
+        TradeSide.LONG,
+        Decimal("95000.5"),
+        "rottura",
+        MemoryOutcome(Decimal("12.5"), realized=False),
+    )
+    records[0] = replace(records[0], memory=(AssetMemory("BTC", (entry,)),))
+
+    detail = flows.read("read_cycle", {"flow_id": flows.flow_id, "planned_at": "2026-11-12T10:00:00Z"})
+    shown = flows.shown(f"/flows/{flows.flow_id}/cycles/2026-11-12T10:00:00Z")
+
+    assert detail["memory"] == shown["memory"]
+    assert detail["memory"][0]["entries"][0]["price"] == "95000.5"
 
 
 def test_the_statistics_are_those_of_the_api(flows: Flows) -> None:

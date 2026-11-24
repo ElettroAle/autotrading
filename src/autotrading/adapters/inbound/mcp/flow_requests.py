@@ -54,18 +54,6 @@ class SourceChoice:
         return SourceRequest(self.name, tuple(adapter.request() for adapter in self.adapters))
 
 
-@dataclass(frozen=True)
-class MemoryChoice:
-    """The memory of the flow: a part not given keeps the one in force, or the default (R5.3.4)."""
-
-    active: bool | None = None
-    decisions: int | None = None
-    days: int | None = None
-
-    def request(self) -> MemoryRequest:
-        return MemoryRequest(active=self.active, decisions=self.decisions, days=self.days)
-
-
 class _StrategyArguments(TypedDict):
     max_leverage: int | None
     max_margin_exposure_percent: Decimal | None
@@ -110,7 +98,7 @@ class FlowStrategy:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
-    memory: MemoryChoice = field(default_factory=MemoryChoice)
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
 
     def _strategy_arguments(self) -> _StrategyArguments:
         return _StrategyArguments(
@@ -132,7 +120,7 @@ class FlowStrategy:
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
-            memory=self.memory.request(),
+            memory=self.memory,
         )
 
 
@@ -198,7 +186,7 @@ class FlowModification:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
-    memory: MemoryChoice = field(default_factory=MemoryChoice)
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
     remove: list[RemovablePart] = field(default_factory=list)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
@@ -238,5 +226,5 @@ class FlowModification:
             remove_default_take_profit="default_take_profit_percent" in removed,
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence="minimum_confidence" in removed,
-            memory=self.memory.request(),
+            memory=self.memory,
         )

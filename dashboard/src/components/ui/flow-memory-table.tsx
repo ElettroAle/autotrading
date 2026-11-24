@@ -6,7 +6,7 @@ import { ActionLabel } from './action-label';
 import { DataTable, type DataTableColumn } from './data-table';
 import { DirectionLabel } from './direction-label';
 
-type Decision = AssetMemory['decisions'][number];
+type Decision = AssetMemory['entries'][number];
 
 const NOTHING = '—';
 
@@ -42,13 +42,13 @@ const COLUMNS: readonly DataTableColumn<Decision>[] = [
  */
 export const FlowMemoryTable = ({ memory }: { readonly memory: readonly AssetMemory[] }) => (
   <div className="space-y-3">
-    {memory.map(({ asset, decisions }) => (
+    {memory.map(({ asset, entries }) => (
       <section key={asset} aria-label={asset} className="space-y-1">
         <h4 className="font-semibold">{asset}</h4>
         <DataTable
           label={`Memoria di ${asset}`}
           columns={COLUMNS}
-          rows={decisions}
+          rows={entries}
           rowKey={(decision) => decision.planned_at}
           empty="Nessuna decisione precedente."
         />

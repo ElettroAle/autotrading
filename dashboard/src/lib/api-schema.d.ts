@@ -1793,12 +1793,15 @@ export interface components {
             /** Currency */
             currency: string;
         };
-        /** AssetMemoryResponse */
-        AssetMemoryResponse: {
+        /**
+         * AssetMemory
+         * @description The previous operative decisions of the flow on one of its assets, from the most recent (R5.3.4).
+         */
+        AssetMemory: {
             /** Asset */
             asset: string;
-            /** Decisions */
-            decisions: components["schemas"]["MemoryEntryResponse"][];
+            /** Entries */
+            entries: components["schemas"]["MemoryEntry"][];
         };
         /**
          * BalanceComparisonResponse
@@ -2030,7 +2033,7 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
-            memory: components["schemas"]["FlowMemorySettingsResponse"];
+            memory: components["schemas"]["FlowMemory"];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -2081,7 +2084,7 @@ export interface components {
             /** Failed Attempts */
             failed_attempts: components["schemas"]["FailedAttemptResponse"][];
             /** Memory */
-            memory: components["schemas"]["AssetMemoryResponse"][] | null;
+            memory: components["schemas"]["AssetMemory"][] | null;
         };
         /**
          * CyclePageResponse
@@ -2151,6 +2154,13 @@ export interface components {
              */
             planned_at: string;
         };
+        /**
+         * DecisionAction
+         * @description What the agent decided on an asset, as the cycle records it: the words of its actions (R1.4.3, R3.1.3,
+         *     R1.4.10).
+         * @enum {string}
+         */
+        DecisionAction: "apri" | "chiudi" | "mantieni" | "aggiorna" | "inverti";
         /**
          * DecisionPageResponse
          * @description A page of the decisions that match the filters in the period, with how many match in all (ADR
@@ -2441,7 +2451,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
-            memory?: components["schemas"]["FlowMemoryBody"];
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2486,35 +2496,41 @@ export interface components {
             forecasts: components["schemas"]["ForecastAccuracyResponse"][];
         };
         /**
-         * FlowMemoryBody
-         * @description The memory of a flow as the user sets it: a part left out keeps the one in force, or the default (R5.3.4).
+         * FlowMemory
+         * @description Whether the agent receives its previous operative decisions on every asset of the flow, and how many from how
+         *     far back: off, 10 decisions and 30 days unless the user says otherwise (R5.3.4).
+         *
+         *     The decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule.
          */
-        FlowMemoryBody: {
-            /** Active */
-            active?: boolean | null;
-            /** Decisions */
-            decisions?: number | null;
-            /** Days */
-            days?: number | null;
+        FlowMemory: {
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+            /**
+             * Decisions
+             * @default 10
+             */
+            decisions: number;
+            /**
+             * Days
+             * @default 30
+             */
+            days: number;
         };
         /**
          * FlowMemoryResponse
          * @description What the agent of the flow would receive if its cycle started now; nothing when its memory is off (R5.3.4).
+         *
+         *     The entries travel as the domain gives them, as in the cycle detail and in the tools of the flows: amounts as
+         *     strings (ADR 0018), instants in ISO 8601, actions and directions as their values.
          */
         FlowMemoryResponse: {
             /** Active */
             active: boolean;
             /** Assets */
-            assets: components["schemas"]["AssetMemoryResponse"][];
-        };
-        /** FlowMemorySettingsResponse */
-        FlowMemorySettingsResponse: {
-            /** Active */
-            active: boolean;
-            /** Decisions */
-            decisions: number;
-            /** Days */
-            days: number;
+            assets: components["schemas"]["AssetMemory"][];
         };
         /**
          * FlowModificationRequest
@@ -2571,7 +2587,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
-            memory?: components["schemas"]["FlowMemoryBody"];
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * FlowOverviewResponse
@@ -2725,7 +2741,7 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
-            memory: components["schemas"]["FlowMemorySettingsResponse"];
+            memory: components["schemas"]["FlowMemory"];
             /** Missing */
             missing: string[];
         };
@@ -3196,31 +3212,47 @@ export interface components {
             password_saved: boolean;
         };
         /**
-         * MemoryEntryResponse
-         * @description A previous operative decision of the flow: no price without an execution, no outcome without a position.
+         * MemoryEntry
+         * @description One previous operative decision of the flow on an asset as the agent receives it (R5.3.4).
          */
-        MemoryEntryResponse: {
+        MemoryEntry: {
             /**
              * Planned At
              * Format: date-time
              */
             planned_at: string;
-            /** Action */
-            action: string;
-            /** Direction */
-            direction: string | null;
+            /** Asset */
+            asset: string;
+            action: components["schemas"]["DecisionAction"];
+            direction: components["schemas"]["TradeSide"] | null;
             /** Price */
             price: string | null;
             /** Reasoning */
             reasoning: string;
-            outcome: components["schemas"]["MemoryOutcomeResponse"] | null;
+            outcome: components["schemas"]["MemoryOutcome"] | null;
         };
-        /** MemoryOutcomeResponse */
-        MemoryOutcomeResponse: {
+        /**
+         * MemoryOutcome
+         * @description The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open.
+         */
+        MemoryOutcome: {
             /** Pnl */
             pnl: string;
             /** Realized */
             realized: boolean;
+        };
+        /**
+         * MemoryRequest
+         * @description The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a
+         *     new flow (R5.3.4).
+         */
+        MemoryRequest: {
+            /** Active */
+            active?: boolean | null;
+            /** Decisions */
+            decisions?: number | null;
+            /** Days */
+            days?: number | null;
         };
         /** ModelCatalogResponse */
         ModelCatalogResponse: {
@@ -3860,7 +3892,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
-            memory?: components["schemas"]["FlowMemoryBody"];
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * StrategyBody
@@ -3901,7 +3933,7 @@ export interface components {
             default_take_profit_percent?: string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
-            memory?: components["schemas"]["FlowMemoryBody"];
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * StrategyDocument
@@ -4005,6 +4037,11 @@ export interface components {
          * @enum {string}
          */
         TargetKind: "flow" | "open_position" | "closed_position" | "alert";
+        /**
+         * TradeSide
+         * @enum {string}
+         */
+        TradeSide: "long" | "short";
         /**
          * TrialOutcome
          * @enum {string}

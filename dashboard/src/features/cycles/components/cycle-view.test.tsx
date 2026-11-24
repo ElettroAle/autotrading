@@ -188,9 +188,10 @@ describe('CycleView', () => {
     const memory = [
       {
         asset: 'BTC',
-        decisions: [
+        entries: [
           {
             planned_at: '2026-11-14T08:07:00Z',
+            asset: 'BTC',
             action: 'apri',
             direction: 'long',
             price: '95000',

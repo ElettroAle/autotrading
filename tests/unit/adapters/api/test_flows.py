@@ -191,9 +191,10 @@ def test_the_memory_of_a_flow_on_answers_what_the_next_cycle_receives(client_of:
         "assets": [
             {
                 "asset": "BTC",
-                "decisions": [
+                "entries": [
                     {
                         "planned_at": planned_at.isoformat().replace("+00:00", "Z"),
+                        "asset": "BTC",
                         "action": "chiudi",
                         "direction": None,
                         "price": None,
@@ -202,7 +203,7 @@ def test_the_memory_of_a_flow_on_answers_what_the_next_cycle_receives(client_of:
                     }
                 ],
             },
-            {"asset": "ETH", "decisions": []},
+            {"asset": "ETH", "entries": []},
         ],
     }
 

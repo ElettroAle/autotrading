@@ -7,7 +7,7 @@ import { z } from 'zod';
  */
 export const assetMemorySchema = z.object({
   asset: z.string(),
-  decisions: z.array(
+  entries: z.array(
     z.object({
       planned_at: z.string(),
       action: z.string(),

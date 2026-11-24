@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 
-import { aCompletedCycle, type FakeCycleMemory } from '@/testing/mocks/cycles';
+import { aCompletedCycle, type FakeAssetMemory } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then, When } from '../../../support/fixtures';
@@ -13,12 +13,13 @@ const USER = 'anna';
 const CYCLE_TIME = '10:07:00';
 const CYCLE_AT = new Date(`2026-11-14T${CYCLE_TIME}+01:00`);
 const REASONING = 'rottura della resistenza';
-const MEMORY: FakeCycleMemory[] = [
+const MEMORY: FakeAssetMemory[] = [
   {
     asset: 'BTC',
-    decisions: [
+    entries: [
       {
         planned_at: '2026-11-14T08:07:00Z',
+        asset: 'BTC',
         action: 'apri',
         direction: 'long',
         price: '95000',

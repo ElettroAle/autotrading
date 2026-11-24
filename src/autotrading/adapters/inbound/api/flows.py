@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
-from autotrading.adapters.inbound.api.flow_memory import FlowMemoryBody, FlowMemoryResponse, FlowMemorySettingsResponse
+from autotrading.adapters.inbound.api.flow_memory import FlowMemoryResponse
 from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
@@ -19,7 +19,7 @@ from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
-from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
+from autotrading.application.flows.create_flow import CreateFlowCommand, MemoryRequest, SourceRequest
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.application.flows.get_flow import GetFlowCommand
@@ -39,6 +39,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
@@ -101,7 +102,7 @@ class FlowCreationRequest(BaseModel):
     # Null or missing: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
     # Missing: off, with 10 decisions and 30 days (R5.3.4).
-    memory: FlowMemoryBody = Field(default_factory=FlowMemoryBody)
+    memory: MemoryRequest = Field(default_factory=MemoryRequest)
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -128,7 +129,7 @@ class FlowCreationRequest(BaseModel):
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
-            memory=self.memory.request(),
+            memory=self.memory,
         )
 
 
@@ -168,7 +169,7 @@ class FlowModificationRequest(BaseModel):
     # A null sent on purpose removes the minimum confidence; a missing one keeps the version in force (R3.1.4).
     minimum_confidence: int | None = None
     # Only the parts of the memory sent change; the others keep the version in force (R5.3.4).
-    memory: FlowMemoryBody = Field(default_factory=FlowMemoryBody)
+    memory: MemoryRequest = Field(default_factory=MemoryRequest)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -206,7 +207,7 @@ class FlowModificationRequest(BaseModel):
             remove_default_take_profit=self._sent_as_null("default_take_profit_percent"),
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence=self._sent_as_null("minimum_confidence"),
-            memory=self.memory.request(),
+            memory=self.memory,
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -313,7 +314,7 @@ class ConfigurationResponse(BaseModel):
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
-    memory: FlowMemorySettingsResponse
+    memory: FlowMemory
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -340,7 +341,7 @@ class ConfigurationResponse(BaseModel):
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
-            memory=FlowMemorySettingsResponse.of(configuration.memory),
+            memory=configuration.memory,
         )
 
 
@@ -391,7 +392,7 @@ class FlowResponse(BaseModel):
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
-    memory: FlowMemorySettingsResponse
+    memory: FlowMemory
     missing: list[str]
 
     @classmethod
@@ -424,7 +425,7 @@ class FlowResponse(BaseModel):
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
-            memory=FlowMemorySettingsResponse.of(configuration.memory),
+            memory=configuration.memory,
             missing=list(flow.missing_before_start),
         )
 
