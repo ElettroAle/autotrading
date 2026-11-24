@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 import httpx
 
 from autotrading.application.agent.errors import (
+    ModelAnswerTruncatedError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -32,6 +33,8 @@ UNREADABLE = (KeyError, IndexError, TypeError, ValueError, InvalidOperation, Inv
 # Failures before the request leaves: OpenRouter never received it, so it cannot have charged it.
 NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 DEFAULT_MAX_TOKENS = 4096
+# The model stopped at the token limit of the call, not at the end of its answer: what it wrote is not a decision.
+CUT_AT_LIMIT = "length"
 EFFORTS: Mapping[str, str] = {"basso": "low", "medio": "medium", "alto": "high"}
 # Routed only to the providers that take every parameter: the format of the answer is enforced, never dropped.
 REQUIRE_EVERY_PARAMETER: Mapping[str, bool] = {"require_parameters": True}
@@ -57,12 +60,15 @@ class OpenRouterModelCallAdapter:
         messages: tuple[ModelMessage, ...],
         answer: AnswerFormat,
     ) -> ModelReply:
-        document = self._complete(key, _request(model, settings, messages, answer))
+        max_tokens = _max_tokens_of(settings)
+        document = self._complete(key, _request(model, settings, max_tokens, messages, answer))
         # Whatever the answer looks like, the request went out and OpenRouter may have charged it (R1.4.6).
         try:
             usage = _usage_of(document)
         except UNREADABLE as error:
             raise _unusable(key, document, None) from error
+        if _cut_at_limit(document):
+            raise ModelAnswerTruncatedError(OPENROUTER, max_tokens, usage=usage, sent=True)
         try:
             return ModelReply(_text_of(document), usage)
         except UNREADABLE as error:
@@ -91,12 +97,12 @@ class OpenRouterModelCallAdapter:
 
 
 def _request(
-    model: str, settings: Settings, messages: tuple[ModelMessage, ...], answer: AnswerFormat
+    model: str, settings: Settings, max_tokens: int, messages: tuple[ModelMessage, ...], answer: AnswerFormat
 ) -> dict[str, object]:
     request: dict[str, object] = {
         "model": model.removeprefix(PREFIX),
         "messages": [{"role": _role(message), "content": message.content} for message in messages],
-        "max_tokens": int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS))),
+        "max_tokens": max_tokens,
         "response_format": {
             "type": "json_schema",
             "json_schema": {"name": answer.name, "strict": True, "schema": answer.schema},
@@ -110,6 +116,10 @@ def _request(
     if effort is not None:
         request["reasoning"] = {"effort": EFFORTS[str(effort)]}
     return request
+
+
+def _max_tokens_of(settings: Settings) -> int:
+    return int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS)))
 
 
 def _role(message: ModelMessage) -> str:
@@ -172,6 +182,15 @@ def _usage_of(document: object) -> ModelUsage:
     cost = usage.get("cost")
     reported = None if cost is None else Decimal(str(cost))
     return ModelUsage(int(usage["prompt_tokens"]), int(usage["completion_tokens"]), reported)
+
+
+def _cut_at_limit(document: object) -> bool:
+    """The first choice ended at the token limit, with no text or only part of it (Bug 733)."""
+    choices = document.get("choices") if isinstance(document, Mapping) else None
+    if not isinstance(choices, list) or not choices:
+        return False
+    first = choices[0]
+    return isinstance(first, Mapping) and first.get("finish_reason") == CUT_AT_LIMIT
 
 
 def _text_of(document: object) -> str:
