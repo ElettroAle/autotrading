@@ -10,6 +10,7 @@ from litellm import exceptions
 
 from autotrading.adapters.outbound.litellm.model_call import LiteLlmModelCallAdapter
 from autotrading.application.agent.errors import (
+    ModelAnswerTruncatedError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -352,3 +353,45 @@ def test_an_unreachable_provider_was_not_sent() -> None:
         call(failing(refused), "openai/gpt")
 
     assert not raised.value.sent
+
+
+# ADR-risposta-del-modello-interrotta-dal-limite-di-token: an answer cut at the token limit says so, with its usage.
+def cut(content: str | None) -> litellm.ModelResponse:
+    return response(
+        choices=[{"index": 0, "finish_reason": "length", "message": {"role": "assistant", "content": content}}],
+        usage={"prompt_tokens": 2000, "completion_tokens": 2048, "total_tokens": 4048},
+    )
+
+
+@pytest.mark.parametrize("content", [None, "", '{"decisioni": [{"asset": "BT'], ids=["no-text", "empty", "partial"])
+def test_an_answer_cut_at_the_token_limit_names_the_limit_of_the_call(content: str | None) -> None:
+    with pytest.raises(ModelAnswerTruncatedError) as raised:
+        call(Library(cut(content)), "deepseek/deepseek-reasoner")
+
+    assert raised.value.max_tokens == 2048
+    assert str(raised.value) == (
+        "risposta del modello interrotta dal limite di 2048 token: alza max_tokens o abbassa il ragionamento del flusso"
+    )
+    assert raised.value.provider.value == "deepseek"
+    assert (raised.value.usage, raised.value.sent) == (ModelUsage(2000, 2048, None), True)
+    assert not raised.value.permanent
+
+
+def test_an_answer_cut_without_settings_names_the_default_limit() -> None:
+    with pytest.raises(ModelAnswerTruncatedError) as raised:
+        call(Library(cut(None)), "openai/gpt", {})
+
+    assert raised.value.max_tokens == 4096
+
+
+def test_an_answer_cut_without_a_readable_usage_is_an_unexpected_answer() -> None:
+    answer = litellm.ModelResponse(
+        model="gpt",
+        choices=[{"index": 0, "finish_reason": "length", "message": {"role": "assistant", "content": None}}],
+    )
+
+    with pytest.raises(ModelUnavailableError) as raised:
+        call(Library(answer), "openai/gpt")
+
+    assert raised.value.original == "risposta del fornitore inattesa"
+    assert not isinstance(raised.value, ModelAnswerTruncatedError)

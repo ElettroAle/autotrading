@@ -6,6 +6,7 @@ from decimal import Decimal
 lazy import litellm.exceptions
 
 from autotrading.application.agent.errors import (
+    ModelAnswerTruncatedError,
     ModelCreditExhaustedError,
     ModelKeyRejectedError,
     ModelUnavailableError,
@@ -27,6 +28,8 @@ ORIGINAL_LIMIT = 300
 KEY_REJECTED = frozenset({401, 403})
 CREDIT_EXHAUSTED = 402
 UNEXPECTED_ANSWER = "risposta del fornitore inattesa"
+# The model stopped at the token limit of the call, not at the end of its answer: what it wrote is not a decision.
+CUT_AT_LIMIT = "length"
 
 type Settings = Mapping[str, ParameterValue]
 type Completion = Callable[..., object]
@@ -59,7 +62,8 @@ class LiteLlmModelCallAdapter:
         answer: AnswerFormat,
     ) -> ModelReply:
         provider = ProviderName(model.partition(PROVIDER_SEPARATOR)[0])
-        request = _request(model, key, settings, messages)
+        max_tokens = _max_tokens_of(settings)
+        request = _request(model, key, settings, max_tokens, messages)
         request["response_format"] = self._response_format(model, answer)
         reply = self._complete(provider, key, request)
         # Whatever the answer looks like, the request went out and the provider may have charged it (R1.4.6).
@@ -67,6 +71,8 @@ class LiteLlmModelCallAdapter:
             usage = _usage_of(reply)
         except InvalidModelUsageError as error:
             raise ModelUnavailableError(provider, UNEXPECTED_ANSWER, sent=True) from error
+        if _cut_at_limit(reply):
+            raise ModelAnswerTruncatedError(provider, max_tokens, usage=usage, sent=True)
         try:
             return ModelReply(_text_of(reply), usage)
         except (IndexError, InvalidModelUsageError) as error:
@@ -108,12 +114,14 @@ class LiteLlmModelCallAdapter:
             raise _refusal(provider, key, error.status_code, error.message) from None
 
 
-def _request(model: str, key: ProviderKey, settings: Settings, messages: tuple[ModelMessage, ...]) -> dict[str, object]:
+def _request(
+    model: str, key: ProviderKey, settings: Settings, max_tokens: int, messages: tuple[ModelMessage, ...]
+) -> dict[str, object]:
     """Only the parameters of the OpenAI API, for every provider: translating them is the work of LiteLLM (ADR 0109)."""
     request: dict[str, object] = {
         "model": model,
         "messages": [{"role": _role(message), "content": message.content} for message in messages],
-        "max_tokens": int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS))),
+        "max_tokens": max_tokens,
     }
     # The key travels as the parameters its provider declared, by name, in this call only (ADR 0159).
     request.update(key.values)
@@ -124,6 +132,10 @@ def _request(model: str, key: ProviderKey, settings: Settings, messages: tuple[M
     if effort is not None:
         request["reasoning_effort"] = EFFORTS[str(effort)]
     return request
+
+
+def _max_tokens_of(settings: Settings) -> int:
+    return int(Decimal(settings.get("max_tokens", DEFAULT_MAX_TOKENS)))
 
 
 def _role(message: ModelMessage) -> str:
@@ -149,6 +161,16 @@ def _usage_of(answer: object) -> ModelUsage:
     if not isinstance(usage, litellm.Usage):
         raise InvalidModelUsageError
     return ModelUsage(usage.prompt_tokens, usage.completion_tokens, None)
+
+
+def _cut_at_limit(answer: object) -> bool:
+    """The first choice ended at the token limit, with no text or only part of it, in the names of the OpenAI API that
+    the library gives every provider (Bug 733).
+    """
+    if not isinstance(answer, litellm.ModelResponse) or not answer.choices:
+        return False
+    first = answer.choices[0]
+    return isinstance(first, litellm.Choices) and first.finish_reason == CUT_AT_LIMIT
 
 
 def _text_of(answer: object) -> str:
