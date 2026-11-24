@@ -5,7 +5,7 @@ A missing name, model, asset or limit arrives empty, so the domain answers with 
 
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Literal
+from typing import Literal, TypedDict
 from uuid import UUID
 
 from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
@@ -54,16 +54,32 @@ class SourceChoice:
         return SourceRequest(self.name, tuple(adapter.request() for adapter in self.adapters))
 
 
-@dataclass(frozen=True)
-class FlowCreation:
-    """A new flow on an account of the tenant (R1.1.1)."""
+class _StrategyArguments(TypedDict):
+    max_leverage: int | None
+    max_margin_exposure_percent: Decimal | None
+    max_value_exposure_percent: Decimal | None
+    max_total_margin_exposure_percent: Decimal | None
+    max_total_value_exposure_percent: Decimal | None
+    model_parameters: dict[str, Decimal | str]
+    sources: tuple[SourceRequest, ...]
+    instructions: str
+    cycle_minutes: int | None
+    bring_to_minimum: bool
+    system_prompt: str | None
+    max_consecutive_failures: int | None
+    max_daily_loss_percent: Decimal | None
+    max_drawdown_percent: Decimal | None
+    openings_resume: OpeningsResume
+    default_stop_loss_percent: Decimal | None
+    default_take_profit_percent: Decimal | None
+    minimum_confidence: int | None
 
-    account_id: UUID
-    allocated_capital: Decimal
-    name: str = ""
-    assets: list[str] = field(default_factory=list)
+
+@dataclass(frozen=True, kw_only=True)
+class FlowStrategy:
+    """What a flow does, shared by a new flow and an imported strategy (R1.1.1, R2.5.2)."""
+
     cycle_minutes: int | None = None
-    model: str = ""
     model_parameters: dict[str, Decimal | str] = field(default_factory=dict)
     sources: list[SourceChoice] = field(default_factory=list)
     instructions: str = ""
@@ -81,6 +97,39 @@ class FlowCreation:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
+
+    def _strategy_arguments(self) -> _StrategyArguments:
+        return _StrategyArguments(
+            max_leverage=self.max_leverage,
+            max_margin_exposure_percent=self.max_margin_exposure_percent,
+            max_value_exposure_percent=self.max_value_exposure_percent,
+            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
+            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
+            model_parameters=self.model_parameters,
+            sources=tuple(source.request() for source in self.sources),
+            instructions=self.instructions,
+            cycle_minutes=self.cycle_minutes,
+            bring_to_minimum=self.bring_to_minimum,
+            system_prompt=self.system_prompt,
+            max_consecutive_failures=self.max_consecutive_failures,
+            max_daily_loss_percent=self.max_daily_loss_percent,
+            max_drawdown_percent=self.max_drawdown_percent,
+            openings_resume=self.openings_resume,
+            default_stop_loss_percent=self.default_stop_loss_percent,
+            default_take_profit_percent=self.default_take_profit_percent,
+            minimum_confidence=self.minimum_confidence,
+        )
+
+
+@dataclass(frozen=True, kw_only=True)
+class FlowCreation(FlowStrategy):
+    """A new flow on an account of the tenant (R1.1.1)."""
+
+    account_id: UUID
+    allocated_capital: Decimal
+    name: str = ""
+    assets: list[str] = field(default_factory=list)
+    model: str = ""
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -89,74 +138,18 @@ class FlowCreation:
             assets=tuple(self.assets),
             model=self.model,
             allocated_capital=self.allocated_capital,
-            max_leverage=self.max_leverage,
-            max_margin_exposure_percent=self.max_margin_exposure_percent,
-            max_value_exposure_percent=self.max_value_exposure_percent,
-            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
-            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
-            model_parameters=self.model_parameters,
-            sources=tuple(source.request() for source in self.sources),
-            instructions=self.instructions,
-            cycle_minutes=self.cycle_minutes,
-            bring_to_minimum=self.bring_to_minimum,
-            system_prompt=self.system_prompt,
-            max_consecutive_failures=self.max_consecutive_failures,
-            max_daily_loss_percent=self.max_daily_loss_percent,
-            max_drawdown_percent=self.max_drawdown_percent,
-            openings_resume=self.openings_resume,
-            default_stop_loss_percent=self.default_stop_loss_percent,
-            default_take_profit_percent=self.default_take_profit_percent,
-            minimum_confidence=self.minimum_confidence,
+            **self._strategy_arguments(),
         )
 
 
-@dataclass(frozen=True)
-class StrategyImport:
+@dataclass(frozen=True, kw_only=True)
+class StrategyImport(FlowStrategy):
     """What a flow does, without account, capital or assets: the strategy section of a strategy file (R2.5.2)."""
 
-    cycle_minutes: int | None = None
     model: str | None = None
-    model_parameters: dict[str, Decimal | str] = field(default_factory=dict)
-    sources: list[SourceChoice] = field(default_factory=list)
-    instructions: str = ""
-    max_leverage: int | None = None
-    max_margin_exposure_percent: Decimal | None = None
-    max_value_exposure_percent: Decimal | None = None
-    max_total_margin_exposure_percent: Decimal | None = None
-    max_total_value_exposure_percent: Decimal | None = None
-    bring_to_minimum: bool = False
-    system_prompt: str | None = None
-    max_consecutive_failures: int | None = None
-    max_daily_loss_percent: Decimal | None = None
-    max_drawdown_percent: Decimal | None = None
-    openings_resume: OpeningsResume = OpeningsResume.MANUAL
-    default_stop_loss_percent: Decimal | None = None
-    default_take_profit_percent: Decimal | None = None
-    minimum_confidence: int | None = None
 
     def command(self, name: str) -> ImportFlowStrategyCommand:
-        return ImportFlowStrategyCommand(
-            name=name,
-            model=self.model,
-            max_leverage=self.max_leverage,
-            max_margin_exposure_percent=self.max_margin_exposure_percent,
-            max_value_exposure_percent=self.max_value_exposure_percent,
-            max_total_margin_exposure_percent=self.max_total_margin_exposure_percent,
-            max_total_value_exposure_percent=self.max_total_value_exposure_percent,
-            model_parameters=self.model_parameters,
-            sources=tuple(source.request() for source in self.sources),
-            instructions=self.instructions,
-            cycle_minutes=self.cycle_minutes,
-            bring_to_minimum=self.bring_to_minimum,
-            system_prompt=self.system_prompt,
-            max_consecutive_failures=self.max_consecutive_failures,
-            max_daily_loss_percent=self.max_daily_loss_percent,
-            max_drawdown_percent=self.max_drawdown_percent,
-            openings_resume=self.openings_resume,
-            default_stop_loss_percent=self.default_stop_loss_percent,
-            default_take_profit_percent=self.default_take_profit_percent,
-            minimum_confidence=self.minimum_confidence,
-        )
+        return ImportFlowStrategyCommand(name=name, model=self.model, **self._strategy_arguments())
 
 
 @dataclass(frozen=True)
