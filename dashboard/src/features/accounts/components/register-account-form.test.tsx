@@ -7,6 +7,7 @@ import {
   EXCHANGE_REFUSAL,
   FAKE_EXCHANGE,
   REJECTED_SECRET_KEY,
+  SIMULATED_EXCHANGE,
   fakePlatform,
 } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
@@ -199,5 +200,70 @@ describe('RegisterAccountForm', () => {
     expect(within(region).getByRole('note')).toHaveTextContent(
       'Il conto opererà sulla rete di test "sandbox", senza denaro reale',
     );
+  });
+
+  describe('on an exchange that holds a virtual balance (R6.3.2)', () => {
+    beforeEach(() => {
+      fakePlatform.offerSimulatedExchange();
+    });
+
+    const chooseSimulated = async () => {
+      const region = await screen.findByRole('region', { name: 'Nuovo conto' });
+      await within(region).findByRole('option', { name: SIMULATED_EXCHANGE });
+      await userEvent.type(within(region).getByLabelText('Nome'), 'prova');
+      await userEvent.selectOptions(within(region).getByLabelText('Exchange'), SIMULATED_EXCHANGE);
+      return region;
+    };
+
+    it('asks the virtual balance and no credentials, warning of the network of the exchange', async () => {
+      await renderApp({ account: 'anna', url: ACCOUNTS });
+
+      const region = await chooseSimulated();
+
+      expect(within(region).getByLabelText('Saldo virtuale')).toBeVisible();
+      expect(within(region).queryByLabelText('Indirizzo del conto')).not.toBeInTheDocument();
+      expect(within(region).queryByLabelText(SECRET_LABEL)).not.toBeInTheDocument();
+      expect(within(region).getByRole('note')).toHaveTextContent(
+        'Il conto opererà sulla rete di test "simulato", senza denaro reale',
+      );
+    });
+
+    it('registers the account with the virtual balance given', async () => {
+      await renderApp({ account: 'anna', url: ACCOUNTS });
+      const region = await chooseSimulated();
+
+      await userEvent.type(within(region).getByLabelText('Saldo virtuale'), '1000');
+      await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
+
+      expect(await within(region).findByRole('status')).toHaveTextContent('Conto prova registrato');
+      const [account] = fakePlatform.user('anna').accounts;
+      expect([account?.exchange, account?.balance]).toEqual([SIMULATED_EXCHANGE, 1000]);
+    });
+
+    it('shows the reason the API gives when the virtual balance is missing', async () => {
+      await renderApp({ account: 'anna', url: ACCOUNTS });
+      const region = await chooseSimulated();
+
+      await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
+
+      expect(await within(region).findByRole('alert')).toHaveTextContent(
+        'saldo virtuale obbligatorio per questo exchange',
+      );
+      expect(fakePlatform.user('anna').accounts).toEqual([]);
+    });
+
+    it('sends no virtual balance for an exchange that does not hold one', async () => {
+      await renderApp({ account: 'anna', url: ACCOUNTS });
+      const region = await chooseSimulated();
+      await userEvent.type(within(region).getByLabelText('Saldo virtuale'), '1000');
+
+      await userEvent.selectOptions(within(region).getByLabelText('Exchange'), FAKE_EXCHANGE);
+      await userEvent.type(within(region).getByLabelText('Indirizzo del conto'), ADDRESS);
+      await userEvent.type(within(region).getByLabelText(SECRET_LABEL), SECRET_KEY);
+      await userEvent.click(within(region).getByRole('button', { name: 'Registra il conto' }));
+
+      expect(await within(region).findByRole('status')).toHaveTextContent('Conto prova registrato');
+      expect(fakePlatform.user('anna').accounts[0]?.exchange).toBeUndefined();
+    });
   });
 });

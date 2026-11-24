@@ -56,6 +56,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/virtual-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reset Virtual Balance
+         * @description Starts the account again from the balance given, its positions closed and its orders cancelled, on an
+         *     exchange that holds a virtual balance (R6.3.2).
+         */
+        put: operations["reset_virtual_balance_accounts__account_id__virtual_balance_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{account_id}": {
         parameters: {
             query?: never;
@@ -1534,6 +1555,8 @@ export interface components {
             };
             /** Expires On */
             expires_on?: string | null;
+            /** Virtual Balance */
+            virtual_balance?: number | string | null;
         };
         /** AccountRegistrationResponse */
         AccountRegistrationResponse: {
@@ -2249,6 +2272,8 @@ export interface components {
             fields: components["schemas"]["CredentialFieldResponse"][];
             /** Expiry Editable */
             expiry_editable: boolean;
+            /** Virtual Balance */
+            virtual_balance: boolean;
         };
         /**
          * ExpirySource
@@ -3986,6 +4011,14 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * VirtualBalanceResetRequest
+         * @description The balance an account of an exchange with a virtual balance starts again from (R6.3.2).
+         */
+        VirtualBalanceResetRequest: {
+            /** Balance */
+            balance: number | string;
+        };
     };
     responses: never;
     parameters: never;
@@ -4078,6 +4111,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AccountRegistrationResponse"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_virtual_balance_accounts__account_id__virtual_balance_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VirtualBalanceResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

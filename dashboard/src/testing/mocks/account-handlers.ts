@@ -6,6 +6,7 @@ import {
   FAKE_EXCHANGE,
   FAKE_SUPPORTED_EXCHANGES,
   REJECTED_SECRET_KEY,
+  SIMULATED_EXCHANGE,
   fakePlatform,
   type FakeAccount,
   type FakeUser,
@@ -24,14 +25,23 @@ const CREDENTIAL_FIELDS = [
   { name: 'secret_key', label: "Chiave dell'API wallet", secret: true },
 ] as const;
 
+// The simulated exchange trades no money and names its own network (R6.3.2).
+const SIMULATED_NETWORK = { network: 'test', network_name: SIMULATED_EXCHANGE } as const;
+
+const isSimulated = (account: FakeAccount): boolean => account.exchange === SIMULATED_EXCHANGE;
+
+const networkOf = (account: FakeAccount) =>
+  isSimulated(account)
+    ? SIMULATED_NETWORK
+    : { network: fakePlatform.exchangeNetwork(), network_name: fakePlatform.exchangeNetworkName() };
+
 const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   id: account.id,
   name: account.name,
-  exchange: FAKE_EXCHANGE,
-  has_credentials: true,
+  exchange: account.exchange ?? FAKE_EXCHANGE,
+  has_credentials: !isSimulated(account),
   public_fields: account.publicFields,
-  network: fakePlatform.exchangeNetwork(),
-  network_name: fakePlatform.exchangeNetworkName(),
+  ...networkOf(account),
   allocated_capital: String(fakePlatform.allocatedCapitalOf(user, account)),
   currency: CURRENCY,
   // The exchange of the fake platform reads the expiry of the credentials, unless a test says otherwise (R6.2.2).
@@ -45,6 +55,32 @@ const expiryRefusal = () => problem(409, 'Conflict', EXPIRY_READ_BY_EXCHANGE);
 const givesExpiry = (fields: Record<string, string>): boolean => (fields.expires_on ?? '') !== '';
 
 const amountOf = (amount: string) => ({ amount, currency: CURRENCY });
+
+// The reasons the API gives about a virtual balance, with the same words (R6.3.2).
+const VIRTUAL_BALANCE_REQUIRED = 'saldo virtuale obbligatorio per questo exchange';
+const VIRTUAL_BALANCE_NOT_POSITIVE = 'il saldo virtuale deve essere maggiore di zero';
+const NO_VIRTUAL_BALANCE = 'questo exchange non ha un saldo virtuale';
+
+const noVirtualBalance = () => problem(409, 'Conflict', NO_VIRTUAL_BALANCE);
+
+// A positive amount, or the refusal the API answers with (R6.3.2).
+const virtualBalanceOf = (text: string | undefined): number | Response => {
+  if ((text ?? '').trim() === '') {
+    return problem(422, 'Unprocessable Content', VIRTUAL_BALANCE_REQUIRED);
+  }
+  const amount = Number(text);
+  return Number.isFinite(amount) && amount > 0
+    ? amount
+    : problem(422, 'Unprocessable Content', VIRTUAL_BALANCE_NOT_POSITIVE);
+};
+
+const simulatedExchange = () => ({
+  name: SIMULATED_EXCHANGE,
+  ...SIMULATED_NETWORK,
+  fields: [],
+  expiry_editable: false,
+  virtual_balance: true,
+});
 
 const accountStateResponse = (account: FakeAccount) => ({
   balance: amountOf(String(account.balance)),
@@ -165,10 +201,58 @@ const refusalOfRegistration = (
       supported: [FAKE_EXCHANGE],
     });
   }
+  if (givesVirtualBalance(fields)) {
+    return noVirtualBalance();
+  }
   if (user.accounts.some((account) => account.name === name)) {
     return problem(409, 'Conflict', 'nome del conto già in uso');
   }
   return refusalOfCredentials(credentials);
+};
+
+const givesVirtualBalance = (fields: Record<string, string>): boolean =>
+  (fields.virtual_balance ?? '').trim() !== '';
+
+const registered = (account: FakeAccount) =>
+  HttpResponse.json(
+    {
+      id: account.id,
+      name: account.name,
+      exchange: account.exchange ?? FAKE_EXCHANGE,
+      balance: amountOf(String(account.balance)),
+    },
+    { status: 201 },
+  );
+
+// An account of the simulated exchange: no credentials, the virtual balance it starts from (R6.3.2).
+const simulatedRegistration = (
+  user: FakeUser,
+  fields: Record<string, string>,
+  credentials: Record<string, string>,
+): Response => {
+  const name = (fields.name ?? '').trim();
+  const [unknown] = Object.keys(credentials);
+  if (unknown !== undefined) {
+    return problem(
+      422,
+      'Unprocessable Content',
+      `campo delle credenziali non previsto: ${unknown}`,
+      {
+        field: unknown,
+      },
+    );
+  }
+  if (name === '') {
+    return problem(422, 'Unprocessable Content', 'nome obbligatorio');
+  }
+  if (user.accounts.some((account) => account.name === name)) {
+    return problem(409, 'Conflict', 'nome del conto già in uso');
+  }
+  const balance = virtualBalanceOf(fields.virtual_balance);
+  if (balance instanceof Response) {
+    return balance;
+  }
+  return registered(fakePlatform.addSimulatedAccount(user.account, name, balance));
 };
 
 const withAccount = (
@@ -184,15 +268,17 @@ export const accountHandlers = [
   http.get('*/exchanges', ({ request }) =>
     withUser(request, () =>
       fakePlatform.listsExchanges()
-        ? HttpResponse.json(
-            FAKE_SUPPORTED_EXCHANGES.map((name) => ({
+        ? HttpResponse.json([
+            ...FAKE_SUPPORTED_EXCHANGES.map((name) => ({
               name,
               network: fakePlatform.exchangeNetwork(),
               network_name: fakePlatform.exchangeNetworkName(),
               fields: CREDENTIAL_FIELDS,
               expiry_editable: !fakePlatform.exchangeReadsExpiry(),
+              virtual_balance: false,
             })),
-          )
+            ...(fakePlatform.offersSimulatedExchange() ? [simulatedExchange()] : []),
+          ])
         : problem(500, 'Internal Server Error', 'errore interno'),
     ),
   ),
@@ -218,6 +304,9 @@ export const accountHandlers = [
   http.post('*/accounts', ({ request }) =>
     withUser(request, async (user) => {
       const { fields, within } = await textFieldsWithin(request, 'credentials');
+      if (fakePlatform.offersSimulatedExchange() && fields.exchange === SIMULATED_EXCHANGE) {
+        return simulatedRegistration(user, fields, within);
+      }
       if (givesExpiry(fields) && fakePlatform.exchangeReadsExpiry()) {
         return expiryRefusal();
       }
@@ -229,15 +318,23 @@ export const accountHandlers = [
       account.publicFields = publicFieldsOf(within);
       account.expiryEditable = !fakePlatform.exchangeReadsExpiry();
       account.expiry = enteredExpiryOf(fields.expires_on);
-      return HttpResponse.json(
-        {
-          id: account.id,
-          name: account.name,
-          exchange: FAKE_EXCHANGE,
-          balance: amountOf(String(account.balance)),
-        },
-        { status: 201 },
-      );
+      return registered(account);
+    }),
+  ),
+  http.put('*/accounts/:accountId/virtual-balance', ({ request, params }) =>
+    withUser(request, async (user) => {
+      const { fields } = await textFieldsWithin(request, 'credentials');
+      return withAccount(user, String(params.accountId), (account) => {
+        if (!isSimulated(account)) {
+          return noVirtualBalance();
+        }
+        const balance = virtualBalanceOf(fields.balance);
+        if (balance instanceof Response) {
+          return balance;
+        }
+        account.balance = balance;
+        return new HttpResponse(null, { status: 204 });
+      });
     }),
   ),
   http.put('*/accounts/:accountId/credentials', ({ request, params }) =>

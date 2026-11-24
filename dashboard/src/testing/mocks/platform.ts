@@ -157,8 +157,11 @@ export type FakeFlow = {
 export type FakeAccount = {
   readonly id: string;
   readonly name: string;
-  readonly balance: number;
+  /** What the account holds; an account of the simulated exchange holds its virtual balance (R6.3.2). */
+  balance: number;
   publicFields: Record<string, string>;
+  /** The exchange of the account: the one the fake platform supports unless it is the simulated one (R6.3.2). */
+  exchange?: string;
   /** The currency the account settles in, which the results of its flows are written in (R6.4.2). */
   currency: string;
   /** The expiry of its credentials, read by the exchange or entered; none when unknown (R6.2.2). */
@@ -303,6 +306,8 @@ const registeredPublicFields = (): Record<string, string> => ({
 });
 /** The exchanges the fake platform supports, as the API lists them (ADR 0152). */
 export const FAKE_SUPPORTED_EXCHANGES: readonly string[] = [FAKE_EXCHANGE];
+/** The exchange that executes on the real market with a virtual balance, without credentials (R6.3.2). */
+export const SIMULATED_EXCHANGE = 'simulato';
 
 /** The networks the API names: the one the exchange is configured on, never deduced (Bug 277). */
 export type FakeNetwork = 'test' | 'real';
@@ -478,6 +483,7 @@ const state = {
   exchangeNetwork: 'test' as FakeNetwork,
   exchangeNetworkName: 'testnet',
   exchangeReadsExpiry: true,
+  simulatedExchangeOffered: false,
   apiAnswers: true,
 };
 
@@ -666,6 +672,7 @@ export const fakePlatform = {
     state.exchangeNetwork = 'test';
     state.exchangeNetworkName = 'testnet';
     state.exchangeReadsExpiry = true;
+    state.simulatedExchangeOffered = false;
     state.apiAnswers = true;
     fakeReconciliation.reset();
     fakeNotificationChannels.reset();
@@ -845,6 +852,25 @@ export const fakePlatform = {
   /** From now on the exchange does not read the expiry of the credentials: the user gives it (R6.2.2). */
   stopReadingExpiry(): void {
     state.exchangeReadsExpiry = false;
+  },
+
+  /** From now on the platform offers the simulated exchange too, as an installation that composes it (R6.3.2). */
+  offerSimulatedExchange(): void {
+    state.simulatedExchangeOffered = true;
+  },
+
+  offersSimulatedExchange(): boolean {
+    return state.simulatedExchangeOffered;
+  },
+
+  /** An account of the user on the simulated exchange, with the virtual balance given and no credentials (R6.3.2). */
+  addSimulatedAccount(account: string, name: string, balance: number): FakeAccount {
+    state.simulatedExchangeOffered = true;
+    const added = accountOf(userNamed(account), name);
+    added.exchange = SIMULATED_EXCHANGE;
+    added.balance = balance;
+    added.publicFields = {};
+    return added;
   },
 
   /** A stopped flow of the user with the configuration given as the API writes it, the rest as the other flows. */

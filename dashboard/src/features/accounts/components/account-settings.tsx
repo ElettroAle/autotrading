@@ -5,12 +5,14 @@ import { Card } from '@/components/ui/card';
 import { CommandButton } from '@/components/ui/command-button';
 import { DangerZone } from '@/components/ui/danger-zone';
 import { paths } from '@/config/paths';
+import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 
 import type { Account } from '../api/get-accounts';
 import { useAccount } from '../hooks/use-account';
 
 import { RemoveAccount } from './remove-account';
 import { ReplaceCredentialsForm } from './replace-credentials-form';
+import { VirtualBalanceForm } from './virtual-balance-form';
 
 type Replacement = 'closed' | 'open' | 'done';
 
@@ -60,18 +62,30 @@ const Removal = ({ account }: { readonly account: Account }) => {
   );
 };
 
+/** Whether the exchange of the account holds a virtual balance, as the API lists it (R6.3.2). */
+const useHoldsVirtualBalance = (account: Account | undefined): boolean => {
+  const exchanges = useSupportedExchanges();
+  return (
+    exchanges.data?.some(
+      (exchange) => exchange.name === account?.exchange && exchange.virtual_balance,
+    ) ?? false
+  );
+};
+
 /**
- * The tab Impostazioni of the page of the account: its credentials, then its removal in the zone of danger (ADR
+ * The tab Impostazioni of the page of the account: its credentials, or the virtual balance of an exchange that holds
+ * one and asks no credentials (R6.3.2), then its removal in the zone of danger (ADR
  * elenco-dei-conti-e-pagina-del-conto). The page has read the account before its tabs show.
  */
 export const AccountSettings = ({ accountId }: { readonly accountId: string }) => {
   const account = useAccount(accountId);
+  const virtual = useHoldsVirtualBalance(account);
   if (account === undefined) {
     return null;
   }
   return (
     <>
-      <Credentials account={account} />
+      {virtual ? <VirtualBalanceForm account={account} /> : <Credentials account={account} />}
       <Removal account={account} />
     </>
   );

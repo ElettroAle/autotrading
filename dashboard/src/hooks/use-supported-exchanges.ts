@@ -13,6 +13,8 @@ const supportedExchangesSchema = z.array(
     fields: z.array(declaredFieldSchema),
     // False where the exchange reads the expiry of the credentials (R6.2.2).
     expiry_editable: z.boolean(),
+    // True where the exchange holds a virtual balance, which the registration asks instead of funds (R6.3.2).
+    virtual_balance: z.boolean(),
   }),
 );
 
@@ -20,7 +22,8 @@ export type SupportedExchange = z.infer<typeof supportedExchangesSchema>[number]
 
 /**
  * The exchanges an account can be registered on, as the API lists them (ADR 0152), each with the network it trades
- * on (ADR 0157), the fields its credentials ask (R2.3.9, ADR 0158) and whether the user gives their expiry (R6.2.2).
+ * on (ADR 0157), the fields its credentials ask (R2.3.9, ADR 0158), whether the user gives their expiry (R6.2.2) and
+ * whether it holds a virtual balance (R6.3.2).
  */
 export const useSupportedExchanges = () => {
   const api = useApiClient();
