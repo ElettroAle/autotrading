@@ -167,6 +167,7 @@ from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.openings import OpeningRegister
 from tests.support.procedure_orders import procedure_orders
 from tests.support.source_selections import platform_systems
+from tests.support.exchange_connections import connection_of
 
 HYPERLIQUID = "Hyperliquid"
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -433,7 +434,8 @@ class Platform:
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         opener = self.credential_opener()
         access = OpenTradingAccessUseCase(accounts, opener)
-        order_exchanges, orders = {HYPERLIQUID: self.order_exchange}, self.orders_of(tenant_id)
+        order_exchanges = {HYPERLIQUID: connection_of(self.order_exchange, self.protection_exchange)}
+        orders = self.orders_of(tenant_id)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
         close_exchange_position = CloseExchangePositionUseCase(
             access, order_exchanges, orders, self.slippage, self.cancel_protections(tenant_id)
@@ -516,7 +518,8 @@ class Platform:
             InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), self.credential_opener()
         )
         protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
-        return CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
+        connections = {HYPERLIQUID: connection_of(self.order_exchange, self.protection_exchange)}
+        return CancelProtectionsUseCase(access, connections, protections)
 
     def link_chat(self) -> LinkChatUseCase:
         """What the bot of the worker runs for every message it receives."""

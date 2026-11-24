@@ -59,3 +59,40 @@ class CycleOrderClosesFlowError(DomainError):
 
     def __init__(self) -> None:
         super().__init__("un ordine del ciclo non chiude un flusso fuori dal ciclo")
+
+
+class SimulatedOrderRefusedError(DomainError):
+    """An order the simulated exchange refuses, as the real exchange refuses it: the adapter answers it with the error of
+    the contract of the port (R6.3.2)."""
+
+
+class OrderBelowMinimumValueError(SimulatedOrderRefusedError):
+    def __init__(self, coin: str, minimum: Decimal) -> None:
+        super().__init__(f"valore dell'ordine sotto il minimo dell'exchange per {coin}: {minimum}")
+        self.coin = coin
+        self.minimum = minimum
+
+
+class OrderSizeOffStepError(SimulatedOrderRefusedError):
+    def __init__(self, coin: str, step: Decimal) -> None:
+        super().__init__(f"dimensione dell'ordine non multipla del passo dell'exchange per {coin}: {step}")
+        self.coin = coin
+        self.step = step
+
+
+class InsufficientMarginError(SimulatedOrderRefusedError):
+    def __init__(self, coin: str) -> None:
+        super().__init__(f"margine insufficiente per l'ordine su {coin}")
+        self.coin = coin
+
+
+class ReduceOnlyWithoutPositionError(SimulatedOrderRefusedError):
+    def __init__(self, coin: str) -> None:
+        super().__init__(f"nessuna posizione da ridurre su {coin}")
+        self.coin = coin
+
+
+class UnknownSimulatedProtectionError(SimulatedOrderRefusedError):
+    def __init__(self, order_id: str) -> None:
+        super().__init__(f"protezione {order_id} non in attesa: eseguita o cancellata")
+        self.order_id = order_id

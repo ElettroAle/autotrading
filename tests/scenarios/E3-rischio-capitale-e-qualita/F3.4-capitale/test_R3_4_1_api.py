@@ -22,6 +22,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.italian_text import money_text
 from autotrading.domain.orders.execution import Execution
+from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
 from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
@@ -52,8 +53,8 @@ class ClosingsShownOnTheAccount(FakeOrderExchangeAdapter):
         # The executions of the closings reach the account only later, after the cash-out has read it (Bug 684).
         self.executions_late = False
 
-    def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
-        execution = super().place_market_order(access, order)
+    def place_market_order(self, access: TradingAccess, order: MarketOrder, market: Market) -> Execution:
+        execution = super().place_market_order(access, order, market)
         if order.reduce_only:
             self._shown_closed(order.coin, execution.fee)
         return execution

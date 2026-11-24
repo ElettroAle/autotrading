@@ -12,7 +12,7 @@ class CycleAccess(AccountReference):
     """
 
     def __hash__(self) -> int:
-        return hash(frozenset(self.fields.items()))
+        return hash((frozenset(self.fields.items()), self.account_id))
 
     def __repr__(self) -> str:
         return f"CycleAccess({MASK})"

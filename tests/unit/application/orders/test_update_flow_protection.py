@@ -27,6 +27,7 @@ from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
 from tests.support.trading import HYPERLIQUID, new_access
+from tests.support.exchange_connections import connection_of
 
 FLOW_ID = UUID("7d0c6a52-4b0e-4f7e-9c55-2f1d0b8e6a11")
 DEFAULT_STOP = Decimal(5)
@@ -44,7 +45,7 @@ class Bench:
         self.store = ProtectionStore()
         self.protections = InMemoryProtectionRepositoryAdapter(self.store, TENANT)
         self.use_case = UpdateFlowProtectionUseCase(
-            {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}, self.protections
+            {HYPERLIQUID: connection_of(self.exchange, self.protection_exchange)}, self.protections
         )
         self.hold(Direction.LONG, Decimal(60000))
 

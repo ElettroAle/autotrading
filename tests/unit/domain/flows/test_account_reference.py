@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from autotrading.domain.flows.account_reference import AccountReference
@@ -24,3 +26,18 @@ def test_a_field_the_reference_does_not_carry_is_refused() -> None:
 def test_an_empty_reference_is_refused(fields: dict[str, str]) -> None:
     with pytest.raises(FlowCredentialsMissingError):
         AccountReference(fields)
+
+
+def test_an_account_without_credentials_is_referred_to_by_its_identifier() -> None:
+    account_id = uuid4()
+
+    reference = AccountReference.without_credentials(account_id)
+
+    assert reference.account_id == account_id
+    assert reference.fields == {}
+    assert reference != AccountReference.without_credentials(uuid4())
+    assert hash(reference) == hash(AccountReference.without_credentials(account_id))
+
+
+def test_a_reference_with_credentials_carries_no_account_identifier() -> None:
+    assert AccountReference({"wallet": "0xAbCd"}).account_id is None

@@ -7,7 +7,7 @@ from uuid import UUID
 from autotrading.application.orders.cancel_protections import CancelProtectionsCommand, CancelProtectionsUseCase
 from autotrading.application.orders.errors import ExchangeRejectedOrderError
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
+from autotrading.application.orders.ports import ExchangeConnection, OrderRepositoryPort
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionCommand, ProtectFlowPositionUseCase
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.application.orders.update_flow_protection import (
@@ -72,7 +72,7 @@ class FlowOrderProtection:
 
 @dataclass(frozen=True, slots=True)
 class _Sending:
-    exchange: ExchangePort
+    exchange: ExchangeConnection
     access: TradingAccess
     command: ExecuteFlowOrdersCommand
 
@@ -95,7 +95,7 @@ class ExecuteFlowOrdersUseCase:
     def __init__(
         self,
         access: OpenTradingAccessUseCase,
-        exchanges: Mapping[str, ExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         orders: OrderRepositoryPort,
         slippage: Slippage,
         protection: FlowOrderProtection,
@@ -129,29 +129,30 @@ class ExecuteFlowOrdersUseCase:
         return FlowOrdersOutcome(notes=notes)
 
     def _closed(self, sending: _Sending, closing: FlowClosing) -> FlowOrdersOutcome:
-        position = sending.exchange.position(sending.access, closing.asset)
+        position = sending.exchange.account.position(sending.access, closing.asset)
         if position is None:
             # Closed on the exchange meanwhile, by a liquidation or by hand: there is nothing left to close.
             operations.info("nessuna posizione da chiudere", extra={"coin": closing.asset})
             return FlowOrdersOutcome()
         request = sending.request(closing, position.leverage, position.closing_order(self._slippage))
-        order = self._recorded(send_order(sending.exchange, sending.access, request))
+        market = sending.exchange.market.market(closing.asset)
+        order = self._recorded(send_order(sending.exchange.account, sending.access, request, market))
         if order.execution is not None:
             self._protection.cancel.execute(CancelProtectionsCommand(sending.command.account_id, closing.asset))
         return FlowOrdersOutcome((order,))
 
     def _opened(self, sending: _Sending, opening: FlowOpening) -> FlowOrdersOutcome:
-        market = sending.exchange.market(sending.access, opening.asset)
+        market = sending.exchange.market.market(opening.asset)
         market.require_leverage(opening.leverage)
         market_order = MarketOrder.opening(
             opening.asset, opening.direction, market.size_for(opening.value), self._slippage
         )
         request = sending.request(opening, opening.leverage, market_order)
         try:
-            sending.exchange.set_leverage(sending.access, opening.asset, opening.leverage, MarginMode.per_position())
+            sending.exchange.account.set_leverage(sending.access, opening.asset, opening.leverage, MarginMode.per_position())
         except ExchangeRejectedOrderError as error:
             return FlowOrdersOutcome((self._recorded(Order.rejected(request, Rejection.of(error.exchange_message))),))
-        order = self._recorded(send_order(sending.exchange, sending.access, request))
+        order = self._recorded(send_order(sending.exchange.account, sending.access, request, market))
         if order.execution is None:
             return FlowOrdersOutcome((order,))
         return self._protected(sending, opening, order, (order.execution, market))

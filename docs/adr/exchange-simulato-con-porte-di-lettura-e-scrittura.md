@@ -35,6 +35,11 @@ la lettura del mercato (`market`) con le operazioni del conto (posizioni, leva, 
     stato del conto): posizione, leva, ordine a mercato, ricerca dell'ordine, protezioni, stato del conto, con
     l'accesso del conto. L'ordine a mercato riceve dal caso d'uso il prezzo corrente letto dalla porta di lettura.
   - I casi d'uso ricevono le due porte e orchestrano: leggono il mercato, poi operano sul conto.
+- **Selezione dell'exchange**: la mappa degli exchange composta nel bootstrap (ADR 0152) resta una sola, dal nome alla
+  **coppia** delle porte: una dataclass frozen in application (es. `ExchangeConnection(market, account)`, con le altre
+  porte del conto come campi della stessa coppia). Il caso d'uso legge l'exchange del conto, prende la coppia e usa
+  `market` per leggere e `account` per operare. Un nome dà sempre entrambe le porte: nessuna mappa parallela da tenere
+  allineata.
 - **Hyperliquid reale**: l'adapter di oggi realizza entrambe le porte; comportamento invariato.
 - **Exchange simulato**, nome `simulato` nella mappa degli exchange (ADR 0152), rete «simulato» (ADR 0157):
   - lettura del mercato: un adapter Hyperliquid configurato su mainnet, in sola lettura e senza credenziali;

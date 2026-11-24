@@ -1,5 +1,6 @@
 import pytest
 
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.errors import (
@@ -142,3 +143,18 @@ def test_a_replacement_of_an_account_without_public_fields_kept_asks_every_field
     assert credentials.values == {"account_address": ADDRESS, "secret_key": SECRET}
     with pytest.raises(CredentialFieldRequiredError):
         Credentials.replacing(FIELDS, None, {"secret_key": SECRET})
+
+
+def test_an_account_of_an_exchange_without_fields_has_credentials_without_values() -> None:
+    account_id = AccountId.new()
+
+    credentials = Credentials.without_fields(account_id)
+
+    assert credentials.values == {}
+    assert credentials.account_id == account_id
+    assert credentials != Credentials.without_fields(AccountId.new())
+    assert hash(credentials) == hash(Credentials.without_fields(account_id))
+
+
+def test_credentials_with_values_name_no_account() -> None:
+    assert Credentials({"wallet": "0xabc"}).account_id is None

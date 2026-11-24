@@ -28,3 +28,19 @@ def an_account(
         ExchangeAccount.of(credentials or hyperliquid_credentials(ADDRESS, SECRET), HYPERLIQUID_FIELDS),
         sealed or SealedCredentials(1, b"sealed"),
     )
+
+
+SIMULATED = "simulato"
+
+
+def a_simulated_account(tenant_id: TenantId, name: str = "simulato-1") -> Account:
+    """An account of the simulated exchange: no credentials, nothing sealed (R6.3.2)."""
+    account_id = AccountId.new()
+    return Account(
+        account_id,
+        tenant_id,
+        AccountName(name),
+        ExchangeName(SIMULATED),
+        ExchangeAccount.of(Credentials.without_fields(account_id), ()),
+        SealedCredentials.none(),
+    )

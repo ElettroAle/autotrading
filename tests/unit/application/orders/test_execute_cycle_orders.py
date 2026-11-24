@@ -28,6 +28,7 @@ from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, new_access
+from tests.support.exchange_connections import connection_of
 
 FLOW_ID = uuid4()
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
@@ -111,14 +112,14 @@ class Bench:
 
     def use_case(self) -> ExecuteCycleOrdersUseCase:
         access, slippage = self.accesses.use_case, Slippage.default()
-        exchanges, protection_exchanges = {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}
-        cancel = CancelProtectionsUseCase(access, protection_exchanges, self.protections)
-        protect = ProtectFlowPositionUseCase(exchanges, protection_exchanges, self.protections, self.orders, slippage)
-        update = UpdateFlowProtectionUseCase(exchanges, protection_exchanges, self.protections)
+        exchanges = {HYPERLIQUID: connection_of(self.exchange, self.protection_exchange)}
+        cancel = CancelProtectionsUseCase(access, exchanges, self.protections)
+        protect = ProtectFlowPositionUseCase(exchanges, self.protections, self.orders, slippage)
+        update = UpdateFlowProtectionUseCase(exchanges, self.protections)
         execute = ExecuteFlowOrdersUseCase(
             access, exchanges, self.orders, slippage, FlowOrderProtection(protect, cancel, update)
         )
-        protect_open = ProtectOpenPositionsUseCase(access, exchanges, protection_exchanges, self.protections)
+        protect_open = ProtectOpenPositionsUseCase(access, exchanges, self.protections)
         return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)
 
     def hold(self, asset: str, entry_price: Decimal = Decimal(100)) -> None:

@@ -98,3 +98,12 @@ class KeyExpiryReadByAdapterError(ApplicationError):
 
     def __init__(self) -> None:
         super().__init__("la scadenza di queste credenziali la legge l'exchange")
+
+
+class VirtualBalanceNotHeldError(ApplicationError):
+    """The exchange of the account moves real or test funds: it has no virtual balance to give or reset (R6.3.2)."""
+
+    status_code = 409
+
+    def __init__(self) -> None:
+        super().__init__("questo exchange non ha un saldo virtuale")

@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.orders.errors import ExchangeRejectedOrderError
-from autotrading.application.orders.ports import ExchangePort, ProtectionExchangePort, ProtectionRepositoryPort
+from autotrading.application.orders.ports import ExchangeConnection, ProtectionExchangePort, ProtectionRepositoryPort
 from autotrading.application.orders.sending import supported_exchange
 from autotrading.domain.italian_text import number_text
 from autotrading.domain.orders.flow_order import FlowUpdate
@@ -83,26 +83,24 @@ class UpdateFlowProtectionUseCase:
 
     def __init__(
         self,
-        exchanges: Mapping[str, ExchangePort],
-        protection_exchanges: Mapping[str, ProtectionExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         protections: ProtectionRepositoryPort,
     ) -> None:
         self._exchanges = exchanges
-        self._protection_exchanges = protection_exchanges
         self._protections = protections
 
     def execute(self, command: UpdateFlowProtectionCommand) -> tuple[ProtectionNote, ...]:
         update = command.update
         exchange = supported_exchange(self._exchanges, command.access.exchange)
-        position = exchange.position(command.access, update.asset)
+        position = exchange.account.position(command.access, update.asset)
         if position is None:
             # Closed meanwhile, by its protection or by hand: there is nothing left to protect.
             return ()
         replacement = _Replacement(
             command,
             position,
-            exchange.market(command.access, update.asset),
-            supported_exchange(self._protection_exchanges, command.access.exchange),
+            exchange.market.market(update.asset),
+            exchange.protections,
             self._protections,
         )
         texts = self._replaced(replacement, update, position)

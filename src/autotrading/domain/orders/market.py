@@ -22,9 +22,11 @@ class Market:
     # digit, and at most so many decimals (R3.1.2).
     price_significant_figures: int | None = None
     price_decimals: int | None = None
+    # The share of the value of an order taken by the exchange at the market price (R6.3.2); none when unknown.
+    taker_fee_rate: Decimal = Decimal(0)
 
     def __post_init__(self) -> None:
-        if self.max_leverage < 1 or self.size_decimals < 0 or self.mid_price <= 0 or self.min_order_value < 0:
+        if self.max_leverage < 1 or self.size_decimals < 0 or self.mid_price <= 0 or self.min_order_value < 0 or self.taker_fee_rate < 0:
             raise InvalidMarketError(self.coin)
 
     @property

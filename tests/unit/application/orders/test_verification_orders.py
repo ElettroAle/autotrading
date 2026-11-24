@@ -29,6 +29,7 @@ from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, new_access
+from tests.support.exchange_connections import connection_of
 
 ANNA = UserId("oid-anna")
 VERIFICATION = OrderSource(OrderOrigin.VERIFICATION, "oid-anna")
@@ -81,7 +82,7 @@ class Orders:
         self.accesses = FakeTradingAccessAdapter()
         self.account_id = uuid4()
         self.accesses.accesses[self.account_id] = new_access()
-        exchanges, slippage = {HYPERLIQUID: self.exchange}, Slippage.default()
+        exchanges, slippage = {HYPERLIQUID: connection_of(self.exchange)}, Slippage.default()
         self.execution = Execution(
             ReadMinimumValueUseCase(ReadMarketUseCase(self.accesses.use_case, exchanges), NAMES),
             OpenVerificationPositionUseCase(
@@ -95,7 +96,7 @@ class Orders:
                     slippage,
                     CancelProtectionsUseCase(
                         self.accesses.use_case,
-                        {HYPERLIQUID: FakeProtectionExchangeAdapter()},
+                        exchanges,
                         InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT),
                     ),
                 ),

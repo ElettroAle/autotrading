@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from autotrading.domain.orders.errors import TradingAccessRequiredError
@@ -44,3 +46,24 @@ def test_the_fields_cannot_be_changed_after_opening() -> None:
 def test_an_incomplete_access_is_refused(exchange: str, fields: dict[str, str]) -> None:
     with pytest.raises(TradingAccessRequiredError):
         TradingAccess(exchange, fields)
+
+
+def test_an_account_without_credentials_is_reached_by_its_identifier_alone() -> None:
+    account_id = uuid4()
+
+    access = TradingAccess.without_credentials("simulato", account_id)
+
+    assert access.account_id == account_id
+    assert access.fields == {}
+    assert access.redact("nothing to hide") == "nothing to hide"
+
+
+def test_an_access_with_credentials_carries_no_account_identifier() -> None:
+    assert TradingAccess("Hyperliquid", FIELDS).account_id is None
+
+
+def test_accesses_of_two_accounts_without_credentials_differ() -> None:
+    first = TradingAccess.without_credentials("simulato", uuid4())
+
+    assert first != TradingAccess.without_credentials("simulato", uuid4())
+    assert hash(first) == hash(TradingAccess.without_credentials("simulato", first.account_id or uuid4()))

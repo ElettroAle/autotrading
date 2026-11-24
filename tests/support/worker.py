@@ -71,6 +71,7 @@ from tests.support.notifications import notification_inbox, notification_routes
 from tests.support.platform import HYPERLIQUID, new_credentials
 from tests.support.procedure_orders import procedure_orders
 from tests.support.source_selections import platform_systems
+from tests.support.exchange_connections import connection_of
 
 TOKEN = token_hex(16)
 STARTED_AT = datetime(2026, 11, 10, 11, 59, 59, tzinfo=UTC)
@@ -121,10 +122,11 @@ class Worker:
     def for_tenant(self, tenant_id: TenantId) -> WorkerUseCases:
         accounts = InMemoryAccountRepositoryAdapter(self.store, tenant_id)
         opener = FakeCredentialOpenerAdapter(self.vault)
-        access, order_exchanges = OpenTradingAccessUseCase(accounts, opener), {HYPERLIQUID: self.order_exchange}
+        access = OpenTradingAccessUseCase(accounts, opener)
+        order_exchanges = {HYPERLIQUID: connection_of(self.order_exchange, self.protection_exchange)}
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, {HYPERLIQUID: self.exchange})
         protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
-        cancel = CancelProtectionsUseCase(access, {HYPERLIQUID: self.protection_exchange}, protections)
+        cancel = CancelProtectionsUseCase(access, order_exchanges, protections)
         closing = CloseExchangePositionUseCase(access, order_exchanges, self.orders, Slippage.default(), cancel)
         opening = OpenPositionUseCase(access, order_exchanges, self.orders, Slippage.default())
         return WorkerUseCases(

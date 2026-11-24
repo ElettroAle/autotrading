@@ -31,6 +31,7 @@ from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, new_access
+from tests.support.exchange_connections import connection_of
 
 SLIPPAGE = Slippage.percent(Decimal(2))
 FLOW_ID = UUID("7d0c6a52-4b0e-4f7e-9c55-2f1d0b8e6a11")
@@ -89,17 +90,17 @@ def a_use_case(
     orders: InMemoryOrderRepositoryAdapter,
     protection: tuple[FakeProtectionExchangeAdapter, InMemoryProtectionRepositoryAdapter],
 ) -> ExecuteFlowOrdersUseCase:
-    protection_exchanges, protections = {HYPERLIQUID: protection[0]}, protection[1]
-    exchanges = {HYPERLIQUID: exchange}
+    protections = protection[1]
+    exchanges = {HYPERLIQUID: connection_of(exchange, protection[0])}
     return ExecuteFlowOrdersUseCase(
         accesses.use_case,
         exchanges,
         orders,
         SLIPPAGE,
         FlowOrderProtection(
-            ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, orders, SLIPPAGE),
-            CancelProtectionsUseCase(accesses.use_case, protection_exchanges, protections),
-            UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
+            ProtectFlowPositionUseCase(exchanges, protections, orders, SLIPPAGE),
+            CancelProtectionsUseCase(accesses.use_case, exchanges, protections),
+            UpdateFlowProtectionUseCase(exchanges, protections),
         ),
     )
 

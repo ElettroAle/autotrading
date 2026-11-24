@@ -426,7 +426,7 @@ def worker_use_cases(
     """
     cycle_for, systems, source_secrets_opener = cycles
     environment, slippage, hyperliquid = trading
-    exchanges, _, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
+    exchanges, _, order_exchanges, activity_readers, executions_readers, *_ = hyperliquid
     opener, mail_password_opener = openers
     outbox, mailer, links = notifications
 
@@ -438,7 +438,7 @@ def worker_use_cases(
         access = OpenTradingAccessUseCase(accounts, opener)
         read_exchange_state = ReadExchangeStateUseCase(accounts, opener, exchanges)
         protections = SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)
-        cancel_protections = CancelProtectionsUseCase(access, protection_exchanges, protections)
+        cancel_protections = CancelProtectionsUseCase(access, order_exchanges, protections)
         close_exchange_position = CloseExchangePositionUseCase(
             access, order_exchanges, orders, slippage, cancel_protections
         )
@@ -508,7 +508,7 @@ def cycle_of(
     environment, slippage, hyperliquid = trading
     models, forecaster = predictors
     opener, provider_key_opener, source_secrets_opener = openers
-    exchanges, markets, order_exchanges, activity_readers, executions_readers, protection_exchanges, *_ = hyperliquid
+    exchanges, markets, order_exchanges, activity_readers, executions_readers, *_ = hyperliquid
     clock = system_clock_adapters()
     systems = source_systems(hyperliquid, forecaster)
     lock = SqlAlchemyFlowLockAdapter(engine)
@@ -529,7 +529,7 @@ def cycle_of(
         activity = ReadAccountActivityUseCase(accounts, opener, activity_readers)
         ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         protections = SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)
-        cancel_protections = CancelProtectionsUseCase(access, protection_exchanges, protections)
+        cancel_protections = CancelProtectionsUseCase(access, order_exchanges, protections)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
             ReadAccountExecutionsUseCase(accounts, opener, executions_readers),
@@ -596,15 +596,13 @@ def cycle_of(
                     orders,
                     slippage,
                     FlowOrderProtection(
-                        ProtectFlowPositionUseCase(
-                            order_exchanges, protection_exchanges, protections, orders, slippage
-                        ),
+                        ProtectFlowPositionUseCase(order_exchanges, protections, orders, slippage),
                         cancel_protections,
-                        UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
+                        UpdateFlowProtectionUseCase(order_exchanges, protections),
                     ),
                 ),
                 follow_flow_orders,
-                ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
+                ProtectOpenPositionsUseCase(access, order_exchanges, protections),
             ),
             openings,
             exit_plans,

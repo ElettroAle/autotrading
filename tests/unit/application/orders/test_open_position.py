@@ -19,6 +19,7 @@ from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.trading_access import FakeTradingAccessAdapter
 from tests.support.trading import HYPERLIQUID, VERIFICATION, new_access
+from tests.support.exchange_connections import connection_of
 
 SLIPPAGE = Slippage.percent(Decimal(2))
 
@@ -49,7 +50,7 @@ def account_id(accesses: FakeTradingAccessAdapter) -> UUID:
 def use_case(
     accesses: FakeTradingAccessAdapter, exchange: FakeOrderExchangeAdapter, orders: InMemoryOrderRepositoryAdapter
 ) -> OpenPositionUseCase:
-    return OpenPositionUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, SLIPPAGE)
+    return OpenPositionUseCase(accesses.use_case, {HYPERLIQUID: connection_of(exchange)}, orders, SLIPPAGE)
 
 
 def opening(account_id: UUID, leverage: int = 3, value: str = "20") -> OpenPositionCommand:
@@ -161,7 +162,9 @@ def test_an_exchange_the_worker_does_not_support_is_refused(
 ) -> None:
     account_id = uuid4()
     accesses.accesses[account_id] = new_access("Binance")
-    use_case = OpenPositionUseCase(accesses.use_case, {HYPERLIQUID: FakeOrderExchangeAdapter()}, orders, SLIPPAGE)
+    use_case = OpenPositionUseCase(
+        accesses.use_case, {HYPERLIQUID: connection_of(FakeOrderExchangeAdapter())}, orders, SLIPPAGE
+    )
 
     with pytest.raises(UnsupportedOrderExchangeError) as raised:
         use_case.execute(opening(account_id))

@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from uuid import UUID
 
+from autotrading.application.flows.account_references import reference_of
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import ReferenceOpenerPort, SealedAddressPort, TransfersReaderPort
 from autotrading.domain.flows.capital_history import AccountTransfer
@@ -33,4 +34,4 @@ class ReadAccountTransfersUseCase:
         reader = self._readers.get(sealed.exchange)
         if reader is None:
             raise FlowExchangeUnavailableError
-        return reader.transfers(self._opener.open_reference(sealed, reader.reference_fields()), command.window)
+        return reader.transfers(reference_of(self._opener, sealed, reader.reference_fields()), command.window)

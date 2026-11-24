@@ -131,6 +131,7 @@ from tests.support.flows import OPENROUTER_MODEL, scenario_catalog
 from tests.support.platform import HYPERLIQUID, Platform, new_credentials, registration
 from tests.support.provider_key import api_key_of
 from tests.support.source_selections import BEFORE_THE_ADAPTERS, reader_of
+from tests.support.exchange_connections import connection_of
 
 DAY = datetime(2026, 11, 12, tzinfo=UTC)
 ACCOUNT = "test-1"
@@ -215,7 +216,6 @@ class FlowCycles:
         closing_notice = NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         protections = InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
-        protection_exchanges = {HYPERLIQUID: platform.protection_exchange}
         cancel_protections = platform.cancel_protections(tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
@@ -260,7 +260,7 @@ class FlowCycles:
             ),
             self.readings,
         )
-        order_exchanges = {HYPERLIQUID: platform.order_exchange}
+        order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
         execute_flow_orders = ExecuteFlowOrdersUseCase(
             access,
             order_exchanges,
@@ -268,10 +268,10 @@ class FlowCycles:
             platform.slippage,
             FlowOrderProtection(
                 ProtectFlowPositionUseCase(
-                    order_exchanges, protection_exchanges, protections, platform.orders_of(tenant_id), platform.slippage
+                    order_exchanges, protections, platform.orders_of(tenant_id), platform.slippage
                 ),
                 cancel_protections,
-                UpdateFlowProtectionUseCase(order_exchanges, protection_exchanges, protections),
+                UpdateFlowProtectionUseCase(order_exchanges, protections),
             ),
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
@@ -297,7 +297,7 @@ class FlowCycles:
                 ExecuteCycleOrdersUseCase(
                     execute_flow_orders,
                     follow_flow_orders,
-                    ProtectOpenPositionsUseCase(access, order_exchanges, protection_exchanges, protections),
+                    ProtectOpenPositionsUseCase(access, order_exchanges, protections),
                 ),
                 openings,
                 exit_plans,

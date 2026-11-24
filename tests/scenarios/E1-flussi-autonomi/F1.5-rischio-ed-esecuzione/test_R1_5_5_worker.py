@@ -26,6 +26,7 @@ from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapte
 from tests.fakes.trading_access import TENANT
 from tests.support.steps import quoted
 from tests.support.trading import HYPERLIQUID, Trading
+from tests.support.exchange_connections import connection_of
 
 scenarios(
     "E1-flussi-autonomi/F1.5-rischio-ed-esecuzione/R1.5.5-esecuzione-delle-decisioni/worker/R1.5.5-esecuzione-delle-decisioni.feature"
@@ -56,15 +57,12 @@ class FlowExecution:
 
     def execute(self, flow: str, cycle: str) -> None:
         trading = self.trading
-        exchanges, protection_exchanges = (
-            {HYPERLIQUID: trading.exchange},
-            {HYPERLIQUID: FakeProtectionExchangeAdapter()},
-        )
+        exchanges = {HYPERLIQUID: connection_of(trading.exchange)}
         protections = InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT)
         protection = FlowOrderProtection(
-            ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, trading.orders, trading.slippage),
-            CancelProtectionsUseCase(trading.accesses.use_case, protection_exchanges, protections),
-            UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
+            ProtectFlowPositionUseCase(exchanges, protections, trading.orders, trading.slippage),
+            CancelProtectionsUseCase(trading.accesses.use_case, exchanges, protections),
+            UpdateFlowProtectionUseCase(exchanges, protections),
         )
         use_case = ExecuteFlowOrdersUseCase(
             trading.accesses.use_case, exchanges, trading.orders, trading.slippage, protection

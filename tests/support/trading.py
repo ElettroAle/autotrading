@@ -15,6 +15,7 @@ from autotrading.domain.orders.trading_access import TradingAccess
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.trading_access import FakeTradingAccessAdapter
+from tests.support.exchange_connections import connection_of
 
 HYPERLIQUID = "Hyperliquid"
 VERIFICATION = OrderSource(OrderOrigin.VERIFICATION)
@@ -42,7 +43,9 @@ class Trading:
         return self.accesses.accesses[self.accounts[name]]
 
     def open_position(self, command: OpenPositionCommand) -> None:
-        use_case = OpenPositionUseCase(self.accesses.use_case, {HYPERLIQUID: self.exchange}, self.orders, self.slippage)
+        use_case = OpenPositionUseCase(
+            self.accesses.use_case, {HYPERLIQUID: connection_of(self.exchange)}, self.orders, self.slippage
+        )
         try:
             self.outcome = use_case.execute(command)
         except AutotradingError as error:
