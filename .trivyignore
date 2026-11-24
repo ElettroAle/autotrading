@@ -1,0 +1,7 @@
+# Eccezioni temporanee del controllo vulnerabilità dell'immagine (ADR eccezioni-delle-vulnerabilita-dell-immagine-con-scadenza).
+# Ogni voce: un commento «Aggiunta il AAAA-MM-GG.» col motivo, poi l'id con exp: al più 14 giorni dopo.
+
+# Aggiunta il 2026-11-25. libexpat 2.10.0 nell'immagine base Chainguard Python: la 2.11.0 è in Wolfi ma l'immagine non è ancora ricostruita.
+CVE-2026-124317 exp:2026-12-09
+# Aggiunta il 2026-11-25. libexpat 2.10.0 nell'immagine base Chainguard Python, solo lo strumento xmlwf: stessa correzione in attesa.
+CVE-2026-128241 exp:2026-12-09
