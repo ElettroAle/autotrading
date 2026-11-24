@@ -4,8 +4,11 @@ rotates or removes the credentials of accounts, sources or AI providers, nor sho
 """
 
 import ast
+import re
 from dataclasses import fields
+from pathlib import Path
 
+import pytest
 from mcp.types import Tool
 
 from autotrading.adapters.inbound.mcp.use_cases import McpUseCases
@@ -123,3 +126,82 @@ def test_adr_server_mcp_a_tool_on_credentials_is_found() -> None:
 
 def test_adr_server_mcp_a_tool_on_flows_is_not_found() -> None:
     assert credential_exposures([A_TOOL_ON_FLOWS]) == []
+
+
+REPOSITORY = Path(__file__).resolve().parents[2]
+MCP_SERVICE = re.compile(r"^  mcp:\n(?P<body>(?:    .*\n|\n)+)", re.MULTILINE)
+COMMAND = '["autotrading.bootstrap:create_mcp_application", "--factory", "--host", "0.0.0.0", "--port", "8000"'
+LOCAL_PORT = '      - "127.0.0.1:8090:8000"'
+HEALTH = "http://127.0.0.1:8000/health"
+SERVES = (
+    "serve --bg --https=443 --set-path=/mcp http://127.0.0.1:8090/mcp",
+    "serve --bg --https=443 --set-path=/.well-known/oauth-protected-resource/mcp "
+    "http://127.0.0.1:8090/.well-known/oauth-protected-resource/mcp",
+)
+
+
+def mcp_service(compose: str) -> str:
+    match = MCP_SERVICE.search(compose)
+    return match["body"] if match else ""
+
+
+def service_violations(service: str) -> list[str]:
+    """The broken rules of the mcp service of the compose."""
+    found = []
+    if "    image: ${API_IMAGE:-}\n" not in service or COMMAND not in service:
+        found.append("il server MCP gira dall'immagine di api con create_mcp_application")
+    if "    read_only: true\n" not in service:
+        found.append("il container del server MCP gira in sola lettura")
+    if re.search(r"credentials_private_key|CREDENTIALS_PRIVATE_KEY", service):
+        found.append("la chiave privata delle credenziali resta al worker")
+    if re.findall(r"^      - \".*\"$", service, re.MULTILINE) != [LOCAL_PORT]:
+        found.append("il server MCP ascolta solo sull'interfaccia locale, porta 8090")
+    if HEALTH not in service:
+        found.append(f"il compose attende la salute del server MCP su {HEALTH}")
+    if "MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}" not in service:
+        found.append("il server MCP riceve il suo indirizzo pubblico")
+    return found
+
+
+CONFORMING_SERVICE = f"""    image: ${{API_IMAGE:-}}
+    command: {COMMAND}]
+    environment:
+      MCP_PUBLIC_URL: ${{MCP_PUBLIC_URL:-}}
+      CREDENTIALS_PUBLIC_KEY_FILE: /run/secrets/credentials_public_key
+    read_only: true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('{HEALTH}')"]
+    ports:
+{LOCAL_PORT}
+"""
+VIOLATING_SERVICES = [
+    CONFORMING_SERVICE.replace("create_mcp_application", "create_application"),
+    CONFORMING_SERVICE.replace("read_only: true", "read_only: false"),
+    CONFORMING_SERVICE + "    secrets:\n      - credentials_private_key_v1\n",
+    CONFORMING_SERVICE.replace("127.0.0.1:8090:8000", "8090:8000"),
+    CONFORMING_SERVICE.replace("/health", "/"),
+    CONFORMING_SERVICE.replace("MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:-}", "MCP_PUBLIC_URL: https://x/mcp"),
+]
+
+
+@pytest.mark.parametrize("service", VIOLATING_SERVICES)
+def test_adr_server_mcp_each_rule_of_the_container_catches_its_violation(service: str) -> None:
+    assert len(service_violations(service)) == 1
+
+
+def test_adr_server_mcp_a_conforming_container_breaks_no_rule() -> None:
+    assert service_violations(CONFORMING_SERVICE) == []
+
+
+def test_adr_server_mcp_the_compose_runs_the_server_in_its_own_container() -> None:
+    compose = (REPOSITORY / "deploy" / "compose.yaml").read_text(encoding="utf-8")
+
+    assert mcp_service(compose)
+    assert service_violations(mcp_service(compose)) == []
+
+
+@pytest.mark.parametrize("path", ["deploy/cloud-init.yaml", "deploy/configure-serve.sh"])
+def test_adr_server_mcp_tailscale_serve_exposes_the_server_and_its_metadata(path: str) -> None:
+    text = (REPOSITORY / path).read_text(encoding="utf-8")
+
+    assert [serve for serve in SERVES if serve not in text] == []
