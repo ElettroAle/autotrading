@@ -158,3 +158,24 @@ def test_an_account_of_an_exchange_without_fields_has_credentials_without_values
 
 def test_credentials_with_values_name_no_account() -> None:
     assert Credentials({"wallet": "0xabc"}).account_id is None
+
+
+def test_an_exchange_without_fields_gives_the_account_credentials_without_values() -> None:
+    account_id = AccountId.new()
+
+    credentials = Credentials.for_account(account_id, (), {})
+
+    assert credentials == Credentials.without_fields(account_id)
+    assert credentials.is_empty
+
+
+def test_an_exchange_without_fields_refuses_any_value() -> None:
+    with pytest.raises(UnknownCredentialFieldError):
+        Credentials.for_account(AccountId.new(), (), {"wallet": "0xabc"})
+
+
+def test_an_exchange_with_fields_asks_them_for_the_account() -> None:
+    credentials = Credentials.for_account(AccountId.new(), FIELDS, {"account_address": ADDRESS, "secret_key": SECRET})
+
+    assert credentials.values == {"account_address": ADDRESS, "secret_key": SECRET}
+    assert not credentials.is_empty

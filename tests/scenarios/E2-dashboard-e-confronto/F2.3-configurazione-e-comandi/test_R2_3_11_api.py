@@ -61,7 +61,7 @@ def _exchanges(platform: Platform, real: str, real_network: str, test: str, test
 # Every user reads the same exchanges: the list belongs to the installation, not to an account.
 @when(parsers.re(r'^"[^"]+" chiede gli exchange supportati$'))
 def _asks_the_supported_exchanges(platform: Platform, readings: Readings) -> None:
-    readings.exchanges = ListSupportedExchangesUseCase(platform.exchanges).execute()
+    readings.exchanges = ListSupportedExchangesUseCase(platform.exchanges, {}).execute()
 
 
 @then(

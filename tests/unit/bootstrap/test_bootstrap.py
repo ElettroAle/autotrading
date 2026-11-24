@@ -75,6 +75,7 @@ from tests.fakes.outbox import InMemoryOutboxAdapter
 from tests.support.accounts import an_account
 from tests.support.flows import a_flow
 from tests.support.installation import (
+    SIMULATION,
     WORKER_TOKEN,
     dev_installation_on_testnet,
     installation_configuration,
@@ -440,11 +441,11 @@ def test_an_account_of_another_tenant_gives_no_access_to_trade() -> None:
 
 def test_each_tenant_gets_worker_use_cases_bound_to_it() -> None:
     opener = SodiumCredentialOpenerAdapter({})
-    environment, hyperliquid, _ = dev_installation_on_testnet()
+    environment, hyperliquid, _, _ = dev_installation_on_testnet()
     factory = worker_use_cases(
         create_engine("sqlite://"),
         (opener, partial(SodiumMailPasswordOpenerAdapter, {})),
-        (environment, Slippage.default(), hyperliquid),
+        (environment, Slippage.default(), hyperliquid, SIMULATION),
         (InMemoryOutboxAdapter(), FakeMailerAdapter(), FakeNotificationLinkAdapter()),
         worker_cycles_of_installation(opener),
     )

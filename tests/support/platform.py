@@ -45,6 +45,7 @@ from autotrading.application.orders.close_exchange_position import CloseExchange
 from autotrading.application.orders.close_flow_position import CloseFlowPositionUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
+from autotrading.application.orders.ports import ExchangeConnection
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase
 from autotrading.application.sources.open_source_credentials import OpenSourceCredentialsUseCase
@@ -147,6 +148,7 @@ from tests.fakes.provider_keys import (
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.running_cycle import FakeRunningCycleAdapter
 from tests.fakes.running_verifications import InMemoryRunningVerificationsAdapter
+from tests.fakes.simulated_exchange import SIMULATED, InMemorySimulatedExchangeAdapter, SimulatedExchangeStore
 from tests.fakes.source_credentials import (
     FakeSourceSecretsOpenerAdapter,
     FakeSourceSecretsSealerAdapter,
@@ -188,6 +190,9 @@ class Platform:
     key_vault: ProviderKeyVault
     source_vault: SourceSecretsVault
     issued: list[Credentials]
+    # The simulated exchange, with the accounts of every tenant, offered only where a scenario offers it; it reads the
+    # market of the order exchange, as the real one reads Hyperliquid mainnet (R6.3.2).
+    simulated: SimulatedExchangeStore | None = None
 
     def __init__(self) -> None:
         self.directory = Directory()
@@ -271,6 +276,24 @@ class Platform:
         # One exchange behind both ports: what the orders open is what the readings show.
         self.hyperliquid.trades_on(self.order_exchange)
 
+    def offers_simulated_exchange(self) -> SimulatedExchangeStore:
+        if self.simulated is None:
+            self.simulated = SimulatedExchangeStore(now=self.now)
+        return self.simulated
+
+    def simulated_exchanges(self, tenant_id: TenantId) -> dict[str, InMemorySimulatedExchangeAdapter]:
+        """The simulated exchange on the accounts of the tenant, as bootstrap composes it, when it is offered."""
+        if self.simulated is None:
+            return {}
+        return {SIMULATED: InMemorySimulatedExchangeAdapter(self.simulated, tenant_id)}
+
+    def order_connections(self, tenant_id: TenantId) -> dict[str, ExchangeConnection]:
+        simulated = {
+            name: ExchangeConnection(self.order_exchange, adapter, adapter)
+            for name, adapter in self.simulated_exchanges(tenant_id).items()
+        }
+        return {HYPERLIQUID: connection_of(self.order_exchange, self.protection_exchange), **simulated}
+
     @property
     def hyperliquid(self) -> FakeExchangeAdapter:
         return self.exchanges[HYPERLIQUID]
@@ -322,11 +345,13 @@ class Platform:
         )
         sources = ListSourcesUseCase(self.source_systems)
         source_credentials = InMemorySourceCredentialsRepositoryAdapter(self.source_credentials, tenant_id)
+        simulated = self.simulated_exchanges(tenant_id)
         ports = TenantPorts(
             accounts=accounts,
             allocated_capital=flows,
             sealer=self.sealer_of(tenant_id),
-            exchanges=self.exchanges,
+            exchanges={**self.exchanges, **simulated},
+            virtual_balances=simulated,
             account_state=account_state,
             position_closing=position_closing,
             manual_closings=RecordManualClosingUseCase(
@@ -345,7 +370,7 @@ class Platform:
             running_verifications=InMemoryRunningVerificationsAdapter(self.running_verifications),
             flow_checks=FlowChecks(
                 accounts=FlowAccountPorts(accounts, account_activity, self.ledger),
-                markets=self.markets,
+                markets={**self.markets, **dict.fromkeys(simulated, self.markets[HYPERLIQUID])},
                 models=SelectModelUseCase({"models": InMemoryModelCatalogAdapter(self.model_catalog)}, provider_keys),
                 sources=SelectSourceUseCase(sources, source_credentials),
             ),
@@ -434,9 +459,10 @@ class Platform:
         accounts = InMemoryAccountRepositoryAdapter(self.accounts, tenant_id)
         opener = self.credential_opener()
         access = OpenTradingAccessUseCase(accounts, opener)
-        order_exchanges = {HYPERLIQUID: connection_of(self.order_exchange, self.protection_exchange)}
+        order_exchanges = self.order_connections(tenant_id)
         orders = self.orders_of(tenant_id)
-        read_exchange_state = ReadExchangeStateUseCase(accounts, opener, self.exchanges)
+        simulated = self.simulated_exchanges(tenant_id)
+        read_exchange_state = ReadExchangeStateUseCase(accounts, opener, {**self.exchanges, **simulated})
         close_exchange_position = CloseExchangePositionUseCase(
             access, order_exchanges, orders, self.slippage, self.cancel_protections(tenant_id)
         )
@@ -460,11 +486,15 @@ class Platform:
                 self.mail_servers.access_of(tenant_id),
                 self.mailer,
             ),
-            read_account_activity=ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
-            read_account_transfers=ReadAccountTransfersUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+            read_account_activity=ReadAccountActivityUseCase(
+                accounts, opener, {HYPERLIQUID: self.activity_reader, **simulated}
+            ),
+            read_account_transfers=ReadAccountTransfersUseCase(
+                accounts, opener, {HYPERLIQUID: self.activity_reader, **simulated}
+            ),
             record_account_executions=RecordAccountExecutionsUseCase(
                 InMemoryFlowRepositoryAdapter(self.flows, tenant_id),
-                ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader}),
+                ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: self.activity_reader, **simulated}),
                 self.platform_orders,
                 self.ledger,
             ),
@@ -518,8 +548,7 @@ class Platform:
             InMemoryAccountRepositoryAdapter(self.accounts, tenant_id), self.credential_opener()
         )
         protections = InMemoryProtectionRepositoryAdapter(self.protections, tenant_id)
-        connections = {HYPERLIQUID: connection_of(self.order_exchange, self.protection_exchange)}
-        return CancelProtectionsUseCase(access, connections, protections)
+        return CancelProtectionsUseCase(access, self.order_connections(tenant_id), protections)
 
     def link_chat(self) -> LinkChatUseCase:
         """What the bot of the worker runs for every message it receives."""

@@ -569,7 +569,7 @@ def test_the_worker_composes_for_every_tenant_the_cycle_of_its_flows() -> None:
     worker = cycle_of(
         create_engine("sqlite://"),
         (SodiumCredentialOpenerAdapter({}), SodiumProviderKeyOpenerAdapter({}), SodiumSourceSecretsOpenerAdapter({})),
-        ("dev", Slippage.default(), dev_installation_on_testnet()[1]),
+        ("dev", Slippage.default(), dev_installation_on_testnet()[1], dev_installation_on_testnet()[3]),
         (InMemoryOutboxAdapter(), FakeNotificationLinkAdapter()),
         ({"models": FakeModelGatewayAdapter(catalog)}, FakePriceForecasterAdapter()),
     )

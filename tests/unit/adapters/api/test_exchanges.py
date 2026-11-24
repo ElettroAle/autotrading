@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from tests.fakes.exchange import FakeExchangeAdapter
+from tests.fakes.simulated_exchange import SIMULATED
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform
 
@@ -99,3 +100,15 @@ def test_lists_whether_the_user_gives_the_expiry_of_the_credentials(platform: Pl
     platform.hyperliquid.reads_expiry = True
 
     assert [exchange["expiry_editable"] for exchange in client_of("anna").get("/exchanges").json()] == [False]
+
+
+def test_lists_whether_each_exchange_holds_a_virtual_balance(platform: Platform, client_of: Client) -> None:
+    """R6.3.2: the registration asks the virtual balance only of the exchange that holds one."""
+    platform.offers_simulated_exchange()
+
+    listed = client_of("anna").get("/exchanges").json()
+
+    assert [(exchange["name"], exchange["virtual_balance"]) for exchange in listed] == [
+        (HYPERLIQUID, False),
+        (SIMULATED, True),
+    ]

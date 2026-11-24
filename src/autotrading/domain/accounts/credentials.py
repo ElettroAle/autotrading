@@ -38,6 +38,25 @@ class Credentials:
         return cls({}, account_id)
 
     @classmethod
+    def for_account(
+        cls, account_id: AccountId, fields: Iterable[CredentialField], values: Mapping[str, str]
+    ) -> Credentials:
+        """The credentials an account is registered with: those the exchange declares, or none at all for an exchange
+        that declares no field, which then refuses any (R6.3.2).
+        """
+        declared = tuple(fields)
+        if declared:
+            return cls.declared(declared, values)
+        unknown = sorted(values)
+        if unknown:
+            raise UnknownCredentialFieldError(unknown[0])
+        return cls.without_fields(account_id)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.values
+
+    @classmethod
     def declared(cls, fields: Iterable[CredentialField], values: Mapping[str, str]) -> Credentials:
         """The values of the fields the exchange declares, each one required; any other field is refused."""
         declared = tuple(fields)

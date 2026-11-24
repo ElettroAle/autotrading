@@ -11,10 +11,12 @@ from autotrading.application.accounts.ports import (
     AllocatedCapitalPort,
     CredentialSealerPort,
     ExchangePort,
+    VirtualBalancePort,
 )
 from autotrading.application.accounts.read_account_state import ReadAccountStateUseCase
-from autotrading.application.accounts.register_account import RegisterAccountUseCase
+from autotrading.application.accounts.register_account import RegisterAccountUseCase, RegistrationPorts
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsUseCase
+from autotrading.application.accounts.reset_virtual_balance import ResetVirtualBalanceUseCase
 from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryUseCase
 from autotrading.application.accounts.set_deviation_threshold import SetDeviationThresholdUseCase
 from autotrading.application.agent.list_models import ListModelsUseCase
@@ -186,6 +188,8 @@ class TenantPorts:
     allocated_capital: AllocatedCapitalPort
     sealer: CredentialSealerPort
     exchanges: Mapping[str, ExchangePort]
+    # The exchanges among them that hold a virtual balance instead of funds (R6.3.2).
+    virtual_balances: Mapping[str, VirtualBalancePort]
     account_state: AccountStatePort
     position_closing: PositionClosingPort
     manual_closings: ManualClosingRecorderPort
@@ -255,6 +259,7 @@ class TenantUseCases:
     """The use cases of one request, built by bootstrap.for_tenant on adapters bound to the tenant of the request."""
 
     register_account: RegisterAccountUseCase
+    reset_virtual_balance: ResetVirtualBalanceUseCase
     list_accounts: ListAccountsUseCase
     list_supported_exchanges: ListSupportedExchangesUseCase
     get_account: GetAccountUseCase
@@ -357,11 +362,14 @@ class TenantUseCases:
         source_offers = ListSourceOffersUseCase(ports.sources, ports.source_credentials)
         key_services = ProviderKeyServices(ports.model_catalogs, ports.provider_key_sealer)
         return cls(
-            register_account=RegisterAccountUseCase(tenant_id, accounts, sealer, exchanges),
+            register_account=RegisterAccountUseCase(
+                tenant_id, RegistrationPorts(accounts, sealer, exchanges, ports.virtual_balances)
+            ),
+            reset_virtual_balance=ResetVirtualBalanceUseCase(accounts, ports.virtual_balances),
             list_accounts=ListAccountsUseCase(
                 accounts, ports.allocated_capital, exchanges, ports.settlement_currency, ports.clock
             ),
-            list_supported_exchanges=ListSupportedExchangesUseCase(exchanges),
+            list_supported_exchanges=ListSupportedExchangesUseCase(exchanges, ports.virtual_balances),
             get_account=GetAccountUseCase(
                 accounts, ports.allocated_capital, exchanges, ports.settlement_currency, ports.clock
             ),

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from typing import Any
 
 import httpx2
@@ -8,6 +9,7 @@ from autotrading.adapters.inbound.api.accounts import AccountRegistrationRequest
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from tests.fakes.exchange import REDACTED_REJECTION
+from tests.fakes.simulated_exchange import SIMULATED
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import HYPERLIQUID, Platform
 from tests.support.problems import reason_of
@@ -176,3 +178,41 @@ def test_the_registration_keeps_the_expiry_the_user_gives(client: TestClient, pl
 
     assert response.status_code == 201
     assert client.get("/accounts").json()[0]["expiry"] == {"expires_on": "2026-12-15", "source": "entered"}
+
+
+def test_registers_an_account_of_the_simulated_exchange_from_its_virtual_balance(
+    client: TestClient, platform: Platform
+) -> None:
+    platform.offers_simulated_exchange()
+
+    response = register(client, name="prova", exchange=SIMULATED, credentials={}, virtual_balance="1000")
+
+    balance = response.json()["balance"]
+    assert (response.status_code, Decimal(balance["amount"]), balance["currency"]) == (201, Decimal(1000), "USDC")
+
+
+def test_a_virtual_balance_for_an_exchange_without_one_is_refused(client: TestClient, platform: Platform) -> None:
+    response = register(client, **accepted_body(platform), virtual_balance="1000")
+
+    assert response.status_code == 409
+    assert platform.accounts_of("anna") == []
+
+
+def test_resets_the_virtual_balance_of_a_simulated_account(client: TestClient, platform: Platform) -> None:
+    platform.offers_simulated_exchange()
+    register(client, name="prova", exchange=SIMULATED, credentials={}, virtual_balance="1000")
+    [account] = platform.accounts_of("anna")
+
+    response = client.put(f"/accounts/{account.id.value}/virtual-balance", json={"balance": "250"})
+
+    assert response.status_code == 204
+    assert Decimal(client.get(f"/accounts/{account.id.value}/state").json()["balance"]["amount"]) == Decimal(250)
+
+
+def test_the_reset_of_an_account_without_a_virtual_balance_is_refused(client: TestClient, platform: Platform) -> None:
+    register(client, **accepted_body(platform))
+    [account] = platform.accounts_of("anna")
+
+    response = client.put(f"/accounts/{account.id.value}/virtual-balance", json={"balance": "250"})
+
+    assert response.status_code == 409

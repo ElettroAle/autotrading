@@ -18,6 +18,7 @@ from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.orders.protection_order import ActiveProtection, ProtectionOrder
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -134,15 +135,25 @@ class ExchangeConnection:
 
 
 class SimulatedSettlementPort(Protocol):
-    """The accounts of the tenant on the simulated exchange, settled on the real prices (R6.3.2)."""
+    """The accounts of the tenant on the simulated exchange, settled on the real prices (R6.3.2), bound to the tenant
+    like every port of owned data.
+    """
 
     def open_coins(self) -> frozenset[str]:
         """The assets with a simulated position open, whatever account holds it."""
         ...
 
-    def settle(self, markets: Mapping[str, Market], at: datetime) -> int:
-        """Closes the positions whose stop loss, take profit or liquidation the current markets reached; how many."""
+    def settle(self, markets: Mapping[str, Market]) -> int:
+        """Closes the positions whose stop loss, take profit or liquidation the current markets reached, and shows the
+        others at their price; how many it closed.
+        """
         ...
+
+
+class SimulatedTenantsPort(Protocol):
+    """The tenants of the installation, each of which may hold accounts on the simulated exchange (R6.3.2)."""
+
+    def tenant_ids(self) -> tuple[TenantId, ...]: ...
 
 
 class ProtectionRepositoryPort(Protocol):

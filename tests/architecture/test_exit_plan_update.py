@@ -63,7 +63,9 @@ def test_adr_aggiornamento_del_piano_the_protections_are_replaced_through_the_po
     assert UpdateFlowProtectionUseCase.__module__ == "autotrading.application.orders.update_flow_protection"
     assert get_type_hints(FlowOrderProtection)["update"] is UpdateFlowProtectionUseCase
     assert hints["protections"] is order_ports.ProtectionRepositoryPort
-    assert str(hints["protection_exchanges"]).endswith("ProtectionExchangePort]")
+    # The exchange of the account gives its protections (ADR exchange-simulato-con-porte-di-lettura-e-scrittura).
+    assert str(hints["exchanges"]).endswith("ExchangeConnection]")
+    assert get_type_hints(order_ports.ExchangeConnection)["protections"] is order_ports.ProtectionExchangePort
 
 
 def test_adr_aggiornamento_del_piano_the_plan_in_force_follows_only_the_levels_placed() -> None:
