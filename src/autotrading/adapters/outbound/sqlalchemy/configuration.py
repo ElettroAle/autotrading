@@ -42,21 +42,21 @@ def _port_of(text: str | None) -> int:
 
 
 @dataclass(frozen=True, slots=True)
-class _SimulationSettings:
+class _SqlAlchemySimulationSettings:
     """How far from the current price the simulated exchange executes a market order (R6.3.2)."""
 
     slippage: Slippage
 
 
-def _simulation_settings_of(source: ConfigurationSource) -> _SimulationSettings:
+def _simulation_settings_of(source: ConfigurationSource) -> _SqlAlchemySimulationSettings:
     """The range is a rule of the domain (Slippage)."""
     text = source.optional(SIMULATION_SLIPPAGE)
     if text is None:
-        return _SimulationSettings(Slippage.percent(DEFAULT_SIMULATION_SLIPPAGE_PERCENT))
+        return _SqlAlchemySimulationSettings(Slippage.percent(DEFAULT_SIMULATION_SLIPPAGE_PERCENT))
     try:
         percent = Decimal(text)
     except InvalidOperation as error:
         raise InvalidConfigurationError(SIMULATION_SLIPPAGE) from error
     if not percent.is_finite():
         raise InvalidConfigurationError(SIMULATION_SLIPPAGE)
-    return _SimulationSettings(Slippage.percent(percent))
+    return _SqlAlchemySimulationSettings(Slippage.percent(percent))

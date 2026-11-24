@@ -112,8 +112,9 @@ def test_an_order_the_market_refuses_is_rejected_as_by_the_real_exchange(databas
     simulated, account_id = opened_account(database)
     order = MarketOrder.opening("BTC", Direction.LONG, Decimal("0.00001"), SLIPPAGE)
 
-    with pytest.raises(ExchangeRejectedOrderError, match="minimo"):
+    with pytest.raises(ExchangeRejectedOrderError) as rejected:
         simulated.place_market_order(access_of(account_id), order, btc_at(Decimal(90000)))
+    assert "minimo" in rejected.value.exchange_message
     assert simulated.find_order(access_of(account_id), order) is None
 
 
