@@ -2,7 +2,7 @@
 
 - Stato: proposta (24 novembre 2026)
 - Requisiti: US 363 R5.3.4 (Task 364, 728)
-- Collegate: ADR 0094 (ciclo decisionale nel contesto `flows`), ADR 0104 (LangGraph), ADR 0070 (PnL della chiusura dal
+- Collegate: ADR 0094 (ciclo decisionale nel contesto `flows`), ADR 0104 (LangGraph), ADR system-prompt-del-flusso-come-modello-con-segnaposti, ADR 0070 (PnL della chiusura dal
   exchange), ADR 0116 (dashboard); `.claude/rules/context-flows.md`, `.claude/rules/context-agent.md`,
   `.claude/rules/tech-sqlalchemy.md`, `.claude/rules/tech-fastapi.md`, `.claude/rules/tech-dashboard.md`
 - Verifica: prova
@@ -53,9 +53,12 @@ l'esito, dove si registra e come si mostra.
 
 ### Uso nel ciclo
 
-- Con la memoria attiva il passo del contesto del ciclo legge la memoria e la aggiunge al contesto dell'agente come
-  sezione propria (un blocco per asset, testo italiano compatto), accanto alle fonti. Con la memoria non attiva il
-  passo non legge nulla e il contesto non ha la sezione.
+- Decisione del proprietario (24 novembre 2026, in chat): la memoria entra come **segnaposto del system prompt**,
+  secondo ADR system-prompt-del-flusso-come-modello-con-segnaposti. Un nuovo membro del registro `PromptPlaceholder`
+  del domain `flows` (nome e descrizione dichiarati una volta sola nel registro) è sostituito con la memoria, un
+  blocco per asset in testo italiano compatto. Il testo predefinito del system prompt lo contiene in una sezione
+  propria; un system prompt personalizzato lo usa se l'utente lo scrive. Con la memoria non attiva, o senza voci, il
+  segnaposto si sostituisce con un testo vuoto, e il passo del ciclo non legge le decisioni.
 - La memoria data all'agente si registra con il ciclo, come i documenti dei passi, ed è restituita dal dettaglio del
   ciclo nell'API e mostrata nella dashboard nel dettaglio del ciclo.
 
@@ -70,6 +73,8 @@ l'esito, dove si registra e come si mostra.
 
 - **Numero e finestra fissi** (testo iniziale del requisito): il proprietario li vuole configurabili.
 - **Anche le decisioni di non agire**: con cicli di pochi minuti riempirebbero la memoria di ripetizioni.
+- **Memoria come sezione del contesto fuori dal system prompt**: il proprietario la vuole come segnaposto del system
+  prompt, visibile e spostabile nel modello del prompt come le altre parti.
 - **Memoria come fonte del ciclo (adapter di fonte)**: è un dato del flusso stesso, non un sistema esterno; una fonte
   la renderebbe disattivabile per errore e la mescolerebbe ai pesi delle fonti.
 - **Memoria calcolata dal modello su tutto lo storico**: costo in token non limitato.
