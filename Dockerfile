@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Chainguard images carry no distribution packages, so the image scan has nothing to report but Python itself (ADR 0006).
-FROM cgr.dev/chainguard/python:latest-dev@sha256:1aad742e9c8ea5597520fe43ae154e0160fb8364485506945f7de6cd7879beea AS build
+FROM cgr.dev/chainguard/python:latest-dev@sha256:3ca53097911a867be4f8190b8bc272d1465e9d95ef32ecc2cd70d841e2baeac3 AS build
 USER root
 COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /usr/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PYTHON=/usr/bin/python
@@ -11,7 +11,7 @@ COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable
 
 # The forecaster has its own image: Prophet, cmdstan and the scientific libraries stay out of api and worker (ADR 0107).
-FROM cgr.dev/chainguard/python:latest-dev@sha256:1aad742e9c8ea5597520fe43ae154e0160fb8364485506945f7de6cd7879beea AS forecaster-build
+FROM cgr.dev/chainguard/python:latest-dev@sha256:3ca53097911a867be4f8190b8bc272d1465e9d95ef32ecc2cd70d841e2baeac3 AS forecaster-build
 USER root
 COPY --from=ghcr.io/astral-sh/uv:0.13.7 /uv /usr/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_PYTHON=/usr/bin/python
@@ -19,7 +19,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --only-group forecaster --no-install-project
 
-FROM cgr.dev/chainguard/python:latest@sha256:e5d8d4eb6975957350c8deb3afb09ea5328629d50a6916fc9863015fbfc0d8f8 AS forecaster
+FROM cgr.dev/chainguard/python:latest@sha256:3a89a9027f47e44e9f9da201493013249a02fc87fa7269bba80f621d7ade83f8 AS forecaster
 ARG REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading"       org.opencontainers.image.revision="${REVISION}"
 COPY --from=forecaster-build /app/.venv /app/.venv
@@ -52,7 +52,7 @@ ENTRYPOINT ["/usr/bin/node"]
 CMD ["/app/server/main.ts"]
 
 # The last stage is the default target: the image of api, worker and migrate.
-FROM cgr.dev/chainguard/python:latest@sha256:e5d8d4eb6975957350c8deb3afb09ea5328629d50a6916fc9863015fbfc0d8f8
+FROM cgr.dev/chainguard/python:latest@sha256:3a89a9027f47e44e9f9da201493013249a02fc87fa7269bba80f621d7ade83f8
 ARG REVISION=unknown
 LABEL org.opencontainers.image.source="https://github.com/ElettroAle/autotrading" \
       org.opencontainers.image.revision="${REVISION}"
