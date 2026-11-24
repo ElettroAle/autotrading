@@ -26,4 +26,4 @@ runs:
       shell: bash
       env:
         IMAGE: ${{ inputs.image }}
-      run: trivy image --exit-code 1 --scanners vuln --no-progress "$IMAGE"
+      run: trivy image --exit-code 1 --scanners vuln --no-progress --ignorefile .trivyignore "$IMAGE"
