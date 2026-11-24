@@ -16,6 +16,7 @@ dependencies = [
     "langgraph>=1.2",
     "langgraph-checkpoint-postgres>=3.0",
     "litellm>=1.109.1",
+    "mcp>=2.3",
     "opentelemetry-exporter-otlp-proto-http>=1.45",
     "opentelemetry-instrumentation-fastapi>=0.66b2",
     "opentelemetry-instrumentation-httpx>=0.66b2",
@@ -178,6 +179,7 @@ name = "Una cartella di tecnologia non importa un'altra"
 type = "independence"
 modules = [
     "autotrading.adapters.inbound.api",
+    "autotrading.adapters.inbound.mcp",
     "autotrading.adapters.outbound.apscheduler",
     "autotrading.adapters.outbound.sqlalchemy",
     "autotrading.adapters.outbound.libsodium",
