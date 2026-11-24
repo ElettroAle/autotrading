@@ -105,4 +105,6 @@ def test_a_cycle_reads_an_account_without_credentials_by_its_identifier() -> Non
 
 
 def test_an_unknown_identifier_is_never_mistaken_for_one_without_credentials() -> None:
-    assert AccountReference.without_credentials(uuid4()) != AccountReference.without_credentials(uuid4())
+    first, second = uuid4(), uuid4()
+
+    assert AccountReference.without_credentials(first) != AccountReference.without_credentials(second)
