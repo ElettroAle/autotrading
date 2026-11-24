@@ -34,7 +34,12 @@ from tests.fakes.mailer import FakeMailerAdapter
 from tests.fakes.messenger import FakeMessengerAdapter
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
-from tests.support.installation import dev_installation_on_testnet, worker_configuration, worker_cycles_of_installation
+from tests.support.installation import (
+    SIMULATION,
+    dev_installation_on_testnet,
+    worker_configuration,
+    worker_cycles_of_installation,
+)
 
 FAKE_BOT = "BOT-FAKE_BOT-FAKE"
 DISABLED = "bot Telegram non configurato: notifiche disattivate"
@@ -42,11 +47,11 @@ DISABLED = "bot Telegram non configurato: notifiche disattivate"
 
 def factory(engine: Engine, outbox: OutboxPort) -> Callable[[TenantId], WorkerUseCases]:
     opener = SodiumCredentialOpenerAdapter({})
-    environment, hyperliquid, _ = dev_installation_on_testnet()
+    environment, hyperliquid, _, _ = dev_installation_on_testnet()
     return worker_use_cases(
         engine,
         (opener, partial(SodiumMailPasswordOpenerAdapter, {})),
-        (environment, Slippage.default(), hyperliquid),
+        (environment, Slippage.default(), hyperliquid, SIMULATION),
         (outbox, FakeMailerAdapter(), FakeNotificationLinkAdapter()),
         worker_cycles_of_installation(opener),
     )

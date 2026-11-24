@@ -1,10 +1,19 @@
 from sqlalchemy import Engine
 
 from autotrading.adapters.configuration.source import ConfigurationSource
-from autotrading.adapters.outbound.sqlalchemy.configuration import _settings_of
+from autotrading.adapters.outbound.sqlalchemy.configuration import _settings_of, _simulation_settings_of
 from autotrading.adapters.outbound.sqlalchemy.database import SqlAlchemyDatabaseAdapter
+from autotrading.adapters.outbound.sqlalchemy.simulated_exchange import (
+    EXCHANGE_NAME as SIMULATED_EXCHANGE_NAME,
+)
+from autotrading.adapters.outbound.sqlalchemy.simulated_exchange import (
+    SqlAlchemySimulatedExchangeAdapter,
+)
+from autotrading.domain.orders.simulation.simulated_execution import SimulatedExecution
+from autotrading.domain.tenancy.tenant_id import TenantId
 
 type SqlAlchemyEngine = Engine
+type SimulatedExchangeOfTenant = dict[str, SqlAlchemySimulatedExchangeAdapter]
 
 
 def sqlalchemy_adapters(source: ConfigurationSource) -> SqlAlchemyEngine:
@@ -12,3 +21,15 @@ def sqlalchemy_adapters(source: ConfigurationSource) -> SqlAlchemyEngine:
     settings = _settings_of(source)
     database = SqlAlchemyDatabaseAdapter(settings.host, settings.port, settings.name, settings.user, settings.password)
     return database.engine()
+
+
+def sqlalchemy_simulation_adapters(source: ConfigurationSource) -> SimulatedExecution:
+    """The engine that executes the orders of the simulated exchange, with the slippage of the installation (R6.3.2)."""
+    return SimulatedExecution(_simulation_settings_of(source).slippage)
+
+
+def sqlalchemy_simulated_exchange_adapters(
+    engine: SqlAlchemyEngine, simulation: SimulatedExecution, tenant_id: TenantId
+) -> SimulatedExchangeOfTenant:
+    """The simulated exchange by its name, on the accounts of the tenant (R6.3.2, ADR 0152)."""
+    return {SIMULATED_EXCHANGE_NAME: SqlAlchemySimulatedExchangeAdapter(engine, tenant_id, simulation)}

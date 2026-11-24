@@ -28,6 +28,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
+from tests.support.exchange_connections import connection_of
 from tests.support.retries import unlimited_retry
 from tests.support.trading import HYPERLIQUID, new_access
 
@@ -49,7 +50,7 @@ class Bench:
         self.waits = FakePauseAdapter()
         self.calls = RetriedCalls(unlimited_retry(self.waits))
         self.use_case = UpdateFlowProtectionUseCase(
-            {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}, self.protections
+            {HYPERLIQUID: connection_of(self.exchange, self.protection_exchange)}, self.protections
         )
         self.hold(Direction.LONG, Decimal(60000))
 

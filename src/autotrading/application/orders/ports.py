@@ -1,4 +1,5 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
@@ -17,6 +18,7 @@ from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.orders.protection_order import ActiveProtection, ProtectionOrder
 from autotrading.domain.orders.sealed_access import SealedAccess
 from autotrading.domain.orders.trading_access import TradingAccess
+from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -38,29 +40,47 @@ class AccessOpenerPort(Protocol):
         ...
 
 
-class ExchangePort(Protocol):
-    """Orders on the exchange. Raises OrderExchangeUnavailableError when the exchange cannot be reached."""
+class MarketReaderPort(Protocol):
+    """The market of an exchange, read without the access of any account (ADR
+    exchange-simulato-con-porte-di-lettura-e-scrittura).
 
-    def market(self, access: TradingAccess, coin: str) -> Market: ...
+    Raises OrderExchangeUnavailableError when the exchange cannot be reached.
+    """
+
+    def market(self, coin: str) -> Market:
+        """The rules of the asset and its current price. Raises ExchangeRejectedOrderError for an asset it does not
+        trade.
+        """
+        ...
+
+
+class OrderExchangePort(Protocol):
+    """The operations on an account of the exchange, with its access. Raises OrderExchangeUnavailableError when the
+    exchange cannot be reached.
+    """
 
     def position(self, access: TradingAccess, coin: str) -> HeldPosition | None:
         """The position open on the asset, or None when there is none."""
+        ...
 
     def set_leverage(self, access: TradingAccess, coin: str, leverage: int, margin: MarginMode) -> None:
         """Sets the leverage of the asset with the given margin mode.
 
         Raises ExchangeRejectedOrderError when the exchange refuses the leverage or the margin mode.
         """
+        ...
 
-    def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
-        """What the exchange executed, read from its fills.
+    def place_market_order(self, access: TradingAccess, order: MarketOrder, market: Market) -> Execution:
+        """What the exchange executed, read from its fills; the market is the one the use case read just before.
 
         Raises ExchangeRejectedOrderError with the message of the exchange when nothing is executed, and
         OrderNotAcknowledgedError when the exchange does not confirm the order in time. Never retries.
         """
+        ...
 
     def find_order(self, access: TradingAccess, order: MarketOrder) -> Execution | None:
         """The execution of an order looked up by its client order id, or None if the exchange has none."""
+        ...
 
 
 class SendingRetryPort(Protocol):
@@ -101,6 +121,39 @@ class ProtectionExchangePort(Protocol):
     def active(self, access: TradingAccess, asset: str) -> tuple[ActiveProtection, ...]:
         """The protections waiting on the exchange for the position on the asset."""
         ...
+
+
+@dataclass(frozen=True, slots=True)
+class ExchangeConnection:
+    """An exchange as the order use cases reach it: the reading of its market and the operations on an account
+    (ADR exchange-simulato-con-porte-di-lettura-e-scrittura). The same adapter may realize them all.
+    """
+
+    market: MarketReaderPort
+    account: OrderExchangePort
+    protections: ProtectionExchangePort
+
+
+class SimulatedSettlementPort(Protocol):
+    """The accounts of the tenant on the simulated exchange, settled on the real prices (R6.3.2), bound to the tenant
+    like every port of owned data.
+    """
+
+    def open_coins(self) -> frozenset[str]:
+        """The assets with a simulated position open, whatever account holds it."""
+        ...
+
+    def settle(self, markets: Mapping[str, Market]) -> int:
+        """Closes the positions whose stop loss, take profit or liquidation the current markets reached, and shows the
+        others at their price; how many it closed.
+        """
+        ...
+
+
+class SimulatedTenantsPort(Protocol):
+    """The tenants of the installation, each of which may hold accounts on the simulated exchange (R6.3.2)."""
+
+    def tenant_ids(self) -> tuple[TenantId, ...]: ...
 
 
 class ProtectionRepositoryPort(Protocol):

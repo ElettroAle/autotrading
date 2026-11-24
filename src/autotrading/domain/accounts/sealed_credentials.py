@@ -7,3 +7,12 @@ class SealedCredentials:
 
     key_version: int
     ciphertext: bytes = field(repr=False)
+
+    @classmethod
+    def none(cls) -> SealedCredentials:
+        """What an account of an exchange without credentials keeps: nothing to open (R6.3.2)."""
+        return cls(0, b"")
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.ciphertext

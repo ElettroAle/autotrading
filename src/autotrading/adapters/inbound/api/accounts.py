@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import date
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -16,6 +17,7 @@ from autotrading.application.accounts.get_account import GetAccountCommand
 from autotrading.application.accounts.read_account_state import ReadAccountStateCommand
 from autotrading.application.accounts.register_account import AccountRegistration, RegisterAccountCommand
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
+from autotrading.application.accounts.reset_virtual_balance import ResetVirtualBalanceCommand
 from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryCommand
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.domain.accounts.account_id import AccountId
@@ -30,9 +32,17 @@ class AccountRegistrationRequest(BaseModel):
     credentials: dict[str, str] = Field(default_factory=dict)
     # Only for an exchange that does not read the expiry of the credentials (R6.2.2).
     expires_on: date | None = None
+    # Only for an exchange that holds a virtual balance: what the account starts from (R6.3.2).
+    virtual_balance: Decimal | None = None
 
     def __repr_args__(self) -> list[tuple[str | None, object]]:
         return [("name", self.name), ("exchange", self.exchange)]
+
+
+class VirtualBalanceResetRequest(BaseModel):
+    """The balance an account of an exchange with a virtual balance starts again from (R6.3.2)."""
+
+    balance: Decimal
 
 
 class CredentialsReplacementRequest(BaseModel):
@@ -134,8 +144,21 @@ def accounts_router(
     def register_account(
         request: AccountRegistrationRequest, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
     ) -> AccountRegistrationResponse:
-        command = RegisterAccountCommand(request.name, request.exchange, request.credentials, request.expires_on)
+        command = RegisterAccountCommand(
+            request.name, request.exchange, request.credentials, request.expires_on, request.virtual_balance
+        )
         return AccountRegistrationResponse.of(use_cases.register_account.execute(command))
+
+    @router.put("/{account_id}/virtual-balance", status_code=status.HTTP_204_NO_CONTENT)
+    def reset_virtual_balance(
+        account_id: UUID,
+        request: VirtualBalanceResetRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> None:
+        """Starts the account again from the balance given, its positions closed and its orders cancelled, on an
+        exchange that holds a virtual balance (R6.3.2)."""
+        command = ResetVirtualBalanceCommand(AccountId(account_id), request.balance)
+        use_cases.reset_virtual_balance.execute(command)
 
     @router.get("")
     def list_accounts(

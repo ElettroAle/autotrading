@@ -21,6 +21,7 @@ from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
+from tests.support.exchange_connections import connection_of
 from tests.support.trading import HYPERLIQUID, new_access
 
 MANUAL = OrderSource(OrderOrigin.MANUAL, "oid-anna")
@@ -69,8 +70,9 @@ def use_case(
     protection_exchange: FakeProtectionExchangeAdapter,
     protections: InMemoryProtectionRepositoryAdapter,
 ) -> CloseExchangePositionUseCase:
-    cancel = CancelProtectionsUseCase(accesses.use_case, {HYPERLIQUID: protection_exchange}, protections)
-    return CloseExchangePositionUseCase(accesses.use_case, {HYPERLIQUID: exchange}, orders, SLIPPAGE, cancel)
+    exchanges = {HYPERLIQUID: connection_of(exchange, protection_exchange)}
+    cancel = CancelProtectionsUseCase(accesses.use_case, exchanges, protections)
+    return CloseExchangePositionUseCase(accesses.use_case, exchanges, orders, SLIPPAGE, cancel)
 
 
 def test_closes_the_whole_position_with_a_reduce_only_order(

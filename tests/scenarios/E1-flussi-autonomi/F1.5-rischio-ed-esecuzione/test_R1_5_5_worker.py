@@ -22,9 +22,9 @@ from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderOrigin, OrderStatus
 from autotrading.domain.orders.protection_request import ProtectionRequest
 from tests.fakes.pause import FakePauseAdapter
-from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT
+from tests.support.exchange_connections import connection_of
 from tests.support.retries import unlimited_retry
 from tests.support.steps import quoted
 from tests.support.trading import HYPERLIQUID, Trading
@@ -58,15 +58,12 @@ class FlowExecution:
 
     def execute(self, flow: str, cycle: str) -> None:
         trading = self.trading
-        exchanges, protection_exchanges = (
-            {HYPERLIQUID: trading.exchange},
-            {HYPERLIQUID: FakeProtectionExchangeAdapter()},
-        )
+        exchanges = {HYPERLIQUID: connection_of(trading.exchange)}
         protections = InMemoryProtectionRepositoryAdapter(ProtectionStore(), TENANT)
         protection = FlowOrderProtection(
-            ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, trading.orders, trading.slippage),
-            CancelProtectionsUseCase(trading.accesses.use_case, protection_exchanges, protections),
-            UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
+            ProtectFlowPositionUseCase(exchanges, protections, trading.orders, trading.slippage),
+            CancelProtectionsUseCase(trading.accesses.use_case, exchanges, protections),
+            UpdateFlowProtectionUseCase(exchanges, protections),
         )
         use_case = ExecuteFlowOrdersUseCase(
             trading.accesses.use_case,

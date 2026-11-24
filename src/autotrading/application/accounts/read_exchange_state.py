@@ -35,10 +35,16 @@ class ReadExchangeStateUseCase:
     def execute(self, command: ReadExchangeStateCommand) -> AccountState:
         account = find_account(self._accounts, command.account_id)
         exchange = supported_exchange(self._exchanges, account.exchange)
-        credentials = self._opener.open(account)
+        credentials = self._credentials_of(account)
         state = read_state_proving(exchange, credentials)
         self._refresh_expiry(account, exchange, credentials)
         return state
+
+    def _credentials_of(self, account: Account) -> Credentials:
+        """An account of an exchange without credentials has nothing to open (R6.3.2)."""
+        if account.credentials.is_empty:
+            return Credentials.without_fields(account.id)
+        return self._opener.open(account)
 
     def _refresh_expiry(self, account: Account, exchange: ExchangePort, credentials: Credentials) -> None:
         if not exchange.reads_credential_expiry():

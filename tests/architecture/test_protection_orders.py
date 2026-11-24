@@ -54,7 +54,9 @@ def test_adr_ordini_di_protezione_every_opening_and_every_closing_goes_through_t
     assert get_type_hints(ExecuteFlowOrdersUseCase.__init__)["protection"] is FlowOrderProtection
     assert "protect_open" in parameters(ExecuteCycleOrdersUseCase)
     assert "protections" in parameters(CloseExchangePositionUseCase)
-    assert "protection_exchanges" in parameters(ProtectOpenPositionsUseCase)
+    # The exchange of the account gives its protections (ADR exchange-simulato-con-porte-di-lettura-e-scrittura).
+    assert "exchanges" in parameters(ProtectOpenPositionsUseCase)
+    assert get_type_hints(order_ports.ExchangeConnection)["protections"] is order_ports.ProtectionExchangePort
 
 
 def test_adr_ordini_di_protezione_only_the_hyperliquid_adapter_knows_the_trigger_orders_of_the_exchange() -> None:

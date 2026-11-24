@@ -40,6 +40,8 @@ UNKNOWN_ASSET = "Unknown asset"
 # decimals of the size of the asset (the tick of Hyperliquid).
 PRICE_SIGNIFICANT_FIGURES = 5
 MAX_PRICE_DECIMALS = 6
+# The fee of an order at the market price on a perpetual for an account without volume discounts (base tier).
+BASE_TAKER_FEE_RATE = Decimal("0.00045")
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, ArithmeticError)
 
 
@@ -113,8 +115,8 @@ class HyperliquidOrderExchangeAdapter:
     def base_url(self) -> str:
         return self._base_url
 
-    def market(self, access: TradingAccess, coin: str) -> Market:
-        with _translated(access):
+    def market(self, coin: str) -> Market:
+        with _translated(None):
             info = self._sdk.info(self._base_url, self._timeout)
             universe, mids = info.meta()["universe"], info.all_mids()
         return _market_of(coin, universe, mids)
@@ -129,7 +131,12 @@ class HyperliquidOrderExchangeAdapter:
             response = self._exchange(access).update_leverage(leverage, coin, margin is MarginMode.CROSS)
         _require_ok(response, access)
 
-    def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
+    def place_market_order(
+        self,
+        access: TradingAccess,
+        order: MarketOrder,
+        market: Market,  # noqa: ARG002 - Hyperliquid prices the order on its own book, within the slippage
+    ) -> Execution:
         with _translated(access, on_timeout=OrderNotAcknowledgedError):
             response = self._send(self._exchange(access), order)
         execution = self._execution(access, _filled_oid(response, access))
@@ -163,12 +170,16 @@ class HyperliquidOrderExchangeAdapter:
 
 
 @contextmanager
-def _translated(access: TradingAccess, on_timeout: type[Exception] = OrderExchangeUnavailableError) -> Iterator[None]:
-    # No exception of the SDK or of the network leaves the adapter (rule layer-adapters).
+def _translated(
+    access: TradingAccess | None, on_timeout: type[Exception] = OrderExchangeUnavailableError
+) -> Iterator[None]:
+    # No exception of the SDK or of the network leaves the adapter (rule layer-adapters). A reading of the market
+    # carries no access, so there is nothing to redact.
     try:
         yield
     except ClientError as error:
-        raise ExchangeRejectedOrderError(access.redact(str(error.error_message))) from error
+        message = str(error.error_message)
+        raise ExchangeRejectedOrderError(message if access is None else access.redact(message)) from error
     except requests.Timeout as error:
         raise on_timeout from error
     except (ServerError, requests.RequestException) as error:
@@ -210,6 +221,7 @@ def _market_of(coin: str, universe: Sequence[Mapping[str, object]], mids: Mappin
             MIN_ORDER_VALUE,
             price_significant_figures=PRICE_SIGNIFICANT_FIGURES,
             price_decimals=MAX_PRICE_DECIMALS - decimals,
+            taker_fee_rate=BASE_TAKER_FEE_RATE,
         )
     except SHAPE_ERRORS as error:
         raise OrderExchangeUnavailableError from error

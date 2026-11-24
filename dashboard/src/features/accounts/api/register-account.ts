@@ -13,12 +13,21 @@ export const accountRegistrationInputSchema = z.object({
   name: z.string().trim().min(1, REQUIRED),
   exchange: z.string().trim().min(1, REQUIRED),
   // The fields the chosen exchange declares: the API tells which one is missing, by its label (R2.3.9).
-  credentials: z.record(z.string(), z.string()),
+  // None at all for an exchange that declares none, as the simulated one (R6.3.2).
+  credentials: z.record(z.string(), z.string()).optional(),
   // The day the credentials expire, when the user knows it and the exchange does not read it (R6.2.2).
   expires_on: z.string().optional(),
+  // The balance an account of an exchange that holds a virtual one starts from (R6.3.2).
+  virtual_balance: z.string().optional(),
 });
 
 export type AccountRegistrationInput = z.infer<typeof accountRegistrationInputSchema>;
+
+// The amount travels as text, so no digit is rounded on the way (ADR 0018); none when the form does not ask it.
+const amountOrNothing = (amount: string | undefined): string | null => {
+  const written = (amount ?? '').trim();
+  return written === '' ? null : written.replace(',', '.');
+};
 
 const registeredAccountSchema = z.object({ id: z.string(), name: z.string() });
 
@@ -33,7 +42,12 @@ export const useRegisterAccount = () => {
     mutationFn: async (input: AccountRegistrationInput) =>
       readData(
         await api.POST('/accounts', {
-          body: { ...input, expires_on: dayOrNothing(input.expires_on) },
+          body: {
+            ...input,
+            credentials: input.credentials ?? {},
+            expires_on: dayOrNothing(input.expires_on),
+            virtual_balance: amountOrNothing(input.virtual_balance),
+          },
         }),
         registeredAccountSchema,
       ),

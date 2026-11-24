@@ -149,6 +149,9 @@ class FakeSdk(HyperliquidSdkAdapter):
         return self._answer("query_order_by_cloid", (address, str(cloid)), self.order_status)
 
 
+BTC_MARKET = Market("BTC", max_leverage=40, size_decimals=5, mid_price=Decimal(100000), min_order_value=Decimal(10))
+
+
 def an_order(*, reduce_only: bool = False) -> MarketOrder:
     return MarketOrder("BTC", Direction.SHORT, Decimal("0.0003"), Slippage.percent(Decimal(2)), reduce_only=reduce_only)
 
@@ -162,14 +165,21 @@ def calls_named(sdk: FakeSdk, name: str) -> list[Any]:
 
 
 def test_the_market_carries_leverage_size_decimals_and_mid_price() -> None:
-    assert adapter(FakeSdk()).market(ACCESS, "ETH") == Market(
-        "ETH", 25, 4, Decimal("4000.5"), Decimal(10), price_significant_figures=5, price_decimals=2
+    assert adapter(FakeSdk()).market("ETH") == Market(
+        "ETH",
+        25,
+        4,
+        Decimal("4000.5"),
+        Decimal(10),
+        price_significant_figures=5,
+        price_decimals=2,
+        taker_fee_rate=Decimal("0.00045"),
     )
 
 
 def test_an_asset_the_exchange_does_not_list_is_refused_as_unknown() -> None:
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(FakeSdk()).market(ACCESS, "DOGE")
+        adapter(FakeSdk()).market("DOGE")
 
     assert raised.value.exchange_message == "Unknown asset DOGE"
 
@@ -178,7 +188,7 @@ def test_metadata_of_unexpected_shape_are_unavailable() -> None:
     sdk = FakeSdk(meta_answer={"universe": [{"name": "BTC", "szDecimals": "five", "maxLeverage": 40}]})
 
     with pytest.raises(OrderExchangeUnavailableError):
-        adapter(sdk).market(ACCESS, "BTC")
+        adapter(sdk).market("BTC")
 
 
 def test_the_leverage_is_set_with_isolated_margin_and_the_wallet_of_the_access() -> None:
@@ -211,7 +221,7 @@ def test_an_opening_order_is_sent_at_market_with_its_cloid_and_slippage() -> Non
     sdk = FakeSdk()
     order = an_order()
 
-    adapter(sdk).place_market_order(ACCESS, order)
+    adapter(sdk).place_market_order(ACCESS, order, BTC_MARKET)
 
     assert calls_named(sdk, "market_open") == [("BTC", False, 0.0003, None, 0.02, order.id.hex)]
 
@@ -220,14 +230,14 @@ def test_a_reduce_only_order_closes_the_position() -> None:
     sdk = FakeSdk()
     order = an_order(reduce_only=True)
 
-    adapter(sdk).place_market_order(ACCESS, order)
+    adapter(sdk).place_market_order(ACCESS, order, BTC_MARKET)
 
     assert calls_named(sdk, "market_close") == [("BTC", 0.0003, None, 0.02, order.id.hex)]
     assert calls_named(sdk, "market_open") == []
 
 
 def test_the_execution_is_read_from_the_fills_of_the_order() -> None:
-    execution = adapter(FakeSdk()).place_market_order(ACCESS, an_order())
+    execution = adapter(FakeSdk()).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
     assert execution == Execution(
         filled_size=Decimal("0.0003"),
@@ -240,7 +250,7 @@ def test_the_execution_is_read_from_the_fills_of_the_order() -> None:
 
 def test_a_filled_order_without_fills_yet_is_not_acknowledged() -> None:
     with pytest.raises(OrderNotAcknowledgedError):
-        adapter(FakeSdk(fills=[])).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(fills=[])).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
 
 @pytest.mark.parametrize(
@@ -249,7 +259,7 @@ def test_a_filled_order_without_fills_yet_is_not_acknowledged() -> None:
 )
 def test_an_order_refused_by_the_exchange_keeps_its_message(message: str) -> None:
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(FakeSdk(order_answer=answer([{"error": message}]))).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(order_answer=answer([{"error": message}]))).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
     assert raised.value.exchange_message == message
 
@@ -258,7 +268,7 @@ def test_a_refusal_of_the_whole_request_keeps_its_message() -> None:
     sdk = FakeSdk(order_answer={"status": "err", "response": "Insufficient margin to place order."})
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(sdk).place_market_order(ACCESS, an_order())
+        adapter(sdk).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
     assert raised.value.exchange_message == "Insufficient margin to place order."
 
@@ -266,17 +276,17 @@ def test_a_refusal_of_the_whole_request_keeps_its_message() -> None:
 @pytest.mark.parametrize("statuses", [[{"resting": {"oid": OID}}], [], [{"filled": {"oid": "x"}}]])
 def test_an_order_answer_of_unexpected_shape_is_unavailable(statuses: list[Any]) -> None:
     with pytest.raises(OrderExchangeUnavailableError):
-        adapter(FakeSdk(order_answer=answer(statuses))).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(order_answer=answer(statuses))).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
 
 def test_an_order_without_answer_in_time_is_not_acknowledged() -> None:
     with pytest.raises(OrderNotAcknowledgedError):
-        adapter(FakeSdk(failure=requests.ReadTimeout())).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(failure=requests.ReadTimeout())).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
 
 def test_a_timeout_outside_the_order_is_an_unavailable_exchange() -> None:
     with pytest.raises(OrderExchangeUnavailableError):
-        adapter(FakeSdk(failure=requests.ReadTimeout())).market(ACCESS, "BTC")
+        adapter(FakeSdk(failure=requests.ReadTimeout())).market("BTC")
 
 
 @pytest.mark.parametrize(
@@ -284,14 +294,14 @@ def test_a_timeout_outside_the_order_is_an_unavailable_exchange() -> None:
 )
 def test_a_fault_of_the_exchange_or_of_the_network_is_unavailable(failure: Exception) -> None:
     with pytest.raises(OrderExchangeUnavailableError):
-        adapter(FakeSdk(failure=failure)).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(failure=failure)).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
 
 def test_an_error_of_the_client_is_a_refusal_without_the_secret() -> None:
     failure = ClientError(422, None, f"bad signer {WALLET.key.hex()}", None)
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(FakeSdk(failure=failure)).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(failure=failure)).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
     assert raised.value.exchange_message == "bad signer ***"
 
@@ -299,7 +309,7 @@ def test_an_error_of_the_client_is_a_refusal_without_the_secret() -> None:
 def test_a_rate_limit_of_the_exchange_keeps_its_code_in_the_cause() -> None:
     # ADR permanenza-decisa-dall-errore-base: the adapter only keeps the cause, the base error reads the 429 in it.
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(FakeSdk(failure=ClientError(429, None, "null", None))).market(ACCESS, "BTC")
+        adapter(FakeSdk(failure=ClientError(429, None, "null", None))).market("BTC")
 
     assert isinstance(raised.value.__cause__, ClientError)
     assert raised.value.__cause__.status_code == 429
@@ -311,7 +321,9 @@ def test_an_invalid_key_is_refused_before_reaching_the_exchange() -> None:
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
         adapter(sdk).place_market_order(
-            TradingAccess("Hyperliquid", {"account_address": ADDRESS, "secret_key": "not-a-key"}), an_order()
+            TradingAccess("Hyperliquid", {"account_address": ADDRESS, "secret_key": "not-a-key"}),
+            an_order(),
+            BTC_MARKET,
         )
 
     assert raised.value.exchange_message == INVALID_KEY_MESSAGE
@@ -346,14 +358,14 @@ def test_an_order_status_of_unexpected_shape_is_unavailable() -> None:
 
 def test_fills_of_unexpected_shape_are_unavailable() -> None:
     with pytest.raises(OrderExchangeUnavailableError):
-        adapter(FakeSdk(fills=[{"oid": OID, "sz": "0.1"}])).place_market_order(ACCESS, an_order())
+        adapter(FakeSdk(fills=[{"oid": OID, "sz": "0.1"}])).place_market_order(ACCESS, an_order(), BTC_MARKET)
 
 
 @pytest.mark.parametrize(("testnet", "url"), [(True, TESTNET_API_URL), (False, MAINNET_API_URL)])
 def test_the_network_is_chosen_by_the_installation(testnet: bool, url: str) -> None:
     sdk = FakeSdk()
 
-    HyperliquidOrderExchangeAdapter.for_network(testnet=testnet, sdk=sdk).market(ACCESS, "BTC")
+    HyperliquidOrderExchangeAdapter.for_network(testnet=testnet, sdk=sdk).market("BTC")
 
     assert calls_named(sdk, "info") == [(url, TIMEOUT_SECONDS)]
 
@@ -393,7 +405,7 @@ def test_an_access_without_a_field_of_the_exchange_is_refused_before_reaching_it
     fields = {name: value for name, value in ACCESS.fields.items() if name != missing}
 
     with pytest.raises(ExchangeRejectedOrderError) as raised:
-        adapter(sdk).place_market_order(TradingAccess("Hyperliquid", fields), an_order())
+        adapter(sdk).place_market_order(TradingAccess("Hyperliquid", fields), an_order(), BTC_MARKET)
 
     assert raised.value.exchange_message == MISSING_FIELD_MESSAGE
     assert calls_named(sdk, "market_open") == []

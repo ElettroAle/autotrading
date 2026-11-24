@@ -42,6 +42,9 @@ class FakeOrderExchangeAdapter:
         self.positions: dict[tuple[str, str], HeldPosition] = {}
         self.sent: list[MarketOrder] = []
         self.signers: list[TradingAccess] = []
+        self.market_readings: list[str] = []
+        # The market each order was sent with, as the use case read it before.
+        self.priced_on: list[Market] = []
         self.lookups: list[ClientOrderId] = []
         self.executions: dict[ClientOrderId, Execution] = {}
         self.price_moves: dict[str, Decimal] = {}
@@ -78,8 +81,8 @@ class FakeOrderExchangeAdapter:
         self._fail_reading()
         return self.positions.get((access.value("account_address"), coin))
 
-    def market(self, access: TradingAccess, coin: str) -> Market:
-        self.signers.append(access)
+    def market(self, coin: str) -> Market:
+        self.market_readings.append(coin)
         self._require_reachable()
         self._fail_reading()
         market = self.markets.get(coin)
@@ -94,8 +97,9 @@ class FakeOrderExchangeAdapter:
         self.leverages[access.value("account_address"), coin] = leverage
         self.margins[access.value("account_address"), coin] = margin
 
-    def place_market_order(self, access: TradingAccess, order: MarketOrder) -> Execution:
+    def place_market_order(self, access: TradingAccess, order: MarketOrder, market: Market) -> Execution:
         self.sent.append(order)
+        self.priced_on.append(market)
         self._require_reachable()
         if self.unreached_sendings > 0:
             self.unreached_sendings -= 1

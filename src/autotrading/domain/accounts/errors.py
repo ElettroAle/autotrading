@@ -95,3 +95,24 @@ class DeviationThresholdOutOfRangeError(DomainError):
     @property
     def details(self) -> Mapping[str, object]:
         return {"percent": str(self.percent)}
+
+
+class VirtualBalanceRequiredError(DomainError):
+    """An account of an exchange that holds a virtual balance starts from the one the user gives (R6.3.2)."""
+
+    status_code = 422
+
+    def __init__(self) -> None:
+        super().__init__("saldo virtuale obbligatorio per questo exchange")
+
+
+class InvalidVirtualBalanceError(DomainError):
+    status_code = 422
+
+    def __init__(self, amount: Decimal) -> None:
+        super().__init__("il saldo virtuale deve essere maggiore di zero")
+        self.amount = amount
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"amount": str(self.amount)}

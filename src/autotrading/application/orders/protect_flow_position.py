@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.orders.ports import (
-    ExchangePort,
+    ExchangeConnection,
     OrderRepositoryPort,
     ProtectionExchangePort,
     ProtectionRepositoryPort,
@@ -87,14 +87,12 @@ class ProtectFlowPositionUseCase:
 
     def __init__(
         self,
-        exchanges: Mapping[str, ExchangePort],
-        protection_exchanges: Mapping[str, ProtectionExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         protections: ProtectionRepositoryPort,
         orders: OrderRepositoryPort,
         slippage: Slippage,
     ) -> None:
         self._exchanges = exchanges
-        self._protection_exchanges = protection_exchanges
         self._protections = protections
         self._orders = orders
         self._slippage = slippage
@@ -102,7 +100,7 @@ class ProtectFlowPositionUseCase:
     def execute(self, command: ProtectFlowPositionCommand) -> ProtectionOutcome:
         asset = command.opening.asset
         levels = command.opening.protection.levels_at(command.opening.direction, command.entry_price)
-        protection = _Protection(command, supported_exchange(self._protection_exchanges, command.access.exchange))
+        protection = _Protection(command, supported_exchange(self._exchanges, command.access.exchange).protections)
         notes = tuple(ProtectionNote(asset, note) for note in levels.notes)
         refusal = protection.refusal(ProtectionKind.STOP_LOSS, levels.stop, self._protections)
         if refusal is not None:
@@ -119,12 +117,13 @@ class ProtectFlowPositionUseCase:
     def _closed(self, command: ProtectFlowPositionCommand) -> Order | None:
         exchange = supported_exchange(self._exchanges, command.access.exchange)
         asset = command.opening.asset
-        position = command.calls.run(asset, lambda: exchange.position(command.access, asset))
+        position = command.calls.run(asset, lambda: exchange.account.position(command.access, asset))
         if position is None:
             return None
         request = OrderRequest(
             command.account_id, command.source, position.leverage, position.closing_order(self._slippage)
         )
-        closing = command.calls.run(asset, OrderSending(exchange, command.access, request).attempt)
+        market = command.calls.run(asset, lambda: exchange.market.market(asset))
+        closing = command.calls.run(asset, OrderSending(exchange.account, command.access, request, market).attempt)
         self._orders.add(closing)
         return closing

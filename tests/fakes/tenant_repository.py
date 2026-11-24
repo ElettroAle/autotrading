@@ -1,5 +1,6 @@
 from autotrading.application.tenancy.errors import TenantAlreadyExistsError
 from autotrading.domain.tenancy.tenant import Tenant
+from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -11,6 +12,9 @@ class InMemoryTenantRepositoryAdapter:
 
     def find_by_member(self, user_id: UserId) -> Tenant | None:
         return next((tenant for tenant in self.tenants if tenant.owner == user_id), None)
+
+    def tenant_ids(self) -> tuple[TenantId, ...]:
+        return tuple(tenant.id for tenant in self.tenants)
 
     def add(self, tenant: Tenant) -> None:
         if self._refuse_next_add:

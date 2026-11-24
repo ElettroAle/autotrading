@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import ProtectedPositionPort, ProtectionExchangePort, ProtectionRepositoryPort
+from autotrading.application.orders.ports import ExchangeConnection, ProtectedPositionPort, ProtectionRepositoryPort
 from autotrading.application.orders.sending import cancel_protection, supported_exchange
 
 
@@ -24,7 +24,7 @@ class CancelProtectionsUseCase:
     def __init__(
         self,
         access: OpenTradingAccessUseCase,
-        exchanges: Mapping[str, ProtectionExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         protections: ProtectionRepositoryPort,
     ) -> None:
         self._access = access
@@ -36,7 +36,7 @@ class CancelProtectionsUseCase:
         if not placed:
             return
         access = self._access.execute(OpenTradingAccessCommand(position.account_id))
-        exchange = supported_exchange(self._exchanges, access.exchange)
+        exchange = supported_exchange(self._exchanges, access.exchange).protections
         for protection in placed:
             cancel_protection(exchange, access, protection)
         self._protections.remove(position.account_id, position.asset)

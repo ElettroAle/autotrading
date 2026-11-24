@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.orders.ports import ExchangePort, ProtectionExchangePort, ProtectionRepositoryPort
+from autotrading.application.orders.ports import ExchangeConnection, ProtectionExchangePort, ProtectionRepositoryPort
 from autotrading.application.orders.sending import (
     ProtectionPlacing,
     RetriedCalls,
@@ -94,26 +94,24 @@ class UpdateFlowProtectionUseCase:
 
     def __init__(
         self,
-        exchanges: Mapping[str, ExchangePort],
-        protection_exchanges: Mapping[str, ProtectionExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         protections: ProtectionRepositoryPort,
     ) -> None:
         self._exchanges = exchanges
-        self._protection_exchanges = protection_exchanges
         self._protections = protections
 
     def execute(self, command: UpdateFlowProtectionCommand) -> tuple[ProtectionNote, ...]:
         update, access, calls = command.update, command.access, command.calls
         exchange = supported_exchange(self._exchanges, access.exchange)
-        position = calls.run(update.asset, lambda: exchange.position(access, update.asset))
+        position = calls.run(update.asset, lambda: exchange.account.position(access, update.asset))
         if position is None:
             # Closed meanwhile, by its protection or by hand: there is nothing left to protect.
             return ()
         replacement = _Replacement(
             command,
             position,
-            calls.run(update.asset, lambda: exchange.market(access, update.asset)),
-            supported_exchange(self._protection_exchanges, command.access.exchange),
+            calls.run(update.asset, lambda: exchange.market.market(update.asset)),
+            exchange.protections,
             self._protections,
         )
         texts = self._replaced(replacement, update, position)

@@ -118,3 +118,12 @@ def test_a_whole_price_keeps_every_digit_beyond_the_significant_figures() -> Non
 
 def test_a_market_without_price_rules_keeps_the_price() -> None:
     assert BTC.rounded_price(Decimal("57017.123")) == Decimal("57017.123")
+
+
+def test_a_negative_fee_rate_is_refused() -> None:
+    with pytest.raises(InvalidMarketError):
+        Market("BTC", 40, 5, Decimal(1), Decimal(10), taker_fee_rate=Decimal(-1))
+
+
+def test_a_market_without_a_declared_fee_takes_none() -> None:
+    assert BTC.taker_fee_rate == 0

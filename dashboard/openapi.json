@@ -124,6 +124,58 @@
         ]
       }
     },
+    "/accounts/{account_id}/virtual-balance": {
+      "put": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Reset Virtual Balance",
+        "description": "Starts the account again from the balance given, its positions closed and its orders cancelled, on an\nexchange that holds a virtual balance (R6.3.2).",
+        "operationId": "reset_virtual_balance_accounts__account_id__virtual_balance_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VirtualBalanceResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/accounts/{account_id}": {
       "get": {
         "tags": [
@@ -5924,6 +5976,20 @@
               }
             ],
             "title": "Expires On"
+          },
+          "virtual_balance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Virtual Balance"
           }
         },
         "type": "object",
@@ -7769,6 +7835,10 @@
           "expiry_editable": {
             "type": "boolean",
             "title": "Expiry Editable"
+          },
+          "virtual_balance": {
+            "type": "boolean",
+            "title": "Virtual Balance"
           }
         },
         "type": "object",
@@ -7777,7 +7847,8 @@
           "network",
           "network_name",
           "fields",
-          "expiry_editable"
+          "expiry_editable",
+          "virtual_balance"
         ],
         "title": "ExchangeResponse"
       },
@@ -12736,6 +12807,27 @@
         ],
         "title": "VersionResponse",
         "description": "One configuration version of a flow in the list: its number and when it was saved (R2.3.5)."
+      },
+      "VirtualBalanceResetRequest": {
+        "properties": {
+          "balance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Balance"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance"
+        ],
+        "title": "VirtualBalanceResetRequest",
+        "description": "The balance an account of an exchange with a virtual balance starts again from (R6.3.2)."
       }
     },
     "securitySchemes": {

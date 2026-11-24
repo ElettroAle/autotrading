@@ -7,7 +7,7 @@ from uuid import UUID
 from autotrading.application.orders.cancel_protections import CancelProtectionsCommand, CancelProtectionsUseCase
 from autotrading.application.orders.errors import ExchangeRejectedOrderError
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort, SendingRetryPort
+from autotrading.application.orders.ports import ExchangeConnection, OrderRepositoryPort, SendingRetryPort
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionCommand, ProtectFlowPositionUseCase
 from autotrading.application.orders.sending import OrderSending, RetriedCalls, supported_exchange
 from autotrading.application.orders.update_flow_protection import (
@@ -75,7 +75,7 @@ class FlowOrderProtection:
 
 @dataclass(frozen=True, slots=True)
 class _Sending:
-    exchange: ExchangePort
+    exchange: ExchangeConnection
     access: TradingAccess
     command: ExecuteFlowOrdersCommand
     calls: RetriedCalls
@@ -104,7 +104,7 @@ class ExecuteFlowOrdersUseCase:
     def __init__(  # noqa: PLR0913, PLR0917 - the exchanges and the record of the orders, their protection and retry
         self,
         access: OpenTradingAccessUseCase,
-        exchanges: Mapping[str, ExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         orders: OrderRepositoryPort,
         slippage: Slippage,
         protection: FlowOrderProtection,
@@ -145,14 +145,15 @@ class ExecuteFlowOrdersUseCase:
 
     def _closed(self, sending: _Sending, closing: FlowClosing) -> FlowOrdersOutcome:
         position = self._retried(
-            sending, closing.asset, lambda: sending.exchange.position(sending.access, closing.asset)
+            sending, closing.asset, lambda: sending.exchange.account.position(sending.access, closing.asset)
         )
         if position is None:
             # Closed on the exchange meanwhile, by a liquidation or by hand: there is nothing left to close.
             operations.info("nessuna posizione da chiudere", extra={"coin": closing.asset})
             return FlowOrdersOutcome()
         request = sending.request(closing, position.leverage, position.closing_order(self._slippage))
-        order = self._recorded(self._sent(sending, closing.asset, request))
+        market = self._retried(sending, closing.asset, lambda: sending.exchange.market.market(closing.asset))
+        order = self._recorded(self._sent(sending, request, market))
         if order.execution is not None:
             # A cancellation tried again finds gone what the lost attempt cancelled: the whole of it goes again.
             cancellation = CancelProtectionsCommand(sending.command.account_id, closing.asset)
@@ -160,7 +161,7 @@ class ExecuteFlowOrdersUseCase:
         return FlowOrdersOutcome((order,))
 
     def _opened(self, sending: _Sending, opening: FlowOpening) -> FlowOrdersOutcome:
-        market = self._retried(sending, opening.asset, lambda: sending.exchange.market(sending.access, opening.asset))
+        market = self._retried(sending, opening.asset, lambda: sending.exchange.market.market(opening.asset))
         market.require_leverage(opening.leverage)
         market_order = MarketOrder.opening(
             opening.asset, opening.direction, market.size_for(opening.value), self._slippage
@@ -169,13 +170,14 @@ class ExecuteFlowOrdersUseCase:
         refusal = self._retried(sending, opening.asset, lambda: _leverage_refusal(sending, opening))
         if refusal is not None:
             return FlowOrdersOutcome((self._recorded(Order.rejected(request, refusal)),))
-        order = self._recorded(self._sent(sending, opening.asset, request))
+        order = self._recorded(self._sent(sending, request, market))
         if order.execution is None:
             return FlowOrdersOutcome((order,))
         return self._protected(sending, opening, order, (order.execution, market))
 
-    def _sent(self, sending: _Sending, asset: str, request: OrderRequest) -> Order:
-        return self._retried(sending, asset, OrderSending(sending.exchange, sending.access, request).attempt)
+    def _sent(self, sending: _Sending, request: OrderRequest, market: Market) -> Order:
+        attempt = OrderSending(sending.exchange.account, sending.access, request, market).attempt
+        return self._retried(sending, request.market_order.coin, attempt)
 
     @staticmethod
     def _retried[T](sending: _Sending, asset: str, call: Callable[[], T]) -> T:
@@ -209,7 +211,9 @@ class ExecuteFlowOrdersUseCase:
 def _leverage_refusal(sending: _Sending, opening: FlowOpening) -> Rejection | None:
     """The leverage the exchange refused is an outcome of the order, not an error to retry."""
     try:
-        sending.exchange.set_leverage(sending.access, opening.asset, opening.leverage, MarginMode.per_position())
+        sending.exchange.account.set_leverage(
+            sending.access, opening.asset, opening.leverage, MarginMode.per_position()
+        )
     except ExchangeRejectedOrderError as error:
         return Rejection.of(error.exchange_message)
     return None

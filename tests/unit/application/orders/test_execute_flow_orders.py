@@ -32,6 +32,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, FakeTradingAccessAdapter
+from tests.support.exchange_connections import connection_of
 from tests.support.retries import unlimited_retry
 from tests.support.trading import HYPERLIQUID, new_access
 
@@ -99,17 +100,17 @@ def a_use_case(
     protection: tuple[FakeProtectionExchangeAdapter, InMemoryProtectionRepositoryAdapter],
     waits: FakePauseAdapter,
 ) -> ExecuteFlowOrdersUseCase:
-    protection_exchanges, protections = {HYPERLIQUID: protection[0]}, protection[1]
-    exchanges = {HYPERLIQUID: exchange}
+    protections = protection[1]
+    exchanges = {HYPERLIQUID: connection_of(exchange, protection[0])}
     return ExecuteFlowOrdersUseCase(
         accesses.use_case,
         exchanges,
         orders,
         SLIPPAGE,
         FlowOrderProtection(
-            ProtectFlowPositionUseCase(exchanges, protection_exchanges, protections, orders, SLIPPAGE),
-            CancelProtectionsUseCase(accesses.use_case, protection_exchanges, protections),
-            UpdateFlowProtectionUseCase(exchanges, protection_exchanges, protections),
+            ProtectFlowPositionUseCase(exchanges, protections, orders, SLIPPAGE),
+            CancelProtectionsUseCase(accesses.use_case, exchanges, protections),
+            UpdateFlowProtectionUseCase(exchanges, protections),
         ),
         unlimited_retry(waits),
     )

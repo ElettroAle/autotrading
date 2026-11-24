@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import ExchangePort
+from autotrading.application.orders.ports import ExchangeConnection
 from autotrading.application.orders.sending import supported_exchange
 from autotrading.domain.orders.market import Market
 
@@ -20,10 +20,10 @@ class ReadMarketUseCase:
     The procedure of verification chooses the value of its opening by them; nothing is sent.
     """
 
-    def __init__(self, access: OpenTradingAccessUseCase, exchanges: Mapping[str, ExchangePort]) -> None:
+    def __init__(self, access: OpenTradingAccessUseCase, exchanges: Mapping[str, ExchangeConnection]) -> None:
         self._access = access
         self._exchanges = exchanges
 
     def execute(self, command: ReadMarketCommand) -> Market:
         access = self._access.execute(OpenTradingAccessCommand(command.account_id))
-        return supported_exchange(self._exchanges, access.exchange).market(access, command.coin)
+        return supported_exchange(self._exchanges, access.exchange).market.market(command.coin)

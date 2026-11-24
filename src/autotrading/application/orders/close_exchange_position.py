@@ -5,7 +5,7 @@ from uuid import UUID
 from autotrading.application.orders.cancel_protections import CancelProtectionsCommand, CancelProtectionsUseCase
 from autotrading.application.orders.errors import NoOpenPositionError
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
+from autotrading.application.orders.ports import ExchangeConnection, OrderExchangePort, OrderRepositoryPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.order import Order, OrderRequest, OrderSource
@@ -33,7 +33,7 @@ class CloseExchangePositionUseCase:
     def __init__(
         self,
         access: OpenTradingAccessUseCase,
-        exchanges: Mapping[str, ExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         orders: OrderRepositoryPort,
         slippage: Slippage,
         protections: CancelProtectionsUseCase,
@@ -47,17 +47,17 @@ class CloseExchangePositionUseCase:
     def execute(self, command: CloseExchangePositionCommand) -> Order:
         access = self._access.execute(OpenTradingAccessCommand(command.account_id))
         exchange = supported_exchange(self._exchanges, access.exchange)
-        position = _open_position(exchange, access, command.coin)
+        position = _open_position(exchange.account, access, command.coin)
         closing = position.closing_order(self._slippage)
         request = OrderRequest(command.account_id, command.source, position.leverage, closing)
-        order = send_order(exchange, access, request)
+        order = send_order(exchange.account, access, request, exchange.market.market(command.coin))
         self._orders.add(order)
         if order.execution is not None:
             self._protections.execute(CancelProtectionsCommand(command.account_id, command.coin))
         return order
 
 
-def _open_position(exchange: ExchangePort, access: TradingAccess, coin: str) -> HeldPosition:
+def _open_position(exchange: OrderExchangePort, access: TradingAccess, coin: str) -> HeldPosition:
     position = exchange.position(access, coin)
     if position is None:
         raise NoOpenPositionError(coin)

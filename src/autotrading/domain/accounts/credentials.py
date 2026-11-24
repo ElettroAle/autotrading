@@ -4,6 +4,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
+from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.errors import (
     CredentialFieldRequiredError,
@@ -20,15 +21,40 @@ INVISIBLE_FORMAT = "Cf"
 class Credentials:
     """The data the user created on the exchange, by the name of the field the exchange declares for each.
 
-    They never appear in answers, logs, errors or exceptions, so the representation masks them all (R0.2.3).
+    They never appear in answers, logs, errors or exceptions, so the representation masks them all (R0.2.3). An account
+    of an exchange that declares no field has none: the exchange knows it by its identifier alone (R6.3.2).
     """
 
     values: Mapping[str, str] = field(repr=False)
+    account_id: AccountId | None = None
 
     def __post_init__(self) -> None:
-        if not self.values:
+        if not self.values and self.account_id is None:
             raise CredentialsRequiredError
         object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
+
+    @classmethod
+    def without_fields(cls, account_id: AccountId) -> Credentials:
+        return cls({}, account_id)
+
+    @classmethod
+    def for_account(
+        cls, account_id: AccountId, fields: Iterable[CredentialField], values: Mapping[str, str]
+    ) -> Credentials:
+        """The credentials an account is registered with: those the exchange declares, or none at all for an exchange
+        that declares no field, which then refuses any (R6.3.2).
+        """
+        declared = tuple(fields)
+        if declared:
+            return cls.declared(declared, values)
+        unknown = sorted(values)
+        if unknown:
+            raise UnknownCredentialFieldError(unknown[0])
+        return cls.without_fields(account_id)
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.values
 
     @classmethod
     def declared(cls, fields: Iterable[CredentialField], values: Mapping[str, str]) -> Credentials:
@@ -73,7 +99,7 @@ class Credentials:
         return text
 
     def __hash__(self) -> int:
-        return hash(frozenset(self.values.items()))
+        return hash((frozenset(self.values.items()), self.account_id))
 
     def __repr__(self) -> str:
         return f"Credentials({MASK})"

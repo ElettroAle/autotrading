@@ -12,12 +12,23 @@ from autotrading.application.accounts.errors import (
     ExchangeUnavailableError,
     KeyExpiryReadByAdapterError,
     UnsupportedExchangeError,
+    VirtualBalanceNotHeldError,
 )
-from autotrading.application.accounts.register_account import RegisterAccountCommand, RegisterAccountUseCase
+from autotrading.application.accounts.register_account import (
+    RegisterAccountCommand,
+    RegisterAccountUseCase,
+    RegistrationPorts,
+)
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.balance import Balance
 from autotrading.domain.accounts.credentials import Credentials
-from autotrading.domain.accounts.errors import AccountNameRequiredError, CredentialsRequiredError, ExchangeRequiredError
+from autotrading.domain.accounts.errors import (
+    AccountNameRequiredError,
+    CredentialsRequiredError,
+    ExchangeRequiredError,
+    UnknownCredentialFieldError,
+    VirtualBalanceRequiredError,
+)
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.key_expiry import KeyExpiry
@@ -27,6 +38,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
 from tests.fakes.credential_sealer import FakeCredentialSealerAdapter
 from tests.fakes.exchange import REDACTED_REJECTION, FakeExchangeAdapter, rejection_message
+from tests.fakes.simulated_exchange import SIMULATED, InMemorySimulatedExchangeAdapter, SimulatedExchangeStore
 from tests.support.accounts import an_account
 from tests.support.credentials import HYPERLIQUID_FIELDS, credentials_of
 from tests.support.platform import HYPERLIQUID, new_credentials, registration
@@ -51,7 +63,8 @@ def exchange() -> FakeExchangeAdapter:
 
 @pytest.fixture
 def use_case(repository: InMemoryAccountRepositoryAdapter, exchange: FakeExchangeAdapter) -> RegisterAccountUseCase:
-    return RegisterAccountUseCase(TENANT, repository, FakeCredentialSealerAdapter(TENANT), {HYPERLIQUID: exchange})
+    ports = RegistrationPorts(repository, FakeCredentialSealerAdapter(TENANT), {HYPERLIQUID: exchange}, {})
+    return RegisterAccountUseCase(TENANT, ports)
 
 
 def accepted(exchange: FakeExchangeAdapter, name: str = "test-1") -> RegisterAccountCommand:
@@ -259,4 +272,63 @@ def test_a_refusal_while_reading_the_expiry_keeps_the_text_of_the_exchange_maske
         use_case.execute(command)
 
     assert raised.value.exchange_message == REDACTED_REJECTION
+    assert store.accounts == []
+
+
+def simulated_registration(
+    repository: InMemoryAccountRepositoryAdapter, exchange: FakeExchangeAdapter
+) -> tuple[RegisterAccountUseCase, InMemorySimulatedExchangeAdapter]:
+    simulated = InMemorySimulatedExchangeAdapter(SimulatedExchangeStore(), TENANT)
+    ports = RegistrationPorts(
+        repository,
+        FakeCredentialSealerAdapter(TENANT),
+        {HYPERLIQUID: exchange, SIMULATED: simulated},
+        {SIMULATED: simulated},
+    )
+    return RegisterAccountUseCase(TENANT, ports), simulated
+
+
+def test_an_account_of_an_exchange_with_a_virtual_balance_starts_from_the_balance_given(
+    repository: InMemoryAccountRepositoryAdapter, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    use_case, simulated = simulated_registration(repository, exchange)
+
+    result = use_case.execute(RegisterAccountCommand("prova", SIMULATED, {}, virtual_balance=Decimal(1000)))
+
+    assert result.balance == Balance(Decimal(1000), "USDC")
+    assert store.accounts == [result.account]
+    assert result.account.credentials == SealedCredentials.none()
+    assert simulated.book_of(result.account.id.value).account.balance == Decimal(1000)
+
+
+def test_an_exchange_with_a_virtual_balance_asks_it(
+    repository: InMemoryAccountRepositoryAdapter, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    use_case, _ = simulated_registration(repository, exchange)
+
+    with pytest.raises(VirtualBalanceRequiredError):
+        use_case.execute(RegisterAccountCommand("prova", SIMULATED, {}))
+
+    assert store.accounts == []
+
+
+def test_an_exchange_without_credentials_refuses_any(
+    repository: InMemoryAccountRepositoryAdapter, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    use_case, _ = simulated_registration(repository, exchange)
+
+    with pytest.raises(UnknownCredentialFieldError):
+        use_case.execute(RegisterAccountCommand("prova", SIMULATED, {"secret_key": "0x1"}, virtual_balance=Decimal(5)))
+
+    assert store.accounts == []
+
+
+def test_an_exchange_with_funds_refuses_a_virtual_balance(
+    use_case: RegisterAccountUseCase, exchange: FakeExchangeAdapter, store: AccountStore
+) -> None:
+    command = replace(accepted(exchange), virtual_balance=Decimal(1000))
+
+    with pytest.raises(VirtualBalanceNotHeldError):
+        use_case.execute(command)
+
     assert store.accounts == []

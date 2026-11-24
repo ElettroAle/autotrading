@@ -29,6 +29,7 @@ from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.trading_access import TENANT, AccountsUnavailableError, FakeTradingAccessAdapter
+from tests.support.exchange_connections import connection_of
 from tests.support.retries import unlimited_retry
 from tests.support.trading import HYPERLIQUID, new_access
 
@@ -115,10 +116,10 @@ class Bench:
 
     def use_case(self) -> ExecuteCycleOrdersUseCase:
         access, slippage = self.accesses.use_case, Slippage.default()
-        exchanges, protection_exchanges = {HYPERLIQUID: self.exchange}, {HYPERLIQUID: self.protection_exchange}
-        cancel = CancelProtectionsUseCase(access, protection_exchanges, self.protections)
-        protect = ProtectFlowPositionUseCase(exchanges, protection_exchanges, self.protections, self.orders, slippage)
-        update = UpdateFlowProtectionUseCase(exchanges, protection_exchanges, self.protections)
+        exchanges = {HYPERLIQUID: connection_of(self.exchange, self.protection_exchange)}
+        cancel = CancelProtectionsUseCase(access, exchanges, self.protections)
+        protect = ProtectFlowPositionUseCase(exchanges, self.protections, self.orders, slippage)
+        update = UpdateFlowProtectionUseCase(exchanges, self.protections)
         execute = ExecuteFlowOrdersUseCase(
             access,
             exchanges,
@@ -127,9 +128,7 @@ class Bench:
             FlowOrderProtection(protect, cancel, update),
             unlimited_retry(self.waits),
         )
-        protect_open = ProtectOpenPositionsUseCase(
-            access, exchanges, protection_exchanges, self.protections, unlimited_retry(self.waits)
-        )
+        protect_open = ProtectOpenPositionsUseCase(access, exchanges, self.protections, unlimited_retry(self.waits))
         return ExecuteCycleOrdersUseCase(execute, self.told.follow(), protect_open)
 
     def hold(self, asset: str, entry_price: Decimal = Decimal(100)) -> None:

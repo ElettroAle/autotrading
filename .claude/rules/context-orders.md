@@ -29,6 +29,10 @@ paths:
 
 ## Porte del contesto
 
-`ExchangePort` (ordini, ricerca per identificativo, metadati degli asset), `OrderRepositoryPort`.
+Le porte dell'exchange sono divise fra lettura del mercato e operazioni del conto (ADR
+exchange-simulato-con-porte-di-lettura-e-scrittura): `MarketReaderPort` (mercato e metadati degli asset, senza
+l'accesso al conto), `OrderExchangePort` (posizione, leva, ordini e ricerca per identificativo, con l'accesso del conto),
+`ProtectionExchangePort` (protezioni), riunite per exchange in `ExchangeConnection`; `OrderAccountPort`,
+`OrderRepositoryPort`.
 Gli ordini approvati di un ciclo arrivano da `flows` come `CycleOrdersPort` con elementi `ApprovedOrderPort`;
 `ExecuteCycleOrdersUseCase` li invia e li segue (ADR 0098).

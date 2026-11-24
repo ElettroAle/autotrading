@@ -17,19 +17,20 @@ import {
   type AccountRegistrationInput,
 } from '../api/register-account';
 
-const FIELDS = ['name', 'exchange', 'expires_on'] as const;
+const FIELDS = ['name', 'exchange', 'expires_on', 'virtual_balance'] as const;
 
 const EMPTY_FORM: AccountRegistrationInput = {
   name: '',
   exchange: '',
   credentials: {},
   expires_on: '',
+  virtual_balance: '',
 };
 
 /**
  * Registers an account on an exchange the API supports (R2.3.8), asking the data that exchange declares (R2.3.9): the
  * API checks the credentials with the exchange before saving them (R0.2.1), and the form warns when the chosen
- * exchange trades real money (ADR 0157).
+ * exchange trades real money (ADR 0157). An exchange that holds a virtual balance asks it instead (R6.3.2).
  */
 export const RegisterAccountForm = () => {
   const registration = useRegisterAccount();
@@ -108,6 +109,15 @@ export const RegisterAccountForm = () => {
           registerField={(name) => register(`credentials.${name}`)}
           reasonOf={(name) => errors.credentials?.[name]?.message}
         />
+        {/* Only where the exchange holds a virtual balance, as the API says (R6.3.2). */}
+        {exchange?.virtual_balance === true && (
+          <InputField
+            label="Saldo virtuale"
+            inputMode="decimal"
+            error={errors.virtual_balance}
+            {...register('virtual_balance')}
+          />
+        )}
         {/* Only where the exchange does not read the expiry of the credentials, as the API says (R6.2.2). */}
         {exchange?.expiry_editable === true && (
           <InputField

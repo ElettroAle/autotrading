@@ -9,6 +9,7 @@ from autotrading.domain.accounts.account_state import AccountState
 from autotrading.domain.accounts.credential_field import CredentialField
 from autotrading.domain.accounts.credentials import Credentials
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
+from autotrading.domain.accounts.virtual_balance import VirtualBalance
 
 
 class ExchangePort(Protocol):
@@ -39,6 +40,23 @@ class ExchangePort(Protocol):
         """The day, in UTC, the credentials stop working as the exchange tells it; none when it tells none for them.
 
         Raises ExchangeRejectedCredentialsError with the message of the exchange, or ExchangeUnavailableError.
+        """
+        ...
+
+
+class VirtualBalancePort(Protocol):
+    """The virtual balance of the accounts of the tenant on an exchange that holds one instead of funds (R6.3.2), bound
+    to the tenant of the request like every port of owned data.
+    """
+
+    def open(self, account_id: AccountId, balance: VirtualBalance) -> None:
+        """The account starts from the balance, with nothing open."""
+        ...
+
+    def reset(self, account_id: AccountId, balance: VirtualBalance) -> None:
+        """Every position of the account closed and every order cancelled, then the balance brought to the one given.
+
+        Raises AccountNotFoundError for an account the exchange does not hold for the tenant.
         """
         ...
 

@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from uuid import UUID
 
+from autotrading.application.flows.account_references import reference_of
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import (
     ActivityReaderPort,
@@ -28,4 +29,4 @@ class ReadAccountActivityUseCase:
         reader = self._readers.get(sealed.exchange)
         if reader is None:
             raise FlowExchangeUnavailableError
-        return reader.activity(self._opener.open_reference(sealed, reader.reference_fields()))
+        return reader.activity(reference_of(self._opener, sealed, reader.reference_fields()))

@@ -669,3 +669,76 @@ inbox_notifications = Table(
     Column("read_at", DateTime(timezone=True)),
     Index("inbox_notifications_newest", "tenant_id", text("notified_at DESC"), text("id DESC")),
 )
+
+# The accounts of the simulated exchange: the virtual balance, the leverage set on each asset, the open positions, the
+# protections and the history of the executions and movements, each of one tenant (R6.3.2, ADR
+# exchange-simulato-con-porte-di-lettura-e-scrittura).
+simulated_accounts = Table(
+    "simulated_accounts",
+    metadata,
+    Column("account_id", Uuid, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("balance", Numeric, nullable=False),
+    Column("leverages", JSON, nullable=False),
+)
+
+simulated_positions = Table(
+    "simulated_positions",
+    metadata,
+    Column("account_id", Uuid, ForeignKey("simulated_accounts.account_id"), primary_key=True),
+    Column("coin", Text, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("direction", Text, nullable=False),
+    Column("size", Numeric, nullable=False),
+    Column("leverage", Integer, nullable=False),
+    Column("entry_price", Numeric, nullable=False),
+    Column("margin", Numeric, nullable=False),
+    Column("maintenance_rate", Numeric, nullable=False),
+    Column("mark_price", Numeric),
+)
+
+simulated_protections = Table(
+    "simulated_protections",
+    metadata,
+    Column("order_id", Text, primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, ForeignKey("simulated_accounts.account_id"), nullable=False),
+    Column("coin", Text, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("closing_direction", Text, nullable=False),
+    Column("trigger_price", Numeric, nullable=False),
+    Column("client_order_id", Uuid, nullable=False, unique=True),
+    Column("placed_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    # Set once the protection stops waiting: executed, cancelled, or gone with its position.
+    Column("closed_at", DateTime(timezone=True)),
+)
+
+simulated_fills = Table(
+    "simulated_fills",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, ForeignKey("simulated_accounts.account_id"), nullable=False),
+    Column("exchange_order_id", Text, nullable=False),
+    Column("client_order_id", Uuid),
+    Column("coin", Text, nullable=False),
+    Column("is_buy", Boolean, nullable=False),
+    Column("size", Numeric, nullable=False),
+    Column("price", Numeric, nullable=False),
+    Column("fee", Numeric, nullable=False),
+    Column("realized_pnl", Numeric, nullable=False),
+    Column("start_position", Numeric, nullable=False),
+    Column("liquidation", Boolean, nullable=False),
+    Column("executed_at", DateTime(timezone=True), nullable=False),
+    Index("simulated_fills_of_account", "tenant_id", "account_id", "executed_at"),
+)
+
+simulated_movements = Table(
+    "simulated_movements",
+    metadata,
+    Column("id", BigInteger, Identity(), primary_key=True),
+    Column("tenant_id", Uuid, ForeignKey("tenants.id"), nullable=False),
+    Column("account_id", Uuid, ForeignKey("simulated_accounts.account_id"), nullable=False),
+    Column("amount", Numeric, nullable=False),
+    Column("moved_at", DateTime(timezone=True), nullable=False),
+)

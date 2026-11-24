@@ -2,6 +2,7 @@
 
 import base64
 from collections.abc import Callable
+from decimal import Decimal
 from pathlib import Path
 from secrets import token_hex
 
@@ -17,6 +18,7 @@ from autotrading.adapters.outbound.libsodium.provider_key_opener import SodiumPr
 from autotrading.adapters.outbound.libsodium.source_secrets_opener import SodiumSourceSecretsOpenerAdapter
 from autotrading.application.sources.list_sources import SourceSystems
 from autotrading.bootstrap import WorkerCycle, cycle_of, source_systems
+from autotrading.domain.orders.simulation.simulated_execution import SimulatedExecution
 from autotrading.domain.orders.slippage import Slippage
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.notification_link import FakeNotificationLinkAdapter
@@ -25,6 +27,7 @@ from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 
 # Generated per run, as prepare-installation.sh generates it per machine.
 WORKER_TOKEN = token_hex(16)
+SIMULATION = SimulatedExecution(Slippage.percent(Decimal("0.1")))
 
 
 def _secret(secrets: Path, name: str, content: str) -> str:
@@ -67,20 +70,20 @@ def worker_configuration(secrets: Path, **overrides: str) -> dict[str, str]:
     return configuration | overrides
 
 
-def dev_installation_on_testnet() -> tuple[str, HyperliquidAdaptersOfInstallation, SourceSystems]:
-    """The dev installation with Hyperliquid and Hyperliquid Testnet, and the adapters of the sources, as bootstrap
-    hands them to the use cases (R2.3.11, R4.1.1)."""
+def dev_installation_on_testnet() -> tuple[str, HyperliquidAdaptersOfInstallation, SourceSystems, SimulatedExecution]:
+    """The dev installation with Hyperliquid and Hyperliquid Testnet, the adapters of the sources and the engine of the
+    simulated exchange, as bootstrap hands them to the use cases (R2.3.11, R4.1.1, R6.3.2)."""
     hyperliquid = hyperliquid_adapters()
-    return "dev", hyperliquid, source_systems(hyperliquid, FakePriceForecasterAdapter())
+    return "dev", hyperliquid, source_systems(hyperliquid, FakePriceForecasterAdapter()), SIMULATION
 
 
 def cycles_of_installation(opener: SodiumCredentialOpenerAdapter) -> Callable[[TenantId], WorkerCycle]:
     """The cycles of the worker of an installation dev on the testnet, on a database that is never reached."""
-    environment, hyperliquid, _ = dev_installation_on_testnet()
+    environment, hyperliquid, _, simulation = dev_installation_on_testnet()
     return cycle_of(
         create_engine("sqlite://"),
         (opener, SodiumProviderKeyOpenerAdapter({}), SodiumSourceSecretsOpenerAdapter({})),
-        (environment, Slippage.default(), hyperliquid),
+        (environment, Slippage.default(), hyperliquid, simulation),
         (InMemoryOutboxAdapter(), FakeNotificationLinkAdapter()),
         ({}, FakePriceForecasterAdapter()),
     )
@@ -91,5 +94,5 @@ def worker_cycles_of_installation(
 ) -> tuple[Callable[[TenantId], WorkerCycle], SourceSystems, SodiumSourceSecretsOpenerAdapter]:
     """The cycles of the worker of an installation dev on the testnet with what the trial of a source reads: the
     adapters of the sources and the opener of their secrets (R6.3.1)."""
-    _, _, systems = dev_installation_on_testnet()
+    _, _, systems, _ = dev_installation_on_testnet()
     return cycles_of_installation(opener), systems, SodiumSourceSecretsOpenerAdapter({})

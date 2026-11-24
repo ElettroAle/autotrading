@@ -4,7 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import ExchangePort, OrderRepositoryPort
+from autotrading.application.orders.ports import ExchangeConnection, OrderRepositoryPort
 from autotrading.application.orders.sending import send_order, supported_exchange
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.margin_mode import MarginMode
@@ -33,7 +33,7 @@ class OpenPositionUseCase:
     def __init__(
         self,
         access: OpenTradingAccessUseCase,
-        exchanges: Mapping[str, ExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         orders: OrderRepositoryPort,
         slippage: Slippage,
     ) -> None:
@@ -45,14 +45,13 @@ class OpenPositionUseCase:
     def execute(self, command: OpenPositionCommand) -> Order:
         access = self._access.execute(OpenTradingAccessCommand(command.account_id))
         exchange = supported_exchange(self._exchanges, access.exchange)
-        market = exchange.market(access, command.coin)
+        market = exchange.market.market(command.coin)
         market.require_leverage(command.leverage)
         market_order = MarketOrder.opening(
             command.coin, command.direction, market.size_for(command.value), self._slippage
         )
-        exchange.set_leverage(access, command.coin, command.leverage, MarginMode.per_position())
-        order = send_order(
-            exchange, access, OrderRequest(command.account_id, command.source, command.leverage, market_order)
-        )
+        exchange.account.set_leverage(access, command.coin, command.leverage, MarginMode.per_position())
+        request = OrderRequest(command.account_id, command.source, command.leverage, market_order)
+        order = send_order(exchange.account, access, request, market)
         self._orders.add(order)
         return order

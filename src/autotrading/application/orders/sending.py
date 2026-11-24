@@ -5,8 +5,9 @@ from autotrading.application.orders.errors import (
     OrderNotAcknowledgedError,
     UnsupportedOrderExchangeError,
 )
-from autotrading.application.orders.ports import ExchangePort, ProtectionExchangePort, SendingRetryPort
+from autotrading.application.orders.ports import OrderExchangePort, ProtectionExchangePort, SendingRetryPort
 from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
+from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderRequest
 from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_order import ProtectionOrder
@@ -50,10 +51,13 @@ class OrderSending:
     its client order id, and an order it knows is never sent twice. Only an order it does not know goes again.
     """
 
-    def __init__(self, exchange: ExchangePort, access: TradingAccess, request: OrderRequest) -> None:
+    def __init__(
+        self, exchange: OrderExchangePort, access: TradingAccess, request: OrderRequest, market: Market
+    ) -> None:
         self._exchange = exchange
         self._access = access
         self._request = request
+        self._market = market
         self._tried = False
 
     def attempt(self) -> Order:
@@ -62,7 +66,7 @@ class OrderSending:
             if known is not None:
                 return Order.executed(self._request, known)
         self._tried = True
-        return send_order(self._exchange, self._access, self._request)
+        return send_order(self._exchange, self._access, self._request, self._market)
 
 
 class ProtectionPlacing:
@@ -103,16 +107,16 @@ def cancel_protection(exchange: ProtectionExchangePort, access: TradingAccess, p
         return
 
 
-def send_order(exchange: ExchangePort, access: TradingAccess, request: OrderRequest) -> Order:
+def send_order(exchange: OrderExchangePort, access: TradingAccess, request: OrderRequest, market: Market) -> Order:
     """Sends the order once, never again: a refusal is an outcome, an order without answer is looked up (R0.3.3)."""
     try:
-        return Order.executed(request, exchange.place_market_order(access, request.market_order))
+        return Order.executed(request, exchange.place_market_order(access, request.market_order, market))
     except ExchangeRejectedOrderError as error:
         return Order.rejected(request, Rejection.of(error.exchange_message))
     except OrderNotAcknowledgedError:
         return _looked_up(exchange, access, request)
 
 
-def _looked_up(exchange: ExchangePort, access: TradingAccess, request: OrderRequest) -> Order:
+def _looked_up(exchange: OrderExchangePort, access: TradingAccess, request: OrderRequest) -> Order:
     execution = exchange.find_order(access, request.market_order)
     return Order.unknown(request) if execution is None else Order.executed(request, execution)

@@ -14,7 +14,9 @@ from autotrading.application.flows.ports import (
     FlowAccountNamePort,
     SealedAddressPort,
 )
+from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.sealed_address import SealedAddress
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,9 +54,15 @@ class ReadCycleAccountUseCase:
         if reader is None:
             raise FlowExchangeUnavailableError
         try:
-            account = reader.cycle_reading(self._opener.open_cycle_access(sealed))
+            account = reader.cycle_reading(self._access_of(sealed))
         except FlowCredentialsNotOpenedError as error:
             raise FlowCredentialsRejectedError(name, account_id, str(error)) from error
         except FlowCredentialsRefusedError as error:
             raise FlowCredentialsRejectedError(name, account_id, error.reason) from error
         return CycleAccountReading(name, sealed.exchange, account)
+
+    def _access_of(self, sealed: SealedAddress) -> CycleAccess:
+        """An account of an exchange without credentials has nothing to open (R6.3.2)."""
+        if not sealed.has_credentials:
+            return CycleAccess.without_credentials(sealed.account_id)
+        return self._opener.open_cycle_access(sealed)

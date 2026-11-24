@@ -15,3 +15,8 @@ class SealedAccess:
     exchange: str
     key_version: int
     ciphertext: bytes = field(repr=False)
+
+    @property
+    def has_credentials(self) -> bool:
+        """False for an account of an exchange without credentials: nothing is opened for it (R6.3.2)."""
+        return bool(self.ciphertext)

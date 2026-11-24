@@ -4,12 +4,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
-from autotrading.application.orders.ports import (
-    ExchangePort,
-    ProtectionExchangePort,
-    ProtectionRepositoryPort,
-    SendingRetryPort,
-)
+from autotrading.application.orders.ports import ExchangeConnection, ProtectionRepositoryPort, SendingRetryPort
 from autotrading.application.orders.sending import ProtectionPlacing, RetriedCalls, supported_exchange
 from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 from autotrading.domain.orders.held_position import HeldPosition
@@ -35,8 +30,7 @@ class ProtectOpenPositionsCommand:
 @dataclass(frozen=True, slots=True)
 class _Account:
     access: TradingAccess
-    exchange: ExchangePort
-    protections: ProtectionExchangePort
+    exchange: ExchangeConnection
     calls: RetriedCalls
 
 
@@ -52,26 +46,19 @@ class ProtectOpenPositionsUseCase:
     def __init__(
         self,
         access: OpenTradingAccessUseCase,
-        exchanges: Mapping[str, ExchangePort],
-        protection_exchanges: Mapping[str, ProtectionExchangePort],
+        exchanges: Mapping[str, ExchangeConnection],
         protections: ProtectionRepositoryPort,
         retry: SendingRetryPort,
     ) -> None:
         self._access = access
         self._exchanges = exchanges
-        self._protection_exchanges = protection_exchanges
         self._protections = protections
         self._retry = retry
 
     def execute(self, command: ProtectOpenPositionsCommand) -> tuple[ProtectionNote | FailedOrderAttempt, ...]:
         calls = RetriedCalls(self._retry)
         access = calls.run(None, lambda: self._access.execute(OpenTradingAccessCommand(command.account_id)))
-        account = _Account(
-            access,
-            supported_exchange(self._exchanges, access.exchange),
-            supported_exchange(self._protection_exchanges, access.exchange),
-            calls,
-        )
+        account = _Account(access, supported_exchange(self._exchanges, access.exchange), calls)
         unprotected = (self._unprotected(account, asset) for asset in command.assets)
         refusals = (self._protected(account, command, position) for position in unprotected if position is not None)
         notes = tuple(note for note in refusals if note is not None)
@@ -79,10 +66,10 @@ class ProtectOpenPositionsUseCase:
 
     @staticmethod
     def _unprotected(account: _Account, asset: str) -> HeldPosition | None:
-        position = account.calls.run(asset, lambda: account.exchange.position(account.access, asset))
+        position = account.calls.run(asset, lambda: account.exchange.account.position(account.access, asset))
         if position is None:
             return None
-        waiting = account.calls.run(asset, lambda: account.protections.active(account.access, asset))
+        waiting = account.calls.run(asset, lambda: account.exchange.protections.active(account.access, asset))
         if any(protection.kind is ProtectionKind.STOP_LOSS for protection in waiting):
             return None
         return position
@@ -92,9 +79,9 @@ class ProtectOpenPositionsUseCase:
     ) -> ProtectionNote | None:
         request = ProtectionRequest(None, None, command.default_stop_loss_percent, None)
         stop = request.levels_at(position.direction, position.entry_price).stop
-        market = account.calls.run(position.coin, lambda: account.exchange.market(account.access, position.coin))
+        market = account.calls.run(position.coin, lambda: account.exchange.market.market(position.coin))
         order = ProtectionOrder(position.coin, ProtectionKind.STOP_LOSS, position.direction, market.rounded_price(stop))
-        placing = ProtectionPlacing(account.protections, account.access, order)
+        placing = ProtectionPlacing(account.exchange.protections, account.access, order)
         order_id = account.calls.run(position.coin, placing.attempt)
         if isinstance(order_id, Rejection):
             refusal = order_id.exchange_message
