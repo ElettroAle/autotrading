@@ -43,17 +43,17 @@ Funzionalità: R6.6.1 Gestione dei flussi via MCP
     Quando il client di "anna" elenca gli strumenti disponibili
     Allora nessuno strumento legge o modifica le credenziali di un conto, di una fonte o di un fornitore IA
 
-  Scenario: La risorsa del server MCP è un identificativo dell'applicazione dell'API
-    Dato un'installazione con il server MCP su "https://<nome>/mcp"
-    Quando lo script delle impostazioni Entra gira per l'installazione
-    Allora l'applicazione dell'API ha tra i suoi identificativi "https://<nome>/mcp"
-    E conserva l'identificativo "api://<client id>"
+  Scenario: Un client MCP conforme alla specifica ottiene l'accesso all'installazione
+    Dato un'installazione appena preparata per l'accesso MCP
+    Quando il proprietario applica le impostazioni di accesso dell'installazione
+    Allora Entra riconosce il server MCP dell'installazione come risorsa dell'API
+    E gli accessi già concessi all'API restano validi
 
-  Scenario: Il client MCP accetta il ritorno sulla porta locale del client
-    Quando lo script delle impostazioni Entra gira per l'installazione
-    Allora il client MCP ha come unico redirect "http://localhost/callback"
+  Scenario: Il client MCP riceve la risposta di Entra sulla propria porta locale
+    Quando il proprietario applica le impostazioni di accesso dell'installazione
+    Allora Entra rimanda l'accesso del client MCP solo al suo indirizzo di ritorno locale
 
-  Scenario: Lo script è idempotente
-    Dato un'installazione già configurata
-    Quando lo script gira di nuovo
-    Allora identificativi e redirect non cambiano
+  Scenario: Riapplicare le impostazioni non cambia nulla
+    Dato un'installazione con le impostazioni di accesso già applicate
+    Quando il proprietario le applica di nuovo
+    Allora Entra non riceve alcuna modifica

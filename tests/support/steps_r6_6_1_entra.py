@@ -7,10 +7,8 @@ import pytest
 from pytest_bdd import given, then, when
 
 from tests.support.entra_installation import API_CLIENT_ID, EntraInstallation
-from tests.support.steps import quoted
 
-CLIENT_ID_PLACEHOLDER = "<client id>"
-NAME_PLACEHOLDER = "<nome>"
+API_IDENTIFIER = f"api://{API_CLIENT_ID}"
 CONFIGURED_REDIRECT = "http://localhost/callback"
 
 
@@ -27,47 +25,45 @@ def entra(tmp_path: Path) -> Entra:
     return Entra(tmp_path)
 
 
-@given(quoted('un\'installazione con il server MCP su "{resource}"'))
-def installation_with_server(entra: Entra, resource: str) -> None:
-    assert resource == entra.installation.resource.replace(entra.installation.name, NAME_PLACEHOLDER)
+@given("un'installazione appena preparata per l'accesso MCP")
+def installation_just_prepared(entra: Entra) -> None:
+    assert entra.installation.resource not in entra.installation.api_identifiers
 
 
-@given("un'installazione già configurata")
+@given("un'installazione con le impostazioni di accesso già applicate")
 def installation_already_configured(entra: Entra) -> None:
     assert entra.installation.configure().status == 0
 
 
-@when("lo script delle impostazioni Entra gira per l'installazione")
-def script_runs(entra: Entra) -> None:
+@when("il proprietario applica le impostazioni di accesso dell'installazione")
+def owner_applies_settings(entra: Entra) -> None:
     assert entra.installation.configure().status == 0
 
 
-@when("lo script gira di nuovo")
-def script_runs_again(entra: Entra) -> None:
+@when("il proprietario le applica di nuovo")
+def owner_applies_settings_again(entra: Entra) -> None:
     entra.writes_before_rerun = len(entra.installation.writes)
     entra.identifiers_before_rerun = entra.installation.api_identifiers
     entra.redirects_before_rerun = entra.installation.client_redirects
     assert entra.installation.configure().status == 0
 
 
-@then(quoted("l'applicazione dell'API ha tra i suoi identificativi \"{identifier}\""))
-def api_has_identifier(entra: Entra, identifier: str) -> None:
-    expected = identifier.replace(NAME_PLACEHOLDER, entra.installation.name)
-    assert expected in entra.installation.api_identifiers
+@then("Entra riconosce il server MCP dell'installazione come risorsa dell'API")
+def server_is_resource_of_api(entra: Entra) -> None:
+    assert entra.installation.resource in entra.installation.api_identifiers
 
 
-@then(quoted('conserva l\'identificativo "{identifier}"'))
-def api_keeps_identifier(entra: Entra, identifier: str) -> None:
-    assert identifier.replace(CLIENT_ID_PLACEHOLDER, API_CLIENT_ID) in entra.installation.api_identifiers
+@then("gli accessi già concessi all'API restano validi")
+def api_keeps_its_identifier(entra: Entra) -> None:
+    assert API_IDENTIFIER in entra.installation.api_identifiers
 
 
-@then(quoted('il client MCP ha come unico redirect "{redirect}"'))
-def client_has_only_redirect(entra: Entra, redirect: str) -> None:
-    assert redirect == CONFIGURED_REDIRECT
-    assert entra.installation.client_redirects == [redirect]
+@then("Entra rimanda l'accesso del client MCP solo al suo indirizzo di ritorno locale")
+def client_returns_only_to_local_callback(entra: Entra) -> None:
+    assert entra.installation.client_redirects == [CONFIGURED_REDIRECT]
 
 
-@then("identificativi e redirect non cambiano")
+@then("Entra non riceve alcuna modifica")
 def nothing_changes(entra: Entra) -> None:
     assert entra.installation.api_identifiers == entra.identifiers_before_rerun
     assert entra.installation.client_redirects == entra.redirects_before_rerun
