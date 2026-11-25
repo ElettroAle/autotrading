@@ -42,3 +42,18 @@ Funzionalità: R6.6.1 Gestione dei flussi via MCP
   Scenario: Nessuna credenziale
     Quando il client di "anna" elenca gli strumenti disponibili
     Allora nessuno strumento legge o modifica le credenziali di un conto, di una fonte o di un fornitore IA
+
+  Scenario: La risorsa del server MCP è un identificativo dell'applicazione dell'API
+    Dato un'installazione con il server MCP su "https://<nome>/mcp"
+    Quando lo script delle impostazioni Entra gira per l'installazione
+    Allora l'applicazione dell'API ha tra i suoi identificativi "https://<nome>/mcp"
+    E conserva l'identificativo "api://<client id>"
+
+  Scenario: Il client MCP accetta il ritorno sulla porta locale del client
+    Quando lo script delle impostazioni Entra gira per l'installazione
+    Allora il client MCP ha come unico redirect "http://localhost/callback"
+
+  Scenario: Lo script è idempotente
+    Dato un'installazione già configurata
+    Quando lo script gira di nuovo
+    Allora identificativi e redirect non cambiano
