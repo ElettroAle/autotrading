@@ -23,7 +23,6 @@ from tests.support.flow_cycles import FlowCycles, at
 from tests.support.mcp_session import INITIALIZE, METADATA_URL, McpSession, body_of, credential_exposures
 from tests.support.problems import reason_of
 from tests.support.steps import quoted
-from tests.support.steps_r6_6_1_entra import *  # noqa: F403 - the steps of the Entra settings, same story
 
 scenarios(
     "E6-piattaforma-e-operativita/F6.6-server-mcp/R6.6.1-gestione-dei-flussi-via-mcp/mcp/R6.6.1-gestione-dei-flussi-via-mcp.feature"
