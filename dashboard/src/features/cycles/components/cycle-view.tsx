@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 
 import { Card } from '@/components/ui/card';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
 import { FlowMemoryTable } from '@/components/ui/flow-memory-table';
@@ -9,7 +10,6 @@ import { paths } from '@/config/paths';
 
 import { useCycle, type Cycle } from '../api/get-cycle';
 
-import { CycleSection } from './cycle-section';
 import { CycleSummaryView } from './cycle-summary';
 import { StepDocumentView } from './step-document';
 
@@ -43,7 +43,7 @@ const absentLabel = (absent: Cycle['absent_sources'][number]): string =>
   absent.adapter === null ? absent.source : `${absent.source} · ${absent.adapter}`;
 
 const AbsentSources = ({ sources }: { sources: Cycle['absent_sources'] }) => (
-  <CycleSection title="Fonti assenti">
+  <CollapsibleSection title="Fonti assenti">
     <ul className="list-inside list-disc text-sm">
       {sources.map((absent) => (
         <li key={absentLabel(absent)}>
@@ -51,7 +51,7 @@ const AbsentSources = ({ sources }: { sources: Cycle['absent_sources'] }) => (
         </li>
       ))}
     </ul>
-  </CycleSection>
+  </CollapsibleSection>
 );
 
 /** Everything recorded about a cycle, step by step, up to where it stopped (R2.2.7). */
@@ -74,9 +74,9 @@ export const CycleView = ({ flowId, plannedAt }: { flowId: string; plannedAt: st
       {failure !== null && <CycleFailureView failure={failure} />}
       {absentSources.length > 0 && <AbsentSources sources={absentSources} />}
       {memory !== null && (
-        <CycleSection title="Memoria ricevuta">
+        <CollapsibleSection title="Memoria ricevuta">
           <FlowMemoryTable memory={memory} />
-        </CycleSection>
+        </CollapsibleSection>
       )}
       {documents.map((document) => (
         <StepDocumentView key={document.step} document={document} />

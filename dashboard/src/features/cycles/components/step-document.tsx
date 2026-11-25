@@ -1,3 +1,4 @@
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DETAIL_VALUE, DETAILS_GRID } from '@/components/ui/details-list';
 import { formatPrice } from '@/utils/format-amount';
 
@@ -13,7 +14,6 @@ import {
   type SourceReading,
 } from '../utils/cycle-documents';
 
-import { CycleSection } from './cycle-section';
 import { DecisionLabel } from './decision-label';
 import { RecordedText, RecordedValue } from './recorded-text';
 
@@ -34,24 +34,24 @@ const TITLE_OF_STEP: Readonly<Record<string, string>> = {
 };
 
 const RecordedSection = ({ title, value }: { title: string; value: unknown }) => (
-  <CycleSection title={title}>
+  <CollapsibleSection title={title}>
     <RecordedValue value={value} />
-  </CycleSection>
+  </CollapsibleSection>
 );
 
 const SourcesSection = ({ readings }: { readings: SourceReading[] }) => (
-  <CycleSection title={SOURCES_TITLE}>
+  <CollapsibleSection title={SOURCES_TITLE}>
     {readings.map((reading) => (
       <div key={reading.fonte}>
         <h3 className="font-medium">{reading.fonte}</h3>
         <RecordedValue value={reading.dati} />
       </div>
     ))}
-  </CycleSection>
+  </CollapsibleSection>
 );
 
 const ContextSection = ({ messages }: { messages: ContextMessage[] }) => (
-  <CycleSection title={CONTEXT_TITLE}>
+  <CollapsibleSection title={CONTEXT_TITLE}>
     {messages.map((message, index) => (
       // The messages have no identity of their own: their order is the context.
       <div key={index}>
@@ -59,7 +59,7 @@ const ContextSection = ({ messages }: { messages: ContextMessage[] }) => (
         <RecordedText text={message.contenuto} />
       </div>
     ))}
-  </CycleSection>
+  </CollapsibleSection>
 );
 
 const DetailOf = ({ term, value }: { term: string; value: string | null }) =>
@@ -99,7 +99,7 @@ const DecisionDetailsOf = ({ decision }: { decision: Decision }) => {
 
 const DecisionSections = ({ decision }: { decision: AgentDecision }) => (
   <>
-    <CycleSection title={DECISIONS_TITLE}>
+    <CollapsibleSection title={DECISIONS_TITLE}>
       {decision.decisioni.length === 0 && <p>Nessuna decisione valida.</p>}
       {decision.decisioni.map((each) => (
         <div key={each.asset}>
@@ -117,10 +117,10 @@ const DecisionSections = ({ decision }: { decision: AgentDecision }) => (
         </div>
       )}
       {decision.mancanti.length > 0 && <p>Asset senza decisione: {decision.mancanti.join(', ')}</p>}
-    </CycleSection>
-    <CycleSection title="Risposta integrale dell'agente">
+    </CollapsibleSection>
+    <CollapsibleSection title="Risposta integrale dell'agente">
       <RecordedText text={decision.risposta} />
-    </CycleSection>
+    </CollapsibleSection>
   </>
 );
 
