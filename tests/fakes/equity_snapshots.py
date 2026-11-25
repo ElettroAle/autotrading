@@ -38,11 +38,11 @@ class InMemoryEquitySnapshotRepositoryAdapter:
         )
 
     def loss_references(
-        self, flow_id: UUID, day_start: datetime, peak_since: datetime, now: datetime
+        self, flow_id: UUID, daily_since: datetime, peak_since: datetime, now: datetime
     ) -> LossReferences:
         recorded = self.of_flow(flow_id, TimeWindow().ending_by(now))
-        until_midnight = [snapshot for snapshot in recorded if snapshot.planned_at <= day_start]
-        of_the_day = [snapshot for snapshot in recorded if snapshot.planned_at >= day_start]
+        until_midnight = [snapshot for snapshot in recorded if snapshot.planned_at <= daily_since]
+        of_the_day = [snapshot for snapshot in recorded if snapshot.planned_at >= daily_since]
         daily = until_midnight[-1] if until_midnight else next(iter(of_the_day), None)
         since = [snapshot for snapshot in recorded if snapshot.planned_at >= peak_since]
         peak = max(reversed(since), key=lambda snapshot: snapshot.equity - snapshot.allocated_capital, default=None)

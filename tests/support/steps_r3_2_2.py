@@ -120,7 +120,9 @@ class MaximumLoss:
         status = openings.status(flow.id.value).at(self.now(), flow.configuration.openings_resume)
         equities = InMemoryEquitySnapshotRepositoryAdapter(self.flow_cycles.equity_snapshots, self.tenant_id)
         now = self.now()
-        references = equities.loss_references(flow.id.value, day_start(now), status.peak_since(FIRST_START), now)
+        references = equities.loss_references(
+            flow.id.value, status.daily_since(day_start(now)), status.peak_since(FIRST_START), now
+        )
         changes = self.flow_cycles.platform.flows.capital_changes.get(flow.id, [])
         cashed_profit = sum((change.cashed_profit for change in changes), Decimal(0))
         return LossGuard.of(flow.configuration, self.value, references, cashed_profit).peak
@@ -256,6 +258,13 @@ def flow_with_resume(loss: MaximumLoss, resume: str) -> None:
 
 @when(parsers.re(r'^un ciclo di "alfa" legge il valore (?P<value>[\d,]+) USDC$'))
 def cycle_reads_value(loss: MaximumLoss, value: str) -> None:
+    loss.worth(amount(value))
+    loss.run_cycle()
+
+
+@when(parsers.re(r'^il ciclo successivo di "alfa" legge il valore (?P<value>[\d,]+) USDC$'))
+def next_cycle_reads_value(loss: MaximumLoss, value: str) -> None:
+    loss.at(loss.now() + timedelta(minutes=15))
     loss.worth(amount(value))
     loss.run_cycle()
 

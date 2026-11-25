@@ -15,9 +15,9 @@ DRAWDOWN = "perdita dal picco"
 class LossReferences:
     """The recorded equities the losses of a flow are measured from (R3.2.2).
 
-    The daily one is the last equity recorded at 00:00 UTC of the day or before, else the first of the day; the peak is
-    the highest recorded since the first start or the last resume of the openings. Either is missing without recorded
-    equity.
+    The daily one is the last equity recorded at 00:00 UTC of the day, or at a later resume of the openings that day,
+    or before, else the first after it (Bug 775); the peak is the highest recorded since the first start or the last
+    resume of the openings. Either is missing without recorded equity.
     """
 
     daily: EquitySnapshot | None

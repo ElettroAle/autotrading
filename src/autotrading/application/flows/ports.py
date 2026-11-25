@@ -1406,11 +1406,12 @@ class LossReferencesPort(Protocol):
     """Bound to the tenant of the cycle: the recorded equities the losses of its flows are measured from (R3.2.2)."""
 
     def loss_references(
-        self, flow_id: UUID, day_start: datetime, peak_since: datetime, now: datetime
+        self, flow_id: UUID, daily_since: datetime, peak_since: datetime, now: datetime
     ) -> LossReferences:
-        """The last equity recorded at the start of the day or before, else the first of the day, and the one highest
-        once brought to the capital of now, since the instant given; the most recent among equal ones. Every read ends
-        at now, its equity included (ADR indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore).
+        """The last equity recorded at the instant the daily loss counts from or before, else the first after it, and
+        the one highest once brought to the capital of now, since the instant given (Bug 775); the most recent among
+        equal ones. Every read ends at now, its equity included (ADR
+        indice-delle-previsioni-in-attesa-e-patrimonio-con-limite-superiore).
         """
         ...
 

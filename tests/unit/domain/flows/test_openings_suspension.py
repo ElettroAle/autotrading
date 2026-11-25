@@ -82,6 +82,27 @@ def test_the_peak_counts_from_the_later_of_the_last_resume_and_the_first_start()
     assert OpeningsStatus(None, earlier).peak_since(later) == later
 
 
+def test_the_daily_loss_counts_from_the_start_of_the_day_without_a_resume_that_day() -> None:
+    today = day_start(SUSPENDED_AT)
+
+    assert NOT_SUSPENDED.daily_since(today) == today
+    assert OpeningsStatus(None, today - timedelta(hours=2)).daily_since(today) == today
+
+
+def test_the_daily_loss_counts_from_a_resume_of_the_same_day() -> None:
+    """Bug 775: after the resume the daily loss passed no longer suspends the openings again."""
+    today = day_start(SUSPENDED_AT)
+
+    assert OpeningsStatus(None, SUSPENDED_AT).daily_since(today) == SUSPENDED_AT
+
+
+def test_the_daily_loss_counts_from_midnight_after_a_next_day_resume() -> None:
+    """The resume the next day falls at 00:00 UTC: the reference of the day does not move."""
+    status = suspended().at(NEXT_MIDNIGHT + timedelta(hours=1), OpeningsResume.NEXT_DAY)
+
+    assert status.daily_since(NEXT_MIDNIGHT) == NEXT_MIDNIGHT
+
+
 def test_a_resume_lifts_the_suspension_and_restarts_the_peak() -> None:
     resumed = suspended().resumed(NEXT_MIDNIGHT, "alfa")
 

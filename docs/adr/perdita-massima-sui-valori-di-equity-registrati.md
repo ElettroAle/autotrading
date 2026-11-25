@@ -1,6 +1,6 @@
 # ADR perdita-massima-sui-valori-di-equity-registrati — Perdita massima del flusso sui valori di equity registrati
 
-- Stato: proposta (16 novembre 2026)
+- Stato: superata da ADR perdita-giornaliera-dalla-ripresa-delle-aperture (25 novembre 2026)
 - Requisiti: R3.2.2 (459), Task T3.2.2.1 (480)
 - Collegate: ADR 0040 (controllo del rischio), ADR 0120 (l'equity di ogni ciclo si registra), ADR 0035
   (collegamento di Telegram e notifiche), ADR 0027 (errori che dichiarano la risposta), ADR 0051 (porta al minimo

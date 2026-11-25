@@ -1,6 +1,9 @@
 """ADR-perdita-massima-sui-valori-di-equity-registrati: the references of the maximum losses come from the recorded
 equities, never from references kept beside the flow, and only the adapter of the recorded equities reads them; the
 suspension blocks the openings inside the risk check, never in a separate check.
+
+ADR-perdita-giornaliera-dalla-ripresa-delle-aperture: the instant the daily loss counts from is the domain's, never
+the start of the day passed straight to the references.
 """
 
 import ast
@@ -22,6 +25,7 @@ FLOWS = "flows"
 EQUITY_ADAPTER = "adapters/outbound/sqlalchemy/equity_snapshot_repository.py"
 RISK_CHECK = "domain/flows/risk_check.py"
 SUSPENSION = "openings_suspended"
+DAY_START = "day_start"
 # The notice of the suspension shares the name: it tells the user, it blocks nothing.
 NOTICE = "Notification"
 
@@ -58,6 +62,25 @@ def suspension_readers(modules: list[SourceModule]) -> list[str]:
             if isinstance(node, ast.Attribute) and node.attr == SUSPENSION and not _is_notice(node.value)
         }
     )
+
+
+def daily_from_the_day_start(modules: list[SourceModule], methods: set[str]) -> list[str]:
+    """The modules that read the references from the start of the day, ignoring a resume of the openings that day."""
+    return sorted(
+        {
+            module.path
+            for module in modules
+            for node in ast.walk(module.tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in methods
+            and any(_calls_day_start(argument) for argument in node.args)
+        }
+    )
+
+
+def _calls_day_start(argument: ast.expr) -> bool:
+    return isinstance(argument, ast.Call) and isinstance(argument.func, ast.Name) and argument.func.id == DAY_START
 
 
 def _is_notice(owner: ast.expr) -> bool:
@@ -103,3 +126,16 @@ def test_adr_maximum_loss_a_separate_check_of_the_suspension_is_a_violation() ->
     )
 
     assert suspension_readers([separate]) == ["application/flows/block_suspended_openings.py"]
+
+
+def test_adr_daily_loss_from_the_resume_the_references_are_read_from_the_instant_of_the_domain() -> None:
+    assert daily_from_the_day_start(source_modules(SOURCE_ROOT), port_methods()) == []
+
+
+def test_adr_daily_loss_from_the_resume_the_start_of_the_day_passed_straight_is_a_violation() -> None:
+    straight = SourceModule.parse(
+        "application/flows/guard_flow_loss.py",
+        "def breach(self, now):\n    return self._references.loss_references(flow_id, day_start(now), peak, now)\n",
+    )
+
+    assert daily_from_the_day_start([straight], port_methods()) == ["application/flows/guard_flow_loss.py"]
