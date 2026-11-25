@@ -1024,6 +1024,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/flows/{flow_id}/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Flow Memory
+         * @description The memory the agent of the flow would receive if its cycle started now (R5.3.4).
+         */
+        get: operations["read_flow_memory_flows__flow_id__memory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/flows/{flow_id}/archive": {
         parameters: {
             query?: never;
@@ -1774,6 +1794,16 @@ export interface components {
             currency: string;
         };
         /**
+         * AssetMemory
+         * @description The previous operative decisions of the flow on one of its assets, from the most recent (R5.3.4).
+         */
+        AssetMemory: {
+            /** Asset */
+            asset: string;
+            /** Entries */
+            entries: components["schemas"]["MemoryEntry"][];
+        };
+        /**
          * BalanceComparisonResponse
          * @description The last comparison of the balance of the account; amounts as strings (ADR 0018).
          */
@@ -2003,6 +2033,7 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
+            memory: components["schemas"]["FlowMemory"];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -2052,6 +2083,8 @@ export interface components {
             trigger: string;
             /** Failed Attempts */
             failed_attempts: components["schemas"]["FailedAttemptResponse"][];
+            /** Memory */
+            memory: components["schemas"]["AssetMemory"][] | null;
         };
         /**
          * CyclePageResponse
@@ -2121,6 +2154,13 @@ export interface components {
              */
             planned_at: string;
         };
+        /**
+         * DecisionAction
+         * @description What the agent decided on an asset, as the cycle records it: the words of its actions (R1.4.3, R3.1.3,
+         *     R1.4.10).
+         * @enum {string}
+         */
+        DecisionAction: "apri" | "chiudi" | "mantieni" | "aggiorna" | "inverti";
         /**
          * DecisionPageResponse
          * @description A page of the decisions that match the filters in the period, with how many match in all (ADR
@@ -2411,6 +2451,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2453,6 +2494,40 @@ export interface components {
         FlowForecastAccuracyResponse: {
             /** Forecasts */
             forecasts: components["schemas"]["ForecastAccuracyResponse"][];
+        };
+        /**
+         * FlowMemory
+         * @description Whether the agent receives its previous operative decisions on every asset of the flow, and how many from how
+         *     far back: off, 10 decisions and 30 days unless the user says otherwise (R5.3.4).
+         *
+         *     The decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule.
+         */
+        FlowMemory: {
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+            /**
+             * Decisions
+             * @default 10
+             */
+            decisions: number;
+            /**
+             * Days
+             * @default 30
+             */
+            days: number;
+        };
+        /**
+         * FlowMemoryReading
+         * @description The memory of the flow as the user consults it: whether it is on and, only then, what every asset gives.
+         */
+        FlowMemoryReading: {
+            /** Active */
+            active: boolean;
+            /** Assets */
+            assets: components["schemas"]["AssetMemory"][];
         };
         /**
          * FlowModificationRequest
@@ -2509,6 +2584,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * FlowOverviewResponse
@@ -2662,6 +2738,7 @@ export interface components {
             default_take_profit_percent: string | null;
             /** Minimum Confidence */
             minimum_confidence: number | null;
+            memory: components["schemas"]["FlowMemory"];
             /** Missing */
             missing: string[];
         };
@@ -3130,6 +3207,49 @@ export interface components {
             sender: string;
             /** Password Saved */
             password_saved: boolean;
+        };
+        /**
+         * MemoryEntry
+         * @description One previous operative decision of the flow on an asset as the agent receives it (R5.3.4).
+         */
+        MemoryEntry: {
+            /**
+             * Planned At
+             * Format: date-time
+             */
+            planned_at: string;
+            /** Asset */
+            asset: string;
+            action: components["schemas"]["DecisionAction"];
+            direction: components["schemas"]["TradeSide"] | null;
+            /** Price */
+            price: string | null;
+            /** Reasoning */
+            reasoning: string;
+            outcome: components["schemas"]["MemoryOutcome"] | null;
+        };
+        /**
+         * MemoryOutcome
+         * @description The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open.
+         */
+        MemoryOutcome: {
+            /** Pnl */
+            pnl: string;
+            /** Realized */
+            realized: boolean;
+        };
+        /**
+         * MemoryRequest
+         * @description The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a
+         *     new flow (R5.3.4).
+         */
+        MemoryRequest: {
+            /** Active */
+            active?: boolean | null;
+            /** Decisions */
+            decisions?: number | null;
+            /** Days */
+            days?: number | null;
         };
         /** ModelCatalogResponse */
         ModelCatalogResponse: {
@@ -3769,6 +3889,7 @@ export interface components {
             default_take_profit_percent?: number | string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * StrategyBody
@@ -3809,6 +3930,7 @@ export interface components {
             default_take_profit_percent?: string | null;
             /** Minimum Confidence */
             minimum_confidence?: number | null;
+            memory?: components["schemas"]["MemoryRequest"];
         };
         /**
          * StrategyDocument
@@ -3912,6 +4034,11 @@ export interface components {
          * @enum {string}
          */
         TargetKind: "flow" | "open_position" | "closed_position" | "alert";
+        /**
+         * TradeSide
+         * @enum {string}
+         */
+        TradeSide: "long" | "short";
         /**
          * TrialOutcome
          * @enum {string}
@@ -6105,6 +6232,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DifferenceResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_flow_memory_flows__flow_id__memory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlowMemoryReading"];
                 };
             };
             /** @description Validation Error */

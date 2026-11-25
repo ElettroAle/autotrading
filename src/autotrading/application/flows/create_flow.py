@@ -19,6 +19,7 @@ from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
@@ -36,6 +37,20 @@ class SourceRequest:
 
     name: str
     adapters: tuple[AdapterRequest, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryRequest:
+    """The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a
+    new flow (R5.3.4).
+    """
+
+    active: bool | None = None
+    decisions: int | None = None
+    days: int | None = None
+
+    def applied_to(self, memory: FlowMemory) -> FlowMemory:
+        return memory.changed(self.active, self.decisions, self.days)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +84,7 @@ class CreateFlowCommand:
     default_take_profit_percent: Decimal | None = None
     # None for a flow without a minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +149,7 @@ class CreateFlowUseCase:
                 command.default_stop_loss_percent, command.default_take_profit_percent
             ),
             minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
+            memory=command.memory.applied_to(FlowMemory()),
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

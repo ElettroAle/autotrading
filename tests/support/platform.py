@@ -135,6 +135,7 @@ from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
 from tests.fakes.outbox import InMemoryOutboxAdapter
+from tests.fakes.past_decisions import InMemoryPastDecisionsAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closing import FakePositionClosingAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
@@ -408,6 +409,7 @@ class Platform:
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, InMemoryFlowTimingAdapter(self.flows, tenant_id)),
             flow_timing=InMemoryFlowTimingAdapter(self.flows, tenant_id),
+            past_decisions=InMemoryPastDecisionsAdapter(self.cycles, self.orders_of(tenant_id), self.closed_positions),
             equity_snapshots=InMemoryEquitySnapshotRepositoryAdapter(self.equity_snapshots, tenant_id),
             openings_suspensions=InMemoryOpeningsSuspensionAdapter(self.flows, tenant_id),
             flow_forecasts=InMemoryFlowForecastsAdapter(self.forecasts_of(tenant_id)),

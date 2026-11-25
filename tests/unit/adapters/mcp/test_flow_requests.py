@@ -9,7 +9,7 @@ from autotrading.adapters.inbound.mcp.flow_requests import (
     StrategyImport,
 )
 from autotrading.adapters.inbound.mcp.reading_filters import ClosedPositionFilters, CycleFilters
-from autotrading.application.flows.create_flow import SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_filter import CycleFilter
@@ -36,6 +36,7 @@ def test_a_creation_is_the_command_of_the_api() -> None:
         max_leverage=5,
         max_margin_exposure_percent=Decimal(10),
         minimum_confidence=60,
+        memory=MemoryRequest(active=True, decisions=5, days=14),
     )
 
     command = creation.command()
@@ -53,6 +54,7 @@ def test_a_creation_is_the_command_of_the_api() -> None:
     )
     assert (command.sources, command.minimum_confidence) == ((SOURCE_REQUEST,), 60)
     assert command.openings_resume is OpeningsResume.MANUAL
+    assert command.memory == MemoryRequest(active=True, decisions=5, days=14)
 
 
 def test_an_import_is_the_strategy_of_a_file_under_the_name_given() -> None:
@@ -67,6 +69,7 @@ def test_an_import_is_the_strategy_of_a_file_under_the_name_given() -> None:
         "Sei un trader",
     )
     assert command.sources == (SOURCE_REQUEST,)
+    assert command.memory == MemoryRequest()
 
 
 def test_a_modification_changes_only_the_parts_given() -> None:
@@ -83,6 +86,13 @@ def test_a_modification_changes_only_the_parts_given() -> None:
     assert (command.model, command.instructions, command.max_leverage) == (None, None, None)
     assert not command.remove_max_margin_exposure
     assert not command.default_system_prompt
+    assert command.memory == MemoryRequest()
+
+
+def test_a_modification_changes_only_the_parts_of_the_memory_given() -> None:
+    command = FlowModification(memory=MemoryRequest(active=True)).command(uuid4())
+
+    assert command.memory == MemoryRequest(active=True)
 
 
 def test_a_part_named_to_remove_goes_back_to_none_or_to_the_default() -> None:

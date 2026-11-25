@@ -10,6 +10,7 @@ from autotrading.application.flows.ports import FailedModelCall, ReversedExecuti
 from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.trade_side import TradeSide
 from tests.fakes.cycles import FakePermanentError, FakeTransientError
@@ -506,3 +507,58 @@ def test_the_attempts_that_failed_in_the_reversal_go_in_the_record(cycles: Cycle
     record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
 
     assert record.failed_attempts == (retried,)
+
+
+# ADR memoria-del-flusso-dalle-decisioni-operative-precedenti: the memory the context gave the agent is read through the
+# journal and kept with the record of the cycle, also when the cycle fails after composing the context.
+MEMORY = (AssetMemory("BTC", ()),)
+
+
+def test_a_completed_cycle_records_the_memory_the_context_gave_the_agent(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.journal.memory = MEMORY
+
+    record = completed(cycles.graph().run(planned(cycles), at("10:00:00")))
+
+    assert record.memory == MEMORY
+    assert cycles.records.records[-1].memory == MEMORY
+
+
+def test_a_cycle_failed_after_composing_the_context_keeps_the_memory(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    cycles.journal.memory = MEMORY
+    cycles.failures.fail_once(cycles.id_of("alfa"), CycleStep.AGENT_DECISION, FakeTransientError("timeout del modello"))
+
+    outcome = cycles.graph().run(planned(cycles), at("10:00:00"))
+
+    assert isinstance(outcome, FailedCycle)
+    assert outcome.record.memory == MEMORY
+
+
+def test_a_cycle_without_memory_records_none(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+
+    assert completed(cycles.graph().run(planned(cycles), at("10:00:00"))).memory is None
+
+
+def test_a_resumed_cycle_records_the_memory_composed_before_it_stopped(cycles: Cycles) -> None:
+    cycles.add_flow("alfa")
+    flow_id = cycles.id_of("alfa")
+    entry = MemoryEntry(
+        at("09:00:00"),
+        "BTC",
+        DecisionAction.OPEN,
+        TradeSide.LONG,
+        Decimal(95000),
+        "rottura",
+        MemoryOutcome(Decimal("-2.5"), realized=False),
+    )
+    cycles.journal.memory = (AssetMemory("BTC", (entry,)),)
+    cycles.failures.fail(flow_id, CycleStep.RISK_CHECK, FakeTransientError("timeout"), times=6)
+    graph = cycles.graph()
+    graph.run(planned(cycles), at("10:00:00"))
+    cycles.journal.memory = None
+
+    record = completed(graph.run(planned(cycles), at("10:05:00")))
+
+    assert record.memory == (AssetMemory("BTC", (entry,)),)

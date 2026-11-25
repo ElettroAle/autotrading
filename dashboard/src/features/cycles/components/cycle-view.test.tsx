@@ -183,6 +183,39 @@ describe('CycleView', () => {
     expect(await section('Flusso alla fine')).toHaveTextContent('"tipo": "FlowStateView"');
   });
 
+  // R5.3.4, ADR memoria-del-flusso-dalle-decisioni-operative-precedenti.
+  it('shows the memory the agent received, for every asset', async () => {
+    const memory = [
+      {
+        asset: 'BTC',
+        entries: [
+          {
+            planned_at: '2026-11-14T08:07:00Z',
+            asset: 'BTC',
+            action: 'apri',
+            direction: 'long',
+            price: '95000',
+            reasoning: 'rottura della resistenza',
+            outcome: { pnl: '40', realized: true },
+          },
+        ],
+      },
+    ];
+    await openCycle({ ...aCompletedCycle(PLANNED_AT), memory });
+
+    const received = await section('Memoria ricevuta');
+    expect(within(received).getByRole('table', { name: 'Memoria di BTC' })).toHaveTextContent(
+      'rottura della resistenza',
+    );
+  });
+
+  it('shows no memory for a cycle of a flow with the memory off', async () => {
+    await openCycle(aCompletedCycle(PLANNED_AT));
+
+    await screen.findByRole('region', { name: 'Riepilogo del ciclo' });
+    expect(screen.queryByRole('group', { name: 'Memoria ricevuta' })).not.toBeInTheDocument();
+  });
+
   it('names the sources that gave no data, with the reason', async () => {
     await openCycle({
       ...aCompletedCycle(PLANNED_AT),

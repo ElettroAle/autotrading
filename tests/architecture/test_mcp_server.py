@@ -25,7 +25,8 @@ from tests.support.platform import Platform
 
 LIBRARY = "mcp"
 LIBRARY_FOLDER = "adapters/inbound/mcp"
-# Every reading and every operation on the flows the ADR lists, by the name of its tool.
+# Every reading and every operation on the flows the ADR lists, by the name of its tool, and those the API added after
+# it (.claude/rules/tech-mcp.md): the memory of the flow (R5.3.4).
 TOOLS_OF_THE_ADR = {
     "list_flows",
     "get_flow",
@@ -33,6 +34,7 @@ TOOLS_OF_THE_ADR = {
     "list_closed_positions",
     "list_cycles",
     "read_cycle",
+    "read_flow_memory",
     "read_flow_statistics",
     "rank_flows",
     "list_accounts",

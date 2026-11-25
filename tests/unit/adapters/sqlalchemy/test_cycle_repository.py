@@ -30,6 +30,7 @@ from autotrading.domain.flows.cycle_record import (
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.decision_filter import DecisionFilter
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
 from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
@@ -87,6 +88,7 @@ def test_a_record_is_saved_with_steps_and_outcome_by_name() -> None:
             },
             {"step": "compose_context", "attempt": 1, "error_type": "FakeTransientError", "message": "timeout"},
         ],
+        "memory": None,
     }
 
 
@@ -297,3 +299,58 @@ def test_a_cycle_recorded_before_the_attempts_were_kept_reads_back_without_faile
     row = row_of(FAILED, TENANT) | {"failed_attempts": None}
 
     assert record_of(row).failed_attempts == ()
+
+
+REMEMBERED = (
+    AssetMemory(
+        "BTC",
+        (
+            MemoryEntry(
+                PLANNED - timedelta(hours=1),
+                "BTC",
+                DecisionAction.OPEN,
+                TradeSide.LONG,
+                Decimal("95000.5"),
+                "rottura",
+                MemoryOutcome(Decimal("-2.25"), realized=False),
+            ),
+            MemoryEntry(PLANNED - timedelta(hours=3), "BTC", DecisionAction.UPDATE, None, None, "stop", None),
+        ),
+    ),
+    AssetMemory("ETH", ()),
+)
+
+
+def test_the_memory_the_agent_received_is_saved_as_json_with_amounts_as_text() -> None:
+    row = row_of(replace(FAILED, memory=REMEMBERED), TENANT)
+
+    assert row["memory"] == [
+        {
+            "asset": "BTC",
+            "entries": [
+                {
+                    "planned_at": "2026-11-12T09:22:00+00:00",
+                    "action": "apri",
+                    "direction": "long",
+                    "price": "95000.5",
+                    "reasoning": "rottura",
+                    "outcome": {"pnl": "-2.25", "realized": False},
+                },
+                {
+                    "planned_at": "2026-11-12T07:22:00+00:00",
+                    "action": "aggiorna",
+                    "direction": None,
+                    "price": None,
+                    "reasoning": "stop",
+                    "outcome": None,
+                },
+            ],
+        },
+        {"asset": "ETH", "entries": []},
+    ]
+
+
+def test_the_saved_memory_reads_back_as_it_was() -> None:
+    record = replace(FAILED, memory=REMEMBERED)
+
+    assert record_of(row_of(record, TENANT)) == record

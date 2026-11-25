@@ -80,6 +80,7 @@ const FLOW: Flow = {
   max_daily_loss_percent: null,
   max_drawdown_percent: null,
   openings_resume: 'manual',
+  memory: { active: false, decisions: 10, days: 30 },
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -126,6 +127,27 @@ describe('creationRequestOf', () => {
       max_daily_loss_percent: null,
       max_drawdown_percent: null,
       openings_resume: 'manual',
+      memory: { active: false, decisions: null, days: null },
+    });
+  });
+
+  it('sends the memory the user turned on, with its decisions and days (R5.3.4)', () => {
+    const memory = { active: true, decisions: ' 5 ', days: '14' };
+
+    expect(creationRequestOf(filled({ memory })).memory).toEqual({
+      active: true,
+      decisions: 5,
+      days: 14,
+    });
+  });
+
+  it('sends the memory off with decisions and days left to the version in force, as the form disables them', () => {
+    const memory = { active: false, decisions: undefined, days: undefined };
+
+    expect(creationRequestOf(filled({ memory })).memory).toEqual({
+      active: false,
+      decisions: null,
+      days: null,
     });
   });
 
@@ -234,6 +256,7 @@ describe('formValuesOf', () => {
       max_daily_loss_percent: '',
       max_drawdown_percent: '',
       openings_resume: 'manual',
+      memory: { active: false, decisions: '10', days: '30' },
     });
   });
 
@@ -487,6 +510,20 @@ describe('changesOf', () => {
     });
   });
 
+  it('changes nothing for the memory off, whose decisions and days the disabled fields do not give', () => {
+    const memory = { active: false, decisions: undefined, days: undefined };
+
+    expect(changesOf(FLOW, { ...formValuesOf(FLOW), memory })).toEqual({ settings: {} });
+  });
+
+  it('sends the whole memory when the user changed a part of it (R5.3.4)', () => {
+    const memory = { active: true, decisions: '10', days: '14' };
+
+    expect(changesOf(FLOW, { ...formValuesOf(FLOW), memory })).toEqual({
+      settings: { memory: { active: true, decisions: 10, days: 14 } },
+    });
+  });
+
   it('sends a system prompt the user wrote, and null to go back to the default', () => {
     const written = {
       ...formValuesOf(FLOW),
@@ -572,6 +609,11 @@ describe('formFieldOf', () => {
   it('places a refusal on the field of the form named after the setting of the API', () => {
     expect(formFieldOf('allocated_capital')).toBe('allocated_capital');
     expect(formFieldOf('model_parameters')).toBe('model_parameters');
+  });
+
+  it('places a refusal of the memory on its decisions or its days', () => {
+    expect(formFieldOf('memory.decisions')).toBe('memory.decisions');
+    expect(formFieldOf('memory.days')).toBe('memory.days');
   });
 
   it('places nowhere a setting the form does not have', () => {

@@ -334,6 +334,44 @@ describe('EditFlow', () => {
     expect(configurationOf(fakePlatform.flowNamed('alfa')).minimum_confidence).toBeNull();
   });
 
+  // R5.3.4, ADR memoria-del-flusso-dalle-decisioni-operative-precedenti.
+  it('turns the memory on with its decisions and days as a new version, refusing them out of range', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const memory = await screen.findByRole('group', { name: 'Memoria' });
+    const active = within(memory).getByRole('checkbox', { name: 'Memoria attiva' });
+    expect(active).not.toBeChecked();
+    expect(field('Decisioni per asset')).toBeDisabled();
+    expect(field('Decisioni per asset')).toHaveValue('10');
+    expect(field('Giorni')).toBeDisabled();
+    await userEvent.click(active);
+    expect(field('Decisioni per asset')).toBeEnabled();
+    await userEvent.clear(field('Decisioni per asset'));
+    await userEvent.type(field('Decisioni per asset'), '51');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Decisioni per asset')).toHaveAccessibleDescription(
+        'le decisioni della memoria vanno da 1 a 50',
+      ),
+    );
+    await userEvent.clear(field('Decisioni per asset'));
+    await userEvent.type(field('Decisioni per asset'), '5');
+    await userEvent.clear(field('Giorni'));
+    await userEvent.type(field('Giorni'), '14');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).memory).toEqual({
+      active: true,
+      decisions: 5,
+      days: 14,
+    });
+  });
+
   it('removes an exposure limit the user empties, and refuses emptying both', async () => {
     fakePlatform.addConfiguredFlow('anna', 'alfa', {
       account_id: 'account-principale',

@@ -22,6 +22,7 @@ from autotrading.domain.flows.cycle_page import CyclePage
 from autotrading.domain.flows.cycle_record import CycleFailure, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.flow_cost import FlowCost
+from autotrading.domain.flows.memory_entry import AssetMemory
 
 
 class FailureResponse(BaseModel):
@@ -140,6 +141,8 @@ class CycleDetailResponse(BaseModel):
     # Every attempt of a step that failed, retried in the same cycle or the one that stopped it (ADR
     # errori-temporanei-ritentati-in-ogni-passo-del-ciclo).
     failed_attempts: list[FailedAttemptResponse]
+    # The memory the agent received in the cycle; None when the memory of the flow was off (R5.3.4).
+    memory: tuple[AssetMemory, ...] | None
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleDetailResponse:
@@ -162,6 +165,7 @@ class CycleDetailResponse(BaseModel):
             model_attempts=record.model_attempts,
             trigger=record.trigger.value,
             failed_attempts=[FailedAttemptResponse.of(attempt) for attempt in record.failed_attempts],
+            memory=record.memory,
         )
 
 

@@ -121,6 +121,7 @@ from autotrading.adapters.outbound.sqlalchemy.notified_flows import SqlAlchemyNo
 from autotrading.adapters.outbound.sqlalchemy.openings_suspension import SqlAlchemyOpeningsSuspensionAdapter
 from autotrading.adapters.outbound.sqlalchemy.order_repository import SqlAlchemyOrderRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.outbox import SqlAlchemyOutboxAdapter
+from autotrading.adapters.outbound.sqlalchemy.past_decisions import SqlAlchemyPastDecisionsAdapter
 from autotrading.adapters.outbound.sqlalchemy.platform_orders import SqlAlchemyPlatformOrdersAdapter
 from autotrading.adapters.outbound.sqlalchemy.protection_repository import SqlAlchemyProtectionRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.provider_key_repository import SqlAlchemyProviderKeyRepositoryAdapter
@@ -421,6 +422,7 @@ def tenant_use_cases(
             flow_directory=flows,
             flow_summaries=ListFlowSummariesUseCase(flows, accounts, SqlAlchemyFlowTimingAdapter(engine, tenant_id)),
             flow_timing=SqlAlchemyFlowTimingAdapter(engine, tenant_id),
+            past_decisions=SqlAlchemyPastDecisionsAdapter(engine, tenant_id),
             equity_snapshots=SqlAlchemyEquitySnapshotRepositoryAdapter(engine, tenant_id),
             openings_suspensions=SqlAlchemyOpeningsSuspensionAdapter(engine, tenant_id),
             flow_forecasts=SqlAlchemyForecastRepositoryAdapter(engine, tenant_id),
@@ -671,7 +673,11 @@ def cycle_of(
             ),
             calls=ThreadPoolConcurrentCallsAdapter(),
             context=ComposeCycleContextUseCase(
-                ComposeAgentContextUseCase(), ListAgentActionsUseCase(), AggregateCycleSourcesUseCase(), clock
+                ComposeAgentContextUseCase(),
+                ListAgentActionsUseCase(),
+                AggregateCycleSourcesUseCase(),
+                clock,
+                SqlAlchemyPastDecisionsAdapter(engine, tenant_id),
             ),
             agent=DecideCycleUseCase(
                 AskFlowAgentUseCase(
@@ -892,6 +898,7 @@ def mcp_use_cases(for_tenant: Callable[[TenantId], TenantUseCases]) -> Callable[
             list_closed_positions=use_cases.list_closed_positions,
             list_cycles=use_cases.list_cycles,
             read_cycle=use_cases.read_cycle,
+            read_flow_memory=use_cases.read_flow_memory,
             read_flow_statistics=use_cases.read_flow_statistics,
             rank_flows=use_cases.rank_flows,
             list_accounts=use_cases.list_accounts,

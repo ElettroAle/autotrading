@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -9,8 +9,10 @@ from fastapi.testclient import TestClient
 
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.system_prompt import DEFAULT_SYSTEM_PROMPT, PromptPlaceholder
 from tests.support.activity import a_fill
 from tests.support.flows import ACCOUNT, OPENROUTER_MODEL, account_id_of, scenario_catalog
@@ -107,6 +109,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "default_stop_loss_percent": "5",
         "default_take_profit_percent": None,
         "minimum_confidence": None,
+        "memory": {"active": False, "decisions": 10, "days": 30},
         "missing": [],
     }
     assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]
@@ -128,6 +131,87 @@ def test_the_minimum_confidence_is_created_changed_and_removed_with_a_null(
     assert anna.get(f"/flows/{flow_id}/versions/2/differences/4").json() == [
         {"part": "confidenza minima", "before": "60", "after": "nessuna"},
     ]
+
+
+def test_the_memory_is_created_kept_and_changed_in_a_new_version(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    created = anna.post("/flows", json=a_request(platform, "anna", memory={"decisions": 4})).json()
+    flow_id = created["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
+    changed = anna.patch(f"/flows/{flow_id}", json={"memory": {"active": True, "days": 14}}).json()
+
+    assert created["memory"] == {"active": False, "decisions": 4, "days": 30}
+    assert untouched["memory"] == created["memory"]
+    assert (changed["version"], changed["memory"]) == (3, {"active": True, "decisions": 4, "days": 14})
+    assert anna.get(f"/flows/{flow_id}/versions/2").json()["memory"] == created["memory"]
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
+        {"part": "memoria", "before": "non attiva", "after": "attiva, 4 decisioni, 14 giorni"}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("memory", "reason"),
+    [
+        ({"decisions": 51}, {"detail": "le decisioni della memoria vanno da 1 a 50", "field": "memory.decisions"}),
+        ({"days": 0}, {"detail": "i giorni della memoria vanno da 1 a 365", "field": "memory.days"}),
+    ],
+)
+def test_a_memory_out_of_range_is_refused_with_the_reason_and_the_field(
+    client_of: Client, platform: Platform, memory: dict[str, int], reason: dict[str, str]
+) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    response = anna.patch(f"/flows/{flow_id}", json={"memory": memory})
+
+    assert (response.status_code, reason_of(response)) == (422, reason)
+    assert anna.get("/flows").json()[0]["version"] == 1
+
+
+def test_the_memory_of_a_flow_off_answers_inactive_and_empty(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    assert anna.get(f"/flows/{flow_id}/memory").json() == {"active": False, "assets": []}
+
+
+def test_the_memory_of_a_flow_on_answers_what_the_next_cycle_receives(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", memory={"active": True})).json()["id"]
+    planned_at = platform.now - timedelta(hours=1)
+    decision = RecordedDecision("BTC", DecisionAction.CLOSE, None, 60, "obiettivo raggiunto")
+    platform.cycles.record(CycleRecord(UUID(flow_id), planned_at, CycleOutcome.COMPLETED, decisions=(decision,)))
+
+    response = anna.get(f"/flows/{flow_id}/memory")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "active": True,
+        "assets": [
+            {
+                "asset": "BTC",
+                "entries": [
+                    {
+                        "planned_at": planned_at.isoformat().replace("+00:00", "Z"),
+                        "asset": "BTC",
+                        "action": "chiudi",
+                        "direction": None,
+                        "price": None,
+                        "reasoning": "obiettivo raggiunto",
+                        "outcome": None,
+                    }
+                ],
+            },
+            {"asset": "ETH", "entries": []},
+        ],
+    }
+
+
+def test_the_memory_of_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:
+    flow_id = client_of("anna").post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    assert client_of("bruno").get(f"/flows/{flow_id}/memory").status_code == 404
 
 
 def test_the_protection_defaults_are_created_changed_and_the_take_profit_removed_with_a_null(

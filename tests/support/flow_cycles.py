@@ -121,6 +121,7 @@ from tests.fakes.model_call import FakeModelCallAdapter
 from tests.fakes.model_catalog import InMemoryModelCatalogAdapter
 from tests.fakes.model_gateway import FakeModelGatewayAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
+from tests.fakes.past_decisions import InMemoryPastDecisionsAdapter
 from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.price_forecaster import FakePriceForecasterAdapter
 from tests.fakes.price_history import FakePriceHistoryAdapter
@@ -374,6 +375,9 @@ class FlowCycles:
             opening_blocked_notice=hold.blocked(NotifyOpeningBlockedUseCase(notify_flow)),
             flow_keys=InMemoryKeyExpiriesAdapter(
                 platform.accounts, platform.provider_keys, platform.flows, tenant_id, platform.source_credentials
+            ),
+            past_decisions=InMemoryPastDecisionsAdapter(
+                self.records, platform.orders_of(tenant_id), platform.closed_positions
             ),
         )
 

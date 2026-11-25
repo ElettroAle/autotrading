@@ -12,10 +12,11 @@ from autotrading.adapters.inbound.api.strategy_document import (
     StrategyFormatNotSupportedError,
     attachment_of,
 )
-from autotrading.application.flows.create_flow import SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_interval import CycleInterval
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_strategy import FlowStrategy
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
@@ -78,6 +79,7 @@ def an_original(client: TestClient, platform: Platform, user: str, name: str = "
         "max_daily_loss_percent": "5",
         "max_drawdown_percent": "10",
         "openings_resume": "next_day",
+        "memory": {"active": True, "decisions": 5, "days": 14},
     }
     response = client.post("/flows", json=request)
     assert response.status_code == 201
@@ -100,6 +102,7 @@ def a_strategy() -> FlowStrategy:
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
         minimum_confidence=MinimumConfidence(55),
+        memory=FlowMemory(active=True, decisions=5, days=14),
     )
 
 
@@ -132,6 +135,7 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
             "default_stop_loss_percent": "3",
             "default_take_profit_percent": "9",
             "minimum_confidence": 55,
+            "memory": {"active": True, "decisions": 5, "days": 14},
         },
     }
 
@@ -170,6 +174,7 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
     )
     assert (command.default_stop_loss_percent, command.default_take_profit_percent) == (Decimal(3), Decimal(9))
     assert command.minimum_confidence == 55
+    assert command.memory == MemoryRequest(active=True, decisions=5, days=14)
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
@@ -185,6 +190,7 @@ def test_a_document_without_model_or_limits_gives_them_empty() -> None:
         OpeningsResume.MANUAL,
     )
     assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (None, None)
+    assert command.memory == MemoryRequest()
 
 
 def test_a_document_before_the_adapters_gives_every_source_the_adapter_it_became() -> None:
@@ -298,6 +304,7 @@ def test_the_exported_file_imports_as_a_draft_with_the_same_strategy(client_of: 
         "bring_to_minimum",
         "system_prompt",
         "max_consecutive_failures",
+        "memory",
     )
     assert {key: draft[key] for key in strategy_parts} == {key: original[key] for key in strategy_parts}
 

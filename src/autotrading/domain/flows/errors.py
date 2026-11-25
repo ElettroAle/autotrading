@@ -123,6 +123,16 @@ class InvalidMinimumConfidenceError(FlowSettingError):
         super().__init__("la confidenza minima va da 0 a 100", FlowSetting.MINIMUM_CONFIDENCE)
 
 
+class MemoryDecisionsOutOfRangeError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("le decisioni della memoria vanno da 1 a 50", FlowSetting.MEMORY_DECISIONS)
+
+
+class MemoryDaysOutOfRangeError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("i giorni della memoria vanno da 1 a 365", FlowSetting.MEMORY_DAYS)
+
+
 class CapitalAboveFreeCapitalError(FlowSettingError):
     def __init__(self, free_capital: str) -> None:
         super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}", FlowSetting.ALLOCATED_CAPITAL)

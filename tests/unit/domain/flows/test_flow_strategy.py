@@ -6,6 +6,7 @@ import pytest
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import RepeatedSourceError, StrategyModelMissingError
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy, strategy_model
@@ -36,6 +37,7 @@ def a_strategy() -> FlowStrategy:
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
         minimum_confidence=MinimumConfidence(55),
+        memory=FlowMemory(active=True, decisions=4, days=9),
     )
 
 
@@ -53,6 +55,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(2), None),
         minimum_confidence=MinimumConfidence(70),
+        memory=FlowMemory(active=True, decisions=5, days=14),
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -71,6 +74,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(2), None),
         minimum_confidence=MinimumConfidence(70),
+        memory=FlowMemory(active=True, decisions=5, days=14),
     )
 
 
@@ -85,6 +89,7 @@ def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
         openings_resume=OpeningsResume.MANUAL,
         protection_defaults=ProtectionDefaults(),
         minimum_confidence=None,
+        memory=FlowMemory(),
     )
 
     assert (

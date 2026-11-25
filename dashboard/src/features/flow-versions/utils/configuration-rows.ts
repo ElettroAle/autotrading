@@ -35,6 +35,10 @@ const RESUME_LABELS: Readonly<Record<Configuration['openings_resume'], string>> 
   next_day: 'il giorno dopo',
 };
 
+// The memory as the API writes it in its differences (R5.3.4).
+const memoryText = ({ active, decisions, days }: Configuration['memory']): string =>
+  active ? `attiva, ${decisions} decisioni, ${days} giorni` : 'non attiva';
+
 /**
  * The parts of a configuration with the names the API gives them in its differences (R1.1.3), so the comparison
  * highlights a row by the name of the part the API reports as changed.
@@ -93,5 +97,6 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
     },
     { part: 'perdita massima dal picco', value: percentText(configuration.max_drawdown_percent) },
     { part: 'ripresa delle aperture', value: RESUME_LABELS[configuration.openings_resume] },
+    { part: 'memoria', value: memoryText(configuration.memory) },
   ];
 };

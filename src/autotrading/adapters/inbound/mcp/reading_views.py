@@ -23,6 +23,7 @@ from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
 from autotrading.domain.flows.flow_statistics import FlowStatistics
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 
 
@@ -364,6 +365,8 @@ class CycleDetailView:
     model_attempts: int | None
     trigger: str
     failed_attempts: list[FailedAttemptView]
+    # The memory as the domain gives it, which the results of the tools write as the API does (R5.3.4).
+    memory: tuple[AssetMemory, ...] | None
 
     @classmethod
     def of(cls, record: CycleRecord) -> CycleDetailView:
@@ -385,6 +388,7 @@ class CycleDetailView:
             model_attempts=record.model_attempts,
             trigger=record.trigger.value,
             failed_attempts=[FailedAttemptView.of(attempt) for attempt in record.failed_attempts],
+            memory=record.memory,
         )
 
 

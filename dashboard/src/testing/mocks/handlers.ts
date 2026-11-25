@@ -113,6 +113,7 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   max_daily_loss_percent: configuration.maxDailyLossPercent,
   max_drawdown_percent: configuration.maxDrawdownPercent,
   openings_resume: configuration.openingsResume,
+  memory: configuration.memory,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
@@ -635,6 +636,15 @@ export const handlers = [
   http.get('*/flows/:flowId/cycles/:plannedAt', ({ request, params }) =>
     withFlow(request, params.flowId, (flow) =>
       cycleAt(fakePlatform.cyclesOf(flow.id), String(params.plannedAt)),
+    ),
+  ),
+  // What the agent would receive if the cycle started now; nothing with the memory off (R5.3.4).
+  http.get('*/flows/:flowId/memory', ({ request, params }) =>
+    withFlow(request, params.flowId, (flow) =>
+      HttpResponse.json({
+        active: flow.memory.active,
+        assets: flow.memory.active ? flow.remembered : [],
+      }),
     ),
   ),
   http.get('*/flows/:flowId/equity', ({ request, params }) =>
