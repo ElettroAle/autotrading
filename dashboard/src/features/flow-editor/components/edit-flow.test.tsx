@@ -383,6 +383,12 @@ describe('EditFlow', () => {
     const unlimited = within(memory).getByRole('checkbox', { name: 'Lunghezza illimitata' });
     const everyDecision = within(memory).getByRole('checkbox', { name: 'Tutte le decisioni' });
     expect(field('Lunghezza del motivo')).toHaveValue('160');
+    expect(field('Lunghezza del motivo')).toHaveAccessibleDescription(
+      'caratteri del motivo di ogni decisione ricordata',
+    );
+    expect(everyDecision).toHaveAccessibleDescription(
+      'spenta: solo aperture, chiusure e inversioni; accesa: anche aggiornamenti e decisioni di mantenere',
+    );
     expect(field('Lunghezza del motivo')).toBeDisabled();
     expect(unlimited).toBeDisabled();
     expect(everyDecision).toBeDisabled();
@@ -393,7 +399,7 @@ describe('EditFlow', () => {
 
     await waitFor(() =>
       expect(field('Lunghezza del motivo')).toHaveAccessibleDescription(
-        'la lunghezza del motivo della memoria è un intero positivo',
+        'caratteri del motivo di ogni decisione ricordata la lunghezza del motivo della memoria è un intero positivo',
       ),
     );
     await userEvent.click(unlimited);

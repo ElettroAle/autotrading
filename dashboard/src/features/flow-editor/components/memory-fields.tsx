@@ -54,6 +54,7 @@ export const MemoryFields = () => {
         id="flow-memory-text-length"
         label="Lunghezza del motivo"
         error={errors.memory?.text_length?.message}
+        hint="caratteri del motivo di ogni decisione ricordata"
       >
         {(fieldControl) => (
           <input
@@ -70,9 +71,18 @@ export const MemoryFields = () => {
         Lunghezza illimitata
       </label>
       <label className="flex items-center gap-2">
-        <input type="checkbox" {...register('memory.all_decisions')} disabled={!active} />
+        <input
+          type="checkbox"
+          {...register('memory.all_decisions')}
+          disabled={!active}
+          aria-describedby="flow-memory-all-decisions-hint"
+        />
         Tutte le decisioni
       </label>
+      <p id="flow-memory-all-decisions-hint" className="text-xs text-slate-600">
+        spenta: solo aperture, chiusure e inversioni; accesa: anche aggiornamenti e decisioni di
+        mantenere
+      </p>
     </fieldset>
   );
 };
