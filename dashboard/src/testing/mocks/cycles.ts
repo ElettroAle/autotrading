@@ -33,8 +33,9 @@ export type FakeCycle = {
 };
 
 /**
- * The previous operative decisions of the flow on an asset, as the API gives them: on the flow what the agent will
- * receive, in a cycle what it received (R5.3.4).
+ * The previous decisions of the flow on an asset, as the API gives them: on the flow what the agent will receive, in a
+ * cycle what it received (R5.3.4), with their motive, the invalidation of an opening and the course of its position
+ * (R5.3.5).
  */
 export type FakeAssetMemory = {
   readonly asset: string;
@@ -44,8 +45,13 @@ export type FakeAssetMemory = {
     readonly action: string;
     readonly direction: string | null;
     readonly price: string | null;
-    readonly reasoning: string;
-    readonly outcome: { readonly pnl: string; readonly realized: boolean } | null;
+    readonly motive: string;
+    readonly invalidation: string | null;
+    readonly outcome: {
+      readonly pnl: string;
+      readonly realized: boolean;
+      readonly course: string | null;
+    } | null;
   }[];
 };
 

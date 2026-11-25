@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
-import { fakePlatform } from '@/testing/mocks/platform';
+import { DEFAULT_MEMORY, fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderInApp, untilEveryRequestIsAnswered } from '@/testing/test-utils';
 
@@ -21,8 +21,9 @@ const REMEMBERED = [
         action: 'apri',
         direction: 'long',
         price: '95000',
-        reasoning: 'rottura della resistenza',
-        outcome: { pnl: '12.5', realized: false },
+        motive: 'rottura della resistenza',
+        invalidation: null,
+        outcome: { pnl: '12.5', realized: false, course: null },
       },
     ],
   },
@@ -35,7 +36,7 @@ describe('FlowMemory', () => {
 
   it('keeps what the agent will receive closed until the user opens it, for every asset', async () => {
     fakePlatform.addFlow('anna', 'alfa', {
-      memory: { active: true, decisions: 5, days: 14 },
+      memory: { ...DEFAULT_MEMORY, active: true, decisions: 5, days: 14 },
       remembered: REMEMBERED,
     });
 

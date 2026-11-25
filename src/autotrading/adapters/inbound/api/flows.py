@@ -100,7 +100,8 @@ class FlowCreationRequest(BaseModel):
     default_take_profit_percent: Decimal | None = None
     # Null or missing: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
-    # Missing: off, with 10 decisions and 30 days (R5.3.4).
+    # Missing: off, with 10 decisions and 30 days (R5.3.4), a motive of 160 characters and only openings, closings and
+    # reversals; `unlimited_text_length` true leaves the motive whole (R5.3.5).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
 
     def command(self) -> CreateFlowCommand:
@@ -167,7 +168,8 @@ class FlowModificationRequest(BaseModel):
     default_take_profit_percent: Decimal | None = None
     # A null sent on purpose removes the minimum confidence; a missing one keeps the version in force (R3.1.4).
     minimum_confidence: int | None = None
-    # Only the parts of the memory sent change; the others keep the version in force (R5.3.4).
+    # Only the parts of the memory sent change; the others keep the version in force (R5.3.4). A null length keeps it
+    # too: `unlimited_text_length` true takes the limit away (R5.3.5).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:

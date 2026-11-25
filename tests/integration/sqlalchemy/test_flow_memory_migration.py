@@ -66,6 +66,17 @@ def test_a_version_saved_before_the_memory_reads_with_it_off_and_its_defaults(tm
         assert flows.get(flow.id).configuration.memory == FlowMemory(active=False, decisions=10, days=30)
         with database.begin() as connection:
             connection.execute(select(func.set_config("app.tenant_id", str(tenant_id), True)))
+            saved = connection.execute(select(flow_versions.c.configuration).where(flow_versions.c.version == 2))
+            memory_document = saved.scalar_one()[MEMORY]
+        assert memory_document == {
+            "active": False,
+            "decisions": 10,
+            "days": 30,
+            "text_length": 160,
+            "all_decisions": False,
+        }
+        with database.begin() as connection:
+            connection.execute(select(func.set_config("app.tenant_id", str(tenant_id), True)))
             versions = connection.execute(select(func.count()).select_from(flow_versions)).scalar_one()
         assert versions == 2
 
@@ -81,7 +92,8 @@ def test_the_memory_saved_after_the_migration_and_the_one_a_cycle_received_read_
             TradeSide.LONG,
             Decimal("95000.5"),
             "rottura",
-            MemoryOutcome(Decimal(3), realized=True),
+            "sotto 94000",
+            MemoryOutcome(Decimal(3), realized=True, course="chiusa dallo stop loss dopo 12 minuti"),
         )
         memory = (AssetMemory("BTC", (entry,)),)
         cycles = SqlAlchemyCycleRepositoryAdapter(database, flow.tenant_id)

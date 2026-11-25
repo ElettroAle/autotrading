@@ -44,7 +44,7 @@ CONFIGURATION = replace(
     openings_resume=OpeningsResume.NEXT_DAY,
     protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
     minimum_confidence=MinimumConfidence(60),
-    memory=FlowMemory(active=True, decisions=5, days=14),
+    memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
 )
 
 
@@ -75,7 +75,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "default_stop_loss_percent": "2.5",
         "default_take_profit_percent": "10",
         "minimum_confidence": 60,
-        "memory": {"active": True, "decisions": 5, "days": 14},
+        "memory": {"active": True, "decisions": 5, "days": 14, "text_length": None, "all_decisions": True},
     }
 
 
@@ -207,6 +207,13 @@ def test_a_version_without_minimum_confidence_reads_back_without_it() -> None:
 
 def test_the_memory_reads_back_as_saved() -> None:
     document = json.loads(json.dumps(document_of(CONFIGURATION)))
+
+    assert configuration_of(1, document).memory == CONFIGURATION.memory
+
+
+def test_a_memory_saved_before_its_length_and_its_choice_of_decisions_cuts_at_160_and_remembers_no_update() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    document["memory"] = {"active": True, "decisions": 5, "days": 14}
 
     assert configuration_of(1, document).memory == FlowMemory(active=True, decisions=5, days=14)
 

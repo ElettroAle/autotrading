@@ -362,3 +362,30 @@ def test_a_reversal_ignores_its_direction(direction: object) -> None:
 )
 def test_the_reasons_of_non_conformity_of_a_reversal(fields: dict[str, object], reason: str) -> None:
     assert reasons(read(answer(reversal("BTC", **fields)))) == {"BTC": reason}
+
+
+def test_a_decision_keeps_its_motive_apart_from_the_reasoning() -> None:
+    decision = read(answer(opening(motivo="  rottura di 95000 con volumi in crescita "))).decisions[0]
+
+    assert decision.motive == "rottura di 95000 con volumi in crescita"
+    assert decision.reasoning == "rottura della resistenza"
+
+
+@pytest.mark.parametrize("action", ["apri", "chiudi", "mantieni", "aggiorna", "inverti"])
+def test_every_action_carries_its_motive(action: str) -> None:
+    entry = {**opening(motivo="attendo la rottura", togli_obiettivo=False), "azione": action}
+
+    assert read(answer(entry)).decisions[0].motive == "attendo la rottura"
+
+
+@pytest.mark.parametrize("motive", [..., None, "   "])
+def test_a_decision_without_motive_stays_valid_without_one(motive: object) -> None:
+    [decision] = read(answer(opening(motivo=motive))).decisions
+
+    assert decision.motive is None
+
+
+def test_a_motive_not_a_text_discards_the_decision() -> None:
+    response = read(answer(opening(motivo=3)))
+
+    assert reasons(response) == {"BTC": "valore di tipo non ammesso: motivo"}

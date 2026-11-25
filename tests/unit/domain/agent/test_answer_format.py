@@ -39,6 +39,7 @@ def test_every_field_of_a_decision_is_required_and_no_other_is_allowed() -> None
         "invalidazione",
         "togli_obiettivo",
         "confidenza",
+        "motivo",
         "ragionamento",
     ]
     assert entry["additionalProperties"] is False
@@ -54,6 +55,8 @@ def test_the_fields_only_an_opening_needs_may_be_null() -> None:
     assert properties["obiettivo"] == properties["stop"] == {"type": ["number", "null"]}
     assert properties["invalidazione"] == {"type": ["string", "null"]}
     assert properties["togli_obiettivo"] == {"type": "boolean"}
+    # Optional for the answers of a system prompt written before it: null says the model gave none (R5.3.5).
+    assert properties["motivo"] == {"type": ["string", "null"]}
     assert properties["asset"] == properties["ragionamento"] == {"type": "string"}
 
 

@@ -1795,7 +1795,7 @@ export interface components {
         };
         /**
          * AssetMemory
-         * @description The previous operative decisions of the flow on one of its assets, from the most recent (R5.3.4).
+         * @description The previous decisions of the flow on one of its assets, from the most recent (R5.3.4).
          */
         AssetMemory: {
             /** Asset */
@@ -2497,10 +2497,12 @@ export interface components {
         };
         /**
          * FlowMemory
-         * @description Whether the agent receives its previous operative decisions on every asset of the flow, and how many from how
-         *     far back: off, 10 decisions and 30 days unless the user says otherwise (R5.3.4).
+         * @description Whether the agent receives its previous decisions on every asset of the flow, how many from how far back, how
+         *     long the motive of each and whether every decision or only those that open or close a position: off, 10 decisions,
+         *     30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5).
          *
-         *     The decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule.
+         *     The decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule. A
+         *     length of None is no limit.
          */
         FlowMemory: {
             /**
@@ -2518,6 +2520,16 @@ export interface components {
              * @default 30
              */
             days: number;
+            /**
+             * Text Length
+             * @default 160
+             */
+            text_length: number | null;
+            /**
+             * All Decisions
+             * @default false
+             */
+            all_decisions: boolean;
         };
         /**
          * FlowMemoryReading
@@ -3210,7 +3222,8 @@ export interface components {
         };
         /**
          * MemoryEntry
-         * @description One previous operative decision of the flow on an asset as the agent receives it (R5.3.4).
+         * @description One previous decision of the flow on an asset as the agent receives it: its motive in one sentence, cut to the
+         *     length of the memory, and the invalidation of an opening (R5.3.4, R5.3.5).
          */
         MemoryEntry: {
             /**
@@ -3224,24 +3237,32 @@ export interface components {
             direction: components["schemas"]["TradeSide"] | null;
             /** Price */
             price: string | null;
-            /** Reasoning */
-            reasoning: string;
+            /** Motive */
+            motive: string;
+            /** Invalidation */
+            invalidation: string | null;
             outcome: components["schemas"]["MemoryOutcome"] | null;
         };
         /**
          * MemoryOutcome
-         * @description The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open.
+         * @description The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open; and
+         *     the course of the position: how and after how long it closed, or for how long it has been open (R5.3.5).
          */
         MemoryOutcome: {
             /** Pnl */
             pnl: string;
             /** Realized */
             realized: boolean;
+            /** Course */
+            course?: string | null;
         };
         /**
          * MemoryRequest
          * @description The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a
-         *     new flow (R5.3.4).
+         *     new flow (R5.3.4, R5.3.5).
+         *
+         *     A length not given cannot say «no limit»: `unlimited_text_length` takes the limit away, as the parts of a
+         *     configuration that may be removed, and prevails over a length given with it.
          */
         MemoryRequest: {
             /** Active */
@@ -3250,6 +3271,15 @@ export interface components {
             decisions?: number | null;
             /** Days */
             days?: number | null;
+            /** Text Length */
+            text_length?: number | null;
+            /** All Decisions */
+            all_decisions?: boolean | null;
+            /**
+             * Unlimited Text Length
+             * @default false
+             */
+            unlimited_text_length: boolean;
         };
         /** ModelCatalogResponse */
         ModelCatalogResponse: {

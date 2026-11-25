@@ -27,7 +27,7 @@ def remembered_decisions(
     memory = configuration.memory
     if not memory.active:
         return None
-    past = decisions.past_decisions(flow_id, memory.window(at))
+    past = decisions.past_decisions(flow_id, memory.window(at), memory.remembered_actions)
     held = configuration.held(open_positions(), lambda position: position.asset)
     unrealized_pnl = {position.asset: position.unrealized_pnl for position in held}
     return memory.recalled(configuration.assets, past, at, unrealized_pnl)

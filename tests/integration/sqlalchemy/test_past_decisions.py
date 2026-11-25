@@ -1,6 +1,6 @@
-"""ADR memoria-del-flusso-dalle-decisioni-operative-precedenti: the decisions of a flow read back from the table of the
-decisions of its completed cycles, with the price of their execution and the PnL of the positions they opened or
-closed, under row level security."""
+"""ADR memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni: the decisions of a flow read back from the
+table of the decisions of its completed cycles, with their motive, the price of their execution, the PnL of the
+positions they opened or closed and how and when those positions closed, under row level security."""
 
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -23,6 +23,7 @@ from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_memory import EVERY_DECISION, OPENINGS_AND_CLOSINGS
 from autotrading.domain.flows.memory_entry import PastDecision
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
@@ -83,14 +84,16 @@ def closed(flow: Flow, realized_pnl: Decimal) -> ClosedPosition:
         opening=PositionEnd(Decimal(100000), OPENED_AT, OPENED_AT),
         closing=PositionEnd(Decimal(102000), CLOSED_AT, CLOSED_AT),
         fees=Decimal("0.08"),
-        reason=CloseReason.AGENT,
+        reason=CloseReason.STOP_LOSS,
         realized_pnl=realized_pnl,
     )
 
 
 def test_the_decisions_read_back_with_price_and_pnl_of_the_positions_newest_first(database: Engine) -> None:
     tenant_id, flow = new_flow(database)
-    opening = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 80, "rottura")
+    opening = RecordedDecision(
+        "BTC", DecisionAction.OPEN, TradeSide.LONG, 80, "il mercato sale", motive="rottura", invalidation="sotto 99000"
+    )
     closing = RecordedDecision("BTC", DecisionAction.CLOSE, None, 70, "obiettivo")
     holding = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 75, "di nuovo")
     decided(database, flow, OPENED_AT, opening)
@@ -102,12 +105,20 @@ def test_the_decisions_read_back_with_price_and_pnl_of_the_positions_newest_firs
     orders.add(executed(flow, HELD_AT, "101000"))
     SqlAlchemyClosedPositionRepositoryAdapter(database, tenant_id).add(closed(flow, Decimal(40)))
 
-    past = SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(flow.id.value, WINDOW)
+    past = SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(flow.id.value, WINDOW, EVERY_DECISION)
 
     assert past == [
-        PastDecision(HELD_AT, holding, Decimal(101000), None, position_open=True),
+        PastDecision(HELD_AT, holding, Decimal(101000), None, position_open=True, opened_at=HELD_AT),
         PastDecision(CLOSED_AT, closing, Decimal(102000), Decimal(40)),
-        PastDecision(OPENED_AT, opening, Decimal(100000), Decimal(40)),
+        PastDecision(
+            OPENED_AT,
+            opening,
+            Decimal(100000),
+            Decimal(40),
+            closed_by=CloseReason.STOP_LOSS,
+            opened_at=OPENED_AT,
+            closed_at=CLOSED_AT,
+        ),
     ]
 
 
@@ -119,9 +130,23 @@ def test_only_the_decisions_of_the_flow_in_the_window_are_read(database: Engine)
     decided(database, alfa, NOW - timedelta(days=40), update)
     decided(database, beta, HELD_AT, RecordedDecision("BTC", DecisionAction.CLOSE, None, 60, "di beta"))
 
-    past = SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(alfa.id.value, WINDOW)
+    past = SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(alfa.id.value, WINDOW, EVERY_DECISION)
 
     assert past == [PastDecision(HELD_AT, update, None, None)]
+
+
+def test_only_the_decisions_with_the_actions_asked_are_read(database: Engine) -> None:
+    tenant_id, flow = new_flow(database)
+    closing = RecordedDecision("BTC", DecisionAction.CLOSE, None, 60, "obiettivo")
+    decided(database, flow, OPENED_AT, closing)
+    decided(database, flow, CLOSED_AT, RecordedDecision("BTC", DecisionAction.UPDATE, None, 60, "stop"))
+    decided(database, flow, HELD_AT, RecordedDecision("BTC", DecisionAction.HOLD, None, 60, "attesa"))
+
+    adapter = SqlAlchemyPastDecisionsAdapter(database, tenant_id)
+
+    assert adapter.past_decisions(flow.id.value, WINDOW, OPENINGS_AND_CLOSINGS) == [
+        PastDecision(OPENED_AT, closing, None, None)
+    ]
 
 
 def test_a_cycle_that_failed_after_deciding_gives_no_decision(database: Engine) -> None:
@@ -134,7 +159,9 @@ def test_a_cycle_that_failed_after_deciding_gives_no_decision(database: Engine) 
     )
     SqlAlchemyCycleRepositoryAdapter(database, tenant_id).record(failed)
 
-    assert SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(flow.id.value, WINDOW) == []
+    assert (
+        SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(flow.id.value, WINDOW, EVERY_DECISION) == []
+    )
 
 
 def test_another_tenant_never_reads_the_decisions(database: Engine) -> None:
@@ -142,4 +169,4 @@ def test_another_tenant_never_reads_the_decisions(database: Engine) -> None:
     decided(database, flow, HELD_AT, RecordedDecision("BTC", DecisionAction.CLOSE, None, 60, "obiettivo"))
     other, _ = new_flow(database)
 
-    assert SqlAlchemyPastDecisionsAdapter(database, other).past_decisions(flow.id.value, WINDOW) == []
+    assert SqlAlchemyPastDecisionsAdapter(database, other).past_decisions(flow.id.value, WINDOW, EVERY_DECISION) == []

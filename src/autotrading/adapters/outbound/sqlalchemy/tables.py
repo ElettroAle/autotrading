@@ -340,6 +340,9 @@ cycle_decisions = Table(
     Column("direction", Text),
     Column("confidence", Integer),
     Column("reasoning", Text, nullable=False),
+    # Null for the decisions recorded before the agent gave them, or whose agent gave none (R5.3.5).
+    Column("motive", Text),
+    Column("invalidation", Text),
     ForeignKeyConstraint(["flow_id", "planned_at"], ["cycles.flow_id", "cycles.planned_at"]),
 )
 

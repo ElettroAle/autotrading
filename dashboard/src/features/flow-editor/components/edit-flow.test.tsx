@@ -369,6 +369,47 @@ describe('EditFlow', () => {
       active: true,
       decisions: 5,
       days: 14,
+      text_length: 160,
+      all_decisions: false,
+    });
+  });
+
+  // R5.3.5, ADR memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni.
+  it('sets the length of the motive, whole or positive, and every decision in the memory as a new version', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const memory = await screen.findByRole('group', { name: 'Memoria' });
+    const unlimited = within(memory).getByRole('checkbox', { name: 'Lunghezza illimitata' });
+    const everyDecision = within(memory).getByRole('checkbox', { name: 'Tutte le decisioni' });
+    expect(field('Lunghezza del motivo')).toHaveValue('160');
+    expect(field('Lunghezza del motivo')).toBeDisabled();
+    expect(unlimited).toBeDisabled();
+    expect(everyDecision).toBeDisabled();
+    await userEvent.click(within(memory).getByRole('checkbox', { name: 'Memoria attiva' }));
+    await userEvent.clear(field('Lunghezza del motivo'));
+    await userEvent.type(field('Lunghezza del motivo'), '0');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Lunghezza del motivo')).toHaveAccessibleDescription(
+        'la lunghezza del motivo della memoria è un intero positivo',
+      ),
+    );
+    await userEvent.click(unlimited);
+    expect(field('Lunghezza del motivo')).toBeDisabled();
+    await userEvent.click(everyDecision);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).memory).toEqual({
+      active: true,
+      decisions: 10,
+      days: 30,
+      text_length: null,
+      all_decisions: true,
     });
   });
 

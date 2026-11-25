@@ -196,7 +196,8 @@ def test_the_detail_of_a_cycle_answers_with_the_memory_the_agent_received(
         TradeSide.LONG,
         Decimal(95000),
         "rottura",
-        MemoryOutcome(Decimal("12.5"), realized=False),
+        "sotto 94000",
+        MemoryOutcome(Decimal("12.5"), realized=False, course="aperta da 1 ora"),
     )
     memory = (AssetMemory("BTC", (entry,)), AssetMemory("ETH", ()))
     platform.cycles.record(replace(a_completed_cycle(flow_id), memory=memory))
@@ -213,8 +214,9 @@ def test_the_detail_of_a_cycle_answers_with_the_memory_the_agent_received(
                     "action": "apri",
                     "direction": "long",
                     "price": "95000",
-                    "reasoning": "rottura",
-                    "outcome": {"pnl": "12.5", "realized": False},
+                    "motive": "rottura",
+                    "invalidation": "sotto 94000",
+                    "outcome": {"pnl": "12.5", "realized": False, "course": "aperta da 1 ora"},
                 }
             ],
         },

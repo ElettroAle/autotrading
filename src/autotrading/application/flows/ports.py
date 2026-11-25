@@ -58,7 +58,7 @@ from autotrading.domain.flows.memory_entry import AssetMemory, PastDecision
 from autotrading.domain.flows.openings_suspension import OpeningsStatus, OpeningsSuspension
 from autotrading.domain.flows.operations import Operation, OperationsOwner, OperationsQuery, OperationsReport
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
-from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, RecordedDecision
+from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.risk_check import AssetLimits
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.flows.selections import ActiveSource, AdapterParameterValue, ModelSelection, SourceSelection
@@ -1249,6 +1249,11 @@ class AgentDecisionPort(Protocol):
     def reasoning(self) -> str: ...
 
     @property
+    def motive(self) -> str | None:
+        """The motive in one sentence, apart from the reasoning; None when the model gave none (R5.3.5)."""
+        ...
+
+    @property
     def confidence(self) -> int: ...
 
     def intent_with[O, C, H, U, R](
@@ -1537,10 +1542,13 @@ class CycleHistoryPort(Protocol):
 class PastDecisionsPort(Protocol):
     """Bound to the tenant of the request: the decisions of one of its flows, never those of another flow (R5.3.4)."""
 
-    def past_decisions(self, flow_id: UUID, window: TimeWindow) -> list[PastDecision]:
-        """The decisions of the completed cycles of the flow planned in the window, with the price their order was
-        executed at, the PnL of the position they opened once closed, or of the one they closed, and whether the
-        position they opened is still open.
+    def past_decisions(
+        self, flow_id: UUID, window: TimeWindow, actions: frozenset[DecisionAction]
+    ) -> list[PastDecision]:
+        """The decisions with the actions given of the completed cycles of the flow planned in the window, with the
+        price their order was executed at, the PnL of the position they opened once closed, or of the one they closed,
+        and whether the position they opened is still open; an opening with when its position opened and, once closed,
+        when and why it closed (R5.3.5).
         """
         ...
 

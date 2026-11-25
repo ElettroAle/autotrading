@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
 import { aCompletedCycle, reasoningOf, type FakeAssetMemory } from '@/testing/mocks/cycles';
-import { fakePlatform } from '@/testing/mocks/platform';
+import { DEFAULT_MEMORY, fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then, When } from '../../../support/fixtures';
 
@@ -24,8 +24,9 @@ const MEMORY: FakeAssetMemory[] = [
         action: 'apri',
         direction: 'long',
         price: '95000',
-        reasoning: REASONING,
-        outcome: { pnl: '40', realized: true },
+        motive: REASONING,
+        invalidation: null,
+        outcome: { pnl: '40', realized: true, course: null },
       },
     ],
   },
@@ -42,7 +43,7 @@ Given('che il flusso {string} ha la memoria non attiva', async ({ memory }, flow
 Given('che il flusso {string} ha la memoria attiva', async ({ memory }, flow: string) => {
   fakePlatform.ensureUser(USER);
   fakePlatform.addFlow(USER, flow, {
-    memory: { active: true, decisions: 10, days: 30 },
+    memory: { ...DEFAULT_MEMORY, active: true },
     remembered: MEMORY,
   });
   memory.flow = flow;

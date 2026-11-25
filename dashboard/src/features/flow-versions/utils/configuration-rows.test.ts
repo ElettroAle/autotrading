@@ -41,7 +41,7 @@ const CONFIGURATION: Configuration = {
   max_daily_loss_percent: '5',
   max_drawdown_percent: '12.5',
   openings_resume: 'next_day',
-  memory: { active: true, decisions: 5, days: 14 },
+  memory: { active: true, decisions: 5, days: 14, text_length: null, all_decisions: true },
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -109,7 +109,10 @@ describe('configurationRows', () => {
       { part: 'perdita giornaliera massima', value: '5%' },
       { part: 'perdita massima dal picco', value: '12.5%' },
       { part: 'ripresa delle aperture', value: 'il giorno dopo' },
-      { part: 'memoria', value: 'attiva, 5 decisioni, 14 giorni' },
+      {
+        part: 'memoria',
+        value: 'attiva, 5 decisioni, 14 giorni, motivo intero, tutte le decisioni',
+      },
     ]);
   });
 
@@ -144,7 +147,7 @@ describe('configurationRows', () => {
       max_daily_loss_percent: null,
       max_drawdown_percent: null,
       openings_resume: 'manual',
-      memory: { active: false, decisions: 10, days: 30 },
+      memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
     });
 
     expect(Object.fromEntries(rows.map((row) => [row.part, row.value]))).toMatchObject({

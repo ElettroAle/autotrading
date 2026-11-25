@@ -77,6 +77,7 @@ class Decision:
     asset: str
     reasoning: str = "motivo"
     confidence: int = 60
+    motive: str | None = None
 
     def intent_with[O, C, H, U, R](
         self,
@@ -169,7 +170,16 @@ def test_a_result_other_than_the_context_received_no_memory() -> None:
 def test_the_decisions_are_recorded_with_the_raw_answer_the_discarded_and_the_missing() -> None:
     assert journal().describe(CycleStep.AGENT_DECISION, CycleDecisions(CYCLE_FLOW, REPLY)) == {
         "risposta": "{}",
-        "decisioni": [{"tipo": "Decision", "action": "hold", "asset": "BTC", "reasoning": "motivo", "confidence": 60}],
+        "decisioni": [
+            {
+                "tipo": "Decision",
+                "action": "hold",
+                "asset": "BTC",
+                "reasoning": "motivo",
+                "confidence": 60,
+                "motive": None,
+            }
+        ],
         "scartate": ["x"],
         "mancanti": ["ETH"],
     }
@@ -274,6 +284,48 @@ def test_the_decisions_are_recorded_one_by_asset_with_action_direction_confidenc
         RecordedDecision("SOL", DecisionAction.HOLD, None, 40, "attesa"),
         RecordedDecision("DOGE", DecisionAction.UPDATE, None, 55, "nuovo stop"),
         RecordedDecision("XRP", DecisionAction.REVERSE, None, 65, "cambio"),
+    )
+
+
+def test_every_decision_is_recorded_with_its_motive_and_an_opening_or_a_reversal_with_its_invalidation() -> None:
+    plan = ExitPlan(stop=Decimal(90000), invalidation="sotto 90000")
+    decisions = decided(
+        AgentDecision(
+            "BTC",
+            TradeAction.OPEN,
+            "il mercato è salito",
+            72,
+            TradeOpening(TradeDirection.LONG, Decimal("0.1"), 2, plan),
+            motive="rottura di 95000",
+        ),
+        AgentDecision("ETH", TradeAction.HOLD, "laterale", 40, motive="attendo 3500"),
+        AgentDecision(
+            "XRP", TradeAction.REVERSE, "cambio", 65, reversal=TradeReversal(Decimal("0.2"), 3, plan), motive="inverto"
+        ),
+        AgentDecision(
+            "DOGE",
+            TradeAction.UPDATE,
+            "nuovo stop",
+            55,
+            plan_change=ExitPlanChange(stop=Decimal(1), invalidation="sotto 1"),
+        ),
+    )
+
+    assert journal().recorded_decisions(decisions) == (
+        RecordedDecision(
+            "BTC",
+            DecisionAction.OPEN,
+            TradeSide.LONG,
+            72,
+            "il mercato è salito",
+            motive="rottura di 95000",
+            invalidation="sotto 90000",
+        ),
+        RecordedDecision("ETH", DecisionAction.HOLD, None, 40, "laterale", motive="attendo 3500"),
+        RecordedDecision(
+            "XRP", DecisionAction.REVERSE, None, 65, "cambio", motive="inverto", invalidation="sotto 90000"
+        ),
+        RecordedDecision("DOGE", DecisionAction.UPDATE, None, 55, "nuovo stop"),
     )
 
 

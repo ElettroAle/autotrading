@@ -49,8 +49,15 @@ export const flowSchema = z.object({
   max_daily_loss_percent: z.string().nullable(),
   max_drawdown_percent: z.string().nullable(),
   openings_resume: z.enum(['manual', 'next_day']),
-  // Off unless the user turns it on, with the decisions per asset and the days it holds (R5.3.4).
-  memory: z.object({ active: z.boolean(), decisions: z.number(), days: z.number() }),
+  // Off unless the user turns it on, with the decisions per asset and the days it holds (R5.3.4), the length of the
+  // motive, null for a whole motive, and whether it remembers every decision (R5.3.5).
+  memory: z.object({
+    active: z.boolean(),
+    decisions: z.number(),
+    days: z.number(),
+    text_length: z.number().nullable(),
+    all_decisions: z.boolean(),
+  }),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

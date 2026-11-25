@@ -112,8 +112,8 @@ def install_reading_tools(server: MCPServer, use_cases: Callable[[], McpUseCases
         )
 
     @server.tool(
-        description="Memoria del flusso: le decisioni operative precedenti per asset, con il loro esito, che l'agente "
-        "riceverebbe se il ciclo partisse ora; vuota se la memoria non è attiva.",
+        description="Memoria del flusso: le decisioni precedenti per asset, con motivo, invalidazione ed esito, come "
+        "l'agente le riceverebbe se il ciclo partisse ora; vuota se la memoria non è attiva.",
         annotations=READING,
     )
     def read_flow_memory(flow_id: UUID) -> Annotated[CallToolResult, FlowMemoryReading]:

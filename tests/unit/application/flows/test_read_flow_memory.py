@@ -94,8 +94,9 @@ def test_the_memory_is_what_the_next_cycle_would_receive_now_with_the_pnl_held_o
     memory = bench.use_case.execute(ReadFlowMemoryCommand(flow.id))
 
     entry = MemoryEntry.of(
-        PastDecision(planned_at, opening, Decimal(95000), None, position_open=True),
-        MemoryOutcome(Decimal(12), realized=False),
+        PastDecision(planned_at, opening, Decimal(95000), None, position_open=True, opened_at=planned_at),
+        MemoryOutcome(Decimal(12), realized=False, course="aperta da 2 ore"),
+        160,
     )
     assert memory == FlowMemoryReading(active=True, assets=(AssetMemory("BTC", (entry,)), AssetMemory("ETH", ())))
 
@@ -108,7 +109,7 @@ def test_a_draft_without_an_account_remembers_without_reading_any_position(bench
     memory = bench.use_case.execute(ReadFlowMemoryCommand(flow.id))
 
     assert memory.assets == (
-        AssetMemory("BTC", (MemoryEntry.of(PastDecision(planned_at, closing, None, None), None),)),
+        AssetMemory("BTC", (MemoryEntry.of(PastDecision(planned_at, closing, None, None), None, 160),)),
         AssetMemory("ETH", ()),
     )
     assert bench.activity.read == []

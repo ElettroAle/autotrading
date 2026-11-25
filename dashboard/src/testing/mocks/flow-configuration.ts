@@ -67,7 +67,14 @@ type ConfigurationRequest = {
   max_daily_loss_percent?: unknown;
   max_drawdown_percent?: unknown;
   openings_resume?: unknown;
-  memory?: { active?: unknown; decisions?: unknown; days?: unknown };
+  memory?: {
+    active?: unknown;
+    decisions?: unknown;
+    days?: unknown;
+    text_length?: unknown;
+    all_decisions?: unknown;
+    unlimited_text_length?: unknown;
+  };
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -124,6 +131,29 @@ const minimumConfidenceOf = (requested: unknown): number | null => {
   return minimum;
 };
 
+// A whole motive takes the length away; a length not sent keeps the one in force; zero or less is refused (R5.3.5).
+const textLengthOf = (
+  requested: ConfigurationRequest['memory'],
+  current: number | null,
+): number | null => {
+  if (requested?.unlimited_text_length === true) {
+    return null;
+  }
+  const sent = requested?.text_length;
+  if (sent === undefined || sent === null) {
+    return current;
+  }
+  const length = numberOf(sent, 'memory.text_length');
+  if (length < 1) {
+    throw new Refusal(
+      422,
+      'la lunghezza del motivo della memoria è un intero positivo',
+      'memory.text_length',
+    );
+  }
+  return length;
+};
+
 // The memory with the parts sent, the others kept, within the ranges the API checks (R5.3.4).
 const memoryOf = (requested: ConfigurationRequest['memory'], current: FakeMemory): FakeMemory => {
   const part = (value: unknown, field: string, kept: number): number =>
@@ -137,7 +167,15 @@ const memoryOf = (requested: ConfigurationRequest['memory'], current: FakeMemory
     throw new Refusal(422, 'i giorni della memoria vanno da 1 a 365', 'memory.days');
   }
   const active = typeof requested?.active === 'boolean' ? requested.active : current.active;
-  return { active, decisions, days };
+  const allDecisions =
+    typeof requested?.all_decisions === 'boolean' ? requested.all_decisions : current.all_decisions;
+  return {
+    active,
+    decisions,
+    days,
+    text_length: textLengthOf(requested, current.text_length),
+    all_decisions: allDecisions,
+  };
 };
 
 const assetsOf = (requested: unknown): string[] => {
