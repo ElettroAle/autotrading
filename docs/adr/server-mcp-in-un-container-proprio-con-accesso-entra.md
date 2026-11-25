@@ -1,6 +1,6 @@
 # ADR server-mcp-in-un-container-proprio-con-accesso-entra — Server MCP in un container proprio, con accesso Entra e le operazioni dell'API sui flussi
 
-- Stato: proposta (24 novembre 2026)
+- Stato: proposta (24 novembre 2026); la parte «Autenticazione» (registrazione del client e identificativi dell'applicazione dell'API) è sostituita dall'ADR impostazioni-entra-dell-accesso-mcp-riproducibili (25 novembre 2026)
 - Requisiti: US 527 R6.6.1 (Task 528, 529)
 - Collegate: ADR 0013 (installazioni raggiungibili solo via Tailscale), ADR 0016 (autenticazione OIDC), ADR 0027
   (errori in Problem Details), ADR 0116 e 0117 (container della dashboard sul suo percorso), ADR 0118 (accesso Entra
