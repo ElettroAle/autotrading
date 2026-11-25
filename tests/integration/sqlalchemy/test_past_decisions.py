@@ -105,7 +105,9 @@ def test_the_decisions_read_back_with_price_and_pnl_of_the_positions_newest_firs
     orders.add(executed(flow, HELD_AT, "101000"))
     SqlAlchemyClosedPositionRepositoryAdapter(database, tenant_id).add(closed(flow, Decimal(40)))
 
-    past = SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(flow.id.value, WINDOW, EVERY_DECISION)
+    past = SqlAlchemyPastDecisionsAdapter(database, tenant_id).past_decisions(
+        flow.id.value, WINDOW, OPENINGS_AND_CLOSINGS
+    )
 
     assert past == [
         PastDecision(HELD_AT, holding, Decimal(101000), None, position_open=True, opened_at=HELD_AT),
