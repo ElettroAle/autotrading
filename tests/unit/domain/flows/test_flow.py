@@ -17,6 +17,7 @@ from autotrading.domain.flows.errors import (
 )
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import assets_of
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.free_capital import FreeCapital, allocated_capital_of_account
@@ -190,6 +191,10 @@ def test_the_minimum_confidence_is_absent_unless_given_and_reaches_the_risk_poli
     assert replace(configuration, minimum_confidence=MinimumConfidence(60)).risk_policy == RiskPolicy(
         configuration.risk_limits, bring_to_minimum=False, minimum_confidence=MinimumConfidence(60)
     )
+
+
+def test_the_memory_is_off_with_10_decisions_and_30_days_unless_given() -> None:
+    assert a_configuration().memory == FlowMemory(active=False, decisions=10, days=30)
 
 
 def test_an_active_flow_plans_its_cycles_every_interval_from_its_anchor() -> None:

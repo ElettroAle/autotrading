@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { readData, useApiClient } from '@/lib/api-client';
 import { pageDataQuery } from '@/lib/react-query';
+import { assetMemorySchema } from '@/types/flow-memory';
 
 import { failureSchema, triggerSchema } from './get-cycles';
 
@@ -26,6 +27,8 @@ const cycleSchema = z.object({
     })
     .nullable(),
   trigger: triggerSchema,
+  // The memory the agent received; null with the memory of the flow off (R5.3.4).
+  memory: z.array(assetMemorySchema).nullable(),
 });
 
 export type Cycle = z.infer<typeof cycleSchema>;

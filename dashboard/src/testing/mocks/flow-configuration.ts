@@ -1,9 +1,11 @@
 import { FAKE_MODELS, FAKE_SYSTEM_PROMPT, type FakeSource as FakeCatalogSource } from './catalogs';
 import {
   fakePlatform,
+  DEFAULT_MEMORY,
   type FakeAccount,
   type FakeAdapterChoice,
   type FakeFlow,
+  type FakeMemory,
   type FakeOpeningsResume,
   type FakeRiskLimits,
   type FakeSource,
@@ -65,6 +67,7 @@ type ConfigurationRequest = {
   max_daily_loss_percent?: unknown;
   max_drawdown_percent?: unknown;
   openings_resume?: unknown;
+  memory?: { active?: unknown; decisions?: unknown; days?: unknown };
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -119,6 +122,22 @@ const minimumConfidenceOf = (requested: unknown): number | null => {
     throw new Refusal(422, 'la confidenza minima va da 0 a 100', 'minimum_confidence');
   }
   return minimum;
+};
+
+// The memory with the parts sent, the others kept, within the ranges the API checks (R5.3.4).
+const memoryOf = (requested: ConfigurationRequest['memory'], current: FakeMemory): FakeMemory => {
+  const part = (value: unknown, field: string, kept: number): number =>
+    value === undefined || value === null ? kept : numberOf(value, field);
+  const decisions = part(requested?.decisions, 'memory.decisions', current.decisions);
+  if (decisions < 1 || decisions > 50) {
+    throw new Refusal(422, 'le decisioni della memoria vanno da 1 a 50', 'memory.decisions');
+  }
+  const days = part(requested?.days, 'memory.days', current.days);
+  if (days < 1 || days > 365) {
+    throw new Refusal(422, 'i giorni della memoria vanno da 1 a 365', 'memory.days');
+  }
+  const active = typeof requested?.active === 'boolean' ? requested.active : current.active;
+  return { active, decisions, days };
 };
 
 const assetsOf = (requested: unknown): string[] => {
@@ -426,6 +445,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       defaultStopLossPercent: flow.defaultStopLossPercent,
       defaultTakeProfitPercent: flow.defaultTakeProfitPercent,
       minimumConfidence: flow.minimumConfidence,
+      memory: flow.memory,
     },
   });
   return flow;
@@ -487,6 +507,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     defaultStopLossPercent: optionalTextOf(request.default_stop_loss_percent) ?? '5',
     defaultTakeProfitPercent: optionalTextOf(request.default_take_profit_percent),
     minimumConfidence: minimumConfidenceOf(request.minimum_confidence),
+    memory: memoryOf(request.memory, DEFAULT_MEMORY),
     currentCapital: capital,
   });
 };
@@ -644,6 +665,7 @@ export const modifyFlow = (
       request.openings_resume === undefined
         ? flow.openingsResume
         : openingsResumeOf(request.openings_resume),
+    memory: memoryOf(request.memory, flow.memory),
   };
   // A draft takes nothing on its account until it starts: the conflict on the assets waits for the start (ADR 0124).
   if (flow.status !== DRAFT) {

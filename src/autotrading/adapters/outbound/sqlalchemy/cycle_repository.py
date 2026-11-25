@@ -26,8 +26,10 @@ from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
 from autotrading.domain.flows.decision_filter import DecisionFilter
 from autotrading.domain.flows.flow_cost import CycleCost
-from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, RecordedDecision
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry, MemoryOutcome
+from autotrading.domain.flows.recorded_decision import DatedDecision, DecidedCycle, DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 KEY = ["flow_id", "planned_at"]
@@ -53,6 +55,25 @@ class _FailedAttemptColumn(TypedDict):
     attempt: int
     error_type: str
     message: str
+
+
+class _OutcomeColumn(TypedDict):
+    pnl: str
+    realized: bool
+
+
+class _MemoryEntryColumn(TypedDict):
+    planned_at: str
+    action: str
+    direction: str | None
+    price: str | None
+    reasoning: str
+    outcome: _OutcomeColumn | None
+
+
+class _AssetMemoryColumn(TypedDict):
+    asset: str
+    entries: list[_MemoryEntryColumn]
 
 
 class _DecisionRow(TypedDict):
@@ -81,6 +102,7 @@ class _CycleRow(TypedDict):
     model_attempts: int | None
     trigger: str
     failed_attempts: list[_FailedAttemptColumn] | None
+    memory: list[_AssetMemoryColumn] | None
 
 
 class SqlAlchemyCycleRepositoryAdapter:
@@ -324,6 +346,7 @@ def row_of(record: CycleRecord, tenant_id: TenantId) -> dict[str, object]:
             }
             for attempt in record.failed_attempts
         ],
+        "memory": _memory_column(record.memory),
     }
 
 
@@ -386,6 +409,7 @@ def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
             FailedAttempt(_step(item["step"]), item["attempt"], item["error_type"], item["message"])
             for item in row["failed_attempts"] or ()
         ),
+        memory=_memory_of(row["memory"]),
     )
 
 
@@ -401,6 +425,47 @@ def _plain_value(value: object) -> str:
         return value.isoformat()
     # A type the journal should never put in a document: failing here keeps it out of the record.
     raise UnrecordableDocumentError(type(value).__name__)
+
+
+def _memory_column(memory: tuple[AssetMemory, ...] | None) -> list[_AssetMemoryColumn] | None:
+    """The memory as plain JSON: amounts as text, so no number is rounded, and instants in ISO 8601."""
+    if memory is None:
+        return None
+    return [{"asset": each.asset, "entries": [_entry_column(entry) for entry in each.entries]} for each in memory]
+
+
+def _entry_column(entry: MemoryEntry) -> _MemoryEntryColumn:
+    outcome = entry.outcome
+    return {
+        "planned_at": entry.planned_at.isoformat(),
+        "action": entry.action.value,
+        "direction": None if entry.direction is None else entry.direction.value,
+        "price": None if entry.price is None else str(entry.price),
+        "reasoning": entry.reasoning,
+        "outcome": None if outcome is None else {"pnl": str(outcome.pnl), "realized": outcome.realized},
+    }
+
+
+def _memory_of(column: list[_AssetMemoryColumn] | None) -> tuple[AssetMemory, ...] | None:
+    if column is None:
+        return None
+    return tuple(
+        AssetMemory(each["asset"], tuple(_entry_of(each["asset"], entry) for entry in each["entries"]))
+        for each in column
+    )
+
+
+def _entry_of(asset: str, column: _MemoryEntryColumn) -> MemoryEntry:
+    outcome, price = column["outcome"], column["price"]
+    return MemoryEntry(
+        datetime.fromisoformat(column["planned_at"]),
+        asset,
+        DecisionAction(column["action"]),
+        None if column["direction"] is None else TradeSide(column["direction"]),
+        None if price is None else Decimal(price),
+        column["reasoning"],
+        None if outcome is None else MemoryOutcome(Decimal(outcome["pnl"]), realized=outcome["realized"]),
+    )
 
 
 def _failure_row(failure: CycleFailure | None) -> dict[str, str] | None:

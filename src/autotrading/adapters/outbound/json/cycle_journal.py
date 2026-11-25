@@ -17,6 +17,7 @@ from autotrading.domain.flows.call_cost import CallCost
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_record import FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.recorded_decision import RecordedDecision
 from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
@@ -72,6 +73,11 @@ class JsonCycleJournalAdapter:
         if not isinstance(decision, CycleDecisions):
             return ()
         return tuple(_recorded(each) for each in decision.reply.response.decisions)
+
+    def received_memory(self, context: object) -> tuple[AssetMemory, ...] | None:
+        if not isinstance(context, CycleContext):
+            return None
+        return context.question.memory
 
     def failed_attempts(self, step: CycleStep, result: object) -> tuple[FailedAttempt, ...]:
         """The orders and the protections sent again after a temporary error, each attempt that failed named by its

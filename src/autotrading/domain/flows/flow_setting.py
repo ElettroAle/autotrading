@@ -25,3 +25,5 @@ class FlowSetting(StrEnum):
     DEFAULT_STOP_LOSS = "default_stop_loss_percent"
     DEFAULT_TAKE_PROFIT = "default_take_profit_percent"
     MINIMUM_CONFIDENCE = "minimum_confidence"
+    MEMORY_DECISIONS = "memory.decisions"
+    MEMORY_DAYS = "memory.days"

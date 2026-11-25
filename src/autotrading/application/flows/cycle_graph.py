@@ -47,6 +47,7 @@ from autotrading.domain.flows.cycle_record import (
 from autotrading.domain.flows.cycle_schedule import CycleSchedule, delay_seconds
 from autotrading.domain.flows.cycle_step import CycleStep
 from autotrading.domain.flows.cycle_trigger import CycleTrigger
+from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.recorded_decision import RecordedDecision
 from autotrading.domain.flows.selections import ActiveSource
 
@@ -123,6 +124,7 @@ class CycleState[S = object, D = object, C = object, A = object, O = object, E =
     readings: Annotated[list[SourceReading[D]], operator.add]
     absent: Annotated[list[AbsentSource], operator.add]
     context: C
+    memory: tuple[AssetMemory, ...] | None
     decisions: A
     cost: CallCost | None
     model_attempts: int | None
@@ -260,7 +262,8 @@ class CycleGraph[S = object, D = object, C = object, A = object, O = object, E =
             lambda: self._steps.context.execute(cycle.flow_id, state["snapshot"], readings, absent),
             failed,
         )
-        return {"context": context, **self._done(CycleStep.COMPOSE_CONTEXT, context)}
+        memory = self._steps.journal.received_memory(context)
+        return {"context": context, "memory": memory, **self._done(CycleStep.COMPOSE_CONTEXT, context)}
 
     def _decide(self, cycle: PlannedCycle, state: CycleState[S, D, C, A, O, E]) -> CycleState[S, D, C, A, O, E]:
         decisions = self._steps.agent.execute(cycle.flow_id, state["context"])
@@ -407,4 +410,12 @@ def _record_of[S, D, C, A, O, E](
         model_attempts=state.get("model_attempts"),
         decisions=tuple(state.get("recorded_decisions", ())),
         trigger=cycle.trigger,
+        memory=_memory_of(state.get("memory")),
     )
+
+
+def _memory_of(memory: Sequence[AssetMemory] | None) -> tuple[AssetMemory, ...] | None:
+    """The memory as the cycle composed it: the checkpointer gives its tuples back as lists."""
+    if memory is None:
+        return None
+    return tuple(AssetMemory(each.asset, tuple(each.entries)) for each in memory)

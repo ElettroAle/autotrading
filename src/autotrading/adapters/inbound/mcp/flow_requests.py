@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Literal, TypedDict
 from uuid import UUID
 
-from autotrading.application.flows.create_flow import CreateFlowCommand, SourceRequest
+from autotrading.application.flows.create_flow import CreateFlowCommand, MemoryRequest, SourceRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import AdapterRequest
@@ -73,6 +73,7 @@ class _StrategyArguments(TypedDict):
     default_stop_loss_percent: Decimal | None
     default_take_profit_percent: Decimal | None
     minimum_confidence: int | None
+    memory: MemoryRequest
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -97,6 +98,7 @@ class FlowStrategy:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
 
     def _strategy_arguments(self) -> _StrategyArguments:
         return _StrategyArguments(
@@ -118,6 +120,7 @@ class FlowStrategy:
             default_stop_loss_percent=self.default_stop_loss_percent,
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
+            memory=self.memory,
         )
 
 
@@ -183,6 +186,7 @@ class FlowModification:
     default_stop_loss_percent: Decimal | None = None
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
+    memory: MemoryRequest = field(default_factory=MemoryRequest)
     remove: list[RemovablePart] = field(default_factory=list)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
@@ -222,4 +226,5 @@ class FlowModification:
             remove_default_take_profit="default_take_profit_percent" in removed,
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence="minimum_confidence" in removed,
+            memory=self.memory,
         )

@@ -16,11 +16,14 @@ from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCa
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
-from autotrading.domain.flows.cycle_record import AbsentSource
+from autotrading.domain.flows.cycle_record import AbsentSource, CycleOutcome, CycleRecord
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_state import FlowState
+from autotrading.domain.flows.memory_entry import AssetMemory, MemoryEntry
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
+from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate, BlockedDecision
 from autotrading.domain.flows.selections import ActiveSource
@@ -28,9 +31,13 @@ from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
+from tests.fakes.closed_position_repository import ClosedPositionStore
+from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.opening_blocked_notices import FakeOpeningBlockedNoticeAdapter
 from tests.fakes.opening_reduced_notices import FakeOpeningReducedNoticeAdapter
+from tests.fakes.order_repository import InMemoryOrderRepositoryAdapter
+from tests.fakes.past_decisions import InMemoryPastDecisionsAdapter
 from tests.support.flows import a_configuration, a_flow
 
 READ_AT = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -193,11 +200,63 @@ class Aggregates:
         return self.answer
 
 
-def a_context(aggregates: Aggregates | None = None) -> CycleContext:
-    readings = [SourceReading("news", (SourceData("news", "RSS", 2, None, {"titolo": "t"}),))]
-    return ComposeCycleContextUseCase(Composer(), Actions(), aggregates or Aggregates(), Clock()).execute(
-        FLOW.id.value, SNAPSHOT, readings, [AbsentSource("pivots", "fonte non disponibile")]
+def no_past_decisions() -> InMemoryPastDecisionsAdapter:
+    return InMemoryPastDecisionsAdapter(
+        InMemoryCycleRepositoryAdapter(), InMemoryOrderRepositoryAdapter(), ClosedPositionStore()
     )
+
+
+def a_context(
+    aggregates: Aggregates | None = None,
+    snapshot: FlowSnapshot[CycleFlow] = SNAPSHOT,
+    decisions: InMemoryPastDecisionsAdapter | None = None,
+) -> CycleContext:
+    readings = [SourceReading("news", (SourceData("news", "RSS", 2, None, {"titolo": "t"}),))]
+    compose = ComposeCycleContextUseCase(
+        Composer(), Actions(), aggregates or Aggregates(), Clock(), decisions or no_past_decisions()
+    )
+    return compose.execute(FLOW.id.value, snapshot, readings, [AbsentSource("pivots", "fonte non disponibile")])
+
+
+def remembering(memory: FlowMemory, *positions: CyclePosition) -> FlowSnapshot[CycleFlow]:
+    flow = replace(FLOW, configuration=replace(FLOW.configuration, memory=memory))
+    account = CycleAccount("USDC", Decimal(500), positions)
+    return FlowSnapshot(SNAPSHOT.sources, replace(CYCLE_FLOW, flow=flow, account=account))
+
+
+def decided(cycles: InMemoryCycleRepositoryAdapter, ago: timedelta, *decisions: RecordedDecision) -> None:
+    cycles.record(CycleRecord(FLOW.id.value, NOW - ago, CycleOutcome.COMPLETED, decisions=decisions))
+
+
+def test_without_the_memory_the_question_has_none_and_nothing_is_read() -> None:
+    cycles = InMemoryCycleRepositoryAdapter()
+    decided(cycles, timedelta(hours=1), RecordedDecision("BTC", DecisionAction.CLOSE, None, 60, "obiettivo"))
+    decisions = InMemoryPastDecisionsAdapter(cycles, InMemoryOrderRepositoryAdapter(), ClosedPositionStore())
+
+    assert a_context(decisions=decisions).question.memory is None
+
+
+def test_with_the_memory_the_question_holds_the_operative_decisions_before_now_with_the_pnl_held_now() -> None:
+    cycles = InMemoryCycleRepositoryAdapter()
+    opening = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 80, "rottura")
+    decided(cycles, timedelta(hours=1), opening, RecordedDecision("ETH", DecisionAction.HOLD, None, 50, "laterale"))
+    decisions = InMemoryPastDecisionsAdapter(cycles, InMemoryOrderRepositoryAdapter(), ClosedPositionStore())
+    held = CyclePosition("BTC", TradeSide.LONG, Decimal(1), 2, Decimal(100), Decimal(104), Decimal(4), None)
+
+    snapshot = remembering(FlowMemory(active=True), held)
+
+    question = a_context(snapshot=snapshot, decisions=decisions).question
+
+    memory = (
+        AssetMemory(
+            "BTC",
+            (MemoryEntry(NOW - timedelta(hours=1), "BTC", DecisionAction.OPEN, TradeSide.LONG, None, "rottura", None),),
+        ),
+        AssetMemory("ETH", ()),
+    )
+    assert question.memory == memory
+    assert question.system_prompt == snapshot.state.configuration.rendered_system_prompt(("apri", "chiudi"), memory)
+    assert "- 2026-" in question.system_prompt
 
 
 def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_missing_declared() -> None:
@@ -213,6 +272,7 @@ def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_mi
         state=CYCLE_FLOW.state_view(),
         sources=(SourceData("news", "RSS", 2, None, {"titolo": "t"}),),
         missing=("pivots: fonte non disponibile",),
+        memory=None,
     )
 
 

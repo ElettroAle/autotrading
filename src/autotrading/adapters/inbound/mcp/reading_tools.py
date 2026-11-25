@@ -31,6 +31,7 @@ from autotrading.application.flows.list_cycles import ListCyclesCommand
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsCommand
 from autotrading.application.flows.rank_flows import RankFlowsCommand
 from autotrading.application.flows.read_cycle import ReadCycleCommand
+from autotrading.application.flows.read_flow_memory import FlowMemoryReading, ReadFlowMemoryCommand
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsCommand
 from autotrading.domain.flows.flow_id import FlowId
@@ -109,6 +110,14 @@ def install_reading_tools(server: MCPServer, use_cases: Callable[[], McpUseCases
         return answer_of(
             lambda: CycleDetailView.of(use_cases().read_cycle.execute(ReadCycleCommand(flow_id, planned_at)))
         )
+
+    @server.tool(
+        description="Memoria del flusso: le decisioni operative precedenti per asset, con il loro esito, che l'agente "
+        "riceverebbe se il ciclo partisse ora; vuota se la memoria non è attiva.",
+        annotations=READING,
+    )
+    def read_flow_memory(flow_id: UUID) -> Annotated[CallToolResult, FlowMemoryReading]:
+        return answer_of(lambda: use_cases().read_flow_memory.execute(ReadFlowMemoryCommand(FlowId(flow_id))))
 
     @server.tool(description=f"Statistiche di un flusso nel periodo. {PERIOD}", annotations=READING)
     def read_flow_statistics(

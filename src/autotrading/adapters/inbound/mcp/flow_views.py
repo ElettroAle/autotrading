@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from autotrading.adapters.inbound.mcp.formats import optional_amount, optional_text
 from autotrading.domain.flows.cash_out import CashOutOutcome
 from autotrading.domain.flows.flow import Flow
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
@@ -88,6 +89,7 @@ class FlowView:
     default_stop_loss_percent: str
     default_take_profit_percent: str | None
     minimum_confidence: int | None
+    memory: FlowMemory
     missing: list[str]
 
     @classmethod
@@ -118,6 +120,7 @@ class FlowView:
             default_stop_loss_percent=str(configuration.protection_defaults.stop_loss_percent),
             default_take_profit_percent=optional_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=None if confidence is None else confidence.value,
+            memory=configuration.memory,
             missing=list(flow.missing_before_start),
         )
 

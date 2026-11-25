@@ -3397,6 +3397,55 @@
         }
       }
     },
+    "/flows/{flow_id}/memory": {
+      "get": {
+        "tags": [
+          "flussi"
+        ],
+        "summary": "Read Flow Memory",
+        "description": "The memory the agent of the flow would receive if its cycle started now (R5.3.4).",
+        "operationId": "read_flow_memory_flows__flow_id__memory_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "flow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Flow Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlowMemoryReading"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/flows/{flow_id}/archive": {
       "post": {
         "tags": [
@@ -6498,6 +6547,28 @@
         ],
         "title": "AmountResponse"
       },
+      "AssetMemory": {
+        "properties": {
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "asset",
+          "entries"
+        ],
+        "title": "AssetMemory",
+        "description": "The previous operative decisions of the flow on one of its assets, from the most recent (R5.3.4)."
+      },
       "BalanceComparisonResponse": {
         "properties": {
           "compared_at": {
@@ -7105,6 +7176,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemory"
           }
         },
         "type": "object",
@@ -7127,7 +7201,8 @@
           "openings_resume",
           "default_stop_loss_percent",
           "default_take_profit_percent",
-          "minimum_confidence"
+          "minimum_confidence",
+          "memory"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -7276,6 +7351,20 @@
             },
             "type": "array",
             "title": "Failed Attempts"
+          },
+          "memory": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AssetMemory"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory"
           }
         },
         "type": "object",
@@ -7291,7 +7380,8 @@
           "cost",
           "model_attempts",
           "trigger",
-          "failed_attempts"
+          "failed_attempts",
+          "memory"
         ],
         "title": "CycleDetailResponse",
         "description": "A cycle with everything recorded about it, and what started it (R1.7.1, R6.5.2)."
@@ -7462,6 +7552,18 @@
         ],
         "title": "DatedDecisionResponse",
         "description": "A decision of the history with the planned instant of its cycle, which leads to its detail (R6.5.5)."
+      },
+      "DecisionAction": {
+        "type": "string",
+        "enum": [
+          "apri",
+          "chiudi",
+          "mantieni",
+          "aggiorna",
+          "inverti"
+        ],
+        "title": "DecisionAction",
+        "description": "What the agent decided on an asset, as the cycle records it: the words of its actions (R1.4.3, R3.1.3,\nR1.4.10)."
       },
       "DecisionPageResponse": {
         "properties": {
@@ -8231,6 +8333,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryRequest"
           }
         },
         "type": "object",
@@ -8346,6 +8451,50 @@
         ],
         "title": "FlowForecastAccuracyResponse",
         "description": "The error of the forecasts of a flow in the period, one for every asset and horizon it forecast (ADR\nerrore-medio-della-previsione-nell-api)."
+      },
+      "FlowMemory": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active",
+            "default": false
+          },
+          "decisions": {
+            "type": "integer",
+            "title": "Decisions",
+            "default": 10
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "default": 30
+          }
+        },
+        "type": "object",
+        "title": "FlowMemory",
+        "description": "Whether the agent receives its previous operative decisions on every asset of the flow, and how many from how\nfar back: off, 10 decisions and 30 days unless the user says otherwise (R5.3.4).\n\nThe decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule."
+      },
+      "FlowMemoryReading": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetMemory"
+            },
+            "type": "array",
+            "title": "Assets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "assets"
+        ],
+        "title": "FlowMemoryReading",
+        "description": "The memory of the flow as the user consults it: whether it is on and, only then, what every asset gives."
       },
       "FlowModificationRequest": {
         "properties": {
@@ -8644,6 +8793,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryRequest"
           }
         },
         "type": "object",
@@ -9138,6 +9290,9 @@
             ],
             "title": "Minimum Confidence"
           },
+          "memory": {
+            "$ref": "#/components/schemas/FlowMemory"
+          },
           "missing": {
             "items": {
               "type": "string"
@@ -9171,6 +9326,7 @@
           "default_stop_loss_percent",
           "default_take_profit_percent",
           "minimum_confidence",
+          "memory",
           "missing"
         ],
         "title": "FlowResponse",
@@ -10341,6 +10497,128 @@
         ],
         "title": "MailServerResponse",
         "description": "The mail server of the user: never its password, only that one is saved (ADR server-di-posta-per-tenant)."
+      },
+      "MemoryEntry": {
+        "properties": {
+          "planned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Planned At"
+          },
+          "asset": {
+            "type": "string",
+            "title": "Asset"
+          },
+          "action": {
+            "$ref": "#/components/schemas/DecisionAction"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TradeSide"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "reasoning": {
+            "type": "string",
+            "title": "Reasoning"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MemoryOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "planned_at",
+          "asset",
+          "action",
+          "direction",
+          "price",
+          "reasoning",
+          "outcome"
+        ],
+        "title": "MemoryEntry",
+        "description": "One previous operative decision of the flow on an asset as the agent receives it (R5.3.4)."
+      },
+      "MemoryOutcome": {
+        "properties": {
+          "pnl": {
+            "type": "string",
+            "title": "Pnl"
+          },
+          "realized": {
+            "type": "boolean",
+            "title": "Realized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pnl",
+          "realized"
+        ],
+        "title": "MemoryOutcome",
+        "description": "The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open."
+      },
+      "MemoryRequest": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active"
+          },
+          "decisions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisions"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "title": "MemoryRequest",
+        "description": "The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a\nnew flow (R5.3.4)."
       },
       "ModelCatalogResponse": {
         "properties": {
@@ -12136,6 +12414,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryRequest"
           }
         },
         "type": "object",
@@ -12272,6 +12553,9 @@
               }
             ],
             "title": "Minimum Confidence"
+          },
+          "memory": {
+            "$ref": "#/components/schemas/MemoryRequest"
           }
         },
         "type": "object",
@@ -12565,6 +12849,14 @@
         ],
         "title": "TargetKind",
         "description": "What a notification leads to: a flow, one of its positions, open or closed, or the alert it opened."
+      },
+      "TradeSide": {
+        "type": "string",
+        "enum": [
+          "long",
+          "short"
+        ],
+        "title": "TradeSide"
       },
       "TrialOutcome": {
         "type": "string",

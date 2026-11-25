@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.application.flows.create_flow import SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
 from autotrading.application.flows.errors import FlowNameInUseError, InvalidFlowSettingError
 from autotrading.application.flows.export_flow_strategy import (
     ExportFlowStrategyCommand,
@@ -21,6 +21,7 @@ from autotrading.domain.flows.errors import (
     StrategyModelMissingError,
 )
 from autotrading.domain.flows.flow import FIRST_VERSION
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.flow_strategy import FlowStrategy
@@ -56,6 +57,7 @@ def a_command(**changes: object) -> ImportFlowStrategyCommand:
         default_stop_loss_percent=Decimal(4),
         default_take_profit_percent=Decimal(12),
         minimum_confidence=65,
+        memory=MemoryRequest(active=True, decisions=6),
     )
     return replace(command, **changes)  # type: ignore[arg-type]  # each test names the part it changes
 
@@ -92,6 +94,7 @@ def test_the_import_saves_a_draft_at_its_first_version_with_the_strategy_checked
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(4), Decimal(12)),
         minimum_confidence=MinimumConfidence(65),
+        memory=FlowMemory(active=True, decisions=6, days=30),
     ).draft_configuration(FIRST_VERSION)
     assert [(record.getMessage(), record.__dict__["flow_id"]) for record in caplog.records] == [
         ("strategia importata", str(draft.id.value))

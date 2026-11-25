@@ -22,7 +22,7 @@ Funzionalità: R1.4.8 System prompt del flusso personalizzabile
   Scenario: La configurazione mostra il system prompt predefinito e i segnaposti
     Quando "anna" consulta la configurazione del flusso "alfa"
     Allora il system prompt è il testo predefinito, indicato come predefinito
-    E la configurazione elenca i segnaposti "instructions, actions, max_leverage, assets, source_weights" ciascuno con la sua descrizione
+    E la configurazione elenca i segnaposti "instructions, actions, max_leverage, assets, source_weights, memory" ciascuno con la sua descrizione
 
   Scenario: Segnaposto sconosciuto
     Quando "anna" imposta il system prompt "Leva al massimo {leverage}"

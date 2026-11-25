@@ -90,6 +90,7 @@ from autotrading.application.flows.ports import (
     LedgerRecordingPort,
     OnDemandCyclePort,
     OpeningsSuspensionPort,
+    PastDecisionsPort,
     ReconciliationRepositoryPort,
     RunningVerificationsPort,
 )
@@ -103,6 +104,7 @@ from autotrading.application.flows.read_cycle import ReadCycleUseCase
 from autotrading.application.flows.read_default_system_prompt import ReadDefaultSystemPromptUseCase
 from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
+from autotrading.application.flows.read_flow_memory import ReadFlowMemoryUseCase
 from autotrading.application.flows.read_flow_results import FlowPeriodPorts, ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
@@ -236,6 +238,8 @@ class TenantPorts:
     flow_directory: FlowDirectoryPort
     flow_summaries: FlowSummaryPort
     flow_timing: FlowTimingPort
+    # The decisions of the flows with what came of them, that the memory of a flow holds (R5.3.4).
+    past_decisions: PastDecisionsPort
     equity_snapshots: EquitySnapshotRepositoryPort
     openings_suspensions: OpeningsSuspensionPort
     flow_forecasts: FlowForecastsPort
@@ -289,6 +293,7 @@ class TenantUseCases:
     read_default_system_prompt: ReadDefaultSystemPromptUseCase
     list_tradable_assets: ListTradableAssetsUseCase
     read_free_capital: ReadFreeCapitalUseCase
+    read_flow_memory: ReadFlowMemoryUseCase
     read_flow_results: ReadFlowResultsUseCase
     request_link_code: RequestLinkCodeUseCase
     get_linked_chat: GetLinkedChatUseCase
@@ -406,6 +411,9 @@ class TenantUseCases:
             read_default_system_prompt=ReadDefaultSystemPromptUseCase(),
             list_tradable_assets=ListTradableAssetsUseCase(ports.flow_checks.markets),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
+            read_flow_memory=ReadFlowMemoryUseCase(
+                ports.flows, ports.past_decisions, ports.account_activity, ports.clock
+            ),
             read_flow_results=ReadFlowResultsUseCase(
                 ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
                 ReadOpeningsSuspensionUseCase(

@@ -236,6 +236,8 @@ describe('CreateFlow', () => {
       max_daily_loss_percent: null,
       max_drawdown_percent: null,
       openings_resume: 'manual',
+      // Left untouched, the memory stays off with the defaults of the platform (R5.3.4).
+      memory: { active: false, decisions: 10, days: 30 },
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');

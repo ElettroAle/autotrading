@@ -41,6 +41,7 @@ const CONFIGURATION: Configuration = {
   max_daily_loss_percent: '5',
   max_drawdown_percent: '12.5',
   openings_resume: 'next_day',
+  memory: { active: true, decisions: 5, days: 14 },
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -71,6 +72,7 @@ const PARTS_OF_FIELD = {
   max_daily_loss_percent: ['perdita giornaliera massima'],
   max_drawdown_percent: ['perdita massima dal picco'],
   openings_resume: ['ripresa delle aperture'],
+  memory: ['memoria'],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
   readonly string[]
@@ -107,6 +109,7 @@ describe('configurationRows', () => {
       { part: 'perdita giornaliera massima', value: '5%' },
       { part: 'perdita massima dal picco', value: '12.5%' },
       { part: 'ripresa delle aperture', value: 'il giorno dopo' },
+      { part: 'memoria', value: 'attiva, 5 decisioni, 14 giorni' },
     ]);
   });
 
@@ -141,6 +144,7 @@ describe('configurationRows', () => {
       max_daily_loss_percent: null,
       max_drawdown_percent: null,
       openings_resume: 'manual',
+      memory: { active: false, decisions: 10, days: 30 },
     });
 
     expect(Object.fromEntries(rows.map((row) => [row.part, row.value]))).toMatchObject({
@@ -158,6 +162,7 @@ describe('configurationRows', () => {
       'perdita giornaliera massima': 'nessuno',
       'perdita massima dal picco': 'nessuno',
       'ripresa delle aperture': 'manuale',
+      memoria: 'non attiva',
     });
   });
 });

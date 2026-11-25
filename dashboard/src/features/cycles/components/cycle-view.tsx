@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { Card } from '@/components/ui/card';
 import { DETAIL_VALUE } from '@/components/ui/details-list';
 import { ErrorMessage } from '@/components/ui/error-message';
+import { FlowMemoryTable } from '@/components/ui/flow-memory-table';
 import { Loading } from '@/components/ui/loading';
 import { paths } from '@/config/paths';
 
@@ -63,7 +64,7 @@ export const CycleView = ({ flowId, plannedAt }: { flowId: string; plannedAt: st
   if (cycle.data === undefined) {
     return <ErrorMessage error={cycle.error} />;
   }
-  const { failure, absent_sources: absentSources, documents } = cycle.data;
+  const { failure, absent_sources: absentSources, documents, memory } = cycle.data;
   return (
     <div className="space-y-4">
       <Link to={paths.flowCycles.getHref(flowId)} className="text-blue-800 hover:underline">
@@ -72,6 +73,11 @@ export const CycleView = ({ flowId, plannedAt }: { flowId: string; plannedAt: st
       <CycleSummaryView cycle={cycle.data} />
       {failure !== null && <CycleFailureView failure={failure} />}
       {absentSources.length > 0 && <AbsentSources sources={absentSources} />}
+      {memory !== null && (
+        <CycleSection title="Memoria ricevuta">
+          <FlowMemoryTable memory={memory} />
+        </CycleSection>
+      )}
       {documents.map((document) => (
         <StepDocumentView key={document.step} document={document} />
       ))}

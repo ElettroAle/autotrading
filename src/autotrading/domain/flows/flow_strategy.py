@@ -4,6 +4,7 @@ from decimal import Decimal
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
@@ -15,9 +16,9 @@ from autotrading.domain.flows.selections import ModelSelection, SourceSelection
 class FlowStrategy:
     """What a flow does, without where and with how much: the part of a configuration a strategy file carries.
 
-    Interval, sources with weights and parameters, model with its parameters, instructions, risk rules and protection;
-    account, allocated capital and assets belong to the flow that uses the strategy, assigned to its draft (R2.5.2,
-    ADR 0140).
+    Interval, sources with weights and parameters, model with its parameters, instructions, risk rules, protection and
+    memory; account, allocated capital and assets belong to the flow that uses the strategy, assigned to its draft
+    (R2.5.2, ADR 0140, R5.3.4).
     """
 
     cycle_interval: CycleInterval
@@ -39,6 +40,8 @@ class FlowStrategy:
     protection_defaults: ProtectionDefaults = field(default_factory=ProtectionDefaults)
     # The confidence an opening needs, a risk rule like the limits; none unless the strategy has one (R3.1.4).
     minimum_confidence: MinimumConfidence | None = None
+    # How the agent remembers its decisions, off unless the strategy has it on, as in the configuration (R5.3.4).
+    memory: FlowMemory = field(default_factory=FlowMemory)
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -56,6 +59,7 @@ class FlowStrategy:
             configuration.openings_resume,
             configuration.protection_defaults,
             configuration.minimum_confidence,
+            configuration.memory,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -77,6 +81,7 @@ class FlowStrategy:
             openings_resume=self.openings_resume,
             protection_defaults=self.protection_defaults,
             minimum_confidence=self.minimum_confidence,
+            memory=self.memory,
         )
 
 

@@ -8,7 +8,7 @@ import pytest
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand, ArchiveFlowUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand, ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand, CompareFlowVersionsUseCase
-from autotrading.application.flows.create_flow import FlowChecks, SourceRequest
+from autotrading.application.flows.create_flow import FlowChecks, MemoryRequest, SourceRequest
 from autotrading.application.flows.errors import (
     AssetNotTradableError,
     AssetUnderVerificationError,
@@ -38,12 +38,15 @@ from autotrading.domain.flows.errors import (
     InvalidMinimumConfidenceError,
     MaxConsecutiveFailuresOutOfRangeError,
     MaxLossOutOfRangeError,
+    MemoryDaysOutOfRangeError,
+    MemoryDecisionsOutOfRangeError,
     TotalExposureOutOfRangeError,
     UnknownPromptPlaceholderError,
 )
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_id import FlowId
+from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
@@ -431,6 +434,23 @@ def test_the_minimum_confidence_removed_on_purpose_leaves_the_next_version_witho
     assert (modified.configuration.version, modified.configuration.minimum_confidence) == (3, None)
 
 
+def test_turning_the_memory_on_with_its_width_saves_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, memory=MemoryRequest(active=True, decisions=5, days=14)))
+
+    assert modified.configuration == replace(flow.configuration, version=2, memory=FlowMemory(True, 5, 14))
+
+
+def test_a_change_without_the_memory_keeps_the_one_in_force(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, memory=MemoryRequest(active=True, decisions=5)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, memory=MemoryRequest(days=7)))
+
+    assert modified.configuration.memory == FlowMemory(active=True, decisions=5, days=7)
+
+
 @pytest.mark.parametrize(
     ("changes", "error", "reason"),
     [
@@ -459,6 +479,12 @@ def test_the_minimum_confidence_removed_on_purpose_leaves_the_next_version_witho
         ),
         ({"minimum_confidence": -1}, InvalidMinimumConfidenceError, "la confidenza minima va da 0 a 100"),
         ({"minimum_confidence": 101}, InvalidMinimumConfidenceError, "la confidenza minima va da 0 a 100"),
+        (
+            {"memory": MemoryRequest(active=True, decisions=51)},
+            MemoryDecisionsOutOfRangeError,
+            "le decisioni della memoria vanno da 1 a 50",
+        ),
+        ({"memory": MemoryRequest(days=0)}, MemoryDaysOutOfRangeError, "i giorni della memoria vanno da 1 a 365"),
     ],
 )
 def test_an_invalid_change_is_refused_and_the_version_in_force_stays(
