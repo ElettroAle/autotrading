@@ -1,6 +1,6 @@
 # ADR memoria-del-flusso-dalle-decisioni-operative-precedenti — Memoria del flusso: decisioni operative precedenti per asset, con esito, ampiezza configurabile
 
-- Stato: proposta (24 novembre 2026)
+- Stato: superata da ADR memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni (25 novembre 2026)
 - Requisiti: US 363 R5.3.4 (Task 364, 728)
 - Collegate: ADR 0094 (ciclo decisionale nel contesto `flows`), ADR 0104 (LangGraph), ADR system-prompt-del-flusso-come-modello-con-segnaposti, ADR 0070 (PnL della chiusura dal
   exchange), ADR 0116 (dashboard); `.claude/rules/context-flows.md`, `.claude/rules/context-agent.md`,
