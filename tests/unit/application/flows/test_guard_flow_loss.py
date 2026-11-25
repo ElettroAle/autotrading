@@ -132,6 +132,16 @@ def test_the_peak_counts_only_from_the_last_resume_of_the_openings() -> None:
     assert not world.guarded("1068")
 
 
+def test_the_daily_loss_counts_from_a_resume_of_the_same_day() -> None:
+    """Bug 775: the daily loss passed before the resume does not suspend the openings again."""
+    world = World()
+    world.recorded(MIDNIGHT, "1000")
+    world.recorded(NOW - timedelta(minutes=15), "940")
+    world.openings.resume(world.flow.id.value, NOW - timedelta(minutes=5))
+
+    assert not world.guarded("935")
+
+
 def test_the_peak_counts_from_the_first_start_without_a_resume() -> None:
     world = World()
     world.recorded(FIRST_START - timedelta(days=1), "5000")

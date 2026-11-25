@@ -170,6 +170,21 @@ def test_without_equity_before_midnight_the_daily_reference_is_the_first_of_the_
     assert references.daily == snapshot(flow_id, midnight + timedelta(hours=1), "9")
 
 
+def test_after_a_resume_of_the_day_the_daily_reference_is_the_last_equity_up_to_the_resume(database: Engine) -> None:
+    # Bug 775: the daily loss counts from the resume of the openings, not from midnight.
+    tenant_id, flow_id = new_flow(database)
+    equity = SqlAlchemyEquitySnapshotRepositoryAdapter(database, tenant_id)
+    midnight = datetime(2026, 11, 16, tzinfo=UTC)
+    resumed_at = midnight + timedelta(hours=2, minutes=10)
+    now = midnight + timedelta(hours=2, minutes=15)
+    for planned_at, realized_pnl in [(midnight, "100"), (midnight + timedelta(hours=2), "40"), (now, "35")]:
+        equity.record(snapshot(flow_id, planned_at, realized_pnl))
+
+    references = equity.loss_references(flow_id, resumed_at, resumed_at, now)
+
+    assert references.daily == snapshot(flow_id, midnight + timedelta(hours=2), "40")
+
+
 def test_a_flow_without_equity_has_no_reference(database: Engine) -> None:
     tenant_id, flow_id = new_flow(database)
 

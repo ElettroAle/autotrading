@@ -70,7 +70,8 @@ class OpeningsStatus:
     """The openings of a flow as saved: the suspension, if one was saved, and the last resume.
 
     The resume the next day needs no write: the suspension read at an instant after its end is already lifted, and its
-    end is the resume the peak counts from (ADR perdita-massima-sui-valori-di-equity-registrati).
+    end is the resume the peak counts from (ADR perdita-massima-sui-valori-di-equity-registrati); falling at 00:00 UTC,
+    it leaves the daily loss counting from midnight (ADR perdita-giornaliera-dalla-ripresa-delle-aperture).
     """
 
     suspension: OpeningsSuspension | None
@@ -92,15 +93,27 @@ class OpeningsStatus:
 
     def peak_since(self, first_start: datetime) -> datetime:
         """The peak counts from the first start of the flow or from the last resume of its openings, the later one."""
+        return self._resumed_after(first_start)
+
+    def daily_since(self, day: datetime) -> datetime:
+        """The daily loss counts from 00:00 UTC of the day or from a later resume of the openings that day: a resume
+        that left the loss passed in force would suspend the openings again at once (Bug 775).
+        """
+        return self._resumed_after(day)
+
+    def _resumed_after(self, start: datetime) -> datetime:
+        """The last resume of the openings if later than the instant, else the instant."""
         if self.resumed_at is None:
-            return first_start
-        return max(first_start, self.resumed_at)
+            return start
+        return max(start, self.resumed_at)
 
     def suspended(self, reason: str, at: datetime) -> OpeningsStatus:
         return replace(self, suspension=OpeningsSuspension(reason, at))
 
     def resumed(self, at: datetime, flow_name: str) -> OpeningsStatus:
-        """The openings resumed by the user: the suspension is lifted and the peak counts again from now."""
+        """The openings resumed by the user: the suspension is lifted and the peak and the daily loss count again from
+        now (Bug 775).
+        """
         if self.suspension is None:
             raise OpeningsNotSuspendedError(flow_name)
         return replace(self, suspension=None, resumed_at=at)

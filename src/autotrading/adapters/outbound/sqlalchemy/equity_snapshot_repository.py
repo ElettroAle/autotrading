@@ -58,11 +58,11 @@ class SqlAlchemyEquitySnapshotRepositoryAdapter:
             return [snapshot_of(row) for row in connection.execute(of_flow_query(flow_id, window)).mappings()]
 
     def loss_references(
-        self, flow_id: UUID, day_start: datetime, peak_since: datetime, now: datetime
+        self, flow_id: UUID, daily_since: datetime, peak_since: datetime, now: datetime
     ) -> LossReferences:
         with self._transaction() as connection:
-            daily = _first(connection, daily_until_query(flow_id, day_start)) or _first(
-                connection, daily_from_query(flow_id, day_start, now)
+            daily = _first(connection, daily_until_query(flow_id, daily_since)) or _first(
+                connection, daily_from_query(flow_id, daily_since, now)
             )
             return LossReferences(daily, _first(connection, peak_query(flow_id, peak_since, now)))
 
@@ -83,23 +83,25 @@ def of_flow_query(flow_id: UUID, window: TimeWindow) -> Select[tuple[object, ...
     return query.order_by(equity_snapshots.c.planned_at)
 
 
-def daily_until_query(flow_id: UUID, day_start: datetime) -> Select[tuple[object, ...]]:
-    """The last equity of the flow recorded at the start of the day or before (R3.2.2)."""
+def daily_until_query(flow_id: UUID, daily_since: datetime) -> Select[tuple[object, ...]]:
+    """The last equity of the flow recorded at the instant the daily loss counts from or before (R3.2.2, Bug 775)."""
     return (
         select(equity_snapshots)
-        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at <= day_start)
+        .where(equity_snapshots.c.flow_id == flow_id, equity_snapshots.c.planned_at <= daily_since)
         .order_by(equity_snapshots.c.planned_at.desc())
         .limit(1)
     )
 
 
-def daily_from_query(flow_id: UUID, day_start: datetime, now: datetime) -> Select[tuple[object, ...]]:
-    """The first equity of the day up to now, for a flow without equity before it (R3.2.2)."""
+def daily_from_query(flow_id: UUID, daily_since: datetime, now: datetime) -> Select[tuple[object, ...]]:
+    """The first equity from the instant the daily loss counts from up to now, for a flow without equity before it
+    (R3.2.2, Bug 775).
+    """
     return (
         select(equity_snapshots)
         .where(
             equity_snapshots.c.flow_id == flow_id,
-            equity_snapshots.c.planned_at >= day_start,
+            equity_snapshots.c.planned_at >= daily_since,
             equity_snapshots.c.planned_at <= now,
         )
         .order_by(equity_snapshots.c.planned_at)
