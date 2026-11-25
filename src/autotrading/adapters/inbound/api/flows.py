@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.cycles import CycleSummaryResponse
-from autotrading.adapters.inbound.api.flow_memory import FlowMemoryResponse
 from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
 from autotrading.adapters.inbound.api.strategy_document import StrategyDocument, attachment_of
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
@@ -28,7 +27,7 @@ from autotrading.application.flows.list_flow_versions import ListFlowVersionsCom
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import AdapterRequest, FlowVersion
 from autotrading.application.flows.read_default_system_prompt import DefaultSystemPrompt
-from autotrading.application.flows.read_flow_memory import ReadFlowMemoryCommand
+from autotrading.application.flows.read_flow_memory import FlowMemoryReading, ReadFlowMemoryCommand
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleCommand
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsCommand
@@ -573,9 +572,9 @@ def flows_router(
     @router.get("/flows/{flow_id}/memory")
     def read_flow_memory(
         flow_id: UUID, use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)]
-    ) -> FlowMemoryResponse:
+    ) -> FlowMemoryReading:
         """The memory the agent of the flow would receive if its cycle started now (R5.3.4)."""
-        return FlowMemoryResponse.of(use_cases.read_flow_memory.execute(ReadFlowMemoryCommand(FlowId(flow_id))))
+        return use_cases.read_flow_memory.execute(ReadFlowMemoryCommand(FlowId(flow_id)))
 
     @router.post("/flows/{flow_id}/archive")
     def archive_flow(

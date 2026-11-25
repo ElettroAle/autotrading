@@ -3428,7 +3428,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FlowMemoryResponse"
+                  "$ref": "#/components/schemas/FlowMemoryReading"
                 }
               }
             }
@@ -8474,7 +8474,7 @@
         "title": "FlowMemory",
         "description": "Whether the agent receives its previous operative decisions on every asset of the flow, and how many from how\nfar back: off, 10 decisions and 30 days unless the user says otherwise (R5.3.4).\n\nThe decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule."
       },
-      "FlowMemoryResponse": {
+      "FlowMemoryReading": {
         "properties": {
           "active": {
             "type": "boolean",
@@ -8493,8 +8493,8 @@
           "active",
           "assets"
         ],
-        "title": "FlowMemoryResponse",
-        "description": "What the agent of the flow would receive if its cycle started now; nothing when its memory is off (R5.3.4).\n\nThe entries travel as the domain gives them, as in the cycle detail and in the tools of the flows: amounts as\nstrings (ADR 0018), instants in ISO 8601, actions and directions as their values."
+        "title": "FlowMemoryReading",
+        "description": "The memory of the flow as the user consults it: whether it is on and, only then, what every asset gives."
       },
       "FlowModificationRequest": {
         "properties": {

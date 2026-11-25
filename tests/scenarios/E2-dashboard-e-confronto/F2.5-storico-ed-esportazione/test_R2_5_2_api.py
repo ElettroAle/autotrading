@@ -178,7 +178,7 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "default_take_profit_percent",
         # The minimum confidence travels with the strategy (ADR confidenza-nella-decisione-e-confidenza-minima).
         "minimum_confidence",
-        # The memory of the flow travels with the strategy (ADR memoria-del-flusso-dalle-decisioni-operative-precedenti).
+        # The memory travels with the strategy (ADR memoria-del-flusso-dalle-decisioni-operative-precedenti).
         "memory",
     }
 

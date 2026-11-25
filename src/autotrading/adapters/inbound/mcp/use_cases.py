@@ -15,6 +15,7 @@ from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsU
 from autotrading.application.flows.modify_flow import ModifyFlowUseCase
 from autotrading.application.flows.rank_flows import RankFlowsUseCase
 from autotrading.application.flows.read_cycle import ReadCycleUseCase
+from autotrading.application.flows.read_flow_memory import ReadFlowMemoryUseCase
 from autotrading.application.flows.read_flow_results import ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
@@ -34,6 +35,7 @@ class McpUseCases:
     list_closed_positions: ListClosedPositionsUseCase
     list_cycles: ListCyclesUseCase
     read_cycle: ReadCycleUseCase
+    read_flow_memory: ReadFlowMemoryUseCase
     read_flow_statistics: ReadFlowStatisticsUseCase
     rank_flows: RankFlowsUseCase
     list_accounts: ListAccountsUseCase

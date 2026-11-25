@@ -133,6 +133,21 @@ def test_a_cycle_is_read_with_the_memory_the_agent_received_as_the_api_gives_it(
     assert detail["memory"][0]["entries"][0]["price"] == "95000.5"
 
 
+def test_the_memory_of_a_flow_is_the_memory_of_the_api() -> None:
+    flows = Flows()
+    off = flows.read("read_flow_memory", {"flow_id": flows.flow_id})
+    modified = flows.mcp.call_as(
+        "anna", "modify_flow", {"flow_id": flows.flow_id, "modification": {"memory": {"active": True}}}
+    )
+    assert not modified.is_error, body_of(modified)
+
+    on = flows.read("read_flow_memory", {"flow_id": flows.flow_id})
+
+    assert off == {"active": False, "assets": []}
+    assert on == flows.shown(f"/flows/{flows.flow_id}/memory")
+    assert (on["active"], [asset["asset"] for asset in on["assets"]]) == (True, ["BTC"])
+
+
 def test_the_statistics_are_those_of_the_api(flows: Flows) -> None:
     statistics = flows.read("read_flow_statistics", {"flow_id": flows.flow_id})
 

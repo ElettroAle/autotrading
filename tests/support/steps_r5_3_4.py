@@ -196,7 +196,7 @@ def opens_memory(memory_cycles: MemoryCycles, user: str, flow: str) -> None:
     command = ReadFlowMemoryCommand(memory_cycles.flow(flow).id)
     # The API reads at the instant of the cycles of the scenario.
     memory_cycles.cycles.platform.now = memory_cycles.cycles.clock.now()
-    memory_cycles.remembered = memory_cycles.cycles.platform.use_cases_of(user).read_flow_memory.execute(command)
+    memory_cycles.remembered = memory_cycles.cycles.platform.use_cases_of(user).read_flow_memory.execute(command).assets
 
 
 @when(quoted('"{user}" attiva la memoria di "{flow}" con {decisions} decisioni e {days} giorni'))

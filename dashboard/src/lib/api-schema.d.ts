@@ -2520,13 +2520,10 @@ export interface components {
             days: number;
         };
         /**
-         * FlowMemoryResponse
-         * @description What the agent of the flow would receive if its cycle started now; nothing when its memory is off (R5.3.4).
-         *
-         *     The entries travel as the domain gives them, as in the cycle detail and in the tools of the flows: amounts as
-         *     strings (ADR 0018), instants in ISO 8601, actions and directions as their values.
+         * FlowMemoryReading
+         * @description The memory of the flow as the user consults it: whether it is on and, only then, what every asset gives.
          */
-        FlowMemoryResponse: {
+        FlowMemoryReading: {
             /** Active */
             active: boolean;
             /** Assets */
@@ -6265,7 +6262,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FlowMemoryResponse"];
+                    "application/json": components["schemas"]["FlowMemoryReading"];
                 };
             };
             /** @description Validation Error */

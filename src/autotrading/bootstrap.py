@@ -898,6 +898,7 @@ def mcp_use_cases(for_tenant: Callable[[TenantId], TenantUseCases]) -> Callable[
             list_closed_positions=use_cases.list_closed_positions,
             list_cycles=use_cases.list_cycles,
             read_cycle=use_cases.read_cycle,
+            read_flow_memory=use_cases.read_flow_memory,
             read_flow_statistics=use_cases.read_flow_statistics,
             rank_flows=use_cases.rank_flows,
             list_accounts=use_cases.list_accounts,

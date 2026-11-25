@@ -5,7 +5,11 @@ from uuid import uuid4
 
 import pytest
 
-from autotrading.application.flows.read_flow_memory import ReadFlowMemoryCommand, ReadFlowMemoryUseCase
+from autotrading.application.flows.read_flow_memory import (
+    FlowMemoryReading,
+    ReadFlowMemoryCommand,
+    ReadFlowMemoryUseCase,
+)
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_memory import FlowMemory
@@ -75,7 +79,7 @@ def test_without_the_memory_nothing_is_read_and_there_is_no_memory(bench: Bench)
     flow = bench.flow(FlowMemory())
     bench.decided(flow, timedelta(hours=1), RecordedDecision("BTC", DecisionAction.CLOSE, None, 60, "obiettivo"))
 
-    assert bench.use_case.execute(ReadFlowMemoryCommand(flow.id)) is None
+    assert bench.use_case.execute(ReadFlowMemoryCommand(flow.id)) == FlowMemoryReading(active=False, assets=())
     assert bench.activity.read == []
 
 
@@ -93,7 +97,7 @@ def test_the_memory_is_what_the_next_cycle_would_receive_now_with_the_pnl_held_o
         PastDecision(planned_at, opening, Decimal(95000), None, position_open=True),
         MemoryOutcome(Decimal(12), realized=False),
     )
-    assert memory == (AssetMemory("BTC", (entry,)), AssetMemory("ETH", ()))
+    assert memory == FlowMemoryReading(active=True, assets=(AssetMemory("BTC", (entry,)), AssetMemory("ETH", ())))
 
 
 def test_a_draft_without_an_account_remembers_without_reading_any_position(bench: Bench) -> None:
@@ -103,7 +107,7 @@ def test_a_draft_without_an_account_remembers_without_reading_any_position(bench
 
     memory = bench.use_case.execute(ReadFlowMemoryCommand(flow.id))
 
-    assert memory == (
+    assert memory.assets == (
         AssetMemory("BTC", (MemoryEntry.of(PastDecision(planned_at, closing, None, None), None),)),
         AssetMemory("ETH", ()),
     )
