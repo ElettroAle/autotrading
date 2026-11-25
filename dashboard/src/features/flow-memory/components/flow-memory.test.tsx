@@ -1,13 +1,14 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 
 import { fakePlatform } from '@/testing/mocks/platform';
 import { server } from '@/testing/mocks/server';
 import { renderInApp, untilEveryRequestIsAnswered } from '@/testing/test-utils';
 
-import { FlowMemory } from './flow-memory';
+import { FLOW_MEMORY_TITLE, FlowMemory } from './flow-memory';
 
-// The memory on the page of the flow, only with the memory on (R5.3.4, ADR
+// The memory in the tab Decisioni, closed until opened, only with the memory on (R5.3.4, ADR
 // memoria-del-flusso-dalle-decisioni-operative-precedenti).
 
 const REMEMBERED = [
@@ -32,7 +33,7 @@ describe('FlowMemory', () => {
     fakePlatform.addUser('anna', { hasUserRole: true });
   });
 
-  it('shows what the agent will receive at the next cycle, for every asset', async () => {
+  it('keeps what the agent will receive closed until the user opens it, for every asset', async () => {
     fakePlatform.addFlow('anna', 'alfa', {
       memory: { active: true, decisions: 5, days: 14 },
       remembered: REMEMBERED,
@@ -40,7 +41,10 @@ describe('FlowMemory', () => {
 
     await renderInApp(<FlowMemory flowId="flow-alfa" />, { account: 'anna' });
 
-    const panel = await screen.findByRole('region', { name: 'Memoria' });
+    const panel = await screen.findByRole('group', { name: FLOW_MEMORY_TITLE });
+    expect(panel).not.toHaveAttribute('open');
+    await userEvent.click(within(panel).getByText(FLOW_MEMORY_TITLE));
+    expect(panel).toHaveAttribute('open');
     expect(panel).toHaveTextContent("ciò che l'agente riceverà al prossimo ciclo");
     expect(within(panel).getByRole('table', { name: 'Memoria di BTC' })).toHaveTextContent(
       'rottura della resistenza',
@@ -60,7 +64,7 @@ describe('FlowMemory', () => {
 
     await renderInApp(<FlowMemory flowId="flow-alfa" />, { account: 'anna' });
 
-    expect(await screen.findByRole('region', { name: 'Memoria' })).toHaveTextContent(
+    expect(await screen.findByRole('group', { name: FLOW_MEMORY_TITLE })).toHaveTextContent(
       'flusso non trovato',
     );
   });
@@ -71,6 +75,6 @@ describe('FlowMemory', () => {
     await renderInApp(<FlowMemory flowId="flow-alfa" />, { account: 'anna' });
 
     await untilEveryRequestIsAnswered();
-    expect(screen.queryByRole('region', { name: 'Memoria' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: FLOW_MEMORY_TITLE })).not.toBeInTheDocument();
   });
 });

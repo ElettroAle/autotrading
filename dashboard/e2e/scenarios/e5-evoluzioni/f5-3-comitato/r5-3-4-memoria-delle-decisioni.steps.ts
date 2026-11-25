@@ -1,11 +1,11 @@
 import { expect } from '@playwright/test';
 
-import { aCompletedCycle, type FakeAssetMemory } from '@/testing/mocks/cycles';
+import { aCompletedCycle, reasoningOf, type FakeAssetMemory } from '@/testing/mocks/cycles';
 import { fakePlatform } from '@/testing/mocks/platform';
 
 import { Given, Then, When } from '../../../support/fixtures';
 
-// The memory of the flow on its page and in the detail of a cycle (R5.3.4, ADR
+// The memory of the flow in the tab Decisioni, closed until opened, and in the detail of a cycle (R5.3.4, ADR
 // memoria-del-flusso-dalle-decisioni-operative-precedenti): the worker composes it, the dashboard only reads it.
 
 const USER = 'anna';
@@ -13,6 +13,7 @@ const USER = 'anna';
 const CYCLE_TIME = '10:07:00';
 const CYCLE_AT = new Date(`2026-11-14T${CYCLE_TIME}+01:00`);
 const REASONING = 'rottura della resistenza';
+const MEMORY_TITLE = "Memoria dell'agente";
 const MEMORY: FakeAssetMemory[] = [
   {
     asset: 'BTC',
@@ -34,6 +35,8 @@ Given('che il flusso {string} ha la memoria non attiva', async ({ memory }, flow
   fakePlatform.ensureUser(USER);
   fakePlatform.addFlow(USER, flow, { remembered: MEMORY });
   memory.flow = flow;
+  memory.cycles = [aCompletedCycle(CYCLE_AT)];
+  fakePlatform.recordCycles(flow, memory.cycles);
 });
 
 Given('che il flusso {string} ha la memoria attiva', async ({ memory }, flow: string) => {
@@ -48,9 +51,9 @@ Given('che il flusso {string} ha la memoria attiva', async ({ memory }, flow: st
 });
 
 When(
-  '{string} apre la pagina di {string}',
+  '{string} apre le decisioni di {string}',
   async ({ dashboard }, account: string, flow: string) => {
-    await dashboard.openFlowAs(account, flow);
+    await dashboard.openDecisionsAs(account, flow);
   },
 );
 
@@ -64,9 +67,21 @@ When(
 );
 
 Then('la memoria non è mostrata', async ({ dashboard }) => {
-  // The last decision reads beside where the memory would be: once it shows, the page has read the flow.
-  await expect(dashboard.page.getByRole('region', { name: 'Ultima decisione' })).toBeVisible();
-  await expect(dashboard.page.getByRole('region', { name: 'Memoria' })).toHaveCount(0);
+  // The decisions read beside where the memory would be: once they show, the page has read the flow.
+  await expect(dashboard.page.getByText(reasoningOf('BTC')).first()).toBeVisible();
+  await expect(dashboard.page.getByRole('group', { name: MEMORY_TITLE })).toHaveCount(0);
+});
+
+Then('la memoria è chiusa', async ({ dashboard }) => {
+  await expect(dashboard.page.getByRole('group', { name: MEMORY_TITLE })).not.toHaveAttribute(
+    'open',
+  );
+});
+
+Then("aprendola vede ciò che l'agente riceverà al prossimo ciclo", async ({ dashboard }) => {
+  const memory = dashboard.page.getByRole('group', { name: MEMORY_TITLE });
+  await memory.getByText(MEMORY_TITLE).click();
+  await expect(memory.getByRole('table', { name: 'Memoria di BTC' })).toContainText(REASONING);
 });
 
 Then("vede la memoria che l'agente ha ricevuto in quel ciclo", async ({ dashboard }) => {

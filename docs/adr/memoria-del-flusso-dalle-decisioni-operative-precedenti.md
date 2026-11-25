@@ -33,8 +33,9 @@ l'esito, dove si registra e come si mostra.
   fuori dai limiti un errore di dominio 422 con il motivo. Fa parte della versione del flusso come le altre
   impostazioni: crearlo, modificarlo, duplicarlo e importare la strategia la portano; cambiarla crea una versione.
 - API: campo `memory` (`active`, `decisions`, `days`) nella creazione, nella modifica e nella lettura del flusso,
-  facoltativo con i predefiniti. Dashboard: sezione «Memoria» nel modulo del flusso (interruttore, decisioni,
-  giorni, questi ultimi abilitati solo con la memoria attiva).
+  facoltativo con i predefiniti. Dashboard: sezione «Memoria» nel modulo del flusso subito dopo il modello, perché
+  regola ciò che il modello riceve (interruttore, decisioni, giorni, questi ultimi abilitati solo con la memoria
+  attiva; decisione del proprietario, 25 novembre 2026).
 
 ### Contenuto della memoria
 
@@ -65,9 +66,11 @@ l'esito, dove si registra e come si mostra.
 ### Consultazione
 
 - Nuova lettura dell'API `GET /flows/{flow_id}/memory`: la memoria che l'agente riceverebbe se il ciclo partisse ora,
-  per asset; con la memoria non attiva risponde con `active: false` e nessuna voce. La dashboard mostra la sezione
-  «Memoria» nella pagina del flusso solo con la memoria attiva, con le card condivise (ADR
-  card-condivisa-distinta-dallo-sfondo) e i componenti esistenti di tabella.
+  per asset; con la memoria non attiva risponde con `active: false` e nessuna voce. La memoria è un dettaglio da
+  aprire su richiesta, non un dato della panoramica (decisione del proprietario, 25 novembre 2026): la dashboard la
+  offre solo con la memoria attiva, nella scheda «Decisioni» della pagina del flusso, in una sezione chiusa
+  («Memoria dell'agente», la sezione apribile condivisa con il dettaglio del ciclo, ADR 0129) con i componenti
+  esistenti di tabella.
 
 ## Alternative scartate
 

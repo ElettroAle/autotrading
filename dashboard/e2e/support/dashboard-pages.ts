@@ -179,6 +179,13 @@ export class DashboardPages {
     await expect(this.flowName().or(this.page.getByText('Flusso non trovato.'))).toBeVisible();
   }
 
+  /** Opens the tab Decisioni of a flow as the account. */
+  async openDecisionsAs(account: string, name: string): Promise<void> {
+    await this.open(`/flows/${encodeURIComponent(fakePlatform.flowNamed(name).id)}/decisions`);
+    await this.signInAs(account);
+    await expect(this.flowName()).toBeVisible();
+  }
+
   /** Asks the API, with the token of the account, for a command the page does not offer. */
   async send(account: string, method: string, path: string): Promise<number> {
     return this.page.evaluate(

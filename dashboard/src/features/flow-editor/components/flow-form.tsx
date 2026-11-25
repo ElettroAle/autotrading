@@ -151,6 +151,7 @@ export const FlowForm = ({
           </FormField>
           <SourceFields sources={sources} />
           <ModelFields models={models} providers={providers} currentModel={values.model} />
+          <MemoryFields />
           <FormField id="flow-instructions" label="Istruzioni" error={errors.instructions?.message}>
             {(control) => (
               <textarea
@@ -331,7 +332,6 @@ export const FlowForm = ({
             <input type="checkbox" {...register('bring_to_minimum')} />
             Porta le aperture al minimo dell&apos;exchange
           </label>
-          <MemoryFields />
           <button
             type="submit"
             disabled={isSubmitting || !tradable.isSuccess}
