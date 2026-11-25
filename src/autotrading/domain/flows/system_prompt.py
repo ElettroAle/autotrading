@@ -31,7 +31,7 @@ SOURCE_WEIGHTS_RULE = (
     "- una voce senza peso è un aggregato: riassume gli adapter elencati della sua fonte, ciascuno col suo peso;",
 )
 NO_ACTIVE_SOURCE = "nessuna fonte attiva"
-MEMORY_HEADING = "Memoria del flusso, le tue decisioni operative precedenti per asset, dalla più recente:"
+MEMORY_HEADING = "Memoria del flusso, le tue decisioni precedenti per asset, dalla più recente:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,7 +116,7 @@ class PromptPlaceholder(StrEnum):
     )
     MEMORY = (
         "memory",
-        "la memoria del flusso: le decisioni operative precedenti per asset con il loro esito, vuota se non attiva",
+        "la memoria del flusso: le decisioni precedenti per asset con il loro motivo ed esito, vuota se non attiva",
         lambda subject: _memory(subject.memory),
     )
 
@@ -158,10 +158,12 @@ DEFAULT_SYSTEM_PROMPT = "\n".join(
         """ "invalidazione": "<condizione che invalida l'apertura>" o null,"""
         """ "togli_obiettivo": <true per togliere l'obiettivo, altrimenti false>,"""
         ' "confidenza": <intero da 0 a 100, quanto sei convinto della decisione>,'
+        ' "motivo": "<una frase: per apri e inverti la tesi, per chiudi il fatto o il livello che ha causato la'
+        ' chiusura, per aggiorna cosa cambia e perché, per mantieni cosa aspetti>",'
         ' "ragionamento": "<perché>"}}]}}',
         "direzione serve solo per apri, quota e leva solo per apri e inverti; obiettivo, stop e invalidazione servono"
-        " solo per apri, inverti e aggiorna, togli_obiettivo solo per aggiorna; il ragionamento e la confidenza servono"
-        " sempre.",
+        " solo per apri, inverti e aggiorna, togli_obiettivo solo per aggiorna; il motivo, il ragionamento e la"
+        " confidenza servono sempre.",
     )
 )
 

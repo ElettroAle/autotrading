@@ -122,7 +122,8 @@ def test_a_cycle_is_read_with_the_memory_the_agent_received_as_the_api_gives_it(
         TradeSide.LONG,
         Decimal("95000.5"),
         "rottura",
-        MemoryOutcome(Decimal("12.5"), realized=False),
+        "sotto 94000",
+        MemoryOutcome(Decimal("12.5"), realized=False, course="aperta da 1 ora"),
     )
     records[0] = replace(records[0], memory=(AssetMemory("BTC", (entry,)),))
 
@@ -131,6 +132,7 @@ def test_a_cycle_is_read_with_the_memory_the_agent_received_as_the_api_gives_it(
 
     assert detail["memory"] == shown["memory"]
     assert detail["memory"][0]["entries"][0]["price"] == "95000.5"
+    assert detail["memory"][0]["entries"][0]["outcome"]["course"] == "aperta da 1 ora"
 
 
 def test_the_memory_of_a_flow_is_the_memory_of_the_api() -> None:
@@ -146,6 +148,20 @@ def test_the_memory_of_a_flow_is_the_memory_of_the_api() -> None:
     assert off == {"active": False, "assets": []}
     assert on == flows.shown(f"/flows/{flows.flow_id}/memory")
     assert (on["active"], [asset["asset"] for asset in on["assets"]]) == (True, ["BTC"])
+
+
+def test_the_tools_leave_the_motive_whole_and_remember_every_decision_as_the_api() -> None:
+    flows = Flows()
+    memory = {"active": True, "unlimited_text_length": True, "all_decisions": True}
+
+    modified = flows.mcp.call_as("anna", "modify_flow", {"flow_id": flows.flow_id, "modification": {"memory": memory}})
+
+    assert not modified.is_error, body_of(modified)
+    changed = body_of(modified)["memory"]
+    assert (changed["text_length"], changed["all_decisions"]) == (None, True)
+    shown = flows.shown(f"/flows/{flows.flow_id}")
+    assert isinstance(shown, dict)
+    assert shown["memory"] == changed
 
 
 def test_the_statistics_are_those_of_the_api(flows: Flows) -> None:

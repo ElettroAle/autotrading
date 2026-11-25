@@ -52,7 +52,7 @@ class Decision:
     to 100 (R1.4.4, R3.1.4).
 
     Only an opening and a reversal carry operational fields and only an update the change of the plan (R3.1.3); a
-    close is always total.
+    close is always total. The motive in one sentence is None when the model gave none (R5.3.5).
     """
 
     asset: str
@@ -62,6 +62,7 @@ class Decision:
     opening: TradeOpening | None = None
     plan_change: ExitPlanChange | None = None
     reversal: TradeReversal | None = None
+    motive: str | None = None
 
     def intent_with[O, C, H, U, R](
         self,

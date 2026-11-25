@@ -55,14 +55,25 @@ export type FakeForecast = {
   readonly actualPrice: number | null;
 };
 
-/** The memory of a flow: off unless the user turns it on, with the decisions per asset and the days (R5.3.4). */
+/**
+ * The memory of a flow: off unless the user turns it on, with the decisions per asset and the days (R5.3.4), the length
+ * of the motive, null for a whole motive, and whether it remembers every decision (R5.3.5).
+ */
 export type FakeMemory = {
   readonly active: boolean;
   readonly decisions: number;
   readonly days: number;
+  readonly text_length: number | null;
+  readonly all_decisions: boolean;
 };
 
-export const DEFAULT_MEMORY: FakeMemory = { active: false, decisions: 10, days: 30 };
+export const DEFAULT_MEMORY: FakeMemory = {
+  active: false,
+  decisions: 10,
+  days: 30,
+  text_length: 160,
+  all_decisions: false,
+};
 
 export type FakeConfiguration = {
   readonly assets: string[];

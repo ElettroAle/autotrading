@@ -189,7 +189,11 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         ConfigurationDifference("stop loss predefinito", "5%", "2,5%"),
         ConfigurationDifference("take profit predefinito", "nessuno", "10%"),
         ConfigurationDifference("confidenza minima", "nessuna", "60"),
-        ConfigurationDifference("memoria", "non attiva", "attiva, 5 decisioni, 14 giorni"),
+        ConfigurationDifference(
+            "memoria",
+            "non attiva",
+            "attiva, 5 decisioni, 14 giorni, motivo fino a 160 caratteri, solo aperture, chiusure e inversioni",
+        ),
     )
 
 

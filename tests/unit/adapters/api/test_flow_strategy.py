@@ -102,7 +102,7 @@ def a_strategy() -> FlowStrategy:
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
         minimum_confidence=MinimumConfidence(55),
-        memory=FlowMemory(active=True, decisions=5, days=14),
+        memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
     )
 
 
@@ -135,7 +135,14 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
             "default_stop_loss_percent": "3",
             "default_take_profit_percent": "9",
             "minimum_confidence": 55,
-            "memory": {"active": True, "decisions": 5, "days": 14},
+            "memory": {
+                "active": True,
+                "decisions": 5,
+                "days": 14,
+                "text_length": None,
+                "all_decisions": True,
+                "unlimited_text_length": True,
+            },
         },
     }
 
@@ -174,7 +181,10 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
     )
     assert (command.default_stop_loss_percent, command.default_take_profit_percent) == (Decimal(3), Decimal(9))
     assert command.minimum_confidence == 55
-    assert command.memory == MemoryRequest(active=True, decisions=5, days=14)
+    assert command.memory == MemoryRequest(
+        active=True, decisions=5, days=14, all_decisions=True, unlimited_text_length=True
+    )
+    assert command.memory.applied_to(FlowMemory()) == a_strategy().memory
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:

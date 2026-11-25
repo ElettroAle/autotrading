@@ -134,7 +134,13 @@ def _decisions_document(response: AgentResponsePort) -> dict[str, object]:
 
 def _recorded(decision: AgentDecisionPort) -> RecordedDecision:
     return RecordedDecision.named(
-        decision.asset, decision.action, _direction_of(decision), decision.confidence, decision.reasoning
+        decision.asset,
+        decision.action,
+        _direction_of(decision),
+        decision.confidence,
+        decision.reasoning,
+        motive=decision.motive,
+        invalidation=_invalidation_of(decision),
     )
 
 
@@ -143,6 +149,18 @@ def _orders_document(result: RiskReview[object] | ReversedExecutions[object]) ->
     if isinstance(result, RiskReview):
         return {"esiti": json_document(result.outcomes), "ordini_approvati": len(result.orders)}
     return {"risultato": json_document(result.executions), "inversioni": json_document(result.reversals)}
+
+
+def _invalidation_of(decision: AgentDecisionPort) -> str | None:
+    # Only an opening and a reversal declare the idea their position stands on; an update changes the plan in force
+    # (R5.3.5).
+    return decision.intent_with(
+        lambda _asset, _direction, _margin, _leverage, plan, _confidence: plan.invalidation,
+        lambda _asset: None,
+        lambda _asset: None,
+        lambda _asset, _change: None,
+        lambda _asset, _margin, _leverage, plan, _confidence: plan.invalidation,
+    )
 
 
 def _direction_of(decision: AgentDecisionPort) -> str | None:

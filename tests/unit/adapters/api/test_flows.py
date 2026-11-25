@@ -109,7 +109,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "default_stop_loss_percent": "5",
         "default_take_profit_percent": None,
         "minimum_confidence": None,
-        "memory": {"active": False, "decisions": 10, "days": 30},
+        "memory": {"active": False, "decisions": 10, "days": 30, "text_length": 160, "all_decisions": False},
         "missing": [],
     }
     assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]
@@ -141,13 +141,36 @@ def test_the_memory_is_created_kept_and_changed_in_a_new_version(client_of: Clie
     untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
     changed = anna.patch(f"/flows/{flow_id}", json={"memory": {"active": True, "days": 14}}).json()
 
-    assert created["memory"] == {"active": False, "decisions": 4, "days": 30}
+    defaults = {"text_length": 160, "all_decisions": False}
+    assert created["memory"] == {"active": False, "decisions": 4, "days": 30} | defaults
     assert untouched["memory"] == created["memory"]
-    assert (changed["version"], changed["memory"]) == (3, {"active": True, "decisions": 4, "days": 14})
+    assert (changed["version"], changed["memory"]) == (3, {"active": True, "decisions": 4, "days": 14} | defaults)
     assert anna.get(f"/flows/{flow_id}/versions/2").json()["memory"] == created["memory"]
     assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
-        {"part": "memoria", "before": "non attiva", "after": "attiva, 4 decisioni, 14 giorni"}
+        {
+            "part": "memoria",
+            "before": "non attiva",
+            "after": (
+                "attiva, 4 decisioni, 14 giorni, motivo fino a 160 caratteri, solo aperture, chiusure e inversioni"
+            ),
+        }
     ]
+
+
+def test_the_motive_is_left_whole_and_every_decision_remembered_and_a_null_length_keeps_it(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    memory = {"active": True, "unlimited_text_length": True, "all_decisions": True}
+    created = anna.post("/flows", json=a_request(platform, "anna", memory=memory)).json()
+    flow_id = created["id"]
+
+    kept = anna.patch(f"/flows/{flow_id}", json={"memory": {"text_length": None, "days": 7}}).json()
+    limited = anna.patch(f"/flows/{flow_id}", json={"memory": {"text_length": 300}}).json()
+
+    assert (created["memory"]["text_length"], created["memory"]["all_decisions"]) == (None, True)
+    assert (kept["memory"]["text_length"], kept["memory"]["days"]) == (None, 7)
+    assert (limited["version"], limited["memory"]["text_length"]) == (3, 300)
 
 
 @pytest.mark.parametrize(
@@ -155,6 +178,14 @@ def test_the_memory_is_created_kept_and_changed_in_a_new_version(client_of: Clie
     [
         ({"decisions": 51}, {"detail": "le decisioni della memoria vanno da 1 a 50", "field": "memory.decisions"}),
         ({"days": 0}, {"detail": "i giorni della memoria vanno da 1 a 365", "field": "memory.days"}),
+        (
+            {"text_length": 0},
+            {"detail": "la lunghezza del motivo della memoria è un intero positivo", "field": "memory.text_length"},
+        ),
+        (
+            {"text_length": -5},
+            {"detail": "la lunghezza del motivo della memoria è un intero positivo", "field": "memory.text_length"},
+        ),
     ],
 )
 def test_a_memory_out_of_range_is_refused_with_the_reason_and_the_field(
@@ -198,7 +229,8 @@ def test_the_memory_of_a_flow_on_answers_what_the_next_cycle_receives(client_of:
                         "action": "chiudi",
                         "direction": None,
                         "price": None,
-                        "reasoning": "obiettivo raggiunto",
+                        "motive": "obiettivo raggiunto",
+                        "invalidation": None,
                         "outcome": None,
                     }
                 ],

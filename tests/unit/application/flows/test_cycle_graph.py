@@ -551,6 +551,7 @@ def test_a_resumed_cycle_records_the_memory_composed_before_it_stopped(cycles: C
         TradeSide.LONG,
         Decimal(95000),
         "rottura",
+        None,
         MemoryOutcome(Decimal("-2.5"), realized=False),
     )
     cycles.journal.memory = (AssetMemory("BTC", (entry,)),)

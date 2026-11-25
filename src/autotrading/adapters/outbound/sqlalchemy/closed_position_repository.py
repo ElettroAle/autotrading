@@ -143,6 +143,11 @@ def position_of(columns: RowMapping | Mapping[str, object]) -> ClosedPosition:
         opening=PositionEnd(row["open_price"], row["opened_at"], row["opening_cycle"]),
         closing=PositionEnd(row["close_price"], row["closed_at"], row["closing_cycle"]),
         fees=row["fees"],
-        reason=CloseReason[row["reason"].upper()],
+        reason=close_reason_named(row["reason"]),
         realized_pnl=row["realized_pnl"],
     )
+
+
+def close_reason_named(name: str) -> CloseReason:
+    """The cause of closing from the name the table keeps."""
+    return CloseReason[name.upper()]

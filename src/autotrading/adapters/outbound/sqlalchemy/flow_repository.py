@@ -78,6 +78,9 @@ class _MemoryDocument(TypedDict):
     active: bool
     decisions: int
     days: int
+    # Missing in the versions saved before them: 160 characters and only openings, closings and reversals (R5.3.5).
+    text_length: NotRequired[int | None]
+    all_decisions: NotRequired[bool]
 
 
 class _ConfigurationDocument(TypedDict):
@@ -371,6 +374,8 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "active": configuration.memory.active,
             "decisions": configuration.memory.decisions,
             "days": configuration.memory.days,
+            "text_length": configuration.memory.text_length,
+            "all_decisions": configuration.memory.all_decisions,
         },
     }
 

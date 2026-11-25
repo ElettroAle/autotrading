@@ -80,7 +80,7 @@ const FLOW: Flow = {
   max_daily_loss_percent: null,
   max_drawdown_percent: null,
   openings_resume: 'manual',
-  memory: { active: false, decisions: 10, days: 30 },
+  memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -127,7 +127,14 @@ describe('creationRequestOf', () => {
       max_daily_loss_percent: null,
       max_drawdown_percent: null,
       openings_resume: 'manual',
-      memory: { active: false, decisions: null, days: null },
+      memory: {
+        active: false,
+        decisions: null,
+        days: null,
+        text_length: null,
+        all_decisions: null,
+        unlimited_text_length: false,
+      },
     });
   });
 
@@ -138,6 +145,24 @@ describe('creationRequestOf', () => {
       active: true,
       decisions: 5,
       days: 14,
+      text_length: null,
+      all_decisions: false,
+      unlimited_text_length: false,
+    });
+  });
+
+  it('sends the length of the motive and every decision, the length taken away by an unlimited one (R5.3.5)', () => {
+    const typed = { active: true, text_length: ' 80 ', all_decisions: true };
+    const unlimited = { active: true, text_length: undefined, unlimited_text_length: true };
+
+    expect(creationRequestOf(filled({ memory: typed })).memory).toMatchObject({
+      text_length: 80,
+      all_decisions: true,
+      unlimited_text_length: false,
+    });
+    expect(creationRequestOf(filled({ memory: unlimited })).memory).toMatchObject({
+      text_length: null,
+      unlimited_text_length: true,
     });
   });
 
@@ -148,6 +173,9 @@ describe('creationRequestOf', () => {
       active: false,
       decisions: null,
       days: null,
+      text_length: null,
+      all_decisions: null,
+      unlimited_text_length: false,
     });
   });
 
@@ -256,7 +284,14 @@ describe('formValuesOf', () => {
       max_daily_loss_percent: '',
       max_drawdown_percent: '',
       openings_resume: 'manual',
-      memory: { active: false, decisions: '10', days: '30' },
+      memory: {
+        active: false,
+        decisions: '10',
+        days: '30',
+        text_length: '160',
+        unlimited_text_length: false,
+        all_decisions: false,
+      },
     });
   });
 
@@ -517,10 +552,19 @@ describe('changesOf', () => {
   });
 
   it('sends the whole memory when the user changed a part of it (R5.3.4)', () => {
-    const memory = { active: true, decisions: '10', days: '14' };
+    const memory = { ...formValuesOf(FLOW).memory, active: true, days: '14' };
 
     expect(changesOf(FLOW, { ...formValuesOf(FLOW), memory })).toEqual({
-      settings: { memory: { active: true, decisions: 10, days: 14 } },
+      settings: {
+        memory: {
+          active: true,
+          decisions: 10,
+          days: 14,
+          text_length: 160,
+          all_decisions: false,
+          unlimited_text_length: false,
+        },
+      },
     });
   });
 

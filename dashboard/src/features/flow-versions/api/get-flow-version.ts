@@ -42,7 +42,13 @@ const configurationSchema = z.object({
   max_daily_loss_percent: z.string().nullable(),
   max_drawdown_percent: z.string().nullable(),
   openings_resume: z.enum(['manual', 'next_day']),
-  memory: z.object({ active: z.boolean(), decisions: z.number(), days: z.number() }),
+  memory: z.object({
+    active: z.boolean(),
+    decisions: z.number(),
+    days: z.number(),
+    text_length: z.number().nullable(),
+    all_decisions: z.boolean(),
+  }),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

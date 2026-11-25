@@ -163,7 +163,9 @@ def test_a_value_that_is_not_json_data_never_reaches_the_record() -> None:
     assert str(raised.value) == "documento del ciclo non registrabile: object"
 
 
-OPENING = RecordedDecision("BTC", DecisionAction.OPEN, TradeSide.LONG, 72, "trend rialzista")
+OPENING = RecordedDecision(
+    "BTC", DecisionAction.OPEN, TradeSide.LONG, 72, "trend rialzista", motive="rottura", invalidation="sotto 90000"
+)
 HOLDING = RecordedDecision("ETH", DecisionAction.HOLD, None, None, "attesa")
 
 
@@ -182,6 +184,8 @@ def test_the_decisions_of_a_record_are_saved_one_row_each_in_their_order() -> No
             "direction": "long",
             "confidence": 72,
             "reasoning": "trend rialzista",
+            "motive": "rottura",
+            "invalidation": "sotto 90000",
         },
         common
         | {
@@ -191,6 +195,8 @@ def test_the_decisions_of_a_record_are_saved_one_row_each_in_their_order() -> No
             "direction": None,
             "confidence": None,
             "reasoning": "attesa",
+            "motive": None,
+            "invalidation": None,
         },
     ]
 
@@ -312,9 +318,10 @@ REMEMBERED = (
                 TradeSide.LONG,
                 Decimal("95000.5"),
                 "rottura",
-                MemoryOutcome(Decimal("-2.25"), realized=False),
+                "sotto 90000",
+                MemoryOutcome(Decimal("-2.25"), realized=False, course="aperta da 1 ora"),
             ),
-            MemoryEntry(PLANNED - timedelta(hours=3), "BTC", DecisionAction.UPDATE, None, None, "stop", None),
+            MemoryEntry(PLANNED - timedelta(hours=3), "BTC", DecisionAction.UPDATE, None, None, "stop", None, None),
         ),
     ),
     AssetMemory("ETH", ()),
@@ -333,15 +340,17 @@ def test_the_memory_the_agent_received_is_saved_as_json_with_amounts_as_text() -
                     "action": "apri",
                     "direction": "long",
                     "price": "95000.5",
-                    "reasoning": "rottura",
-                    "outcome": {"pnl": "-2.25", "realized": False},
+                    "motive": "rottura",
+                    "invalidation": "sotto 90000",
+                    "outcome": {"pnl": "-2.25", "realized": False, "course": "aperta da 1 ora"},
                 },
                 {
                     "planned_at": "2026-11-12T07:22:00+00:00",
                     "action": "aggiorna",
                     "direction": None,
                     "price": None,
-                    "reasoning": "stop",
+                    "motive": "stop",
+                    "invalidation": None,
                     "outcome": None,
                 },
             ],
@@ -354,3 +363,30 @@ def test_the_saved_memory_reads_back_as_it_was() -> None:
     record = replace(FAILED, memory=REMEMBERED)
 
     assert record_of(row_of(record, TENANT)) == record
+
+
+def test_a_memory_saved_before_the_motive_reads_its_reasoning_as_the_motive_without_invalidation_nor_course() -> None:
+    entry = {
+        "planned_at": "2026-11-12T09:22:00+00:00",
+        "action": "apri",
+        "direction": "long",
+        "price": "95000.5",
+        "reasoning": "rottura",
+        "outcome": {"pnl": "-2.25", "realized": False},
+    }
+    row = row_of(FAILED, TENANT) | {"memory": [{"asset": "BTC", "entries": [entry]}]}
+
+    [remembered] = record_of(row).memory or ()
+
+    assert remembered.entries == (
+        MemoryEntry(
+            PLANNED - timedelta(hours=1),
+            "BTC",
+            DecisionAction.OPEN,
+            TradeSide.LONG,
+            Decimal("95000.5"),
+            "rottura",
+            None,
+            MemoryOutcome(Decimal("-2.25"), realized=False),
+        ),
+    )

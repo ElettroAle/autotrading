@@ -42,15 +42,43 @@ class SourceRequest:
 @dataclass(frozen=True, slots=True)
 class MemoryRequest:
     """The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a
-    new flow (R5.3.4).
+    new flow (R5.3.4, R5.3.5).
+
+    A length not given cannot say «no limit»: `unlimited_text_length` takes the limit away, as the parts of a
+    configuration that may be removed, and prevails over a length given with it.
     """
 
     active: bool | None = None
     decisions: int | None = None
     days: int | None = None
+    text_length: int | None = None
+    all_decisions: bool | None = None
+    unlimited_text_length: bool = False
+
+    @classmethod
+    def of(cls, memory: FlowMemory) -> MemoryRequest:
+        """Every part of the memory given, so a strategy file brings it back as it was (R2.5.2)."""
+        return cls(
+            active=memory.active,
+            decisions=memory.decisions,
+            days=memory.days,
+            text_length=memory.text_length,
+            all_decisions=memory.all_decisions,
+            unlimited_text_length=memory.text_length is None,
+        )
 
     def applied_to(self, memory: FlowMemory) -> FlowMemory:
-        return memory.changed(self.active, self.decisions, self.days)
+        return memory.changed(
+            active=_given(self.active, memory.active),
+            decisions=_given(self.decisions, memory.decisions),
+            days=_given(self.days, memory.days),
+            text_length=None if self.unlimited_text_length else _given(self.text_length, memory.text_length),
+            all_decisions=_given(self.all_decisions, memory.all_decisions),
+        )
+
+
+def _given[T](sent: T | None, current: T) -> T:
+    return current if sent is None else sent
 
 
 @dataclass(frozen=True, slots=True)

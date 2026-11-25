@@ -10,8 +10,11 @@ type Decision = AssetMemory['entries'][number];
 
 const NOTHING = '—';
 
-const outcomeText = (outcome: NonNullable<Decision['outcome']>): string =>
+const pnlText = (outcome: NonNullable<Decision['outcome']>): string =>
   `${formatSignedAmount(outcome.pnl)} ${outcome.realized ? 'realizzato' : 'non realizzato'}`;
+
+const outcomeText = (outcome: NonNullable<Decision['outcome']>): string =>
+  outcome.course == null ? pnlText(outcome) : `${outcome.course}, ${pnlText(outcome)}`;
 
 const COLUMNS: readonly DataTableColumn<Decision>[] = [
   { header: 'Istante', cell: (decision) => formatInstant(decision.planned_at) },
@@ -28,17 +31,18 @@ const COLUMNS: readonly DataTableColumn<Decision>[] = [
     header: 'Prezzo',
     cell: (decision) => (decision.price === null ? NOTHING : formatPrice(decision.price)),
   },
-  { header: 'Motivazione', cell: (decision) => decision.reasoning },
   {
-    header: 'Esito (PnL)',
+    header: 'Esito',
     cell: (decision) => (decision.outcome === null ? NOTHING : outcomeText(decision.outcome)),
   },
+  { header: 'Motivo', cell: (decision) => decision.motive },
+  { header: 'Invalidazione', cell: (decision) => decision.invalidation ?? NOTHING },
 ];
 
 /**
- * The memory of a flow, one table per asset with its previous operative decisions from the most recent: on the page of
- * the flow what the agent will receive, in the detail of a cycle what it received (R5.3.4, ADR
- * memoria-del-flusso-dalle-decisioni-operative-precedenti).
+ * The memory of a flow, one table per asset with its previous decisions from the most recent, with motive, invalidation
+ * and the course of the position: on the page of the flow what the agent will receive, in the detail of a cycle what it
+ * received (R5.3.4, R5.3.5, ADR memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni).
  */
 export const FlowMemoryTable = ({ memory }: { readonly memory: readonly AssetMemory[] }) => (
   <div className="space-y-3">

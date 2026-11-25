@@ -27,3 +27,4 @@ class FlowSetting(StrEnum):
     MINIMUM_CONFIDENCE = "minimum_confidence"
     MEMORY_DECISIONS = "memory.decisions"
     MEMORY_DAYS = "memory.days"
+    MEMORY_TEXT_LENGTH = "memory.text_length"

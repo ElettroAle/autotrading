@@ -5,8 +5,9 @@ import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 import type { FlowFormValues } from '../utils/flow-form';
 
 /**
- * The memory of the flow: the switch, then how many previous decisions per asset and of how many days, which count
- * only with the memory on (R5.3.4, ADR memoria-del-flusso-dalle-decisioni-operative-precedenti).
+ * The memory of the flow: the switch, then how many previous decisions per asset and of how many days, how long the
+ * motive of each and whether it remembers every decision, which count only with the memory on (R5.3.4, R5.3.5, ADR
+ * memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni). An unlimited length leaves the motive whole.
  */
 export const MemoryFields = () => {
   const {
@@ -15,6 +16,7 @@ export const MemoryFields = () => {
     formState: { errors },
   } = useFormContext<FlowFormValues>();
   const active = useWatch({ control, name: 'memory.active' });
+  const unlimited = useWatch({ control, name: 'memory.unlimited_text_length' });
   return (
     <fieldset className="min-w-0 space-y-2">
       <legend className="font-semibold">Memoria</legend>
@@ -48,6 +50,39 @@ export const MemoryFields = () => {
           />
         )}
       </FormField>
+      <FormField
+        id="flow-memory-text-length"
+        label="Lunghezza del motivo"
+        error={errors.memory?.text_length?.message}
+        hint="caratteri del motivo di ogni decisione ricordata"
+      >
+        {(fieldControl) => (
+          <input
+            {...fieldControl}
+            {...register('memory.text_length')}
+            disabled={!active || unlimited === true}
+            inputMode="numeric"
+            className={FORM_CONTROL}
+          />
+        )}
+      </FormField>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" {...register('memory.unlimited_text_length')} disabled={!active} />
+        Lunghezza illimitata
+      </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          {...register('memory.all_decisions')}
+          disabled={!active}
+          aria-describedby="flow-memory-all-decisions-hint"
+        />
+        Tutte le decisioni
+      </label>
+      <p id="flow-memory-all-decisions-hint" className="text-xs text-slate-600">
+        spenta: solo aperture, chiusure e inversioni; accesa: anche aggiornamenti e decisioni di
+        mantenere
+      </p>
     </fieldset>
   );
 };

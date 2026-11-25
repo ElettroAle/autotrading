@@ -27,6 +27,7 @@ ASSET, ACTION, DIRECTION, MARGIN_FRACTION, LEVERAGE, REASONING = (
 TARGET, STOP, INVALIDATION = "obiettivo", "stop", "invalidazione"
 REMOVE_TARGET = "togli_obiettivo"
 CONFIDENCE = "confidenza"
+MOTIVE = "motivo"
 LOWEST_CONFIDENCE, HIGHEST_CONFIDENCE = 0, 100
 UNREADABLE = "risposta non leggibile"
 FENCE = "```"
@@ -104,13 +105,14 @@ def _decision_of(entry: object, asset: str, flow_assets: tuple[str, ...]) -> Dec
     action = _action_of(entry)
     reasoning = _text_of(entry, REASONING)
     confidence = _confidence_of(entry)
+    motive = _motive_of(entry)
     if action is TradeAction.OPEN:
-        return Decision(asset, action, reasoning, confidence, _opening_of(entry))
+        return Decision(asset, action, reasoning, confidence, _opening_of(entry), motive=motive)
     if action is TradeAction.UPDATE:
-        return Decision(asset, action, reasoning, confidence, plan_change=_plan_change_of(entry))
+        return Decision(asset, action, reasoning, confidence, plan_change=_plan_change_of(entry), motive=motive)
     if action is TradeAction.REVERSE:
-        return Decision(asset, action, reasoning, confidence, reversal=_reversal_of(entry))
-    return Decision(asset, action, reasoning, confidence)
+        return Decision(asset, action, reasoning, confidence, reversal=_reversal_of(entry), motive=motive)
+    return Decision(asset, action, reasoning, confidence, motive=motive)
 
 
 def _action_of(entry: Mapping[str, object]) -> TradeAction:
@@ -203,6 +205,18 @@ def _invalidation_of(entry: Mapping[str, object]) -> str | None:
         return None
     if not isinstance(value, str):
         raise DecisionNotConformingError.type(INVALIDATION)
+    return value.strip() or None
+
+
+def _motive_of(entry: Mapping[str, object]) -> str | None:
+    """The motive in one sentence is optional: a system prompt written before it does not ask for it, and its decision
+    still holds (R5.3.5).
+    """
+    value = entry.get(MOTIVE)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise DecisionNotConformingError.type(MOTIVE)
     return value.strip() or None
 
 

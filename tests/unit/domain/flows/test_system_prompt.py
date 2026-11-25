@@ -29,15 +29,17 @@ OPENING = MemoryEntry(
     TradeSide.LONG,
     Decimal(95000),
     "rottura",
-    MemoryOutcome(Decimal(12), realized=False),
+    "chiusura sotto 94000",
+    MemoryOutcome(Decimal(12), realized=False, course="aperta da 2 ore"),
 )
-UPDATE = MemoryEntry(AT - timedelta(days=1), "BTC", DecisionAction.UPDATE, None, None, "stop più alto", None)
+UPDATE = MemoryEntry(AT - timedelta(days=1), "BTC", DecisionAction.UPDATE, None, None, "stop più alto", None, None)
 MEMORY = (AssetMemory("BTC", (OPENING, UPDATE)), AssetMemory("ETH", ()))
 MEMORY_TEXT = "\n".join(
     (
-        "Memoria del flusso, le tue decisioni operative precedenti per asset, dalla più recente:",
+        "Memoria del flusso, le tue decisioni precedenti per asset, dalla più recente:",
         "BTC:",
-        "- 2026-11-24T10:00+00:00 apri long, prezzo 95000, PnL non realizzato 12: rottura",
+        "- 2026-11-24T10:00+00:00 apri long, prezzo 95000, aperta da 2 ore, PnL non realizzato 12: rottura;"
+        " invalidazione: chiusura sotto 94000",
         "- 2026-11-23T10:00+00:00 aggiorna: stop più alto",
     )
 )
@@ -188,7 +190,17 @@ def test_the_default_asks_the_confidence_of_every_decision() -> None:
     rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
 
     assert '"confidenza": <intero da 0 a 100, quanto sei convinto della decisione>' in rendered
-    assert "il ragionamento e la confidenza servono sempre." in rendered
+    assert "il motivo, il ragionamento e la confidenza servono sempre." in rendered
+
+
+def test_the_default_asks_the_motive_of_every_decision_in_one_sentence_apart_from_the_reasoning() -> None:
+    rendered = rendered_system_prompt(DEFAULT_SYSTEM_PROMPT, PromptSubject(CONFIGURATION, ACTIONS))
+
+    assert (
+        '"motivo": "<una frase: per apri e inverti la tesi, per chiudi il fatto o il livello che ha causato la'
+        ' chiusura, per aggiorna cosa cambia e perché, per mantieni cosa aspetti>"'
+    ) in rendered
+    assert rendered.index('"motivo"') < rendered.index('"ragionamento"')
 
 
 def test_a_template_with_known_placeholders_and_doubled_braces_is_accepted() -> None:

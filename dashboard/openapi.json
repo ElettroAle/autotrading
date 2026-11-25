@@ -6567,7 +6567,7 @@
           "entries"
         ],
         "title": "AssetMemory",
-        "description": "The previous operative decisions of the flow on one of its assets, from the most recent (R5.3.4)."
+        "description": "The previous decisions of the flow on one of its assets, from the most recent (R5.3.4)."
       },
       "BalanceComparisonResponse": {
         "properties": {
@@ -8468,11 +8468,28 @@
             "type": "integer",
             "title": "Days",
             "default": 30
+          },
+          "text_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Length",
+            "default": 160
+          },
+          "all_decisions": {
+            "type": "boolean",
+            "title": "All Decisions",
+            "default": false
           }
         },
         "type": "object",
         "title": "FlowMemory",
-        "description": "Whether the agent receives its previous operative decisions on every asset of the flow, and how many from how\nfar back: off, 10 decisions and 30 days unless the user says otherwise (R5.3.4).\n\nThe decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule."
+        "description": "Whether the agent receives its previous decisions on every asset of the flow, how many from how far back, how\nlong the motive of each and whether every decision or only those that open or close a position: off, 10 decisions,\n30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5).\n\nThe decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule. A\nlength of None is no limit."
       },
       "FlowMemoryReading": {
         "properties": {
@@ -10533,9 +10550,20 @@
             ],
             "title": "Price"
           },
-          "reasoning": {
+          "motive": {
             "type": "string",
-            "title": "Reasoning"
+            "title": "Motive"
+          },
+          "invalidation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidation"
           },
           "outcome": {
             "anyOf": [
@@ -10555,11 +10583,12 @@
           "action",
           "direction",
           "price",
-          "reasoning",
+          "motive",
+          "invalidation",
           "outcome"
         ],
         "title": "MemoryEntry",
-        "description": "One previous operative decision of the flow on an asset as the agent receives it (R5.3.4)."
+        "description": "One previous decision of the flow on an asset as the agent receives it: its motive in one sentence, cut to the\nlength of the memory, and the invalidation of an opening (R5.3.4, R5.3.5)."
       },
       "MemoryOutcome": {
         "properties": {
@@ -10570,6 +10599,17 @@
           "realized": {
             "type": "boolean",
             "title": "Realized"
+          },
+          "course": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Course"
           }
         },
         "type": "object",
@@ -10578,7 +10618,7 @@
           "realized"
         ],
         "title": "MemoryOutcome",
-        "description": "The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open."
+        "description": "The PnL a decision got: realized for a position closed, unrealized at the price of now for one still open; and\nthe course of the position: how and after how long it closed, or for how long it has been open (R5.3.5)."
       },
       "MemoryRequest": {
         "properties": {
@@ -10614,11 +10654,38 @@
               }
             ],
             "title": "Days"
+          },
+          "text_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text Length"
+          },
+          "all_decisions": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "All Decisions"
+          },
+          "unlimited_text_length": {
+            "type": "boolean",
+            "title": "Unlimited Text Length",
+            "default": false
           }
         },
         "type": "object",
         "title": "MemoryRequest",
-        "description": "The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a\nnew flow (R5.3.4)."
+        "description": "The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a\nnew flow (R5.3.4, R5.3.5).\n\nA length not given cannot say «no limit»: `unlimited_text_length` takes the limit away, as the parts of a\nconfiguration that may be removed, and prevails over a length given with it."
       },
       "ModelCatalogResponse": {
         "properties": {

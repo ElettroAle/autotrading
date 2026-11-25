@@ -89,7 +89,8 @@ class Decision:
     plan: Plan = Plan()
     change: Change = Change()
     confidence: int = 70
-    reasoning: str = "motivo"
+    reasoning: str = "ragionamento"
+    motive: str | None = "motivo"
 
     def intent_with[O, C, H, U, R](
         self,
@@ -250,7 +251,11 @@ def test_with_the_memory_the_question_holds_the_operative_decisions_before_now_w
     memory = (
         AssetMemory(
             "BTC",
-            (MemoryEntry(NOW - timedelta(hours=1), "BTC", DecisionAction.OPEN, TradeSide.LONG, None, "rottura", None),),
+            (
+                MemoryEntry(
+                    NOW - timedelta(hours=1), "BTC", DecisionAction.OPEN, TradeSide.LONG, None, "rottura", None, None
+                ),
+            ),
         ),
         AssetMemory("ETH", ()),
     )

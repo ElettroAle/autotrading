@@ -31,7 +31,8 @@ class RecordedDecision:
     decisioni-del-ciclo-registrate-per-asset).
 
     Only an opening has a direction; the confidence is None for the decisions recorded before the agent gave one
-    (R3.1.4).
+    (R3.1.4). The motive in one sentence is None for the decisions recorded before the agent gave one, or whose agent
+    gave none; the invalidation is the one an opening or a reversal declared (R5.3.5).
     """
 
     asset: str
@@ -39,6 +40,8 @@ class RecordedDecision:
     direction: TradeSide | None
     confidence: int | None
     reasoning: str
+    motive: str | None = None
+    invalidation: str | None = None
 
     def __post_init__(self) -> None:
         if self.direction is not None and self.action is not DecisionAction.OPEN:
@@ -47,11 +50,27 @@ class RecordedDecision:
             raise DecisionConfidenceOutOfRangeError(self.confidence, LOWEST_CONFIDENCE, HIGHEST_CONFIDENCE)
 
     @classmethod
-    def named(
-        cls, asset: str, action: str, direction: str | None, confidence: int | None, reasoning: str
+    def named(  # noqa: PLR0913 - one argument per word the record keeps
+        cls,
+        asset: str,
+        action: str,
+        direction: str | None,
+        confidence: int | None,
+        reasoning: str,
+        *,
+        motive: str | None = None,
+        invalidation: str | None = None,
     ) -> RecordedDecision:
         """The decision from the words the record keeps."""
-        return cls(asset, _action_named(action), _direction_named(direction), confidence, reasoning)
+        return cls(
+            asset,
+            _action_named(action),
+            _direction_named(direction),
+            confidence,
+            reasoning,
+            motive=motive,
+            invalidation=invalidation,
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -60,6 +60,8 @@ class _FailedAttemptColumn(TypedDict):
 class _OutcomeColumn(TypedDict):
     pnl: str
     realized: bool
+    # Missing in the memories saved before the course of the position (R5.3.5).
+    course: NotRequired[str | None]
 
 
 class _MemoryEntryColumn(TypedDict):
@@ -67,7 +69,10 @@ class _MemoryEntryColumn(TypedDict):
     action: str
     direction: str | None
     price: str | None
-    reasoning: str
+    # The memories saved before the motive (R5.3.5) keep the start of the reasoning, without invalidation.
+    motive: NotRequired[str]
+    reasoning: NotRequired[str]
+    invalidation: NotRequired[str | None]
     outcome: _OutcomeColumn | None
 
 
@@ -83,6 +88,8 @@ class _DecisionRow(TypedDict):
     direction: str | None
     confidence: int | None
     reasoning: str
+    motive: str | None
+    invalidation: str | None
 
 
 class _CycleRow(TypedDict):
@@ -362,6 +369,8 @@ def decision_rows_of(record: CycleRecord, tenant_id: TenantId) -> list[dict[str,
             "direction": None if decision.direction is None else decision.direction.value,
             "confidence": decision.confidence,
             "reasoning": decision.reasoning,
+            "motive": decision.motive,
+            "invalidation": decision.invalidation,
         }
         for position, decision in enumerate(record.decisions)
     ]
@@ -382,7 +391,15 @@ def dated_decisions_of(columns: Sequence[RowMapping | Mapping[str, object]]) -> 
 
 
 def _decision_of(row: _DecisionRow) -> RecordedDecision:
-    return RecordedDecision.named(row["asset"], row["action"], row["direction"], row["confidence"], row["reasoning"])
+    return RecordedDecision.named(
+        row["asset"],
+        row["action"],
+        row["direction"],
+        row["confidence"],
+        row["reasoning"],
+        motive=row["motive"],
+        invalidation=row["invalidation"],
+    )
 
 
 def record_of(columns: RowMapping | Mapping[str, object]) -> CycleRecord:
@@ -441,8 +458,11 @@ def _entry_column(entry: MemoryEntry) -> _MemoryEntryColumn:
         "action": entry.action.value,
         "direction": None if entry.direction is None else entry.direction.value,
         "price": None if entry.price is None else str(entry.price),
-        "reasoning": entry.reasoning,
-        "outcome": None if outcome is None else {"pnl": str(outcome.pnl), "realized": outcome.realized},
+        "motive": entry.motive,
+        "invalidation": entry.invalidation,
+        "outcome": None
+        if outcome is None
+        else {"pnl": str(outcome.pnl), "realized": outcome.realized, "course": outcome.course},
     }
 
 
@@ -463,9 +483,14 @@ def _entry_of(asset: str, column: _MemoryEntryColumn) -> MemoryEntry:
         DecisionAction(column["action"]),
         None if column["direction"] is None else TradeSide(column["direction"]),
         None if price is None else Decimal(price),
-        column["reasoning"],
-        None if outcome is None else MemoryOutcome(Decimal(outcome["pnl"]), realized=outcome["realized"]),
+        column.get("motive") or column.get("reasoning", ""),
+        column.get("invalidation"),
+        None if outcome is None else _outcome_of(outcome),
     )
+
+
+def _outcome_of(column: _OutcomeColumn) -> MemoryOutcome:
+    return MemoryOutcome(Decimal(column["pnl"]), realized=column["realized"], course=column.get("course"))
 
 
 def _failure_row(failure: CycleFailure | None) -> dict[str, str] | None:

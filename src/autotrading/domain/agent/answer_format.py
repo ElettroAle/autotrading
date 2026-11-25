@@ -12,6 +12,7 @@ from autotrading.domain.agent.agent_response import (
     LEVERAGE,
     LOWEST_CONFIDENCE,
     MARGIN_FRACTION,
+    MOTIVE,
     REASONING,
     REMOVE_TARGET,
     STOP,
@@ -51,6 +52,7 @@ def _decisions_schema() -> Schema:
             INVALIDATION: {"type": ["string", "null"]},
             REMOVE_TARGET: {"type": "boolean"},
             CONFIDENCE: {"type": "integer", "minimum": LOWEST_CONFIDENCE, "maximum": HIGHEST_CONFIDENCE},
+            MOTIVE: {"type": ["string", "null"]},
             REASONING: {"type": "string"},
         }
     )

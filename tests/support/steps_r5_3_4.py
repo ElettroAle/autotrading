@@ -104,13 +104,15 @@ def entries_of(memory: tuple[AssetMemory, ...] | None, asset: str) -> tuple[Memo
 
 
 def assert_the_opening_with_its_outcome(entry: MemoryEntry) -> None:
-    assert (entry.action, entry.direction, entry.price, entry.reasoning) == (
+    assert (entry.action, entry.direction, entry.price, entry.motive) == (
         DecisionAction.OPEN,
         TradeSide.LONG,
         OPENED_PRICE,
         OPENING_REASONING,
     )
-    assert entry.outcome == MemoryOutcome(REALIZED_PNL, realized=True)
+    assert entry.outcome == MemoryOutcome(
+        REALIZED_PNL, realized=True, course="chiusa dalla decisione dell'agente dopo 30 minuti"
+    )
 
 
 # Given
@@ -148,7 +150,7 @@ def decisions_in_and_out_of_the_window(  # noqa: PLR0917 - one argument per valu
     now = at("10:00")
     for day in range(1, int(recent) + 1):
         assert day < int(days)
-        decision = RecordedDecision(asset, DecisionAction.UPDATE, None, 60, f"stop di {day} giorni fa")
+        decision = RecordedDecision(asset, DecisionAction.CLOSE, None, 60, f"stop di {day} giorni fa")
         memory_cycles.decided(flow, now - timedelta(days=day), decision)
     decision = RecordedDecision(asset, DecisionAction.CLOSE, None, 60, f"chiusura di {old} giorni fa")
     memory_cycles.decided(flow, now - timedelta(days=int(old)), decision)
@@ -217,7 +219,8 @@ def memory_in_context(memory_cycles: MemoryCycles, asset: str) -> None:
     assert_the_opening_with_its_outcome(entry)
     system = memory_cycles.cycles.system_text()
     assert f"{MEMORY_HEADING}\n{asset}:\n- {entry.text}" in system
-    assert "apri long, prezzo 95000, PnL realizzato 40: rottura della resistenza" in entry.text
+    assert "apri long, prezzo 95000, chiusa dalla decisione dell'agente dopo 30 minuti, PnL realizzato 40" in entry.text
+    assert entry.text.endswith(": rottura della resistenza")
 
 
 @then("il contesto non contiene decisioni precedenti")
@@ -231,7 +234,7 @@ def no_memory_in_context(memory_cycles: MemoryCycles) -> None:
 @then(quoted('il contesto contiene solo le {count} decisioni più recenti su "{asset}"'))
 def only_the_most_recent(memory_cycles: MemoryCycles, count: str, asset: str) -> None:
     entries = entries_of(memory_cycles.received("alfa"), asset)
-    assert [entry.reasoning for entry in entries] == [f"stop di {day} giorni fa" for day in range(1, int(count) + 1)]
+    assert [entry.motive for entry in entries] == [f"stop di {day} giorni fa" for day in range(1, int(count) + 1)]
     system = memory_cycles.cycles.system_text()
     assert all(f"- {entry.text}" in system for entry in entries)
     assert "stop di 3 giorni fa" not in system

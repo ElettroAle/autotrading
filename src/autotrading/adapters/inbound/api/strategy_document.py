@@ -106,7 +106,8 @@ class StrategyBody(BaseModel):
     default_take_profit_percent: Decimal | None = None
     # Missing in the files written before it: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
-    # Missing in the files written before it: off, with 10 decisions and 30 days (R5.3.4).
+    # Missing in the files written before it: off, with 10 decisions and 30 days (R5.3.4); missing length and choice of
+    # the decisions: 160 characters and only openings, closings and reversals (R5.3.5).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
 
 
@@ -158,9 +159,7 @@ class StrategyDocument(BaseModel):
                 default_stop_loss_percent=strategy.protection_defaults.stop_loss_percent,
                 default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
                 minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
-                memory=MemoryRequest(
-                    active=strategy.memory.active, decisions=strategy.memory.decisions, days=strategy.memory.days
-                ),
+                memory=MemoryRequest.of(strategy.memory),
             ),
         )
 

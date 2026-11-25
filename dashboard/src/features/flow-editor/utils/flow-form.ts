@@ -52,11 +52,15 @@ export const adapterKeyOf = (name: string): string =>
 
 const adapterNameOf = (key: string): string => decodeURIComponent(key);
 
-// Decisions and days are disabled while the memory is off, and a disabled field gives no value (R5.3.4).
+// Decisions, days, length and choice are disabled while the memory is off, and a disabled field gives no value (R5.3.4);
+// the length is disabled too while the motive is whole (R5.3.5).
 const memoryValuesSchema = z.object({
   active: z.boolean(),
   decisions: numberText.optional(),
   days: numberText.optional(),
+  text_length: numberText.optional(),
+  unlimited_text_length: z.boolean().optional(),
+  all_decisions: z.boolean().optional(),
 });
 
 export const flowFormSchema = z.object({
@@ -133,8 +137,16 @@ type SettingsRequest = {
   max_daily_loss_percent: string | null;
   max_drawdown_percent: string | null;
   openings_resume: OpeningsResume;
-  // Null decisions or days keep those in force, or the defaults of the platform at creation (R5.3.4).
-  memory: { active: boolean; decisions: number | null; days: number | null };
+  // Null decisions, days, length or choice keep those in force, or the defaults of the platform at creation (R5.3.4);
+  // a whole motive takes the length away (R5.3.5).
+  memory: {
+    active: boolean;
+    decisions: number | null;
+    days: number | null;
+    text_length: number | null;
+    all_decisions: boolean | null;
+    unlimited_text_length: boolean;
+  };
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -170,7 +182,14 @@ export const emptyFormValues = (): FlowFormValues => ({
   max_daily_loss_percent: '',
   max_drawdown_percent: '',
   openings_resume: 'manual',
-  memory: { active: false, decisions: '', days: '' },
+  memory: {
+    active: false,
+    decisions: '',
+    days: '',
+    text_length: '',
+    unlimited_text_length: false,
+    all_decisions: false,
+  },
 });
 
 const decimalOf = (text: string): string => text.trim().replace(',', '.');
@@ -218,15 +237,25 @@ const sourcesOf = (sources: Record<string, SourceValues>): SourceRequest[] =>
     .filter(([, source]) => source.active)
     .map(([name, source]) => ({ name, adapters: adaptersOf(source.adapters ?? {}) }));
 
-// Off, the memory sends no decisions nor days: the API keeps those in force, or its defaults at creation (R5.3.4).
+// Off, the memory sends none of its parts: the API keeps those in force, or its defaults at creation (R5.3.4, R5.3.5).
 const memoryOf = (memory: MemoryValues): SettingsRequest['memory'] =>
   memory.active
     ? {
         active: true,
         decisions: numberOrNull(memory.decisions ?? ''),
         days: numberOrNull(memory.days ?? ''),
+        text_length: memory.unlimited_text_length ? null : numberOrNull(memory.text_length ?? ''),
+        all_decisions: memory.all_decisions ?? false,
+        unlimited_text_length: memory.unlimited_text_length ?? false,
       }
-    : { active: false, decisions: null, days: null };
+    : {
+        active: false,
+        decisions: null,
+        days: null,
+        text_length: null,
+        all_decisions: null,
+        unlimited_text_length: false,
+      };
 
 const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   account_id: values.account_id,
@@ -329,6 +358,9 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
     active: flow.memory.active,
     decisions: String(flow.memory.decisions),
     days: String(flow.memory.days),
+    text_length: textOf(flow.memory.text_length),
+    unlimited_text_length: flow.memory.text_length === null,
+    all_decisions: flow.memory.all_decisions,
   },
 });
 
@@ -386,7 +418,11 @@ export const changesOf = (flow: Flow, values: FlowFormValues): FlowChanges => {
     : { settings, capital };
 };
 
-const MEMORY_FIELDS: readonly Path<FlowFormValues>[] = ['memory.decisions', 'memory.days'];
+const MEMORY_FIELDS: readonly Path<FlowFormValues>[] = [
+  'memory.decisions',
+  'memory.days',
+  'memory.text_length',
+];
 const FORM_FIELDS = new Set<string>([...Object.keys(flowFormSchema.shape), ...MEMORY_FIELDS]);
 
 /** The field of the form a setting named by the API is typed in, when the form has it. */

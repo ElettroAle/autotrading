@@ -40,6 +40,7 @@ from autotrading.domain.flows.errors import (
     MaxLossOutOfRangeError,
     MemoryDaysOutOfRangeError,
     MemoryDecisionsOutOfRangeError,
+    MemoryTextLengthNotPositiveError,
     TotalExposureOutOfRangeError,
     UnknownPromptPlaceholderError,
 )
@@ -451,6 +452,36 @@ def test_a_change_without_the_memory_keeps_the_one_in_force(flows: Flows) -> Non
     assert modified.configuration.memory == FlowMemory(active=True, decisions=5, days=7)
 
 
+def test_the_length_of_the_motive_and_every_decision_change_in_the_next_version(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(
+        ModifyFlowCommand(flow.id, memory=MemoryRequest(active=True, text_length=300, all_decisions=True))
+    )
+
+    assert modified.configuration.version == 2
+    assert modified.configuration.memory == FlowMemory(active=True, text_length=300, all_decisions=True)
+
+
+def test_a_length_taken_away_leaves_the_motive_whole_and_one_not_given_keeps_it(flows: Flows) -> None:
+    flow = flows.saved()
+    flows.modify.execute(ModifyFlowCommand(flow.id, memory=MemoryRequest(active=True, unlimited_text_length=True)))
+
+    modified = flows.modify.execute(ModifyFlowCommand(flow.id, memory=MemoryRequest(all_decisions=True)))
+
+    assert modified.configuration.memory == FlowMemory(active=True, text_length=None, all_decisions=True)
+
+
+def test_a_length_taken_away_prevails_over_a_length_given_with_it(flows: Flows) -> None:
+    flow = flows.saved()
+
+    modified = flows.modify.execute(
+        ModifyFlowCommand(flow.id, memory=MemoryRequest(text_length=80, unlimited_text_length=True))
+    )
+
+    assert modified.configuration.memory.text_length is None
+
+
 @pytest.mark.parametrize(
     ("changes", "error", "reason"),
     [
@@ -485,6 +516,16 @@ def test_a_change_without_the_memory_keeps_the_one_in_force(flows: Flows) -> Non
             "le decisioni della memoria vanno da 1 a 50",
         ),
         ({"memory": MemoryRequest(days=0)}, MemoryDaysOutOfRangeError, "i giorni della memoria vanno da 1 a 365"),
+        (
+            {"memory": MemoryRequest(text_length=0)},
+            MemoryTextLengthNotPositiveError,
+            "la lunghezza del motivo della memoria è un intero positivo",
+        ),
+        (
+            {"memory": MemoryRequest(text_length=-5)},
+            MemoryTextLengthNotPositiveError,
+            "la lunghezza del motivo della memoria è un intero positivo",
+        ),
     ],
 )
 def test_an_invalid_change_is_refused_and_the_version_in_force_stays(

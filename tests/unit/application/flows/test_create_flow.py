@@ -194,6 +194,18 @@ def test_the_memory_given_is_saved_with_the_defaults_for_the_parts_not_given(flo
     assert flow.configuration.memory == FlowMemory(active=True, decisions=10, days=14)
 
 
+def test_a_flow_created_without_the_new_parts_of_the_memory_cuts_at_160_and_remembers_no_update(flows: Flows) -> None:
+    memory = flows.create.execute(flows.command(memory=MemoryRequest(active=True))).configuration.memory
+
+    assert (memory.text_length, memory.all_decisions) == (160, False)
+
+
+def test_a_flow_created_with_the_length_taken_away_keeps_the_motive_whole(flows: Flows) -> None:
+    flow = flows.create.execute(flows.command(memory=MemoryRequest(unlimited_text_length=True, all_decisions=True)))
+
+    assert flow.configuration.memory == FlowMemory(text_length=None, all_decisions=True)
+
+
 def test_the_creation_is_logged_with_the_flow_and_nothing_of_its_configuration(
     flows: Flows, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -302,3 +314,11 @@ def test_the_flows_are_listed_by_name(flows: Flows) -> None:
         flows.store.flows.append(a_flow(flows.tenant_id, name=name))
 
     assert [flow.name.value for flow in ListFlowsUseCase(flows.repository).execute()] == ["alfa", "beta", "gamma"]
+
+
+@pytest.mark.parametrize(
+    "memory",
+    [FlowMemory(), FlowMemory(active=True, decisions=3, days=7, text_length=None, all_decisions=True)],
+)
+def test_a_memory_given_whole_comes_back_as_it_was(memory: FlowMemory) -> None:
+    assert MemoryRequest.of(memory).applied_to(FlowMemory(active=True, text_length=40)) == memory
