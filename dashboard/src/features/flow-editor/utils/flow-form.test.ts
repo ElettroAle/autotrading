@@ -96,6 +96,7 @@ const FLOW: Flow = {
     max_profit_in_context: false,
   },
   consecutive_loss_limit: null,
+  account_exposure_for_agent: false,
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -168,7 +169,15 @@ describe('creationRequestOf', () => {
         count_scope: null,
         remove_limit: true,
       },
+      account_exposure_for_agent: false,
     });
+  });
+
+  // R5.5.5, ADR esposizione-del-conto-nella-dashboard.
+  it('sends the exposure of the other flows of the account for the agent as the user chose it', () => {
+    expect(
+      creationRequestOf(filled({ account_exposure_for_agent: true })).account_exposure_for_agent,
+    ).toBe(true);
   });
 
   // ADR blocco-delle-riaperture-nella-dashboard: the three blank take the limit away, the API checks the values.
@@ -417,6 +426,7 @@ describe('formValuesOf', () => {
         block_minutes: '',
         count_scope: 'asset',
       },
+      account_exposure_for_agent: false,
     });
   });
 

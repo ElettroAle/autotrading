@@ -65,6 +65,7 @@ const configurationSchema = z.object({
       count_scope: z.enum(['asset', 'flusso']),
     })
     .nullable(),
+  account_exposure_for_agent: z.boolean(),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

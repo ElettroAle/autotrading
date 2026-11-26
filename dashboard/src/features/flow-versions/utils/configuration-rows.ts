@@ -140,5 +140,9 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       value: consecutiveLossLimitText(configuration.consecutive_loss_limit),
     },
     { part: 'memoria', value: memoryText(configuration.memory) },
+    {
+      part: "esposizione del conto nel contesto dell'agente",
+      value: configuration.account_exposure_for_agent ? 'sì' : 'no',
+    },
   ];
 };

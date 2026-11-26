@@ -808,6 +808,29 @@ describe('EditFlow', () => {
     );
   });
 
+  // R5.5.5, ADR esposizione-del-conto-nella-dashboard.
+  it('turns on the exposure of the other flows of the account beside the options of the memory', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const option = await screen.findByRole('checkbox', {
+      name: "Esposizione degli altri flussi del conto nel contesto dell'agente",
+    });
+    const memory = screen.getByRole('group', { name: 'Memoria' });
+    expect(option).not.toBeChecked();
+    expect(memory.compareDocumentPosition(option) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(option).toHaveAccessibleDescription(
+      "lo stato inviato all'agente riporta il valore long e short delle posizioni degli altri flussi dello stesso conto",
+    );
+    await userEvent.click(option);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).account_exposure_for_agent).toBe(true);
+  });
+
   it('says a flow outside the tenant of the user does not exist', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-omega/edit' });
 

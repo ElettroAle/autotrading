@@ -62,6 +62,7 @@ const CONFIGURATION: Configuration = {
     block_minutes: 120,
     count_scope: 'flusso',
   },
+  account_exposure_for_agent: true,
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -100,6 +101,7 @@ const PARTS_OF_FIELD = {
   openings_resume: ['ripresa delle aperture'],
   consecutive_loss_limit: ['blocco delle riaperture dopo perdite consecutive'],
   memory: ['memoria'],
+  account_exposure_for_agent: ["esposizione del conto nel contesto dell'agente"],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
   readonly string[]
@@ -148,6 +150,7 @@ describe('configurationRows', () => {
         part: 'memoria',
         value: 'attiva, 5 decisioni, 14 giorni, motivo intero, tutte le decisioni, riepilogo',
       },
+      { part: "esposizione del conto nel contesto dell'agente", value: 'sì' },
     ]);
   });
 

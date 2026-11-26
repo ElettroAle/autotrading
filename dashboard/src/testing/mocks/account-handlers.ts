@@ -46,6 +46,7 @@ const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   currency: CURRENCY,
   // The exchange of the fake platform reads the expiry of the credentials, unless a test says otherwise (R6.2.2).
   ...keyExpiryResponse(account.expiry, account.expiryEditable ?? false),
+  max_direction_exposure_percent: account.maxDirectionExposurePercent ?? null,
 });
 
 const EXPIRY_READ_BY_EXCHANGE = "la scadenza di queste credenziali la legge l'exchange";
@@ -55,6 +56,22 @@ const expiryRefusal = () => problem(409, 'Conflict', EXPIRY_READ_BY_EXCHANGE);
 const givesExpiry = (fields: Record<string, string>): boolean => (fields.expires_on ?? '') !== '';
 
 const amountOf = (amount: string) => ({ amount, currency: CURRENCY });
+
+// The reason the API gives for a limit of the exposure per side not above zero, with the same words (R5.5.5).
+const EXPOSURE_NOT_POSITIVE = "l'esposizione massima per direzione è maggiore di 0";
+
+// A null removes the limit; a number above zero sets it; anything else is refused as the API refuses it.
+const exposureLimitOf = (body: unknown): string | null | Response => {
+  const percent: unknown =
+    typeof body === 'object' && body !== null ? Reflect.get(body, 'percent') : null;
+  if (percent === null || percent === undefined) {
+    return null;
+  }
+  const amount = Number(percent);
+  return Number.isFinite(amount) && amount > 0
+    ? String(percent)
+    : problem(422, 'Unprocessable Content', EXPOSURE_NOT_POSITIVE);
+};
 
 // The reasons the API gives about a virtual balance, with the same words (R6.3.2).
 const VIRTUAL_BALANCE_REQUIRED = 'saldo virtuale obbligatorio per questo exchange';
@@ -355,6 +372,18 @@ export const accountHandlers = [
           return expiryRefusal();
         }
         account.expiry = enteredExpiryOf(fields.expires_on);
+        return new HttpResponse(null, { status: 204 });
+      });
+    }),
+  ),
+  http.put('*/accounts/:accountId/max-direction-exposure', ({ request, params }) =>
+    withUser(request, async (user) => {
+      const limit = exposureLimitOf(await request.json().catch(() => ({})));
+      return withAccount(user, String(params.accountId), (account) => {
+        if (limit instanceof Response) {
+          return limit;
+        }
+        account.maxDirectionExposurePercent = limit;
         return new HttpResponse(null, { status: 204 });
       });
     }),

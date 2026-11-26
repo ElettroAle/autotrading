@@ -19,6 +19,8 @@ export const accountSchema = z.object({
   allocated_capital: z.string(),
   currency: z.string(),
   ...keyExpiryFields,
+  // The exposure of its flows on one side, in percent of the balance; null unless the user sets it (R5.5.5).
+  max_direction_exposure_percent: z.string().nullable(),
 });
 
 export type Account = z.infer<typeof accountSchema>;

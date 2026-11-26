@@ -10,6 +10,7 @@ import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import type { Account } from '../api/get-accounts';
 import { useAccount } from '../hooks/use-account';
 
+import { MaxDirectionExposureForm } from './max-direction-exposure-form';
 import { RemoveAccount } from './remove-account';
 import { ReplaceCredentialsForm } from './replace-credentials-form';
 import { VirtualBalanceForm } from './virtual-balance-form';
@@ -74,7 +75,8 @@ const useHoldsVirtualBalance = (account: Account | undefined): boolean => {
 
 /**
  * The tab Impostazioni of the page of the account: its credentials, or the virtual balance of an exchange that holds
- * one and asks no credentials (R6.3.2), then its removal in the zone of danger (ADR
+ * one and asks no credentials (R6.3.2), the limit of the exposure of its flows on one side (R5.5.5, ADR
+ * esposizione-del-conto-nella-dashboard), then its removal in the zone of danger (ADR
  * elenco-dei-conti-e-pagina-del-conto). The page has read the account before its tabs show.
  */
 export const AccountSettings = ({ accountId }: { readonly accountId: string }) => {
@@ -86,6 +88,7 @@ export const AccountSettings = ({ accountId }: { readonly accountId: string }) =
   return (
     <>
       {virtual ? <VirtualBalanceForm account={account} /> : <Credentials account={account} />}
+      <MaxDirectionExposureForm account={account} />
       <Removal account={account} />
     </>
   );

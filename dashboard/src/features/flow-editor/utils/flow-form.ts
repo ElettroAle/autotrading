@@ -113,6 +113,7 @@ export const flowFormSchema = z.object({
   memory: memoryValuesSchema,
   trailing_stop: trailingStopValuesSchema,
   consecutive_loss_limit: consecutiveLossLimitValuesSchema,
+  account_exposure_for_agent: z.boolean(),
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
@@ -192,6 +193,8 @@ type SettingsRequest = {
     count_scope: string | null;
     remove_limit: boolean;
   };
+  // Off unless the user turns it on: the agent sees the flow alone (R5.5.5).
+  account_exposure_for_agent: boolean;
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -249,6 +252,7 @@ export const emptyFormValues = (): FlowFormValues => ({
     block_minutes: '',
     count_scope: 'asset',
   },
+  account_exposure_for_agent: false,
 });
 
 const decimalOf = (text: string): string => text.trim().replace(',', '.');
@@ -369,6 +373,7 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   memory: memoryOf(values.memory),
   trailing_stop: trailingStopOf(values.trailing_stop),
   consecutive_loss_limit: consecutiveLossLimitOf(values.consecutive_loss_limit),
+  account_exposure_for_agent: values.account_exposure_for_agent,
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -465,6 +470,7 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
     block_minutes: textOf(flow.consecutive_loss_limit?.block_minutes ?? null),
     count_scope: flow.consecutive_loss_limit?.count_scope ?? 'asset',
   },
+  account_exposure_for_agent: flow.account_exposure_for_agent,
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>
