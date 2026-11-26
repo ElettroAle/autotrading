@@ -35,7 +35,7 @@ const RESUME_LABELS: Readonly<Record<Configuration['openings_resume'], string>> 
   next_day: 'il giorno dopo',
 };
 
-// The memory as the API writes it in its differences (R5.3.4, R5.3.5).
+// The memory as the API writes it in its differences (R5.3.4, R5.3.5, R5.3.7).
 const memoryText = (memory: Configuration['memory']): string => {
   if (!memory.active) {
     return 'non attiva';
@@ -45,7 +45,16 @@ const memoryText = (memory: Configuration['memory']): string => {
   const which = memory.all_decisions
     ? 'tutte le decisioni'
     : 'solo aperture, chiusure e inversioni';
-  return `attiva, ${memory.decisions} decisioni, ${memory.days} giorni, ${motive}, ${which}`;
+  const options = [
+    memory.summary ? ['riepilogo'] : [],
+    memory.other_assets ? ['altri asset'] : [],
+  ].flat();
+  return [
+    `attiva, ${memory.decisions} decisioni, ${memory.days} giorni`,
+    motive,
+    which,
+    ...options,
+  ].join(', ');
 };
 
 // The block of the reopenings as the API writes it in its differences (R5.5.2).

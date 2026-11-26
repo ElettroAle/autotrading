@@ -83,6 +83,9 @@ class _MemoryDocument(TypedDict):
     # Missing in the versions saved before them: 160 characters and only openings, closings and reversals (R5.3.5).
     text_length: NotRequired[int | None]
     all_decisions: NotRequired[bool]
+    # Missing in the versions saved before them: off, so those versions stay as they are (R5.3.7).
+    summary: NotRequired[bool]
+    other_assets: NotRequired[bool]
 
 
 class _TrailingStopDocument(TypedDict):
@@ -396,6 +399,8 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "days": configuration.memory.days,
             "text_length": configuration.memory.text_length,
             "all_decisions": configuration.memory.all_decisions,
+            "summary": configuration.memory.summary,
+            "other_assets": configuration.memory.other_assets,
         },
         "trailing_stop": _trailing_stop_document(configuration.trailing_stop),
         "consecutive_loss_limit": _consecutive_loss_limit_document(configuration.consecutive_loss_limit),

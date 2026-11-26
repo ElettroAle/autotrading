@@ -418,4 +418,6 @@ def _memory_of(memory: Sequence[AssetMemory] | None) -> tuple[AssetMemory, ...] 
     """The memory as the cycle composed it: the checkpointer gives its tuples back as lists."""
     if memory is None:
         return None
-    return tuple(AssetMemory(each.asset, tuple(each.entries)) for each in memory)
+    return tuple(
+        AssetMemory(each.asset, tuple(each.entries), tuple(each.summary), tuple(each.other_assets)) for each in memory
+    )

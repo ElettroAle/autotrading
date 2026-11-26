@@ -76,6 +76,8 @@ type ConfigurationRequest = {
     days?: unknown;
     text_length?: unknown;
     all_decisions?: unknown;
+    summary?: unknown;
+    other_assets?: unknown;
     unlimited_text_length?: unknown;
   };
   trailing_stop?: {
@@ -185,15 +187,16 @@ const memoryOf = (requested: ConfigurationRequest['memory'], current: FakeMemory
   if (days < 1 || days > 365) {
     throw new Refusal(422, 'i giorni della memoria vanno da 1 a 365', 'memory.days');
   }
-  const active = typeof requested?.active === 'boolean' ? requested.active : current.active;
-  const allDecisions =
-    typeof requested?.all_decisions === 'boolean' ? requested.all_decisions : current.all_decisions;
+  const switched = (sent: unknown, kept: boolean): boolean =>
+    typeof sent === 'boolean' ? sent : kept;
   return {
-    active,
+    active: switched(requested?.active, current.active),
     decisions,
     days,
     text_length: textLengthOf(requested, current.text_length),
-    all_decisions: allDecisions,
+    all_decisions: switched(requested?.all_decisions, current.all_decisions),
+    summary: switched(requested?.summary, current.summary),
+    other_assets: switched(requested?.other_assets, current.other_assets),
   };
 };
 

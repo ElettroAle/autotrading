@@ -62,13 +62,13 @@ def _source_weights(sources: tuple[SourceSelection, ...]) -> str:
 
 
 def _memory(memory: tuple[AssetMemory, ...] | None) -> str:
-    """A block for every asset with previous decisions; an empty text with the memory off or without any (R5.3.4, ADR
-    memoria-del-flusso-dalle-decisioni-operative-precedenti).
+    """A block for every asset with something to remember, its summary lines first; an empty text with the memory off
+    or without anything (R5.3.4, R5.3.7, ADR memoria-del-flusso-con-riepilogo-e-altri-asset).
     """
-    remembered = tuple(asset for asset in memory or () if asset.entries)
+    remembered = tuple(asset for asset in memory or () if not asset.is_empty)
     if not remembered:
         return ""
-    blocks = ("\n".join((f"{asset.asset}:", *(f"- {entry.text}" for entry in asset.entries))) for asset in remembered)
+    blocks = ("\n".join((f"{asset.asset}:", *(f"- {line}" for line in asset.lines))) for asset in remembered)
     return "\n".join((MEMORY_HEADING, *blocks))
 
 

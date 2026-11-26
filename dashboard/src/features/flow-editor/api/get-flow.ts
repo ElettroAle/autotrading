@@ -50,13 +50,16 @@ export const flowSchema = z.object({
   max_drawdown_percent: z.string().nullable(),
   openings_resume: z.enum(['manual', 'next_day']),
   // Off unless the user turns it on, with the decisions per asset and the days it holds (R5.3.4), the length of the
-  // motive, null for a whole motive, and whether it remembers every decision (R5.3.5).
+  // motive, null for a whole motive, and whether it remembers every decision (R5.3.5); the summary and the other
+  // assets, off unless the user turns them on (R5.3.7).
   memory: z.object({
     active: z.boolean(),
     decisions: z.number(),
     days: z.number(),
     text_length: z.number().nullable(),
     all_decisions: z.boolean(),
+    summary: z.boolean(),
+    other_assets: z.boolean(),
   }),
   // Every part empty and the option off unless the user sets them: the flow behaves as before (R5.5.1).
   trailing_stop: z.object({

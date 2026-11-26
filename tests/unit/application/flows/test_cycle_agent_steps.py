@@ -12,7 +12,9 @@ from autotrading.application.flows.compose_cycle_context import ComposeCycleCont
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.ports import CycleContext, CycleDecisions, FlowSnapshot, SourceReading
+from autotrading.application.flows.remembered_decisions import MemoryReadings
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
+from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.cycle_question import CycleQuestion
@@ -31,7 +33,7 @@ from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_intent import OpenIntent
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.fakes.closed_position_repository import ClosedPositionStore
+from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.cycles import InMemoryCycleRepositoryAdapter
 from tests.fakes.exchange_limits import FakeExchangeLimitsAdapter
 from tests.fakes.opening_blocked_notices import FakeOpeningBlockedNoticeAdapter
@@ -207,15 +209,33 @@ def no_past_decisions() -> InMemoryPastDecisionsAdapter:
     )
 
 
+def a_closing(asset: str, pnl: Decimal) -> ClosedPosition:
+    closed_at = NOW - timedelta(hours=1)
+    return ClosedPosition(
+        tenant_id=TENANT,
+        flow_id=FLOW.id,
+        asset=asset,
+        side=TradeSide.LONG,
+        leverage=2,
+        margin=Decimal(50),
+        opening=PositionEnd(Decimal(100), closed_at - timedelta(minutes=5)),
+        closing=PositionEnd(Decimal(101), closed_at),
+        fees=Decimal(0),
+        reason=CloseReason.AGENT,
+        realized_pnl=pnl,
+    )
+
+
 def a_context(
     aggregates: Aggregates | None = None,
     snapshot: FlowSnapshot[CycleFlow] = SNAPSHOT,
     decisions: InMemoryPastDecisionsAdapter | None = None,
+    closed: ClosedPositionStore | None = None,
 ) -> CycleContext:
     readings = [SourceReading("news", (SourceData("news", "RSS", 2, None, {"titolo": "t"}),))]
-    compose = ComposeCycleContextUseCase(
-        Composer(), Actions(), aggregates or Aggregates(), Clock(), decisions or no_past_decisions()
-    )
+    closings = InMemoryClosedPositionRepositoryAdapter(closed or ClosedPositionStore(), TENANT)
+    memory = MemoryReadings(decisions or no_past_decisions(), closings)
+    compose = ComposeCycleContextUseCase(Composer(), Actions(), aggregates or Aggregates(), Clock(), memory)
     return compose.execute(FLOW.id.value, snapshot, readings, [AbsentSource("pivots", "fonte non disponibile")])
 
 
@@ -262,6 +282,21 @@ def test_with_the_memory_the_question_holds_the_operative_decisions_before_now_w
     assert question.memory == memory
     assert question.system_prompt == snapshot.state.configuration.rendered_system_prompt(("apri", "chiudi"), memory)
     assert "- 2026-" in question.system_prompt
+
+
+def test_with_the_summary_the_memory_begins_with_the_closings_of_the_flow_in_the_currency_of_its_account() -> None:
+    closed = ClosedPositionStore()
+    closed.positions.append(a_closing("ETH", Decimal("1.5")))
+    snapshot = remembering(FlowMemory(active=True, days=2, summary=True))
+
+    question = a_context(snapshot=snapshot, closed=closed).question
+
+    assert question.memory is not None
+    assert question.memory[1].summary == (
+        "ETH long — oggi: 1 chiuse, 1 vinte, 0 perse, PnL 1,50 USDC; ultimi 2 giorni: 1 chiuse, 1 vinte, 0 perse,"
+        " PnL 1,50 USDC",
+    )
+    assert f"ETH:\n- {question.memory[1].summary[0]}" in question.system_prompt
 
 
 def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_missing_declared() -> None:

@@ -80,7 +80,15 @@ const FLOW: Flow = {
   max_daily_loss_percent: null,
   max_drawdown_percent: null,
   openings_resume: 'manual',
-  memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
+  memory: {
+    active: false,
+    decisions: 10,
+    days: 30,
+    text_length: 160,
+    all_decisions: false,
+    summary: false,
+    other_assets: false,
+  },
   trailing_stop: {
     distance_percent: null,
     activation_percent: null,
@@ -140,6 +148,8 @@ describe('creationRequestOf', () => {
         days: null,
         text_length: null,
         all_decisions: null,
+        summary: null,
+        other_assets: null,
         unlimited_text_length: false,
       },
       trailing_stop: {
@@ -225,6 +235,8 @@ describe('creationRequestOf', () => {
       days: 14,
       text_length: null,
       all_decisions: false,
+      summary: false,
+      other_assets: false,
       unlimited_text_length: false,
     });
   });
@@ -244,6 +256,25 @@ describe('creationRequestOf', () => {
     });
   });
 
+  it('sends the summary and the other assets the user switched on (R5.3.7)', () => {
+    const memory = { active: true, summary: true, other_assets: true };
+
+    expect(creationRequestOf(filled({ memory })).memory).toMatchObject({
+      summary: true,
+      other_assets: true,
+    });
+    expect(
+      changesOf(FLOW, {
+        ...formValuesOf(FLOW),
+        memory: { ...formValuesOf(FLOW).memory, active: true, summary: true },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        settings: { memory: expect.objectContaining({ summary: true, other_assets: false }) },
+      }),
+    );
+  });
+
   it('sends the memory off with decisions and days left to the version in force, as the form disables them', () => {
     const memory = { active: false, decisions: undefined, days: undefined };
 
@@ -253,6 +284,8 @@ describe('creationRequestOf', () => {
       days: null,
       text_length: null,
       all_decisions: null,
+      summary: null,
+      other_assets: null,
       unlimited_text_length: false,
     });
   });
@@ -369,6 +402,8 @@ describe('formValuesOf', () => {
         text_length: '160',
         unlimited_text_length: false,
         all_decisions: false,
+        summary: false,
+        other_assets: false,
       },
       trailing_stop: {
         distance_percent: '',
@@ -696,6 +731,8 @@ describe('changesOf', () => {
           days: 14,
           text_length: 160,
           all_decisions: false,
+          summary: false,
+          other_assets: false,
           unlimited_text_length: false,
         },
       },

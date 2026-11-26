@@ -17,6 +17,8 @@ const MEMORY_TITLE = "Memoria dell'agente";
 const MEMORY: FakeAssetMemory[] = [
   {
     asset: 'BTC',
+    summary: [],
+    other_assets: [],
     entries: [
       {
         planned_at: '2026-11-14T08:07:00Z',

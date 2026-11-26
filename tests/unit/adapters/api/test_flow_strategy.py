@@ -109,7 +109,9 @@ def a_strategy() -> FlowStrategy:
         openings_resume=OpeningsResume.NEXT_DAY,
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
         minimum_confidence=MinimumConfidence(55),
-        memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
+        memory=FlowMemory(
+            active=True, decisions=5, days=14, text_length=None, all_decisions=True, summary=True, other_assets=True
+        ),
         trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
         consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
     )
@@ -150,6 +152,8 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "days": 14,
                 "text_length": None,
                 "all_decisions": True,
+                "summary": True,
+                "other_assets": True,
                 "unlimited_text_length": True,
             },
             "trailing_stop": {
@@ -207,7 +211,13 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
     assert (command.default_stop_loss_percent, command.default_take_profit_percent) == (Decimal(3), Decimal(9))
     assert command.minimum_confidence == 55
     assert command.memory == MemoryRequest(
-        active=True, decisions=5, days=14, all_decisions=True, unlimited_text_length=True
+        active=True,
+        decisions=5,
+        days=14,
+        all_decisions=True,
+        summary=True,
+        other_assets=True,
+        unlimited_text_length=True,
     )
     assert command.memory.applied_to(FlowMemory()) == a_strategy().memory
     assert command.trailing_stop == TrailingStopRequest(

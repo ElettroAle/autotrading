@@ -1795,13 +1795,24 @@ export interface components {
         };
         /**
          * AssetMemory
-         * @description The previous decisions of the flow on one of its assets, from the most recent (R5.3.4).
+         * @description The previous decisions of the flow on one of its assets, from the most recent (R5.3.4); before them, with the
+         *     options of the memory on, the summary lines of the asset and those of the other assets of the flow (R5.3.7).
          */
         AssetMemory: {
             /** Asset */
             asset: string;
             /** Entries */
             entries: components["schemas"]["MemoryEntry"][];
+            /**
+             * Summary
+             * @default []
+             */
+            summary: string[];
+            /**
+             * Other Assets
+             * @default []
+             */
+            other_assets: string[];
         };
         /**
          * BalanceComparisonResponse
@@ -2538,7 +2549,9 @@ export interface components {
          * FlowMemory
          * @description Whether the agent receives its previous decisions on every asset of the flow, how many from how far back, how
          *     long the motive of each and whether every decision or only those that open or close a position: off, 10 decisions,
-         *     30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5).
+         *     30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5);
+         *     whether every asset begins with the summary of its closed positions and gives the summary of the other assets of the
+         *     flow, both off unless the user says otherwise (R5.3.7).
          *
          *     The decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule. A
          *     length of None is no limit.
@@ -2569,6 +2582,16 @@ export interface components {
              * @default false
              */
             all_decisions: boolean;
+            /**
+             * Summary
+             * @default false
+             */
+            summary: boolean;
+            /**
+             * Other Assets
+             * @default false
+             */
+            other_assets: boolean;
         };
         /**
          * FlowMemoryReading
@@ -3315,7 +3338,7 @@ export interface components {
         /**
          * MemoryRequest
          * @description The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a
-         *     new flow (R5.3.4, R5.3.5).
+         *     new flow (R5.3.4, R5.3.5, R5.3.7).
          *
          *     A length not given cannot say «no limit»: `unlimited_text_length` takes the limit away, as the parts of a
          *     configuration that may be removed, and prevails over a length given with it.
@@ -3331,6 +3354,10 @@ export interface components {
             text_length?: number | null;
             /** All Decisions */
             all_decisions?: boolean | null;
+            /** Summary */
+            summary?: boolean | null;
+            /** Other Assets */
+            other_assets?: boolean | null;
             /**
              * Unlimited Text Length
              * @default false

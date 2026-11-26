@@ -41,7 +41,15 @@ const CONFIGURATION: Configuration = {
   max_daily_loss_percent: '5',
   max_drawdown_percent: '12.5',
   openings_resume: 'next_day',
-  memory: { active: true, decisions: 5, days: 14, text_length: null, all_decisions: true },
+  memory: {
+    active: true,
+    decisions: 5,
+    days: 14,
+    text_length: null,
+    all_decisions: true,
+    summary: true,
+    other_assets: false,
+  },
   trailing_stop: {
     distance_percent: '2',
     activation_percent: null,
@@ -138,7 +146,7 @@ describe('configurationRows', () => {
       },
       {
         part: 'memoria',
-        value: 'attiva, 5 decisioni, 14 giorni, motivo intero, tutte le decisioni',
+        value: 'attiva, 5 decisioni, 14 giorni, motivo intero, tutte le decisioni, riepilogo',
       },
     ]);
   });
@@ -174,7 +182,15 @@ describe('configurationRows', () => {
       max_daily_loss_percent: null,
       max_drawdown_percent: null,
       openings_resume: 'manual',
-      memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
+      memory: {
+        active: false,
+        decisions: 10,
+        days: 30,
+        text_length: 160,
+        all_decisions: false,
+        summary: false,
+        other_assets: false,
+      },
     });
 
     expect(Object.fromEntries(rows.map((row) => [row.part, row.value]))).toMatchObject({

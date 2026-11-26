@@ -244,7 +244,15 @@ describe('CreateFlow', () => {
       max_drawdown_percent: null,
       openings_resume: 'manual',
       // Left untouched, the memory stays off with the defaults of the platform (R5.3.4).
-      memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
+      memory: {
+        active: false,
+        decisions: 10,
+        days: 30,
+        text_length: 160,
+        all_decisions: false,
+        summary: false,
+        other_assets: false,
+      },
       // Left untouched, the stop does not follow the price: the flow behaves as before (R5.5.1).
       trailing_stop: {
         distance_percent: null,

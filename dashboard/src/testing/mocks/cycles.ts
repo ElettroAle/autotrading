@@ -35,10 +35,12 @@ export type FakeCycle = {
 /**
  * The previous decisions of the flow on an asset, as the API gives them: on the flow what the agent will receive, in a
  * cycle what it received (R5.3.4), with their motive, the invalidation of an opening and the course of its position
- * (R5.3.5).
+ * (R5.3.5), after the summary lines of the asset and of the other assets (R5.3.7).
  */
 export type FakeAssetMemory = {
   readonly asset: string;
+  readonly summary: readonly string[];
+  readonly other_assets: readonly string[];
   readonly entries: {
     readonly planned_at: string;
     readonly asset: string;

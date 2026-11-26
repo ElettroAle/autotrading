@@ -112,7 +112,8 @@ class StrategyBody(BaseModel):
     # Missing in the files written before it: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
     # Missing in the files written before it: off, with 10 decisions and 30 days (R5.3.4); missing length and choice of
-    # the decisions: 160 characters and only openings, closings and reversals (R5.3.5).
+    # the decisions: 160 characters and only openings, closings and reversals (R5.3.5); missing summary and other
+    # assets: off (R5.3.7).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
     # Missing in the files written before it: no stop that follows the price (R5.5.1).
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)

@@ -79,6 +79,9 @@ class _MemoryEntryColumn(TypedDict):
 class _AssetMemoryColumn(TypedDict):
     asset: str
     entries: list[_MemoryEntryColumn]
+    # Missing in the memories saved before the summary (R5.3.7).
+    summary: NotRequired[list[str]]
+    other_assets: NotRequired[list[str]]
 
 
 class _DecisionRow(TypedDict):
@@ -448,7 +451,15 @@ def _memory_column(memory: tuple[AssetMemory, ...] | None) -> list[_AssetMemoryC
     """The memory as plain JSON: amounts as text, so no number is rounded, and instants in ISO 8601."""
     if memory is None:
         return None
-    return [{"asset": each.asset, "entries": [_entry_column(entry) for entry in each.entries]} for each in memory]
+    return [
+        {
+            "asset": each.asset,
+            "entries": [_entry_column(entry) for entry in each.entries],
+            "summary": list(each.summary),
+            "other_assets": list(each.other_assets),
+        }
+        for each in memory
+    ]
 
 
 def _entry_column(entry: MemoryEntry) -> _MemoryEntryColumn:
@@ -470,7 +481,12 @@ def _memory_of(column: list[_AssetMemoryColumn] | None) -> tuple[AssetMemory, ..
     if column is None:
         return None
     return tuple(
-        AssetMemory(each["asset"], tuple(_entry_of(each["asset"], entry) for entry in each["entries"]))
+        AssetMemory(
+            each["asset"],
+            tuple(_entry_of(each["asset"], entry) for entry in each["entries"]),
+            summary=tuple(each.get("summary", ())),
+            other_assets=tuple(each.get("other_assets", ())),
+        )
         for each in column
     )
 

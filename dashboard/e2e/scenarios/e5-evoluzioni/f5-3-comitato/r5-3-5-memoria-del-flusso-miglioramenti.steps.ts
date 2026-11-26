@@ -18,6 +18,8 @@ const STOP_LOSS = 'chiusa dallo stop loss dopo 12 minuti';
 const MEMORY: FakeAssetMemory[] = [
   {
     asset: 'DOGE',
+    summary: [],
+    other_assets: [],
     entries: [
       {
         planned_at: '2026-11-24T09:00:00Z',

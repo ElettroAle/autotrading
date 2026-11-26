@@ -39,16 +39,39 @@ const COLUMNS: readonly DataTableColumn<Decision>[] = [
   { header: 'Invalidazione', cell: (decision) => decision.invalidation ?? NOTHING },
 ];
 
+// Summary lines as the API writes them, as the agent receives them; nothing without lines.
+const SummaryLines = ({
+  label,
+  lines,
+}: {
+  readonly label: string;
+  readonly lines: readonly string[];
+}) =>
+  lines.length === 0 ? null : (
+    <div className="text-sm">
+      <p className="text-slate-600">{label}</p>
+      <ul aria-label={label} className="list-inside list-disc">
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
+
 /**
  * The memory of a flow, one table per asset with its previous decisions from the most recent, with motive, invalidation
  * and the course of the position: on the page of the flow what the agent will receive, in the detail of a cycle what it
- * received (R5.3.4, R5.3.5, ADR memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni).
+ * received (R5.3.4, R5.3.5, ADR memoria-del-flusso-con-motivo-lunghezza-e-scelta-delle-decisioni). Before the table,
+ * the summary lines of the asset and those of the other assets, with the text of the API (R5.3.7, ADR
+ * opzioni-della-memoria-nella-dashboard).
  */
 export const FlowMemoryTable = ({ memory }: { readonly memory: readonly AssetMemory[] }) => (
   <div className="space-y-3">
-    {memory.map(({ asset, entries }) => (
+    {memory.map(({ asset, summary, other_assets: otherAssets, entries }) => (
       <section key={asset} aria-label={asset} className="space-y-1">
         <h4 className="font-semibold">{asset}</h4>
+        <SummaryLines label={`Riepilogo di ${asset}`} lines={summary} />
+        <SummaryLines label="Altri asset del flusso" lines={otherAssets} />
         <DataTable
           label={`Memoria di ${asset}`}
           columns={COLUMNS}

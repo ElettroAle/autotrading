@@ -109,7 +109,7 @@ class FlowCreationRequest(BaseModel):
     # Null or missing: no minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
     # Missing: off, with 10 decisions and 30 days (R5.3.4), a motive of 160 characters and only openings, closings and
-    # reversals; `unlimited_text_length` true leaves the motive whole (R5.3.5).
+    # reversals; `unlimited_text_length` true leaves the motive whole (R5.3.5); summary and other assets off (R5.3.7).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
     # Missing: no stop that follows the price, the option of the agent off (R5.5.1).
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)

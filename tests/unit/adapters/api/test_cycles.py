@@ -207,6 +207,8 @@ def test_the_detail_of_a_cycle_answers_with_the_memory_the_agent_received(
     assert response.json()["memory"] == [
         {
             "asset": "BTC",
+            "summary": [],
+            "other_assets": [],
             "entries": [
                 {
                     "planned_at": "2026-11-12T09:07:00Z",
@@ -220,7 +222,7 @@ def test_the_detail_of_a_cycle_answers_with_the_memory_the_agent_received(
                 }
             ],
         },
-        {"asset": "ETH", "entries": []},
+        {"asset": "ETH", "summary": [], "other_assets": [], "entries": []},
     ]
 
 

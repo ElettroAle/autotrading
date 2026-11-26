@@ -4,12 +4,14 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TypedDict, Unpack
 
+from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.errors import (
     MemoryDaysOutOfRangeError,
     MemoryDecisionsOutOfRangeError,
     MemoryTextLengthNotPositiveError,
 )
 from autotrading.domain.flows.memory_entry import OPENINGS, AssetMemory, MemoryEntry, MemoryOutcome, PastDecision
+from autotrading.domain.flows.memory_summary import MemorySummary
 from autotrading.domain.flows.recorded_decision import DecisionAction
 from autotrading.domain.flows.statistics_period import TimeWindow
 
@@ -33,13 +35,17 @@ class MemoryParts(TypedDict, total=False):
     days: int
     text_length: int | None
     all_decisions: bool
+    summary: bool
+    other_assets: bool
 
 
 @dataclass(frozen=True, slots=True)
 class FlowMemory:
     """Whether the agent receives its previous decisions on every asset of the flow, how many from how far back, how
     long the motive of each and whether every decision or only those that open or close a position: off, 10 decisions,
-    30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5).
+    30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5);
+    whether every asset begins with the summary of its closed positions and gives the summary of the other assets of the
+    flow, both off unless the user says otherwise (R5.3.7).
 
     The decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule. A
     length of None is no limit.
@@ -50,6 +56,8 @@ class FlowMemory:
     days: int = DEFAULT_MEMORY_DAYS
     text_length: int | None = DEFAULT_MEMORY_TEXT_LENGTH
     all_decisions: bool = False
+    summary: bool = False
+    other_assets: bool = False
 
     def __post_init__(self) -> None:
         if not FEWEST_MEMORY_DECISIONS <= self.decisions <= MOST_MEMORY_DECISIONS:
@@ -68,9 +76,20 @@ class FlowMemory:
         """The actions whose decisions the memory holds and counts."""
         return EVERY_DECISION if self.all_decisions else OPENINGS_AND_CLOSINGS
 
+    @property
+    def summarizes(self) -> bool:
+        """Whether the memory gives the summary of the closed positions: only then are they read (R5.3.7)."""
+        return self.summary or self.other_assets
+
     def window(self, at: datetime) -> TimeWindow:
         """The instants the memory reaches: its days back from the instant of the cycle, that instant excluded."""
         return TimeWindow(at - timedelta(days=self.days), at)
+
+    def summary_of(self, closed: Iterable[ClosedPosition], at: datetime, currency: str) -> MemorySummary:
+        """The summary of the positions of the flow closed within the window, in the currency of its account."""
+        window = self.window(at)
+        within = tuple(position for position in closed if window.contains(position.closing.at))
+        return MemorySummary(within, at, self.days, currency)
 
     def recalled(
         self,
@@ -78,9 +97,11 @@ class FlowMemory:
         past: Iterable[PastDecision],
         at: datetime,
         unrealized_pnl: Mapping[str, Decimal],
+        summary: MemorySummary | None = None,
     ) -> tuple[AssetMemory, ...]:
         """For every asset, its last remembered decisions within the window, from the most recent, with their outcome;
-        the PnL of a position still open is the unrealized one of now, on the asset, open since its opening.
+        the PnL of a position still open is the unrealized one of now, on the asset, open since its opening. Before
+        them, with the options on, the summary of the asset and that of the other assets of the flow (R5.3.7).
         """
         window = self.window(at)
         remembered = [
@@ -88,14 +109,34 @@ class FlowMemory:
             for decision in past
             if decision.decision.action in self.remembered_actions and window.contains(decision.planned_at)
         ]
-        return tuple(AssetMemory(asset, self._entries_on(asset, remembered, at, unrealized_pnl)) for asset in assets)
+        return tuple(
+            AssetMemory(
+                asset,
+                self._entries_on(asset, remembered, at, unrealized_pnl),
+                summary=self._summary_on(asset, summary),
+                other_assets=self._summary_beside(asset, assets, summary),
+            )
+            for asset in assets
+        )
 
     def __str__(self) -> str:
         if not self.active:
             return "non attiva"
         motive = "motivo intero" if self.text_length is None else f"motivo fino a {self.text_length} caratteri"
         which = "tutte le decisioni" if self.all_decisions else "solo aperture, chiusure e inversioni"
-        return f"attiva, {self.decisions} decisioni, {self.days} giorni, {motive}, {which}"
+        options = ("riepilogo",) * self.summary + ("altri asset",) * self.other_assets
+        return ", ".join((f"attiva, {self.decisions} decisioni, {self.days} giorni", motive, which, *options))
+
+    def _summary_on(self, asset: str, summary: MemorySummary | None) -> tuple[str, ...]:
+        if not self.summary or summary is None:
+            return ()
+        return summary.lines_of(asset)
+
+    def _summary_beside(self, asset: str, assets: Sequence[str], summary: MemorySummary | None) -> tuple[str, ...]:
+        """The lines of the other assets of the flow, in the order of the configuration, without their decisions."""
+        if not self.other_assets or summary is None:
+            return ()
+        return tuple(line for other in assets if other != asset for line in summary.lines_of(other))
 
     def _entries_on(
         self, asset: str, remembered: list[PastDecision], at: datetime, unrealized_pnl: Mapping[str, Decimal]

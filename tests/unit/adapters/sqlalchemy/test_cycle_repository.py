@@ -323,6 +323,8 @@ REMEMBERED = (
             ),
             MemoryEntry(PLANNED - timedelta(hours=3), "BTC", DecisionAction.UPDATE, None, None, "stop", None, None),
         ),
+        summary=("BTC long — oggi: 1 chiuse",),
+        other_assets=("ETH short — oggi: 2 chiuse",),
     ),
     AssetMemory("ETH", ()),
 )
@@ -354,8 +356,10 @@ def test_the_memory_the_agent_received_is_saved_as_json_with_amounts_as_text() -
                     "outcome": None,
                 },
             ],
+            "summary": ["BTC long — oggi: 1 chiuse"],
+            "other_assets": ["ETH short — oggi: 2 chiuse"],
         },
-        {"asset": "ETH", "entries": []},
+        {"asset": "ETH", "entries": [], "summary": [], "other_assets": []},
     ]
 
 
@@ -363,6 +367,12 @@ def test_the_saved_memory_reads_back_as_it_was() -> None:
     record = replace(FAILED, memory=REMEMBERED)
 
     assert record_of(row_of(record, TENANT)) == record
+
+
+def test_a_memory_saved_before_the_summary_reads_without_summary_lines() -> None:
+    row = row_of(FAILED, TENANT) | {"memory": [{"asset": "BTC", "entries": []}]}
+
+    assert record_of(row).memory == (AssetMemory("BTC", ()),)
 
 
 def test_a_memory_saved_before_the_motive_reads_its_reasoning_as_the_motive_without_invalidation_nor_course() -> None:

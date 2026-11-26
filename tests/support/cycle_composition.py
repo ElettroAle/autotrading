@@ -52,6 +52,7 @@ from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCa
 from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
+from autotrading.application.flows.remembered_decisions import MemoryReadings
 from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePositionsUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
@@ -171,7 +172,7 @@ def run_cycle_for(
             ListAgentActionsUseCase(),
             AggregateCycleSourcesUseCase(),
             services.clock,
-            ports.past_decisions,
+            MemoryReadings(ports.past_decisions, ports.closed_positions),
         ),
         agent=DecideCycleUseCase(
             AskFlowAgentUseCase(

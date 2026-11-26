@@ -116,6 +116,7 @@ from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCa
 from autotrading.application.flows.read_last_decision import ReadLastDecisionUseCase
 from autotrading.application.flows.read_next_cycle import ReadNextCycleUseCase
 from autotrading.application.flows.read_openings_suspension import ReadOpeningsSuspensionUseCase
+from autotrading.application.flows.remembered_decisions import MemoryReadings
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsUseCase
 from autotrading.application.flows.request_on_demand_cycle import RequestOnDemandCycleUseCase
 from autotrading.application.flows.resume_flow_openings import ResumeFlowOpeningsUseCase
@@ -426,7 +427,10 @@ class TenantUseCases:
             list_tradable_assets=ListTradableAssetsUseCase(ports.flow_checks.markets),
             read_free_capital=ReadFreeCapitalUseCase(ports.flows, ports.flow_checks.accounts),
             read_flow_memory=ReadFlowMemoryUseCase(
-                ports.flows, ports.past_decisions, ports.account_activity, ports.clock
+                ports.flows,
+                MemoryReadings(ports.past_decisions, ports.closed_positions),
+                ports.account_activity,
+                ports.clock,
             ),
             read_flow_results=ReadFlowResultsUseCase(
                 read_flow_state,
