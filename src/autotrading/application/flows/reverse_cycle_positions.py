@@ -83,7 +83,13 @@ class ReverseCyclePositionsUseCase:
         """The account and the state now, with the configuration the cycle read at its start (R1.1.3)."""
         self._record_executions.execute(RecordAccountExecutionsCommand(started.flow.assigned_account_id))
         read = self._read_flow.execute(ReadCycleFlowCommand(started.flow.id, anchor, reconciled=False))
-        return replace(started, account=read.account, attributed=read.attributed, alarm=read.alarm)
+        return replace(
+            started,
+            account=read.account,
+            attributed=read.attributed,
+            alarm=read.alarm,
+            account_exposure=read.account_exposure,
+        )
 
     def _outcomes(
         self, flow: CycleFlow, openings: tuple[OpenIntent, ...], failed: list[FailedAttempt]

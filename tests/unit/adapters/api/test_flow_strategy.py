@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 
@@ -172,6 +173,7 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "count_scope": "flusso",
                 "remove_limit": False,
             },
+            "account_exposure_for_agent": False,
         },
     }
 
@@ -410,3 +412,14 @@ def test_an_import_without_name_answers_with_the_reason(client_of: Client) -> No
         422,
         {"detail": "nome del flusso obbligatorio", "field": "name"},
     )
+
+
+def test_the_option_of_the_exposure_of_the_account_goes_through_the_file_and_is_off_when_missing() -> None:
+    # R5.5.5: a file written before the option imports it off.
+    strategy = replace(a_strategy(), account_exposure_for_agent=True)
+    document = StrategyDocument.model_validate_json(StrategyDocument.of(strategy).model_dump_json())
+    older = document.model_dump(mode="json")
+    del older["strategy"]["account_exposure_for_agent"]
+
+    assert document.command("copia").account_exposure_for_agent is True
+    assert StrategyDocument.model_validate(older).command("copia").account_exposure_for_agent is False

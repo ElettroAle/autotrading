@@ -292,6 +292,7 @@ class SqlAlchemySimulatedExchangeAdapter:
             SETTLEMENT_CURRENCY,
             account.available_margin,
             tuple(cycle_position_of(position) for position in account.positions),
+            account.value,
         )
 
     def activity(self, reference: AccountReference) -> AccountActivity:

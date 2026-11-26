@@ -81,6 +81,13 @@ class InMemoryAccountRepositoryAdapter:
             raise FlowAccountNotFoundError
         return account.deviation_threshold.percent
 
+    def max_direction_exposure_percent(self, account_id: UUID) -> Decimal | None:
+        """The limit of the account as the cycle of a flow checks its openings with it (R5.5.5)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.max_direction_exposure_percent
+
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         account = self.get(AccountId(account_id))
         if account is None:

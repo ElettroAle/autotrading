@@ -247,6 +247,7 @@ class InMemorySimulatedExchangeAdapter:
                 )
                 for p in account.positions
             ),
+            account.value,
         )
 
     def activity(self, reference: AccountReference) -> AccountActivity:

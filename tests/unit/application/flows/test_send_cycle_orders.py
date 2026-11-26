@@ -40,7 +40,9 @@ FLOW = a_flow(
     ),
 )
 STATE = FlowState(FLOW.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0))
-CYCLE_FLOW = CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), ()), STATE)
+CYCLE_FLOW = CycleFlow(
+    TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), (), Decimal(500)), STATE
+)
 
 
 PLAN = ExitPlan(Decimal(63000), Decimal(58500), "chiusura sotto 59000")

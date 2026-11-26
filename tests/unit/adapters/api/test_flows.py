@@ -125,6 +125,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
             "max_profit_in_context": False,
         },
         "consecutive_loss_limit": None,
+        "account_exposure_for_agent": False,
         "missing": [],
     }
     assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]
@@ -993,3 +994,21 @@ def test_every_part_of_the_limit_of_consecutive_losses_is_in_the_answer(platform
         "block_minutes",
         "count_scope",
     }
+
+
+def test_the_option_of_the_exposure_of_the_account_is_created_off_turned_on_and_kept(
+    client_of: Client, platform: Platform
+) -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    anna = client_of("anna")
+    flow_id = anna.post("/flows", json=a_request(platform, "anna")).json()["id"]
+
+    turned_on = anna.patch(f"/flows/{flow_id}", json={"account_exposure_for_agent": True}).json()
+    kept = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
+
+    assert anna.get(f"/flows/{flow_id}/versions/1").json()["account_exposure_for_agent"] is False
+    assert (turned_on["version"], turned_on["account_exposure_for_agent"]) == (2, True)
+    assert kept["account_exposure_for_agent"] is True
+    assert anna.get(f"/flows/{flow_id}/versions/1/differences/2").json() == [
+        {"part": "esposizione del conto nel contesto dell'agente", "before": "no", "after": "sì"},
+    ]

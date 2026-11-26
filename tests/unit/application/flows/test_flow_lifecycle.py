@@ -841,3 +841,16 @@ def test_a_change_sets_keeps_and_removes_the_limit_of_consecutive_losses(flows: 
     assert modified(ConsecutiveLossLimitRequest(2, 24, 120)) == ConsecutiveLossLimit(2, 24, 120, LossCountScope.ASSET)
     assert modified(ConsecutiveLossLimitRequest()) == ConsecutiveLossLimit(2, 24, 120, LossCountScope.ASSET)
     assert modified(ConsecutiveLossLimitRequest(remove_limit=True)) is None
+
+
+def test_the_option_of_the_exposure_of_the_account_changes_in_a_new_version_and_is_kept_otherwise(
+    flows: Flows,
+) -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    flow = flows.saved()
+
+    turned_on = flows.modify.execute(ModifyFlowCommand(flow.id, account_exposure_for_agent=True)).configuration
+    kept = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="audace")).configuration
+
+    assert (turned_on.version, turned_on.account_exposure_for_agent) == (2, True)
+    assert kept.account_exposure_for_agent is True

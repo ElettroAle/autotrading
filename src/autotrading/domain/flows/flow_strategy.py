@@ -48,6 +48,8 @@ class FlowStrategy:
     trailing_stop: TrailingStop = field(default_factory=TrailingStop)
     # A risk rule like the maximum loss; none unless the strategy has it (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimit | None = None
+    # What the agent sees of the account, off unless the strategy has it on (R5.5.5).
+    account_exposure_for_agent: bool = False
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -68,6 +70,7 @@ class FlowStrategy:
             configuration.memory,
             configuration.trailing_stop,
             configuration.consecutive_loss_limit,
+            configuration.account_exposure_for_agent,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -92,6 +95,7 @@ class FlowStrategy:
             memory=self.memory,
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
+            account_exposure_for_agent=self.account_exposure_for_agent,
         )
 
 

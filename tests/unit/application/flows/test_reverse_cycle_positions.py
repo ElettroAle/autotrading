@@ -54,7 +54,9 @@ def position(asset: str, side: TradeSide = TradeSide.SHORT) -> CyclePosition:
 
 def cycle_flow(*positions: CyclePosition, realized: str = "0") -> CycleFlow:
     state = FlowState(FLOW.id, "USDC", Decimal(100), (), Decimal(realized), Decimal(0), Decimal(0))
-    return CycleFlow(TENANT, FLOW, "test-1", EXCHANGE, ANCHOR, CycleAccount("USDC", Decimal(1000), positions), state)
+    return CycleFlow(
+        TENANT, FLOW, "test-1", EXCHANGE, ANCHOR, CycleAccount("USDC", Decimal(1000), positions, Decimal(1000)), state
+    )
 
 
 START = cycle_flow(position("BTC"), position("ETH", TradeSide.LONG))

@@ -35,3 +35,5 @@ class FlowSetting(StrEnum):
     LOSS_WINDOW_HOURS = "consecutive_loss_limit.loss_window_hours"
     BLOCK_MINUTES = "consecutive_loss_limit.block_minutes"
     LOSS_COUNT_SCOPE = "consecutive_loss_limit.count_scope"
+    # A switch, never refused: it names the option in the documents that list the settings of a flow (R5.5.5).
+    ACCOUNT_EXPOSURE_FOR_AGENT = "account_exposure_for_agent"

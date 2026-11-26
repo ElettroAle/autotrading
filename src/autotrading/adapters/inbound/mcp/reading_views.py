@@ -493,7 +493,8 @@ class RankingView:
 
 @dataclass(frozen=True)
 class AccountView:
-    """An account of the tenant: what it is and the capital its flows hold, never its credentials (R0.2.3)."""
+    """An account of the tenant: what it is, the capital its flows hold and the largest exposure they may have together
+    on one side, never its credentials (R0.2.3, R5.5.5)."""
 
     id: str
     name: str
@@ -501,6 +502,7 @@ class AccountView:
     network: str
     allocated_capital: str
     currency: str
+    max_direction_exposure_percent: str | None
 
     @classmethod
     def of(cls, summary: AccountSummary) -> AccountView:
@@ -511,6 +513,7 @@ class AccountView:
             network=summary.network.kind.value,
             allocated_capital=amount_text(summary.allocated_capital),
             currency=summary.currency,
+            max_direction_exposure_percent=optional_amount(summary.max_direction_exposure_percent),
         )
 
 

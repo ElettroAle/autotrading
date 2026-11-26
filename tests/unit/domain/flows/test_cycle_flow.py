@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountPosition
+from autotrading.domain.flows.account_exposure import AccountExposure, AccountExposureLimit
+from autotrading.domain.flows.account_exposure_reading import AccountExposureReading
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.exit_plan import ExitPlan
@@ -43,7 +45,7 @@ def attributed(
 
 
 def cycle_flow(state: FlowState, free_margin: Decimal = Decimal(10000)) -> CycleFlow:
-    account = CycleAccount("USDC", free_margin, (held("BTC"), held("ETH")))
+    account = CycleAccount("USDC", free_margin, (held("BTC"), held("ETH")), free_margin)
     return CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", READ_AT, account, state)
 
 
@@ -171,7 +173,13 @@ def test_the_sources_of_the_cycle_are_the_active_sources_of_the_configuration_in
     flow = a_flow(TENANT, configuration=configuration)
 
     cycle = CycleFlow(
-        TENANT, flow, "test-1", "Hyperliquid", READ_AT, CycleAccount("USDC", Decimal(10000), ()), held_nothing(flow)
+        TENANT,
+        flow,
+        "test-1",
+        "Hyperliquid",
+        READ_AT,
+        CycleAccount("USDC", Decimal(10000), (), Decimal(10000)),
+        held_nothing(flow),
     )
 
     assert cycle.sources == (ActiveSource("notizie", "RSS"), ActiveSource("notizie", "altro"))
@@ -234,3 +242,31 @@ def test_the_agent_reads_the_blocks_of_the_openings_as_the_state_tells_them() ->
 
 def test_without_a_block_the_agent_reads_none() -> None:
     assert cycle_flow(attributed()).state_view().reopening_blocks == ()
+
+
+# R5.5.5: the exposure of the account read at the start of the cycle.
+ACCOUNT_LIMIT = AccountExposureLimit(Decimal(60), Decimal(2000), "USDC")
+
+
+def test_the_risk_state_carries_the_limit_and_the_exposure_of_the_account() -> None:
+    reading = AccountExposureReading(ACCOUNT_LIMIT, AccountExposure(Decimal(150), Decimal(1100)))
+    flow = replace(cycle_flow(attributed()), account_exposure=reading)
+
+    state = flow.risk_state()
+
+    assert (state.account_exposure_limit, state.account_exposure) == (ACCOUNT_LIMIT, reading.of_account)
+
+
+def test_without_a_reading_the_risk_state_has_no_limit_of_the_account() -> None:
+    state = cycle_flow(attributed()).risk_state()
+
+    assert (state.account_exposure_limit, state.account_exposure) == (None, AccountExposure())
+
+
+def test_the_state_view_tells_the_exposure_of_the_other_flows_only_when_read() -> None:
+    reading = AccountExposureReading(of_others=AccountExposure(Decimal(150), Decimal(1100)))
+
+    shown = replace(cycle_flow(attributed()), account_exposure=reading).state_view()
+
+    assert shown.account_exposure == "altri flussi del conto: long 150 USDC, short 1100 USDC"
+    assert cycle_flow(attributed()).state_view().account_exposure is None

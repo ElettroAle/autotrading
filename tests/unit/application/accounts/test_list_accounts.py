@@ -112,3 +112,14 @@ def test_each_account_carries_the_name_its_exchange_gives_the_network(store: Acc
     [summary] = list_accounts(store, flows)
 
     assert summary.network.name == "testnet"
+
+
+def test_each_account_carries_its_max_direction_exposure_if_any(store: AccountStore, flows: FlowStore) -> None:
+    store.accounts += [
+        an_account(ANNA, "senza-limite"),
+        an_account(ANNA, "con-limite").with_max_direction_exposure(Decimal(60)),
+    ]
+
+    listed = list_accounts(store, flows)
+
+    assert [summary.max_direction_exposure_percent for summary in listed] == [None, Decimal(60)]

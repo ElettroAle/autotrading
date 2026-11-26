@@ -404,7 +404,7 @@ def test_the_cycle_reads_margin_and_positions_proving_the_signer() -> None:
         Decimal("12.5"),
         Decimal("31000.0"),
     )
-    assert account == CycleAccount("USDC", Decimal("1000.5"), (position,))
+    assert account == CycleAccount("USDC", Decimal("1000.5"), (position,), Decimal("1234.56"))
     assert [name for name, _ in sdk.calls] == [
         "exchange",
         "cancel",

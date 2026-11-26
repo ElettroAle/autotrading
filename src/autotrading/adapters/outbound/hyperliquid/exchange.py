@@ -212,6 +212,7 @@ class HyperliquidExchangeAdapter:
                 )
                 for position in state.positions
             ),
+            balance=state.balance.amount,
         )
 
 

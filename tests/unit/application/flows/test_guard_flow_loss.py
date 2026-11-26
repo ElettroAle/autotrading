@@ -61,7 +61,7 @@ class World:
         realized = Decimal(value) - CAPITAL + Decimal(cashed)
         changes = () if cashed == "0" else (self.cash_out(Decimal(cashed)),)
         state = FlowState(self.flow.id, "USDC", CAPITAL, (), realized, Decimal(0), Decimal(0), capital_changes=changes)
-        account = CycleAccount("USDC", Decimal(5000), ())
+        account = CycleAccount("USDC", Decimal(5000), (), Decimal(5000))
         flow = CycleFlow(TENANT, self.flow, "test-1", "Hyperliquid", FIRST_START, account, state)
         suspension = self.use_case.execute(flow)
         assert suspension == self.status.at(NOW, self.flow.configuration.openings_resume).suspension

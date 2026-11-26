@@ -1,6 +1,7 @@
 """The flow as a cycle reads it at its start, with the alarm of reconciliation of its account (R3.3.1)."""
 
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -19,6 +20,8 @@ from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
+from autotrading.domain.flows.account_exposure import AccountExposure, AccountExposureLimit
+from autotrading.domain.flows.account_exposure_reading import AccountExposureReading
 from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.cycle_access import CycleAccess
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
@@ -30,6 +33,7 @@ from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.account_exposure_limits import FakeAccountExposureLimitsAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
@@ -74,7 +78,7 @@ class Reader:
         self.positions: tuple[CyclePosition, ...] = ()
 
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:  # noqa: ARG002 - one reading for every account
-        return CycleAccount("USDC", Decimal(1000), self.positions)
+        return CycleAccount("USDC", Decimal(1000), self.positions, Decimal(1000))
 
 
 class Notices:
@@ -88,6 +92,7 @@ class Bench:
         self.readings = InMemoryReconciliationRepositoryAdapter()
         self.activity = activity = FakeAccountActivityAdapter()
         self.reader = Reader()
+        self.limits = FakeAccountExposureLimitsAdapter({ACCOUNT, OTHER_ACCOUNT})
         protections = ProtectionStore()
         self.waiting = FakeWaitingProtectionsAdapter(protections, TENANT)
         ledger = InMemoryFlowLedgerAdapter()
@@ -110,7 +115,9 @@ class Bench:
             flows,
             InMemoryFlowTimingAdapter(self.store, TENANT),
             CycleAccountReadings(
-                ReadCycleAccountUseCase(accounts, accounts, Opener(), {"Hyperliquid": self.reader}), self.waiting
+                ReadCycleAccountUseCase(accounts, accounts, Opener(), {"Hyperliquid": self.reader}),
+                self.waiting,
+                self.limits,
             ),
             ReadCycleFlowStateUseCase(
                 ReadFlowStateUseCase(
@@ -129,13 +136,9 @@ class Bench:
             self.readings,
         )
 
-    def flow_on(self, account_id: UUID, *assets: str) -> ReadCycleFlowCommand:
-        flow = a_flow(
-            TENANT,
-            account_id=account_id,
-            status=FlowStatus.ACTIVE,
-            configuration=a_configuration(assets=assets or ("BTC",)),
-        )
+    def flow_on(self, account_id: UUID, *assets: str, account_exposure: bool = False) -> ReadCycleFlowCommand:
+        configuration = replace(a_configuration(assets=assets or ("BTC",)), account_exposure_for_agent=account_exposure)
+        flow = a_flow(TENANT, account_id=account_id, status=FlowStatus.ACTIVE, configuration=configuration)
         self.store.flows.append(flow)
         return ReadCycleFlowCommand(flow.id, READ_AT, reconciled=False)
 
@@ -209,3 +212,41 @@ def test_only_the_assets_of_the_flow_held_on_the_account_are_asked_for_their_pro
     cycle_flow = bench.use_case.execute(command)
 
     assert bench.waiting.asked == [FlowHeldAssets(ACCOUNT, cycle_flow.flow.id.value, ("BTC",))]
+
+
+# R5.5.5, ADR controllo-dell-esposizione-del-conto-nel-rischio: the reader shows every position long, of value 100.
+
+
+def test_without_a_limit_on_the_account_nor_the_option_nothing_of_the_exposure_is_read(bench: Bench) -> None:
+    command = bench.flow_on(ACCOUNT, "BTC")
+    bench.flow_on(ACCOUNT, "ETH")
+    bench.hold("BTC", "ETH")
+
+    cycle_flow = bench.use_case.execute(command)
+
+    assert cycle_flow.account_exposure == AccountExposureReading()
+    assert bench.limits.readings == [ACCOUNT]
+
+
+def test_with_a_limit_the_cycle_reads_it_on_the_balance_with_the_exposure_of_every_flow(bench: Bench) -> None:
+    command = bench.flow_on(ACCOUNT, "BTC")
+    bench.flow_on(ACCOUNT, "ETH")
+    bench.flow_on(OTHER_ACCOUNT, "SOL")
+    bench.hold("BTC", "ETH", "SOL")
+    bench.limits.limits[ACCOUNT] = Decimal(60)
+
+    reading = bench.use_case.execute(command).account_exposure
+
+    assert reading.limit == AccountExposureLimit(Decimal(60), Decimal(1000), "USDC")
+    assert reading.of_account == AccountExposure(Decimal(200), Decimal(0))
+    assert reading.of_others is None
+
+
+def test_with_the_option_the_cycle_reads_the_exposure_of_the_other_flows(bench: Bench) -> None:
+    command = bench.flow_on(ACCOUNT, "BTC", account_exposure=True)
+    bench.flow_on(ACCOUNT, "ETH")
+    bench.hold("BTC", "ETH")
+
+    reading = bench.use_case.execute(command).account_exposure
+
+    assert reading.of_others == AccountExposure(Decimal(100), Decimal(0))

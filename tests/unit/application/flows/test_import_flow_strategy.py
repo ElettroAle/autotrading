@@ -173,3 +173,10 @@ def test_the_import_saves_the_limit_of_consecutive_losses_of_the_file(strategies
     draft = strategies.import_.execute(command)
 
     assert draft.configuration.consecutive_loss_limit == ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW)
+
+
+def test_the_draft_of_a_strategy_keeps_the_option_of_the_exposure_of_the_account() -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    draft = Strategies().import_.execute(a_command(account_exposure_for_agent=True))
+
+    assert draft.configuration.account_exposure_for_agent is True

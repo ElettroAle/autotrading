@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.account_exposure import AccountExposure, AccountExposureLimit
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
@@ -42,6 +43,8 @@ def check(
     openings_suspended: str | None = None,
     minimum_confidence: int | None = None,
     reopening_blocks: tuple[ReopeningBlock, ...] = (),
+    account_exposure: AccountExposure | None = None,
+    account_limit: AccountExposureLimit | None = None,
 ) -> RiskCheck:
     open_sides = open_sides or {}
     limits = RiskLimits(
@@ -60,6 +63,8 @@ def check(
         Decimal(open_value),
         openings_suspended=openings_suspended,
         reopening_blocks=reopening_blocks,
+        account_exposure=account_exposure or AccountExposure(),
+        account_exposure_limit=account_limit,
     )
     return RiskCheck(RiskPolicy(limits, bring_to_minimum, MinimumConfidence.optional(minimum_confidence)), state)
 
@@ -757,3 +762,82 @@ def test_the_suspension_of_the_openings_comes_before_a_block_after_consecutive_l
 
 def test_an_opening_without_the_limits_of_the_exchange_is_held() -> None:
     assert check().outcome(opening("0.01", 2), None) == HeldPosition("BTC")
+
+
+# R5.5.5, ADR controllo-dell-esposizione-del-conto-nel-rischio: 60% of a balance of 2000, 1100 short and 150 long held.
+ACCOUNT_LIMIT = AccountExposureLimit(Decimal(60), Decimal(2000), "USDC")
+ACCOUNT_EXPOSURE = AccountExposure(Decimal(150), Decimal(1100))
+
+
+def account_check(*, bring_to_minimum: bool = False, value: str | None = None) -> RiskCheck:
+    return check(
+        margin="100",
+        value=value,
+        bring_to_minimum=bring_to_minimum,
+        account_exposure=ACCOUNT_EXPOSURE,
+        account_limit=ACCOUNT_LIMIT,
+    )
+
+
+def test_an_opening_beyond_the_limit_of_the_account_is_blocked_with_the_reason() -> None:
+    outcome = account_check().outcome(opening("0.1", 2, "ETH", TradeSide.SHORT), EXCHANGE)
+
+    assert outcome == BlockedDecision(
+        "ETH",
+        "apertura short su ETH bloccata: esposizione short del conto 1300 USDC oltre il limite di 1200 USDC "
+        "(60% del saldo 2000 USDC)",
+    )
+
+
+def test_an_opening_that_brings_the_account_exactly_to_its_limit_passes() -> None:
+    outcome = account_check().outcome(opening("0.05", 2, "ETH", TradeSide.SHORT), EXCHANGE)
+
+    assert approved(outcome).value == Decimal(100)
+
+
+def test_the_other_side_of_the_account_has_its_own_count() -> None:
+    outcome = account_check().outcome(opening("0.1", 2, "ETH", TradeSide.LONG), EXCHANGE)
+
+    assert approved(outcome).value == Decimal(200)
+
+
+def test_the_limit_of_the_account_checks_the_value_the_limits_of_the_flow_left() -> None:
+    # The limit on the value of the flow brings the opening of 200 to 100, which stays within the account.
+    outcome = account_check(value="10").outcome(opening("0.1", 2, "ETH", TradeSide.SHORT), EXCHANGE)
+
+    assert approved(outcome).value == Decimal(100)
+
+
+def test_bring_to_minimum_never_reduces_an_opening_beyond_the_limit_of_the_account() -> None:
+    outcome = account_check(bring_to_minimum=True).outcome(opening("0.1", 2, "ETH", TradeSide.SHORT), EXCHANGE)
+
+    assert isinstance(outcome, BlockedDecision)
+    assert outcome.reason.startswith("apertura short su ETH bloccata: esposizione short del conto 1300 USDC")
+
+
+def test_the_openings_of_a_cycle_add_up_on_the_account_in_the_order_they_are_approved() -> None:
+    risk = account_check()
+
+    first = risk.outcome(opening("0.05", 2, "ETH", TradeSide.SHORT), EXCHANGE)
+    second = risk.outcome(opening("0.01", 2, "XRP", TradeSide.SHORT), EXCHANGE)
+
+    assert approved(first).value == Decimal(100)
+    assert isinstance(second, BlockedDecision)
+    assert "esposizione short del conto 1220 USDC" in second.reason
+
+
+def test_a_reversal_closes_and_leaves_its_opening_to_the_check_after_the_close() -> None:
+    outcome = check(
+        open_sides={"ETH": TradeSide.LONG}, account_exposure=ACCOUNT_EXPOSURE, account_limit=ACCOUNT_LIMIT
+    ).outcome(ReverseIntent("ETH", Decimal("0.1"), 2, 70, ExitPlan()), None)
+
+    assert isinstance(outcome, ApprovedClose)
+    assert outcome.reopening is not None
+
+
+def test_without_a_limit_the_exposure_of_the_account_blocks_nothing() -> None:
+    outcome = check(account_exposure=AccountExposure(Decimal(0), Decimal(10**6))).outcome(
+        opening("0.1", 2, "ETH", TradeSide.SHORT), EXCHANGE
+    )
+
+    assert approved(outcome).value == Decimal(200)

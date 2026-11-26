@@ -19,6 +19,7 @@ from autotrading.application.accounts.replace_credentials import ReplaceCredenti
 from autotrading.application.accounts.reset_virtual_balance import ResetVirtualBalanceUseCase
 from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryUseCase
 from autotrading.application.accounts.set_deviation_threshold import SetDeviationThresholdUseCase
+from autotrading.application.accounts.set_max_direction_exposure import SetMaxDirectionExposureUseCase
 from autotrading.application.agent.list_models import ListModelsUseCase
 from autotrading.application.agent.list_provider_keys import ListProviderKeysUseCase
 from autotrading.application.agent.model_gateways import ModelCatalogs
@@ -353,6 +354,7 @@ class TenantUseCases:
     rank_flows: RankFlowsUseCase
     resume_flow_openings: ResumeFlowOpeningsUseCase
     set_deviation_threshold: SetDeviationThresholdUseCase
+    set_max_direction_exposure: SetMaxDirectionExposureUseCase
     read_account_reconciliation: ReadAccountReconciliationUseCase
     list_reconciliation_alarms: ListReconciliationAlarmsUseCase
     list_unattributable: ListUnattributableUseCase
@@ -543,6 +545,7 @@ class TenantUseCases:
             ),
             resume_flow_openings=ResumeFlowOpeningsUseCase(ports.flows, ports.openings_suspensions, ports.clock),
             set_deviation_threshold=SetDeviationThresholdUseCase(accounts),
+            set_max_direction_exposure=SetMaxDirectionExposureUseCase(accounts),
             read_account_reconciliation=ReadAccountReconciliationUseCase(
                 ports.reconciliation, ports.account_thresholds
             ),

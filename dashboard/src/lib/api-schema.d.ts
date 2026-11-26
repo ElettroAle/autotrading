@@ -132,6 +132,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/max-direction-exposure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Max Direction Exposure
+         * @description Sets or takes away the limit of the exposure of the flows of the account on one side (R5.5.5).
+         */
+        put: operations["set_max_direction_exposure_accounts__account_id__max_direction_exposure_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{account_id}/state": {
         parameters: {
             query?: never;
@@ -1611,7 +1631,8 @@ export interface components {
          * @description An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,
          *     which the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state
          *     (`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it
-         *     (R6.2.2).
+         *     (R6.2.2); the largest exposure its flows may have together on one side, in percent of its balance, null without a
+         *     limit (R5.5.5).
          */
         AccountSummaryResponse: {
             /** Id */
@@ -1640,6 +1661,8 @@ export interface components {
             days_left: number | null;
             /** Expiry Editable */
             expiry_editable: boolean;
+            /** Max Direction Exposure Percent */
+            max_direction_exposure_percent: string | null;
         };
         /** AdapterSelectionRequest */
         AdapterSelectionRequest: {
@@ -2047,6 +2070,8 @@ export interface components {
             memory: components["schemas"]["FlowMemory"];
             trailing_stop: components["schemas"]["TrailingStopResponse"];
             consecutive_loss_limit: components["schemas"]["ConsecutiveLossLimitResponse"] | null;
+            /** Account Exposure For Agent */
+            account_exposure_for_agent: boolean;
         };
         /**
          * ConsecutiveLossLimitRequest
@@ -2502,6 +2527,11 @@ export interface components {
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
             consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
+            /**
+             * Account Exposure For Agent
+             * @default false
+             */
+            account_exposure_for_agent: boolean;
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2661,6 +2691,8 @@ export interface components {
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
             consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
+            /** Account Exposure For Agent */
+            account_exposure_for_agent?: boolean | null;
         };
         /**
          * FlowOverviewResponse
@@ -2820,6 +2852,8 @@ export interface components {
             memory: components["schemas"]["FlowMemory"];
             trailing_stop: components["schemas"]["TrailingStopResponse"];
             consecutive_loss_limit: components["schemas"]["ConsecutiveLossLimitResponse"] | null;
+            /** Account Exposure For Agent */
+            account_exposure_for_agent: boolean;
             /** Missing */
             missing: string[];
         };
@@ -3298,6 +3332,15 @@ export interface components {
             sender: string;
             /** Password Saved */
             password_saved: boolean;
+        };
+        /**
+         * MaxDirectionExposureRequest
+         * @description The largest exposure the flows of the account may have together on one side, in percent of its balance read from
+         *     the exchange; null takes it away (R5.5.5).
+         */
+        MaxDirectionExposureRequest: {
+            /** Percent */
+            percent?: number | string | null;
         };
         /**
          * MemoryEntry
@@ -4024,6 +4067,11 @@ export interface components {
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
             consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
+            /**
+             * Account Exposure For Agent
+             * @default false
+             */
+            account_exposure_for_agent: boolean;
         };
         /**
          * StrategyBody
@@ -4067,6 +4115,11 @@ export interface components {
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Output"];
             consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
+            /**
+             * Account Exposure For Agent
+             * @default false
+             */
+            account_exposure_for_agent: boolean;
         };
         /**
          * StrategyDocument
@@ -4608,6 +4661,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["KeyExpiryRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_max_direction_exposure_accounts__account_id__max_direction_exposure_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MaxDirectionExposureRequest"];
             };
         };
         responses: {

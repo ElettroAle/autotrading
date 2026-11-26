@@ -141,3 +141,15 @@ def test_the_limit_of_consecutive_losses_reaches_every_command_as_given() -> Non
     assert StrategyImport(consecutive_loss_limit=limit).command("copia").consecutive_loss_limit == limit
     assert FlowModification(consecutive_loss_limit=limit).command(uuid4()).consecutive_loss_limit == limit
     assert FlowModification().command(uuid4()).consecutive_loss_limit == ConsecutiveLossLimitRequest()
+
+
+def test_the_option_of_the_exposure_of_the_account_reaches_every_command_as_given() -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    creation = FlowCreation(
+        account_id=uuid4(), allocated_capital=Decimal(100), name="alfa", assets=["BTC"], account_exposure_for_agent=True
+    )
+
+    assert creation.command().account_exposure_for_agent is True
+    assert StrategyImport(account_exposure_for_agent=True).command("copia").account_exposure_for_agent is True
+    assert FlowModification(account_exposure_for_agent=True).command(uuid4()).account_exposure_for_agent is True
+    assert FlowModification().command(uuid4()).account_exposure_for_agent is None

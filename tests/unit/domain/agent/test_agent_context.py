@@ -227,3 +227,17 @@ def test_the_state_carries_the_openings_blocked_after_consecutive_losses_only_wh
     assert isinstance(plain, dict)
     assert blocked["riaperture_ferme"] == [block]
     assert "riaperture_ferme" not in plain
+
+
+def test_the_state_carries_the_exposure_of_the_other_flows_only_when_the_flow_gives_it() -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente: with the option off the state is the one of
+    # before.
+    line = "altri flussi del conto: long 150 USDC, short 1100 USDC"
+
+    shown = user_document(context(state=replace(STATE, account_exposure=line)))["stato_del_flusso"]
+    plain = user_document(context())["stato_del_flusso"]
+
+    assert isinstance(shown, dict)
+    assert isinstance(plain, dict)
+    assert shown["esposizione_degli_altri_flussi"] == line
+    assert "esposizione_degli_altri_flussi" not in plain

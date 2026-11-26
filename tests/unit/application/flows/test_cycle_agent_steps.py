@@ -47,7 +47,9 @@ NOW = READ_AT + timedelta(seconds=3)
 TENANT = TenantId.new()
 FLOW = a_flow(TENANT, configuration=replace(a_configuration(), assets=("BTC", "ETH")))
 STATE = FlowState(FLOW.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0))
-CYCLE_FLOW = CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", READ_AT, CycleAccount("USDC", Decimal(500), ()), STATE)
+CYCLE_FLOW = CycleFlow(
+    TENANT, FLOW, "test-1", "Hyperliquid", READ_AT, CycleAccount("USDC", Decimal(500), (), Decimal(500)), STATE
+)
 SNAPSHOT = FlowSnapshot((ActiveSource("news", "RSS"),), CYCLE_FLOW)
 
 
@@ -241,7 +243,7 @@ def a_context(
 
 def remembering(memory: FlowMemory, *positions: CyclePosition) -> FlowSnapshot[CycleFlow]:
     flow = replace(FLOW, configuration=replace(FLOW.configuration, memory=memory))
-    account = CycleAccount("USDC", Decimal(500), positions)
+    account = CycleAccount("USDC", Decimal(500), positions, Decimal(500))
     return FlowSnapshot(SNAPSHOT.sources, replace(CYCLE_FLOW, flow=flow, account=account))
 
 
@@ -416,7 +418,7 @@ def test_the_change_of_the_plan_of_an_open_position_reaches_the_risk_check() -> 
     held = CyclePosition(
         "BTC", TradeSide.SHORT, Decimal("0.01"), 2, Decimal(102000), Decimal(100000), Decimal(20), None
     )
-    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,)))
+    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,), Decimal(500)))
     change = Change(Decimal(99000), Decimal(101500), "sopra 103000", remove_target=False)
     decisions = CycleDecisions(cycle_flow, Reply(Response((Decision("update", "BTC", change=change),))))
     check = CheckRiskUseCase({"Hyperliquid": FakeExchangeLimitsAdapter(frozenset({"BTC"}))})
@@ -429,7 +431,7 @@ def test_the_change_of_the_plan_of_an_open_position_reaches_the_risk_check() -> 
 
 def test_a_removal_of_the_target_reaches_the_risk_check() -> None:
     held = CyclePosition("BTC", TradeSide.LONG, Decimal("0.01"), 2, Decimal(98000), Decimal(100000), Decimal(20), None)
-    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,)))
+    cycle_flow = replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (held,), Decimal(500)))
     decisions = CycleDecisions(
         cycle_flow, Reply(Response((Decision("update", "BTC", change=Change(remove_target=True)),)))
     )
@@ -486,7 +488,7 @@ def short_on_btc() -> CycleFlow:
     position = CyclePosition(
         "BTC", TradeSide.SHORT, Decimal("0.01"), 2, Decimal(100000), Decimal(100000), Decimal(0), None
     )
-    return replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (position,)))
+    return replace(CYCLE_FLOW, account=CycleAccount("USDC", Decimal(500), (position,), Decimal(500)))
 
 
 def test_a_reversal_closes_the_position_and_leaves_its_opening_waiting_for_the_second_execution() -> None:

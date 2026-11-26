@@ -33,6 +33,7 @@ def test_the_summary_names_the_account_with_network_and_allocated_capital() -> N
         "USDC",
         {"account_address": ADDRESS},
         EXPIRY,
+        None,
     )
     assert SECRET not in repr(summary)
 

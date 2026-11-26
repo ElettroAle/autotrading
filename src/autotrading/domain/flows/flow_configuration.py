@@ -82,6 +82,8 @@ class FlowConfiguration:
     trailing_stop: TrailingStop = field(default_factory=TrailingStop)
     # None unless the user sets it: consecutive losses on a side never block the openings on it (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimit | None = None
+    # Off unless the user turns it on: the agent sees the flow alone, never the other flows of its account (R5.5.5).
+    account_exposure_for_agent: bool = False
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]

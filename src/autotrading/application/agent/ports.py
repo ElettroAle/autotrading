@@ -221,6 +221,11 @@ class QuestionStatePort(Protocol):
         """The openings blocked after consecutive losses, as the flow tells them; none without the limit (R5.5.2)."""
         ...
 
+    @property
+    def account_exposure(self) -> str | None:
+        """The exposure of the other flows of the account, as the flow tells it; None with the option off (R5.5.5)."""
+        ...
+
 
 class QuestionSourcePort(Protocol):
     """The values of one adapter of an active source in the cycle, with its weight; an aggregate of several adapters has

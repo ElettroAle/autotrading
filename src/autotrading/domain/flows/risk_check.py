@@ -2,6 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
+from autotrading.domain.flows.account_exposure import AccountExposure, AccountExposureLimit
 from autotrading.domain.flows.exit_plan import DiscardedLevel, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.reopening_block import ReopeningBlock
@@ -43,7 +44,8 @@ class RiskState:
     limits measure (R3.2.1). Suspended openings, for maximum loss (R3.2.2) or for an alarm of reconciliation on the
     account (R3.3.1), block every opening of the cycle with the reason of the suspension. The stop the platform computes
     for each position whose stop follows the price bounds the stop of an update (R5.5.1). A block after consecutive
-    losses stops the openings on its side, on its asset or on every asset of the flow (R5.5.2).
+    losses stops the openings on its side, on its asset or on every asset of the flow (R5.5.2). With a limit on the
+    account, the exposure of every flow of the account on each side is what an opening adds its value to (R5.5.5).
     """
 
     currency: str
@@ -55,6 +57,8 @@ class RiskState:
     openings_suspended: str | None = None
     trailing_stops: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
     reopening_blocks: tuple[ReopeningBlock, ...] = ()
+    account_exposure: AccountExposure = field(default_factory=AccountExposure)
+    account_exposure_limit: AccountExposureLimit | None = None
 
     @property
     def open_assets(self) -> frozenset[str]:
@@ -132,7 +136,9 @@ class RiskCheck:
     The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
     so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065). The overall
     exposure limits come after the limit per operation and the openings consume their residual in the same order
-    (R3.2.1).
+    (R3.2.1). The limit of the account on one side comes after every check of the flow, on the value the opening would
+    be sent with, and blocks it without reducing it; the openings approved before in the cycle add up on it (R5.5.5,
+    ADR controllo-dell-esposizione-del-conto-nel-rischio).
     """
 
     def __init__(self, policy: RiskPolicy, state: RiskState) -> None:
@@ -141,6 +147,7 @@ class RiskCheck:
         self._liquidity = state.available_liquidity
         self._open_margin = state.open_margin
         self._open_value = state.open_value
+        self._account_exposure = state.account_exposure
 
     def outcome(self, intent: TradeIntent, limits: AssetLimits | None) -> RiskOutcome:
         if isinstance(intent, CloseIntent):
@@ -164,13 +171,25 @@ class RiskCheck:
             return BlockedDecision(intent.asset, block.opening_reason(intent.asset))
         if limits is None:
             return HeldPosition(intent.asset)
-        return self._committed(self._open(intent, limits))
+        return self._committed(self._within_account(self._open(intent, limits)))
+
+    def _within_account(self, outcome: RiskOutcome) -> RiskOutcome:
+        """An opening that would bring the exposure of the account on its side beyond the limit is blocked: exactly at
+        the limit it passes (R5.5.5)."""
+        limit = self._state.account_exposure_limit
+        if limit is None or not isinstance(outcome, ApprovedOpening):
+            return outcome
+        exposure = self._account_exposure.on(outcome.side) + outcome.value
+        if not limit.exceeded_by(exposure):
+            return outcome
+        return BlockedDecision(outcome.asset, limit.opening_reason(outcome.side, outcome.asset, exposure))
 
     def _committed(self, outcome: RiskOutcome) -> RiskOutcome:
         if isinstance(outcome, ApprovedOpening):
             self._liquidity -= outcome.margin
             self._open_margin += outcome.margin
             self._open_value += outcome.value
+            self._account_exposure = self._account_exposure.adding(outcome.side, outcome.value)
         return outcome
 
     def _close(self, intent: CloseIntent) -> RiskOutcome:
