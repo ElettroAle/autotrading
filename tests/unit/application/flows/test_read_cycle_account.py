@@ -21,7 +21,7 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 ACCOUNT_ID = uuid4()
 SEALED = SealedAddress(TenantId.new(), ACCOUNT_ID, "Hyperliquid", 1, b"sealed")
 ACCESS = CycleAccess({"wallet": "0xabc", "signer": "0xsecret"})
-ACCOUNT = CycleAccount("USDC", Decimal(100), ())
+ACCOUNT = CycleAccount("USDC", Decimal(100), (), Decimal(100))
 
 
 class ExternalRefusal(Exception):  # noqa: N818 - the error the library of the exchange raises, not a project error

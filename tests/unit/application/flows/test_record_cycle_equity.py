@@ -24,7 +24,9 @@ def cycle_flow() -> CycleFlow:
         "BTC", TradeSide.LONG, Decimal(1), Decimal(20), Decimal(3), 1, Decimal(100), Decimal(103)
     )
     state = FlowState(FLOW.id, "USDC", Decimal(300), (position,), Decimal(4), Decimal(1), Decimal(0))
-    return CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), ()), state)
+    return CycleFlow(
+        TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), (), Decimal(500)), state
+    )
 
 
 def test_the_cycle_records_the_equity_of_the_state_attributed_to_the_flow() -> None:

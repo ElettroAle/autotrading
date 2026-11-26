@@ -14,7 +14,8 @@ from autotrading.domain.accounts.exchange_name import ExchangeName
 @dataclass(frozen=True, slots=True)
 class AccountSummary:
     """An account as its owner reads it in the list (R2.2.1): network, the capital its flows hold, the public fields
-    kept (Bug 401) and the expiry of its credentials (R6.2.2).
+    kept (Bug 401), the expiry of its credentials (R6.2.2) and the largest exposure its flows may have together on one
+    side, if any (R5.5.5).
 
     The balance is not here: it comes from the exchange, which may not answer while the rest is still worth showing.
     """
@@ -28,6 +29,7 @@ class AccountSummary:
     currency: str
     public_fields: Mapping[str, str]
     expiry: KeyExpiryDetails
+    max_direction_exposure_percent: Decimal | None
 
     @classmethod
     def of(
@@ -48,4 +50,5 @@ class AccountSummary:
             currency=currency,
             public_fields=public_fields_of(account),
             expiry=expiry,
+            max_direction_exposure_percent=account.max_direction_exposure_percent,
         )

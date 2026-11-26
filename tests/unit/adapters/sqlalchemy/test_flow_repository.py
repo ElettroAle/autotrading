@@ -51,6 +51,7 @@ CONFIGURATION = replace(
     ),
     trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
     consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
+    account_exposure_for_agent=True,
 )
 
 
@@ -102,6 +103,7 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
             "block_minutes": 120,
             "count_scope": "flusso",
         },
+        "account_exposure_for_agent": True,
     }
 
 
@@ -314,3 +316,11 @@ def test_a_version_saved_before_the_limit_of_consecutive_losses_reads_it_absent(
     del document["consecutive_loss_limit"]
 
     assert configuration_of(1, document).consecutive_loss_limit is None
+
+
+def test_a_version_saved_before_the_option_of_the_exposure_of_the_account_reads_it_off() -> None:
+    # R5.5.5: the existing flows keep their version, with the option off.
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    del document["account_exposure_for_agent"]
+
+    assert configuration_of(1, document).account_exposure_for_agent is False

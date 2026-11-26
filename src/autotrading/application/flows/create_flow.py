@@ -199,6 +199,8 @@ class CreateFlowCommand:
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     # Nothing given: no block of the openings after consecutive losses (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
+    # Nothing given: the agent sees the flow alone, never the other flows of its account (R5.5.5).
+    account_exposure_for_agent: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,6 +268,7 @@ class CreateFlowUseCase:
             memory=command.memory.applied_to(FlowMemory()),
             trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
             consecutive_loss_limit=command.consecutive_loss_limit.applied_to(None),
+            account_exposure_for_agent=command.account_exposure_for_agent,
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

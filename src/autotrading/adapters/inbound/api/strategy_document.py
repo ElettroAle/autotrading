@@ -119,6 +119,8 @@ class StrategyBody(BaseModel):
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
     # Missing in the files written before it: no block of the openings after consecutive losses (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
+    # Missing in the files written before it: the option off (R5.5.5).
+    account_exposure_for_agent: bool = False
 
 
 class StrategyDocument(BaseModel):
@@ -172,6 +174,7 @@ class StrategyDocument(BaseModel):
                 memory=MemoryRequest.of(strategy.memory),
                 trailing_stop=TrailingStopRequest.of(strategy.trailing_stop),
                 consecutive_loss_limit=ConsecutiveLossLimitRequest.of(strategy.consecutive_loss_limit),
+                account_exposure_for_agent=strategy.account_exposure_for_agent,
             ),
         )
 
@@ -203,6 +206,7 @@ class StrategyDocument(BaseModel):
             memory=strategy.memory,
             trailing_stop=strategy.trailing_stop,
             consecutive_loss_limit=strategy.consecutive_loss_limit,
+            account_exposure_for_agent=strategy.account_exposure_for_agent,
         )
 
     def _require_supported(self) -> None:

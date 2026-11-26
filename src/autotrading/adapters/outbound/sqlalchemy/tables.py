@@ -62,6 +62,8 @@ accounts = Table(
     # The day the credentials stop working and who gave it, both empty while unknown (R6.2.2).
     Column("expires_on", Date),
     Column("expiry_source", Text),
+    # In percent of the balance read from the exchange, empty unless the user sets it (R5.5.5).
+    Column("max_direction_exposure_percent", Numeric),
     CheckConstraint("expiry_source IN ('read', 'entered')", name="accounts_expiry_source_known"),
     CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="accounts_expiry_complete"),
     Index(

@@ -48,7 +48,7 @@ class RecordingReader:
 
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:
         self.references.append(access)
-        return CycleAccount("USDC", an_activity().available_margin, ())
+        return CycleAccount("USDC", an_activity().available_margin, (), an_activity().available_margin)
 
 
 def a_simulated_worker() -> tuple[Worker, InMemoryAccountRepositoryAdapter, FakeCredentialOpenerAdapter]:

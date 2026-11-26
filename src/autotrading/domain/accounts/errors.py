@@ -116,3 +116,18 @@ class InvalidVirtualBalanceError(DomainError):
     @property
     def details(self) -> Mapping[str, object]:
         return {"amount": str(self.amount)}
+
+
+class MaxDirectionExposureNotPositiveError(DomainError):
+    """The exposure of the flows of an account on one side is limited to a finite percent of its balance above zero
+    (R5.5.5, ADR esposizione-massima-per-direzione-del-conto)."""
+
+    status_code = 422
+
+    def __init__(self, percent: Decimal) -> None:
+        super().__init__("l'esposizione massima per direzione è maggiore di 0")
+        self.percent = percent
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"percent": str(self.percent)}

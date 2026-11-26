@@ -413,3 +413,14 @@ def test_the_remove_flag_takes_the_limit_of_consecutive_losses_away_even_with_pa
 @pytest.mark.parametrize("limit", [None, ConsecutiveLossLimit(3, 12, 60, LossCountScope.FLOW)])
 def test_a_limit_of_consecutive_losses_given_whole_comes_back_as_it_was(limit: ConsecutiveLossLimit | None) -> None:
     assert ConsecutiveLossLimitRequest.of(limit).applied_to(LIMIT_IN_FORCE if limit else None) == limit
+
+
+def test_a_new_flow_shows_its_agent_the_flow_alone_unless_asked() -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    flows = Flows()
+
+    plain = flows.create.execute(flows.command()).configuration
+    shown = flows.create.execute(flows.command(name="beta", assets=("SOL",), account_exposure_for_agent=True))
+
+    assert plain.account_exposure_for_agent is False
+    assert shown.configuration.account_exposure_for_agent is True

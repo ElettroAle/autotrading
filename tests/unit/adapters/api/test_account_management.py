@@ -86,6 +86,7 @@ def test_the_list_shows_the_accounts_of_the_tenant(
             "expiry_status": "unknown",
             "days_left": None,
             "expiry_editable": True,
+            "max_direction_exposure_percent": None,
         }
     ]
 
@@ -391,3 +392,34 @@ def test_the_replacement_carries_the_expiry_given_with_the_new_credentials(
 
     assert response.status_code == 200
     assert anna.get(f"/accounts/{account_id}").json()["expiry"] == {"expires_on": "2027-03-15", "source": "entered"}
+
+
+def test_the_max_direction_exposure_is_set_shown_and_taken_away(client_of: Client, account_id: str) -> None:
+    """R5.5.5, ADR esposizione-massima-per-direzione-del-conto."""
+    anna = client_of("anna")
+
+    set_response = anna.put(f"/accounts/{account_id}/max-direction-exposure", json={"percent": "62.5"})
+    [listed] = anna.get("/accounts").json()
+    removed = anna.put(f"/accounts/{account_id}/max-direction-exposure", json={"percent": None})
+    details = anna.get(f"/accounts/{account_id}").json()
+
+    assert (set_response.status_code, removed.status_code) == (204, 204)
+    assert listed["max_direction_exposure_percent"] == "62.5"
+    assert details["max_direction_exposure_percent"] is None
+
+
+def test_a_max_direction_exposure_not_above_zero_is_refused_with_the_reason(client_of: Client, account_id: str) -> None:
+    response = client_of("anna").put(f"/accounts/{account_id}/max-direction-exposure", json={"percent": "0"})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "l'esposizione massima per direzione è maggiore di 0", "percent": "0"},
+    )
+
+
+def test_the_max_direction_exposure_of_an_account_of_another_tenant_is_not_found(
+    client_of: Client, account_id: str
+) -> None:
+    response = client_of("bruno").put(f"/accounts/{account_id}/max-direction-exposure", json={"percent": "60"})
+
+    assert response.status_code == 404

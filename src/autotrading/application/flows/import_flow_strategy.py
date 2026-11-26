@@ -54,6 +54,7 @@ class ImportFlowStrategyCommand:
     memory: MemoryRequest = field(default_factory=MemoryRequest)
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
+    account_exposure_for_agent: bool = False
 
 
 class ImportFlowStrategyUseCase:
@@ -113,4 +114,5 @@ class ImportFlowStrategyUseCase:
             memory=command.memory.applied_to(FlowMemory()),
             trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
             consecutive_loss_limit=command.consecutive_loss_limit.applied_to(None),
+            account_exposure_for_agent=command.account_exposure_for_agent,
         )

@@ -180,7 +180,16 @@ def test_the_accounts_are_read_without_their_credentials(flows: Flows) -> None:
     (shown,) = flows.shown("/accounts")
 
     assert account == {
-        name: shown[name] for name in ("id", "name", "exchange", "network", "allocated_capital", "currency")
+        name: shown[name]
+        for name in (
+            "id",
+            "name",
+            "exchange",
+            "network",
+            "allocated_capital",
+            "currency",
+            "max_direction_exposure_percent",
+        )
     }
 
 
@@ -204,3 +213,15 @@ def test_the_limit_of_consecutive_losses_and_its_blocks_are_those_of_the_api() -
     assert [block["text"] for block in state["reopening_blocks"]] == [
         "riaperture short su BTC ferme fino alle 19:00: 1 perdita consecutiva"
     ]
+
+
+def test_the_option_of_the_exposure_of_the_account_is_that_of_the_api() -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    flows = Flows()
+    modified = flows.mcp.call_as(
+        "anna", "modify_flow", {"flow_id": flows.flow_id, "modification": {"account_exposure_for_agent": True}}
+    )
+    assert not modified.is_error, body_of(modified)
+
+    assert body_of(modified)["account_exposure_for_agent"] is True
+    assert flows.read("get_flow", {"flow_id": flows.flow_id})["account_exposure_for_agent"] is True

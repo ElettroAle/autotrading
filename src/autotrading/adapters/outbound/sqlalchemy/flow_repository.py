@@ -131,6 +131,8 @@ class _ConfigurationDocument(TypedDict):
     trailing_stop: NotRequired[_TrailingStopDocument]
     # Absent in the versions saved before it, null without the limit: no block, and no new version for them (R5.5.2).
     consecutive_loss_limit: NotRequired[_ConsecutiveLossLimitDocument | None]
+    # Absent in the versions saved before it: the option off, and no new version for them (R5.5.5).
+    account_exposure_for_agent: NotRequired[bool]
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -404,6 +406,7 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
         },
         "trailing_stop": _trailing_stop_document(configuration.trailing_stop),
         "consecutive_loss_limit": _consecutive_loss_limit_document(configuration.consecutive_loss_limit),
+        "account_exposure_for_agent": configuration.account_exposure_for_agent,
     }
 
 
@@ -452,6 +455,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         memory=FlowMemory(**document["memory"]),
         trailing_stop=_trailing_stop_of(document.get("trailing_stop")),
         consecutive_loss_limit=_consecutive_loss_limit_of(document.get("consecutive_loss_limit")),
+        account_exposure_for_agent=document.get("account_exposure_for_agent", False),
     )
 
 

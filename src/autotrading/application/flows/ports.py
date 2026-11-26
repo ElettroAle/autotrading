@@ -614,6 +614,18 @@ class AccountDeviationThresholdPort(Protocol):
         ...
 
 
+class AccountExposureLimitPort(Protocol):
+    """Bound to the tenant of the request: the largest exposure the flows of one of its accounts may have together on
+    one side, from the accounts context (R5.5.5, ADR controllo-dell-esposizione-del-conto-nel-rischio).
+    """
+
+    def max_direction_exposure_percent(self, account_id: UUID) -> Decimal | None:
+        """In percent of the balance read from the exchange, None without a limit; raises FlowAccountNotFoundError for
+        an account the tenant does not have.
+        """
+        ...
+
+
 class ReconciliationAlarmNoticePort(Protocol):
     """In the worker: NotifyReconciliationAlarmUseCase (R3.3.1)."""
 

@@ -42,8 +42,9 @@ class PositionView:
 
 @dataclass(frozen=True, slots=True)
 class FlowStateView:
-    """The state of the flow alone: never the balance of the account, never another flow (R1.4.3); with the openings
-    blocked after consecutive losses, as the flow tells them (R5.5.2).
+    """The state of the flow alone: never the balance of the account (R1.4.3); with the openings blocked after
+    consecutive losses, as the flow tells them (R5.5.2), and the exposure of the other flows of the account only when
+    the user wants the agent to see it, as the flow tells it (R5.5.5).
     """
 
     currency: str
@@ -55,6 +56,7 @@ class FlowStateView:
     return_percent: Decimal | None
     positions: tuple[PositionView, ...]
     reopening_blocks: tuple[str, ...] = ()
+    account_exposure: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +135,9 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
     # Without a block in force the line is not there, and the state is the one of before (ADR
     # controllo-delle-riaperture-dopo-perdite-consecutive).
     blocked = {} if not state.reopening_blocks else {"riaperture_ferme": list(state.reopening_blocks)}
+    # Without the option the line is not there, and the state is the one of before (ADR
+    # esposizione-degli-altri-flussi-nel-contesto-dell-agente).
+    exposure = {} if state.account_exposure is None else {"esposizione_degli_altri_flussi": state.account_exposure}
     return {
         "valuta": state.currency,
         "capitale_allocato": str(state.allocated_capital),
@@ -142,6 +147,7 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
         "rendimento_dall_avvio_percento": None if state.return_percent is None else str(state.return_percent),
         "posizioni_aperte": [_position_document(position) for position in state.positions],
         **blocked,
+        **exposure,
     }
 
 

@@ -170,6 +170,7 @@ class FakeExchangeAdapter:
                 )
                 for p in state.positions
             ),
+            state.balance.amount,
         )
 
     def _traded_positions(self, credentials: Credentials) -> tuple[Position, ...]:

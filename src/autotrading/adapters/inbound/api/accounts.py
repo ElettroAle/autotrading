@@ -19,6 +19,7 @@ from autotrading.application.accounts.register_account import AccountRegistratio
 from autotrading.application.accounts.replace_credentials import ReplaceCredentialsCommand
 from autotrading.application.accounts.reset_virtual_balance import ResetVirtualBalanceCommand
 from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryCommand
+from autotrading.application.accounts.set_max_direction_exposure import SetMaxDirectionExposureCommand
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.tenancy.user_id import UserId
@@ -53,6 +54,13 @@ class CredentialsReplacementRequest(BaseModel):
         return []
 
 
+class MaxDirectionExposureRequest(BaseModel):
+    """The largest exposure the flows of the account may have together on one side, in percent of its balance read from
+    the exchange; null takes it away (R5.5.5)."""
+
+    percent: Decimal | None = None
+
+
 class AccountDetailsResponse(BaseModel):
     """An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the
     public fields the exchange declares are shown by name (Bug 401)."""
@@ -78,7 +86,8 @@ class AccountSummaryResponse(AccountDetailsResponse):
     """An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,
     which the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state
     (`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it
-    (R6.2.2)."""
+    (R6.2.2); the largest exposure its flows may have together on one side, in percent of its balance, null without a
+    limit (R5.5.5)."""
 
     network: str
     network_name: str
@@ -88,6 +97,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
     expiry_status: ExpiryStatus
     days_left: int | None
     expiry_editable: bool
+    max_direction_exposure_percent: str | None
 
     @classmethod
     def of_summary(cls, summary: AccountSummary) -> AccountSummaryResponse:
@@ -105,12 +115,17 @@ class AccountSummaryResponse(AccountDetailsResponse):
             expiry_status=ExpiryStatus(summary.expiry.reading.status.value),
             days_left=summary.expiry.reading.days_left,
             expiry_editable=summary.expiry.editable,
+            max_direction_exposure_percent=_percent_text(summary.max_direction_exposure_percent),
         )
 
 
 def _expiry_response_of(summary: AccountSummary) -> KeyExpiryResponse | None:
     expiry = summary.expiry.expiry
     return None if expiry is None else KeyExpiryResponse.of(expiry.expires_on, expiry.source)
+
+
+def _percent_text(percent: Decimal | None) -> str | None:
+    return None if percent is None else amount_text(percent)
 
 
 class BalanceResponse(BaseModel):
@@ -191,6 +206,16 @@ def accounts_router(
         """The day the user says the credentials stop working, only when the exchange does not read it (R6.2.2)."""
         command = SetAccountKeyExpiryCommand(AccountId(account_id), request.expires_on)
         use_cases.set_account_key_expiry.execute(command)
+
+    @router.put("/{account_id}/max-direction-exposure", status_code=status.HTTP_204_NO_CONTENT)
+    def set_max_direction_exposure(
+        account_id: UUID,
+        request: MaxDirectionExposureRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> None:
+        """Sets or takes away the limit of the exposure of the flows of the account on one side (R5.5.5)."""
+        command = SetMaxDirectionExposureCommand(AccountId(account_id), request.percent)
+        use_cases.set_max_direction_exposure.execute(command)
 
     @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
     def remove_account(

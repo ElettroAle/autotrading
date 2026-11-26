@@ -40,6 +40,7 @@ def a_strategy() -> FlowStrategy:
         minimum_confidence=MinimumConfidence(55),
         memory=FlowMemory(active=True, decisions=4, days=9),
         consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
+        account_exposure_for_agent=True,
     )
 
 
@@ -59,6 +60,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         minimum_confidence=MinimumConfidence(70),
         memory=FlowMemory(active=True, decisions=5, days=14),
         consecutive_loss_limit=ConsecutiveLossLimit(3, 12, 60),
+        account_exposure_for_agent=True,
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -79,6 +81,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         minimum_confidence=MinimumConfidence(70),
         memory=FlowMemory(active=True, decisions=5, days=14),
         consecutive_loss_limit=ConsecutiveLossLimit(3, 12, 60),
+        account_exposure_for_agent=True,
     )
 
 
@@ -95,6 +98,7 @@ def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
         minimum_confidence=None,
         memory=FlowMemory(),
         consecutive_loss_limit=None,
+        account_exposure_for_agent=False,
     )
 
     assert (

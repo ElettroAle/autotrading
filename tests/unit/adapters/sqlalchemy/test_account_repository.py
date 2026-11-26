@@ -40,6 +40,7 @@ def test_a_row_carries_tenant_name_exchange_account_and_the_sealed_credentials()
         "deviation_threshold": Decimal(1),
         "expires_on": None,
         "expiry_source": None,
+        "max_direction_exposure_percent": None,
     }
 
 
@@ -79,3 +80,11 @@ def test_the_threshold_of_the_account_is_read_back_as_saved() -> None:
     read = _account_of(_row_of(account))  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
 
     assert read.deviation_threshold == DeviationThreshold(Decimal("2.5"))
+
+
+def test_the_max_direction_exposure_of_the_account_is_read_back_as_saved() -> None:
+    account = account_of(TenantId.new()).with_max_direction_exposure(Decimal(60))
+
+    read = _account_of(_row_of(account))  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
+
+    assert read.max_direction_exposure_percent == Decimal(60)

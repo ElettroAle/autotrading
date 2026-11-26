@@ -293,6 +293,36 @@ def test_the_threshold_of_an_account_is_replaced_and_read_for_its_tenant_only(da
         SqlAlchemyAccountRepositoryAdapter(database, bruno).deviation_threshold(account.id.value)
 
 
+def test_an_account_saved_before_the_limit_has_no_max_direction_exposure(database: Engine) -> None:
+    """R5.5.5: the accounts that existed before the limit read it empty."""
+    anna = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    read = repository.get(account.id)
+    assert read is not None
+    assert read.max_direction_exposure_percent is None
+    assert repository.max_direction_exposure_percent(account.id.value) is None
+
+
+def test_the_max_direction_exposure_is_set_taken_away_and_read_for_its_tenant_only(database: Engine) -> None:
+    """R5.5.5, ADR esposizione-massima-per-direzione-del-conto."""
+    anna, bruno = new_tenant(database), new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    repository.replace(account.with_max_direction_exposure(Decimal("62.5")))
+    limited = repository.max_direction_exposure_percent(account.id.value)
+    repository.replace(account.with_max_direction_exposure(None))
+
+    assert limited == Decimal("62.5")
+    assert repository.max_direction_exposure_percent(account.id.value) is None
+    with pytest.raises(FlowAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, bruno).max_direction_exposure_percent(account.id.value)
+
+
 def test_the_expiry_of_the_credentials_and_who_gave_it_read_back_and_can_be_forgotten(database: Engine) -> None:
     """R6.2.2."""
     tenant = new_tenant(database)

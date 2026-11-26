@@ -132,6 +132,7 @@ export type FakeConfiguration = {
   readonly memory: FakeMemory;
   readonly trailingStop: FakeTrailingStop;
   readonly consecutiveLossLimit: FakeConsecutiveLossLimit;
+  readonly accountExposureForAgent: boolean;
 };
 
 export type FakeVersion = {
@@ -199,6 +200,8 @@ export type FakeFlow = {
   memory: FakeMemory;
   trailingStop: FakeTrailingStop;
   consecutiveLossLimit: FakeConsecutiveLossLimit;
+  /** The agent sees the exposure of the other flows of the account (R5.5.5). */
+  accountExposureForAgent: boolean;
   /** The blocks of the reopenings in force now, as the API reads them from the closings (R5.5.2). */
   reopeningBlocks: FakeReopeningBlock[];
   /** What the agent would receive of the memory if the cycle started now, for every asset (R5.3.4). */
@@ -237,6 +240,8 @@ export type FakeAccount = {
   expiry?: FakeKeyExpiry;
   /** The exchange of the account does not read the expiry: the user gives it (R6.2.2). */
   expiryEditable?: boolean;
+  /** The exposure of its flows on one side, in percent of the balance; none unless the user sets it (R5.5.5). */
+  maxDirectionExposurePercent?: string | null;
 };
 
 /**
@@ -295,6 +300,7 @@ export type FakeFlowConfiguration = {
   memory: FakeMemory;
   trailing_stop: FakeTrailingStop;
   consecutive_loss_limit: FakeConsecutiveLossLimit;
+  account_exposure_for_agent: boolean;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -331,6 +337,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   memory: { ...flow.memory },
   trailing_stop: { ...flow.trailingStop },
   consecutive_loss_limit: flow.consecutiveLossLimit,
+  account_exposure_for_agent: flow.accountExposureForAgent,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -516,6 +523,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   memory: DEFAULT_MEMORY,
   trailingStop: DEFAULT_TRAILING_STOP,
   consecutiveLossLimit: null,
+  accountExposureForAgent: false,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -641,6 +649,7 @@ const draftOf = (
   memory: DEFAULT_MEMORY,
   trailingStop: DEFAULT_TRAILING_STOP,
   consecutiveLossLimit: null,
+  accountExposureForAgent: false,
   reopeningBlocks: [],
   remembered: [],
   openingsSuspension: null,
@@ -844,6 +853,7 @@ export const fakePlatform = {
       memory: DEFAULT_MEMORY,
       trailingStop: DEFAULT_TRAILING_STOP,
       consecutiveLossLimit: null,
+      accountExposureForAgent: false,
       reopeningBlocks: [],
       remembered: [],
       openingsSuspension: null,

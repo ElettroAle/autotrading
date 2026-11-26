@@ -20,10 +20,12 @@ class CyclePosition:
 
 @dataclass(frozen=True, slots=True)
 class CycleAccount:
-    """The account of the flow at the start of a cycle: the margin it has free, which no flow may go beyond, and the
-    details of its open positions (ADR 0062).
+    """The account of the flow at the start of a cycle: the margin it has free, which no flow may go beyond, the
+    details of its open positions (ADR 0062) and its balance, which the limit of the exposure of its flows on one side
+    is a percent of (R5.5.5); all from one reading of the exchange.
     """
 
     currency: str
     available_margin: Decimal
     positions: tuple[CyclePosition, ...]
+    balance: Decimal

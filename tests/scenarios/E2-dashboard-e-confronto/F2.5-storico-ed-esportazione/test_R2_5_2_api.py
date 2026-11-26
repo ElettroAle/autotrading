@@ -184,6 +184,9 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "trailing_stop",
         # The block of the reopenings travels with the strategy (ADR limite-di-perdite-consecutive-del-flusso).
         "consecutive_loss_limit",
+        # What the agent sees of the account travels with the strategy (ADR
+        # esposizione-degli-altri-flussi-nel-contesto-dell-agente).
+        "account_exposure_for_agent",
     }
 
 

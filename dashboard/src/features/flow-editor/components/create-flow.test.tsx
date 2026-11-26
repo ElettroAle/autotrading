@@ -262,6 +262,8 @@ describe('CreateFlow', () => {
       },
       // Left untouched, no reopening is ever blocked: the flow behaves as before (R5.5.2).
       consecutive_loss_limit: null,
+      // Left untouched, the agent sees the flow alone: the flow behaves as before (R5.5.5).
+      account_exposure_for_agent: false,
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');

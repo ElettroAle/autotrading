@@ -95,6 +95,7 @@ class FlowView:
     trailing_stop: TrailingStop
     # None for a flow without the limit (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimit | None
+    account_exposure_for_agent: bool
     missing: list[str]
 
     @classmethod
@@ -128,6 +129,7 @@ class FlowView:
             memory=configuration.memory,
             trailing_stop=configuration.trailing_stop,
             consecutive_loss_limit=configuration.consecutive_loss_limit,
+            account_exposure_for_agent=configuration.account_exposure_for_agent,
             missing=list(flow.missing_before_start),
         )
 

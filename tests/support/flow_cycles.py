@@ -320,6 +320,7 @@ class FlowCycles:
             CycleAccountReadings(
                 ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
                 RecordWaitingProtectionsUseCase(access, order_exchanges, protections),
+                accounts,
             ),
             ReadCycleFlowStateUseCase(
                 ReadFlowStateUseCase(

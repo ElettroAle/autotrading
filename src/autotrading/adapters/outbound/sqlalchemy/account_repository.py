@@ -81,6 +81,13 @@ class SqlAlchemyAccountRepositoryAdapter:
             raise FlowAccountNotFoundError
         return account.deviation_threshold.percent
 
+    def max_direction_exposure_percent(self, account_id: UUID) -> Decimal | None:
+        """The limit of the account as the cycle of a flow checks its openings with it (R5.5.5)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.max_direction_exposure_percent
+
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         """The account as the flows context opens it to read it on its exchange (ADR 0044)."""
         account = self.get(AccountId(account_id))
@@ -166,6 +173,7 @@ def _row_of(account: Account) -> dict[str, object]:
         "deviation_threshold": account.deviation_threshold.percent,
         "expires_on": None if account.expiry is None else account.expiry.expires_on,
         "expiry_source": None if account.expiry is None else account.expiry.source.value,
+        "max_direction_exposure_percent": account.max_direction_exposure_percent,
     }
 
 
@@ -179,6 +187,7 @@ def _account_of(row: RowMapping) -> Account:
         SealedCredentials(row["credentials_key_version"], row["credentials_ciphertext"]),
         DeviationThreshold(row["deviation_threshold"]),
         _expiry_of(row),
+        row["max_direction_exposure_percent"],
     )
 
 

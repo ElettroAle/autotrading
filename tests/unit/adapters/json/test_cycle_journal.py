@@ -50,10 +50,10 @@ CYCLE_FLOW = CycleFlow(
     "test-1",
     "Hyperliquid",
     READ_AT,
-    CycleAccount("USDC", Decimal(500), ()),
+    CycleAccount("USDC", Decimal(500), (), Decimal(500)),
     FlowState(FLOW.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0)),
 )
-STATE = {
+STATE: dict[str, object] = {
     "tipo": "FlowStateView",
     "currency": "USDC",
     "allocated_capital": "500",
@@ -63,6 +63,7 @@ STATE = {
     "return_percent": "0.00",
     "positions": [],
     "reopening_blocks": [],
+    "account_exposure": None,
 }
 
 

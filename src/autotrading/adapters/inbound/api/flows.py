@@ -116,6 +116,8 @@ class FlowCreationRequest(BaseModel):
     # Missing: no block of the openings after consecutive losses; the three numbers go together, the scope «asset» or
     # «flusso», the asset if not given (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
+    # Missing: the agent sees the flow alone, never the other flows of its account (R5.5.5).
+    account_exposure_for_agent: bool = False
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -145,6 +147,7 @@ class FlowCreationRequest(BaseModel):
             memory=self.memory,
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
+            account_exposure_for_agent=self.account_exposure_for_agent,
         )
 
 
@@ -190,6 +193,8 @@ class FlowModificationRequest(BaseModel):
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
     # Missing keeps the limit of consecutive losses; sent, it replaces it whole; `remove_limit` takes it away (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
+    # Missing keeps the option in force (R5.5.5).
+    account_exposure_for_agent: bool | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -230,6 +235,7 @@ class FlowModificationRequest(BaseModel):
             memory=self.memory,
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
+            account_exposure_for_agent=self.account_exposure_for_agent,
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -378,6 +384,7 @@ class ConfigurationResponse(BaseModel):
     trailing_stop: TrailingStopResponse
     # Null for a flow without the limit (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitResponse | None
+    account_exposure_for_agent: bool
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -407,6 +414,7 @@ class ConfigurationResponse(BaseModel):
             memory=configuration.memory,
             trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
             consecutive_loss_limit=ConsecutiveLossLimitResponse.of(configuration.consecutive_loss_limit),
+            account_exposure_for_agent=configuration.account_exposure_for_agent,
         )
 
 
@@ -461,6 +469,7 @@ class FlowResponse(BaseModel):
     trailing_stop: TrailingStopResponse
     # Null for a flow without the limit (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitResponse | None
+    account_exposure_for_agent: bool
     missing: list[str]
 
     @classmethod
@@ -496,6 +505,7 @@ class FlowResponse(BaseModel):
             memory=configuration.memory,
             trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
             consecutive_loss_limit=ConsecutiveLossLimitResponse.of(configuration.consecutive_loss_limit),
+            account_exposure_for_agent=configuration.account_exposure_for_agent,
             missing=list(flow.missing_before_start),
         )
 

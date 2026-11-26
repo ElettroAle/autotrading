@@ -25,7 +25,9 @@ CONFIGURATION = replace(
 )
 FLOW = a_flow(TENANT, configuration=CONFIGURATION)
 STATE = FlowState(FLOW.id, "USDC", Decimal(500), (), Decimal(0), Decimal(0), Decimal(0))
-CYCLE_FLOW = CycleFlow(TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), ()), STATE)
+CYCLE_FLOW = CycleFlow(
+    TENANT, FLOW, "test-1", "Hyperliquid", PLANNED_AT, CycleAccount("USDC", Decimal(500), (), Decimal(500)), STATE
+)
 INDICATORS = ActiveSource("indicatori", "Hyperliquid")
 REQUEST = SourceRequest(FLOW.id.value, PLANNED_AT, FlowSnapshot((INDICATORS,), CYCLE_FLOW))
 

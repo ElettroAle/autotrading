@@ -96,6 +96,7 @@ type ConfigurationRequest = {
     count_scope?: unknown;
     remove_limit?: unknown;
   };
+  account_exposure_for_agent?: unknown;
 };
 
 const DEFAULT_CYCLE_MINUTES = 15;
@@ -609,6 +610,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       memory: flow.memory,
       trailingStop: flow.trailingStop,
       consecutiveLossLimit: flow.consecutiveLossLimit,
+      accountExposureForAgent: flow.accountExposureForAgent,
     },
   });
   return flow;
@@ -673,6 +675,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     memory: memoryOf(request.memory, DEFAULT_MEMORY),
     trailingStop: trailingStopOf(request.trailing_stop, DEFAULT_TRAILING_STOP),
     consecutiveLossLimit: consecutiveLossLimitOf(request.consecutive_loss_limit, null),
+    accountExposureForAgent: request.account_exposure_for_agent === true,
     currentCapital: capital,
   });
 };
@@ -835,6 +838,11 @@ export const modifyFlow = (
     consecutiveLossLimit: consecutiveLossLimitOf(
       request.consecutive_loss_limit,
       flow.consecutiveLossLimit,
+    ),
+    accountExposureForAgent: changed(
+      request.account_exposure_for_agent,
+      flow.accountExposureForAgent,
+      (value) => value === true,
     ),
   };
   // A draft takes nothing on its account until it starts: the conflict on the assets waits for the start (ADR 0124).

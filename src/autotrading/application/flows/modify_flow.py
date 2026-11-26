@@ -86,6 +86,8 @@ class ModifyFlowCommand:
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     # Nothing sent keeps the limit; a limit sent replaces it whole, or the remove flag takes it away (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
+    # Nothing sent keeps the option in force (R5.5.5).
+    account_exposure_for_agent: bool | None = None
 
 
 class ModifyFlowUseCase:
@@ -191,6 +193,11 @@ class ModifyFlowUseCase:
             memory=command.memory.applied_to(current.memory),
             trailing_stop=command.trailing_stop.applied_to(current.trailing_stop),
             consecutive_loss_limit=command.consecutive_loss_limit.applied_to(current.consecutive_loss_limit),
+            account_exposure_for_agent=(
+                current.account_exposure_for_agent
+                if command.account_exposure_for_agent is None
+                else command.account_exposure_for_agent
+            ),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

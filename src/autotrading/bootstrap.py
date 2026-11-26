@@ -633,6 +633,7 @@ def cycle_of(
             CycleAccountReadings(
                 ReadCycleAccountUseCase(accounts, accounts, opener, exchanges),
                 RecordWaitingProtectionsUseCase(access, order_exchanges, protections),
+                accounts,
             ),
             ReadCycleFlowStateUseCase(
                 ReadFlowStateUseCase(

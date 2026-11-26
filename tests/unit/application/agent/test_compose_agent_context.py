@@ -44,6 +44,7 @@ class State:
     return_percent: Decimal = Decimal("-4.40")
     positions: tuple[Position, ...] = (Position(),)
     reopening_blocks: tuple[str, ...] = ()
+    account_exposure: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,3 +121,13 @@ def test_the_state_keeps_the_openings_blocked_after_consecutive_losses_the_flow_
     state = ComposeAgentContextUseCase().execute(question).state
 
     assert state.reopening_blocks == (block,)
+
+
+def test_the_state_keeps_the_exposure_of_the_other_flows_the_flow_hands() -> None:
+    # R5.5.5, ADR esposizione-degli-altri-flussi-nel-contesto-dell-agente.
+    line = "altri flussi del conto: long 150 USDC, short 1100 USDC"
+    question = replace(Question(), state=State(account_exposure=line))
+
+    state = ComposeAgentContextUseCase().execute(question).state
+
+    assert state.account_exposure == line

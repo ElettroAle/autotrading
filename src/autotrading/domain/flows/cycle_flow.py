@@ -1,7 +1,8 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
+from autotrading.domain.flows.account_exposure_reading import AccountExposureReading
 from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.cycle_funds import CycleFunds
 from autotrading.domain.flows.flow import Flow
@@ -22,7 +23,8 @@ class CycleFlow:
 
     The amounts are the state attributed to the flow, the same the user consults (R1.6.1, ADR 0062); the account
     gives only the details of the positions and the margin it has free, which no flow may go beyond. An alarm of
-    reconciliation open on the account suspends the openings of the flow (R3.3.1).
+    reconciliation open on the account suspends the openings of the flow (R3.3.1). The exposure of the account is what
+    the cycle read of it, for its limit and for the agent (R5.5.5).
     """
 
     tenant_id: TenantId
@@ -33,6 +35,7 @@ class CycleFlow:
     account: CycleAccount
     attributed: FlowState
     alarm: ReconciliationAlarm | None = None
+    account_exposure: AccountExposureReading = field(default_factory=AccountExposureReading)
 
     @property
     def configuration(self) -> FlowConfiguration:
@@ -62,7 +65,7 @@ class CycleFlow:
         """The margin of the open positions is the one the exchange declares, as in the liquidity (ADR 0067); their
         value is at the mark price (R3.2.1). The openings are suspended by what the guard of the losses found (R3.2.2)
         or by an alarm of reconciliation on the account (R3.3.1), and blocked on a side after consecutive losses
-        (R5.5.2).
+        (R5.5.2) or beyond the limit of the account (R5.5.5).
         """
         attributed = self.attributed
         suspension = self.openings_suspension(loss_suspension)
@@ -76,6 +79,8 @@ class CycleFlow:
             openings_suspended=None if suspension is None else suspension.blocked_reason,
             trailing_stops=frozendict(self._trailing_stops()),
             reopening_blocks=attributed.reopening_blocks,
+            account_exposure=self.account_exposure.of_account,
+            account_exposure_limit=self.account_exposure.limit,
         )
 
     def _trailing_stops(self) -> dict[str, Decimal]:
@@ -138,4 +143,11 @@ class CycleFlow:
                 for position in self.positions
             ),
             reopening_blocks=tuple(block.state_text for block in self.attributed.reopening_blocks),
+            account_exposure=self._others_exposure_text(),
         )
+
+    def _others_exposure_text(self) -> str | None:
+        """Only with the option on does the agent see the exposure of the other flows of the account (ADR
+        esposizione-degli-altri-flussi-nel-contesto-dell-agente)."""
+        others = self.account_exposure.of_others
+        return None if others is None else others.others_text(self.account.currency)

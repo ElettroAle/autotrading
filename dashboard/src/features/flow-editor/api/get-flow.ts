@@ -77,6 +77,8 @@ export const flowSchema = z.object({
       count_scope: z.enum(['asset', 'flusso']),
     })
     .nullable(),
+  // Off unless the user turns it on: the agent sees the flow alone (R5.5.5).
+  account_exposure_for_agent: z.boolean(),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

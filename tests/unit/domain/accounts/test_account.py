@@ -5,7 +5,7 @@ import pytest
 
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
-from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError
+from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError, MaxDirectionExposureNotPositiveError
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.key_expiry import KeyExpiry
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
@@ -116,3 +116,26 @@ def test_new_credentials_keep_a_date_read_by_the_exchange_until_it_is_read_again
     account = an_account(TenantId.new()).with_expiry(KeyExpiry.read(date(2026, 12, 30)))
 
     assert account.with_credentials(SealedCredentials(1, b"new")).expiry == KeyExpiry.read(date(2026, 12, 30))
+
+
+def test_an_account_starts_without_a_max_direction_exposure() -> None:
+    assert an_account(TenantId.new()).max_direction_exposure_percent is None
+
+
+def test_an_account_takes_and_drops_a_max_direction_exposure() -> None:
+    account = an_account(TenantId.new())
+
+    limited = account.with_max_direction_exposure(Decimal(60))
+
+    assert limited.max_direction_exposure_percent == Decimal(60)
+    assert limited.with_max_direction_exposure(None).max_direction_exposure_percent is None
+
+
+@pytest.mark.parametrize("percent", ["0", "-1", "Infinity", "NaN"])
+def test_an_account_refuses_a_max_direction_exposure_not_above_zero(percent: str) -> None:
+    with pytest.raises(MaxDirectionExposureNotPositiveError) as raised:
+        an_account(TenantId.new()).with_max_direction_exposure(Decimal(percent))
+
+    assert str(raised.value) == "l'esposizione massima per direzione è maggiore di 0"
+    assert raised.value.status_code == 422
+    assert raised.value.details == {"percent": percent}
