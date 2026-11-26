@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import StrategyModelMissingError
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -18,8 +19,8 @@ class FlowStrategy:
     """What a flow does, without where and with how much: the part of a configuration a strategy file carries.
 
     Interval, sources with weights and parameters, model with its parameters, instructions, risk rules, protection, the
-    stop that follows the price and memory; account, allocated capital and assets belong to the flow that uses the
-    strategy, assigned to its draft (R2.5.2, ADR 0140, R5.3.4, R5.5.1).
+    stop that follows the price, the limit of consecutive losses and memory; account, allocated capital and assets
+    belong to the flow that uses the strategy, assigned to its draft (R2.5.2, ADR 0140, R5.3.4, R5.5.1, R5.5.2).
     """
 
     cycle_interval: CycleInterval
@@ -45,6 +46,8 @@ class FlowStrategy:
     memory: FlowMemory = field(default_factory=FlowMemory)
     # How the stop follows the price, a risk rule like the protection; empty unless the strategy has it (R5.5.1).
     trailing_stop: TrailingStop = field(default_factory=TrailingStop)
+    # A risk rule like the maximum loss; none unless the strategy has it (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimit | None = None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -64,6 +67,7 @@ class FlowStrategy:
             configuration.minimum_confidence,
             configuration.memory,
             configuration.trailing_stop,
+            configuration.consecutive_loss_limit,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -87,6 +91,7 @@ class FlowStrategy:
             minimum_confidence=self.minimum_confidence,
             memory=self.memory,
             trailing_stop=self.trailing_stop,
+            consecutive_loss_limit=self.consecutive_loss_limit,
         )
 
 

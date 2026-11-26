@@ -396,6 +396,72 @@ describe('EditFlow', () => {
     });
   });
 
+  // R5.5.2, ADR blocco-delle-riaperture-nella-dashboard.
+  it('places the block of the reopenings right after the resume of the openings, with what each part admits', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const risk = await screen.findByRole('group', { name: 'Rischio' });
+    const ids = (role: 'textbox' | 'combobox') =>
+      within(risk)
+        .getAllByRole(role)
+        .map((control) => control.getAttribute('id'));
+    const numbers = ids('textbox');
+    const drawdown = numbers.indexOf('flow-max-drawdown');
+    expect(numbers.slice(drawdown + 1, drawdown + 5)).toEqual([
+      'flow-loss-limit-losses',
+      'flow-loss-limit-window',
+      'flow-loss-limit-block',
+      'flow-default-stop-loss',
+    ]);
+    const choices = ids('combobox');
+    expect(choices.slice(choices.indexOf('flow-openings-resume') + 1)[0]).toBe(
+      'flow-loss-limit-scope',
+    );
+    expect(field('Perdite consecutive massime')).toHaveValue('');
+    expect(field('Perdite consecutive massime')).toHaveAccessibleDescription(
+      'intero da 1 in su, con finestra e durata; vuote tutte e tre: nessun blocco',
+    );
+    expect(field('Finestra delle perdite (ore)')).toHaveAccessibleDescription(
+      'intero da 1 in su: le chiusure più vecchie non contano',
+    );
+    expect(field('Durata del blocco (minuti)')).toHaveAccessibleDescription(
+      "intero da 1 in su, dall'ultima perdita contata",
+    );
+    expect(field('Ambito del conteggio')).toHaveValue('asset');
+    expect(field('Ambito del conteggio')).toHaveAccessibleDescription(
+      'le perdite si contano e si bloccano su ogni asset, o su tutti gli asset del flusso',
+    );
+  });
+
+  it('sets the block of the reopenings as a new version, with the reason of a refusal under its part', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await userEvent.type(await screen.findByLabelText('Perdite consecutive massime'), '2');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Perdite consecutive massime')).toHaveAccessibleDescription(
+        'intero da 1 in su, con finestra e durata; vuote tutte e tre: nessun blocco perdite consecutive massime, finestra delle perdite e durata del blocco si impostano insieme',
+      ),
+    );
+    await userEvent.type(field('Finestra delle perdite (ore)'), '24');
+    await userEvent.type(field('Durata del blocco (minuti)'), '120');
+    await userEvent.selectOptions(field('Ambito del conteggio'), 'flusso');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).consecutive_loss_limit).toEqual({
+      max_consecutive_losses: 2,
+      loss_window_hours: 24,
+      block_minutes: 120,
+      count_scope: 'flusso',
+    });
+  });
+
   // R5.3.4, ADR memoria-del-flusso-dalle-decisioni-operative-precedenti.
   it('turns the memory on with its decisions and days as a new version, refusing them out of range', async () => {
     fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });

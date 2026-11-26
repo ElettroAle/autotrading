@@ -40,6 +40,7 @@ from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_fill, a_position, an_activity
+from tests.support.closings import closing_readings
 from tests.support.flows import a_configuration, a_flow
 from tests.support.position_closings import NOTHING_TO_CLOSE, ClosingAnswer, closed_by, refused
 
@@ -136,6 +137,7 @@ class Bench:
                 InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
                 InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), self.tenant_id),
             ),
+            closing_readings(self.tenant_id),
         )
         self.notices = FakeCashOutNoticeAdapter()
         ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW, self.notices)

@@ -39,6 +39,7 @@ from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import CURRENCY, a_position, an_activity
+from tests.support.closings import closing_readings
 from tests.support.flows import a_configuration, a_flow
 
 NOW = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
@@ -65,6 +66,7 @@ class Bench:
                     InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
                     InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
                 ),
+                closing_readings(TENANT),
             ),
             ReadOpeningsSuspensionUseCase(
                 flows, InMemoryOpeningsSuspensionAdapter(self.store, TENANT), self.readings, self.accounts, lambda: NOW

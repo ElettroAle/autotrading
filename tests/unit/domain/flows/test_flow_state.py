@@ -8,6 +8,7 @@ from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_state import FlowState, PositionMismatch
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.reopening_block import ReopeningBlock
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -229,3 +230,13 @@ def test_the_profits_cashed_out_are_the_sum_of_those_of_its_changes() -> None:
     )
 
     assert (state.capital_changes, state.cashed_profit) == (changes, Decimal("118.5"))
+
+
+def test_the_state_holds_no_block_of_the_openings_unless_given() -> None:
+    # R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive.
+    flow = flow_on("NEAR")
+    state = FlowState.attributed(flow, an_activity(), totals_of(flow))
+    block = ReopeningBlock(TradeSide.SHORT, "NEAR", 2, datetime(2026, 11, 26, 15, 30, tzinfo=UTC))
+
+    assert state.reopening_blocks == ()
+    assert state.blocking([block]).reopening_blocks == (block,)

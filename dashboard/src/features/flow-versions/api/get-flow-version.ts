@@ -55,6 +55,14 @@ const configurationSchema = z.object({
     breakeven_percent: z.string().nullable(),
     max_profit_in_context: z.boolean(),
   }),
+  consecutive_loss_limit: z
+    .object({
+      max_consecutive_losses: z.number(),
+      loss_window_hours: z.number(),
+      block_minutes: z.number(),
+      count_scope: z.enum(['asset', 'flusso']),
+    })
+    .nullable(),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

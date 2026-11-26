@@ -34,6 +34,7 @@ from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoti
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_fill, a_position, an_activity
+from tests.support.closings import closing_readings
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -93,6 +94,7 @@ class Bench:
                     InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
                     InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
                 ),
+                closing_readings(TENANT),
             ),
             self.reconcile,
         )

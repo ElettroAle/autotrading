@@ -19,6 +19,7 @@ from autotrading.application.flows.change_allocated_capital import ChangeAllocat
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
 from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
     CreateFlowCommand,
     MemoryRequest,
     SourceRequest,
@@ -39,6 +40,7 @@ from autotrading.application.flows.resume_flow_openings import ResumeFlowOpening
 from autotrading.application.flows.stop_flow import StopFlowCommand
 from autotrading.domain.flows.cash_out import CashOutOutcome
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_action import FlowAction
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -111,6 +113,9 @@ class FlowCreationRequest(BaseModel):
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
     # Missing: no stop that follows the price, the option of the agent off (R5.5.1).
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
+    # Missing: no block of the openings after consecutive losses; the three numbers go together, the scope «asset» or
+    # «flusso», the asset if not given (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -139,6 +144,7 @@ class FlowCreationRequest(BaseModel):
             minimum_confidence=self.minimum_confidence,
             memory=self.memory,
             trailing_stop=self.trailing_stop,
+            consecutive_loss_limit=self.consecutive_loss_limit,
         )
 
 
@@ -182,6 +188,8 @@ class FlowModificationRequest(BaseModel):
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
     # Only the parts of the stop that follows the price sent change; `remove_*` takes a part away (R5.5.1).
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
+    # Missing keeps the limit of consecutive losses; sent, it replaces it whole; `remove_limit` takes it away (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -221,6 +229,7 @@ class FlowModificationRequest(BaseModel):
             remove_minimum_confidence=self._sent_as_null("minimum_confidence"),
             memory=self.memory,
             trailing_stop=self.trailing_stop,
+            consecutive_loss_limit=self.consecutive_loss_limit,
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -292,6 +301,26 @@ class TrailingStopResponse(BaseModel):
         )
 
 
+class ConsecutiveLossLimitResponse(BaseModel):
+    """The limit of consecutive losses of a version (R5.5.2)."""
+
+    max_consecutive_losses: int
+    loss_window_hours: int
+    block_minutes: int
+    count_scope: LossCountScope
+
+    @classmethod
+    def of(cls, limit: ConsecutiveLossLimit | None) -> ConsecutiveLossLimitResponse | None:
+        if limit is None:
+            return None
+        return cls(
+            max_consecutive_losses=limit.max_consecutive_losses,
+            loss_window_hours=limit.loss_window_hours,
+            block_minutes=limit.block_minutes,
+            count_scope=limit.count_scope,
+        )
+
+
 class PromptPlaceholderResponse(BaseModel):
     """A placeholder the system prompt may use, with what it stands for (R1.4.8)."""
 
@@ -347,6 +376,8 @@ class ConfigurationResponse(BaseModel):
     minimum_confidence: int | None
     memory: FlowMemory
     trailing_stop: TrailingStopResponse
+    # Null for a flow without the limit (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitResponse | None
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -375,6 +406,7 @@ class ConfigurationResponse(BaseModel):
             minimum_confidence=_confidence(configuration.minimum_confidence),
             memory=configuration.memory,
             trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
+            consecutive_loss_limit=ConsecutiveLossLimitResponse.of(configuration.consecutive_loss_limit),
         )
 
 
@@ -427,6 +459,8 @@ class FlowResponse(BaseModel):
     minimum_confidence: int | None
     memory: FlowMemory
     trailing_stop: TrailingStopResponse
+    # Null for a flow without the limit (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitResponse | None
     missing: list[str]
 
     @classmethod
@@ -461,6 +495,7 @@ class FlowResponse(BaseModel):
             minimum_confidence=_confidence(configuration.minimum_confidence),
             memory=configuration.memory,
             trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
+            consecutive_loss_limit=ConsecutiveLossLimitResponse.of(configuration.consecutive_loss_limit),
             missing=list(flow.missing_before_start),
         )
 

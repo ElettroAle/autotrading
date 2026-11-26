@@ -47,7 +47,7 @@ from autotrading.application.flows.read_account_executions import ReadAccountExe
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
 from autotrading.application.flows.read_cycle_flow import CycleAccountReadings, ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
-from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
@@ -327,6 +327,7 @@ class FlowCycles:
                     activity,
                     platform.ledger,
                     records,
+                    ClosingReadings(closed_positions, self.clock.now),
                 ),
                 reconcile_for_cycle,
             ),

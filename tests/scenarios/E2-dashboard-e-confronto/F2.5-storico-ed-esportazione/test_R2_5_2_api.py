@@ -182,6 +182,8 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "memory",
         # The stop that follows the price travels with the strategy (ADR impostazioni-dello-stop-che-segue-il-prezzo).
         "trailing_stop",
+        # The block of the reopenings travels with the strategy (ADR limite-di-perdite-consecutive-del-flusso).
+        "consecutive_loss_limit",
     }
 
 

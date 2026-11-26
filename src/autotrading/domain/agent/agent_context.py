@@ -42,7 +42,9 @@ class PositionView:
 
 @dataclass(frozen=True, slots=True)
 class FlowStateView:
-    """The state of the flow alone: never the balance of the account, never another flow (R1.4.3)."""
+    """The state of the flow alone: never the balance of the account, never another flow (R1.4.3); with the openings
+    blocked after consecutive losses, as the flow tells them (R5.5.2).
+    """
 
     currency: str
     allocated_capital: Decimal
@@ -52,6 +54,7 @@ class FlowStateView:
     # None when no return can be measured (R3.4.3).
     return_percent: Decimal | None
     positions: tuple[PositionView, ...]
+    reopening_blocks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +130,9 @@ def _counted(amount: int, one: str, many: str) -> str:
 
 
 def _state_document(state: FlowStateView) -> dict[str, object]:
+    # Without a block in force the line is not there, and the state is the one of before (ADR
+    # controllo-delle-riaperture-dopo-perdite-consecutive).
+    blocked = {} if not state.reopening_blocks else {"riaperture_ferme": list(state.reopening_blocks)}
     return {
         "valuta": state.currency,
         "capitale_allocato": str(state.allocated_capital),
@@ -135,6 +141,7 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
         "valore_complessivo": str(state.total_value),
         "rendimento_dall_avvio_percento": None if state.return_percent is None else str(state.return_percent),
         "posizioni_aperte": [_position_document(position) for position in state.positions],
+        **blocked,
     }
 
 

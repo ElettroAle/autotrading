@@ -39,6 +39,7 @@ def _state_of(state: QuestionStatePort) -> FlowStateView:
         total_value=state.total_value,
         return_percent=state.return_percent,
         positions=tuple(_position_of(position) for position in state.positions),
+        reopening_blocks=tuple(state.reopening_blocks),
     )
 
 

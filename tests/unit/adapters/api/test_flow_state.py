@@ -11,6 +11,7 @@ from autotrading.adapters.inbound.api.flow_state import FlowStateResponse
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.cycle_record import CycleOutcome, CycleRecord
 from autotrading.domain.flows.equity_snapshot import EquitySnapshot
 from autotrading.domain.flows.exit_plan import ExitPlan
@@ -21,6 +22,7 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.flows.watched_position import WatchedPosition
 from autotrading.domain.orders.client_order_id import ClientOrderId
@@ -28,6 +30,7 @@ from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter
 from tests.support.activity import a_position, an_activity
+from tests.support.closings import a_closing
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -128,6 +131,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
             "next_cycle_at": None,
         },
         "openings_suspension": None,
+        "reopening_blocks": [],
     }
 
 
@@ -289,3 +293,48 @@ def test_the_state_of_a_flow_tells_why_its_openings_are_suspended(client_of: Cli
         "cause": "riconciliazione",
         "resumable": False,
     }
+
+
+def test_the_state_of_a_flow_tells_the_reopenings_its_consecutive_losses_stop(
+    client_of: Client, platform: Platform
+) -> None:
+    # R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive.
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    limited = replace(
+        flow, configuration=replace(flow.configuration, consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120))
+    )
+    platform.flows.flows[platform.flows.flows.index(flow)] = limited
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+    platform.now = NOW
+    platform.closed_positions.positions += [
+        a_closing(
+            TradeSide.SHORT,
+            "BTC",
+            NOW - timedelta(minutes=minutes),
+            Decimal(-3),
+            tenant_id=flow.tenant_id,
+            flow_id=flow.id,
+        )
+        for minutes in (60, 30)
+    ]
+
+    state = anna.get(f"/flows/{flow.id.value}/state").json()
+
+    assert state["reopening_blocks"] == [
+        {
+            "side": "short",
+            "asset": "BTC",
+            "consecutive_losses": 2,
+            "until": "2026-11-14T13:30:00Z",
+            "text": "riaperture short su BTC ferme fino alle 13:30: 2 perdite consecutive",
+        }
+    ]
+
+
+def test_the_state_of_a_flow_without_the_limit_has_no_stopped_reopenings(client_of: Client, platform: Platform) -> None:
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity()
+
+    assert anna.get(f"/flows/{flow.id.value}/state").json()["reopening_blocks"] == []

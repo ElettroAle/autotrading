@@ -4,7 +4,13 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.flows.create_flow import FlowChecks, MemoryRequest, SourceRequest, TrailingStopRequest
+from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
+    FlowChecks,
+    MemoryRequest,
+    SourceRequest,
+    TrailingStopRequest,
+)
 from autotrading.application.flows.errors import AssetWithOpenPositionError, FlowNameInUseError
 from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
@@ -78,6 +84,8 @@ class ModifyFlowCommand:
     memory: MemoryRequest = field(default_factory=MemoryRequest)
     # Only the parts sent change; a part taken away goes back to none (R5.5.1).
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
+    # Nothing sent keeps the limit; a limit sent replaces it whole, or the remove flag takes it away (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
 
 
 class ModifyFlowUseCase:
@@ -182,6 +190,7 @@ class ModifyFlowUseCase:
             minimum_confidence=_minimum_confidence(current.minimum_confidence, command),
             memory=command.memory.applied_to(current.memory),
             trailing_stop=command.trailing_stop.applied_to(current.trailing_stop),
+            consecutive_loss_limit=command.consecutive_loss_limit.applied_to(current.consecutive_loss_limit),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

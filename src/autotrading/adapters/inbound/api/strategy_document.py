@@ -6,7 +6,12 @@ from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest, TrailingStopRequest
+from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
+    MemoryRequest,
+    SourceRequest,
+    TrailingStopRequest,
+)
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.errors import AutotradingError
@@ -111,6 +116,8 @@ class StrategyBody(BaseModel):
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
     # Missing in the files written before it: no stop that follows the price (R5.5.1).
     trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
+    # Missing in the files written before it: no block of the openings after consecutive losses (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
 
 
 class StrategyDocument(BaseModel):
@@ -163,6 +170,7 @@ class StrategyDocument(BaseModel):
                 minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
                 memory=MemoryRequest.of(strategy.memory),
                 trailing_stop=TrailingStopRequest.of(strategy.trailing_stop),
+                consecutive_loss_limit=ConsecutiveLossLimitRequest.of(strategy.consecutive_loss_limit),
             ),
         )
 
@@ -193,6 +201,7 @@ class StrategyDocument(BaseModel):
             minimum_confidence=strategy.minimum_confidence,
             memory=strategy.memory,
             trailing_stop=strategy.trailing_stop,
+            consecutive_loss_limit=strategy.consecutive_loss_limit,
         )
 
     def _require_supported(self) -> None:

@@ -15,6 +15,7 @@ import type { Source } from '../api/get-sources';
 import type { DefaultSystemPrompt } from '../api/get-system-prompt';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
+import { ConsecutiveLossFields } from './consecutive-loss-fields';
 import { MemoryFields } from './memory-fields';
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
@@ -272,6 +273,7 @@ export const FlowForm = ({
               error={errors.openings_resume}
               {...register('openings_resume')}
             />
+            <ConsecutiveLossFields />
             <FormField
               id="flow-default-stop-loss"
               label="Stop loss predefinito (%)"

@@ -5,6 +5,7 @@ import {
   DEFAULT_TRAILING_STOP,
   type FakeAccount,
   type FakeAdapterChoice,
+  type FakeConsecutiveLossLimit,
   type FakeFlow,
   type FakeMemory,
   type FakeOpeningsResume,
@@ -85,6 +86,13 @@ type ConfigurationRequest = {
     remove_distance?: unknown;
     remove_activation?: unknown;
     remove_breakeven?: unknown;
+  };
+  consecutive_loss_limit?: {
+    max_consecutive_losses?: unknown;
+    loss_window_hours?: unknown;
+    block_minutes?: unknown;
+    count_scope?: unknown;
+    remove_limit?: unknown;
   };
 };
 
@@ -239,6 +247,55 @@ const trailingStopOf = (
     );
   }
   return trailing;
+};
+
+const LOSS_LIMIT_PARTS = [
+  ['max_consecutive_losses', 'le perdite consecutive massime sono almeno 1'],
+  ['loss_window_hours', 'la finestra delle perdite è di almeno 1 ora'],
+  ['block_minutes', 'la durata del blocco è di almeno 1 minuto'],
+] as const;
+
+const givenOf = (value: unknown): boolean => value !== undefined && value !== null;
+
+// The block of the reopenings with the rules the API checks, the reasons as it gives them (R5.5.2): nothing sent keeps
+// the limit in force, the flag takes it away, any part sent replaces it whole.
+const consecutiveLossLimitOf = (
+  requested: ConfigurationRequest['consecutive_loss_limit'],
+  current: FakeConsecutiveLossLimit,
+): FakeConsecutiveLossLimit => {
+  if (requested?.remove_limit === true) {
+    return null;
+  }
+  const numbers = LOSS_LIMIT_PARTS.map(([part]) => requested?.[part]);
+  if (!numbers.some(givenOf) && !givenOf(requested?.count_scope)) {
+    return current;
+  }
+  if (!numbers.every(givenOf)) {
+    throw new Refusal(
+      422,
+      'perdite consecutive massime, finestra delle perdite e durata del blocco si impostano insieme',
+      'consecutive_loss_limit.max_consecutive_losses',
+    );
+  }
+  LOSS_LIMIT_PARTS.forEach(([part, reason], index) => {
+    if (Number(numbers[index]) < 1) {
+      throw new Refusal(422, reason, `consecutive_loss_limit.${part}`);
+    }
+  });
+  const scope = requested?.count_scope ?? 'asset';
+  if (scope !== 'asset' && scope !== 'flusso') {
+    throw new Refusal(
+      422,
+      "l'ambito del conteggio è asset oppure flusso",
+      'consecutive_loss_limit.count_scope',
+    );
+  }
+  return {
+    max_consecutive_losses: Number(numbers[0]),
+    loss_window_hours: Number(numbers[1]),
+    block_minutes: Number(numbers[2]),
+    count_scope: scope,
+  };
 };
 
 const assetsOf = (requested: unknown): string[] => {
@@ -548,6 +605,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       minimumConfidence: flow.minimumConfidence,
       memory: flow.memory,
       trailingStop: flow.trailingStop,
+      consecutiveLossLimit: flow.consecutiveLossLimit,
     },
   });
   return flow;
@@ -611,6 +669,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     minimumConfidence: minimumConfidenceOf(request.minimum_confidence),
     memory: memoryOf(request.memory, DEFAULT_MEMORY),
     trailingStop: trailingStopOf(request.trailing_stop, DEFAULT_TRAILING_STOP),
+    consecutiveLossLimit: consecutiveLossLimitOf(request.consecutive_loss_limit, null),
     currentCapital: capital,
   });
 };
@@ -770,6 +829,10 @@ export const modifyFlow = (
         : openingsResumeOf(request.openings_resume),
     memory: memoryOf(request.memory, flow.memory),
     trailingStop: trailingStopOf(request.trailing_stop, flow.trailingStop),
+    consecutiveLossLimit: consecutiveLossLimitOf(
+      request.consecutive_loss_limit,
+      flow.consecutiveLossLimit,
+    ),
   };
   // A draft takes nothing on its account until it starts: the conflict on the assets waits for the start (ADR 0124).
   if (flow.status !== DRAFT) {

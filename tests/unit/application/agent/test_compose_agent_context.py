@@ -43,6 +43,7 @@ class State:
     total_value: Decimal = Decimal(478)
     return_percent: Decimal = Decimal("-4.40")
     positions: tuple[Position, ...] = (Position(),)
+    reopening_blocks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,3 +110,13 @@ def test_each_position_keeps_the_largest_profit_it_reached_when_the_flow_hands_i
     positions = ComposeAgentContextUseCase().execute(question).state.positions
 
     assert [position.max_profit for position in positions] == [Decimal(30), None]
+
+
+def test_the_state_keeps_the_openings_blocked_after_consecutive_losses_the_flow_hands() -> None:
+    # R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive.
+    block = "riaperture short su NEAR ferme fino alle 15:30: 2 perdite consecutive"
+    question = replace(Question(), state=State(reopening_blocks=(block,)))
+
+    state = ComposeAgentContextUseCase().execute(question).state
+
+    assert state.reopening_blocks == (block,)

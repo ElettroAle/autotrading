@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
     CreateFlowCommand,
     CreateFlowUseCase,
     FlowChecks,
@@ -23,6 +24,7 @@ from autotrading.application.flows.errors import (
 from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalCommand, ReadFreeCapitalUseCase
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.errors import (
     CapitalAboveFreeCapitalError,
     CycleIntervalOutOfRangeError,
@@ -375,3 +377,39 @@ def test_the_option_of_the_largest_profit_not_given_keeps_its_value() -> None:
 
     assert request.applied_to(IN_FORCE).max_profit_in_context is True
     assert request.applied_to(TrailingStop()).max_profit_in_context is False
+
+
+# R5.5.2, ADR limite-di-perdite-consecutive-del-flusso: what a request changes of the limit of consecutive losses.
+LIMIT_IN_FORCE = ConsecutiveLossLimit(2, 24, 120, LossCountScope.ASSET)
+
+
+def test_a_new_flow_has_no_limit_of_consecutive_losses_unless_given(flows: Flows) -> None:
+    assert flows.create.execute(flows.command()).configuration.consecutive_loss_limit is None
+
+
+def test_a_new_flow_saves_the_limit_of_consecutive_losses_given(flows: Flows) -> None:
+    command = flows.command(consecutive_loss_limit=ConsecutiveLossLimitRequest(3, 12, 60, "flusso"))
+
+    limit = flows.create.execute(command).configuration.consecutive_loss_limit
+
+    assert limit == ConsecutiveLossLimit(3, 12, 60, LossCountScope.FLOW)
+
+
+def test_the_limit_of_consecutive_losses_not_given_keeps_the_one_in_force() -> None:
+    assert ConsecutiveLossLimitRequest().applied_to(LIMIT_IN_FORCE) == LIMIT_IN_FORCE
+    assert ConsecutiveLossLimitRequest().applied_to(None) is None
+
+
+def test_the_limit_of_consecutive_losses_given_replaces_the_one_in_force_whole() -> None:
+    request = ConsecutiveLossLimitRequest(4, 6, 30)
+
+    assert request.applied_to(LIMIT_IN_FORCE) == ConsecutiveLossLimit(4, 6, 30, LossCountScope.ASSET)
+
+
+def test_the_remove_flag_takes_the_limit_of_consecutive_losses_away_even_with_parts_given() -> None:
+    assert ConsecutiveLossLimitRequest(4, 6, 30, remove_limit=True).applied_to(LIMIT_IN_FORCE) is None
+
+
+@pytest.mark.parametrize("limit", [None, ConsecutiveLossLimit(3, 12, 60, LossCountScope.FLOW)])
+def test_a_limit_of_consecutive_losses_given_whole_comes_back_as_it_was(limit: ConsecutiveLossLimit | None) -> None:
+    assert ConsecutiveLossLimitRequest.of(limit).applied_to(LIMIT_IN_FORCE if limit else None) == limit

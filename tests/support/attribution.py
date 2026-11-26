@@ -43,6 +43,7 @@ from tests.fakes.reconciliation_repository import InMemoryReconciliationReposito
 from tests.fakes.unattributable_notices import FakeUnattributableAssetNoticeAdapter
 from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import READ_AT, an_activity
+from tests.support.closings import closing_readings
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -86,6 +87,7 @@ class AttributionBench:
                 InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
                 InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
             ),
+            closing_readings(TENANT),
         )
         self.thresholds = FakeAccountThresholdsAdapter({})
         self.alarm_notices = FakeReconciliationAlarmNoticeAdapter()

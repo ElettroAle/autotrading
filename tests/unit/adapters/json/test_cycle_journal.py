@@ -62,6 +62,7 @@ STATE = {
     "total_value": "500",
     "return_percent": "0.00",
     "positions": [],
+    "reopening_blocks": [],
 }
 
 

@@ -214,3 +214,16 @@ def test_a_position_carries_the_largest_profit_it_reached_only_when_the_flow_giv
     reached, plain = document["posizioni_aperte"]
     assert reached["massimo_profitto_raggiunto"] == "30.5"
     assert "massimo_profitto_raggiunto" not in plain
+
+
+def test_the_state_carries_the_openings_blocked_after_consecutive_losses_only_while_there_are_some() -> None:
+    # R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive: without a block the state is the one of before.
+    block = "riaperture short su NEAR ferme fino alle 15:30: 2 perdite consecutive"
+
+    blocked = user_document(context(state=replace(STATE, reopening_blocks=(block,))))["stato_del_flusso"]
+    plain = user_document(context())["stato_del_flusso"]
+
+    assert isinstance(blocked, dict)
+    assert isinstance(plain, dict)
+    assert blocked["riaperture_ferme"] == [block]
+    assert "riaperture_ferme" not in plain

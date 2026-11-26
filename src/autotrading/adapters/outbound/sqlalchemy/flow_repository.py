@@ -20,6 +20,7 @@ from autotrading.application.flows.ports import FlowVersion
 from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import Flow, holder_of
 from autotrading.domain.flows.flow_configuration import FlowConfiguration
@@ -91,6 +92,13 @@ class _TrailingStopDocument(TypedDict):
     max_profit_in_context: bool
 
 
+class _ConsecutiveLossLimitDocument(TypedDict):
+    max_consecutive_losses: int
+    loss_window_hours: int
+    block_minutes: int
+    count_scope: str
+
+
 class _ConfigurationDocument(TypedDict):
     """A configuration version as saved in JSON; a wrong shape fails while it is read."""
 
@@ -118,6 +126,8 @@ class _ConfigurationDocument(TypedDict):
     memory: _MemoryDocument
     # Absent in the versions saved before it: no stop that follows the price, and no new version for them (R5.5.1).
     trailing_stop: NotRequired[_TrailingStopDocument]
+    # Absent in the versions saved before it, null without the limit: no block, and no new version for them (R5.5.2).
+    consecutive_loss_limit: NotRequired[_ConsecutiveLossLimitDocument | None]
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -388,6 +398,7 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "all_decisions": configuration.memory.all_decisions,
         },
         "trailing_stop": _trailing_stop_document(configuration.trailing_stop),
+        "consecutive_loss_limit": _consecutive_loss_limit_document(configuration.consecutive_loss_limit),
     }
 
 
@@ -435,6 +446,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         minimum_confidence=MinimumConfidence.optional(document["minimum_confidence"]),
         memory=FlowMemory(**document["memory"]),
         trailing_stop=_trailing_stop_of(document.get("trailing_stop")),
+        consecutive_loss_limit=_consecutive_loss_limit_of(document.get("consecutive_loss_limit")),
     )
 
 
@@ -466,6 +478,28 @@ def _trailing_stop_of(document: _TrailingStopDocument | None) -> TrailingStop:
         _decimal(document["activation_percent"]),
         _decimal(document["breakeven_percent"]),
         document["max_profit_in_context"],
+    )
+
+
+def _consecutive_loss_limit_document(limit: ConsecutiveLossLimit | None) -> _ConsecutiveLossLimitDocument | None:
+    if limit is None:
+        return None
+    return {
+        "max_consecutive_losses": limit.max_consecutive_losses,
+        "loss_window_hours": limit.loss_window_hours,
+        "block_minutes": limit.block_minutes,
+        "count_scope": limit.count_scope.value,
+    }
+
+
+def _consecutive_loss_limit_of(document: _ConsecutiveLossLimitDocument | None) -> ConsecutiveLossLimit | None:
+    if document is None:
+        return None
+    return ConsecutiveLossLimit(
+        document["max_consecutive_losses"],
+        document["loss_window_hours"],
+        document["block_minutes"],
+        LossCountScope(document["count_scope"]),
     )
 
 

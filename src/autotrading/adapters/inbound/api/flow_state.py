@@ -10,6 +10,7 @@ from autotrading.adapters.inbound.api.amounts import amount_text
 from autotrading.adapters.inbound.api.flow_results import FlowResultsResponse
 from autotrading.adapters.inbound.api.interval_query import IntervalEnd, IntervalStart
 from autotrading.adapters.inbound.api.openings_suspension_response import OpeningsSuspensionResponse
+from autotrading.adapters.inbound.api.reopening_block_response import ReopeningBlockResponse
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.domain.flows.account_activity import AccountPosition
@@ -61,7 +62,8 @@ class FlowPositionResponse(BaseModel):
 
 class FlowStateResponse(BaseModel):
     """The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
-    for (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018).
+    for (R6.4.2), why its openings are suspended, null when they are not (R3.3.2), and the openings blocked on a side
+    after consecutive losses, none without the limit (R5.5.2); amounts as strings (ADR 0018).
     """
 
     flow_id: UUID
@@ -78,6 +80,7 @@ class FlowStateResponse(BaseModel):
     positions: list[FlowPositionResponse]
     summary: FlowResultsResponse
     openings_suspension: OpeningsSuspensionResponse | None
+    reopening_blocks: list[ReopeningBlockResponse]
 
     @classmethod
     def of(cls, results: FlowResults) -> FlowStateResponse:
@@ -96,6 +99,7 @@ class FlowStateResponse(BaseModel):
             positions=[FlowPositionResponse.of(position, state) for position in state.positions],
             summary=FlowResultsResponse.of(results),
             openings_suspension=OpeningsSuspensionResponse.of(results.openings_suspension),
+            reopening_blocks=[ReopeningBlockResponse.of(block) for block in state.reopening_blocks],
         )
 
 

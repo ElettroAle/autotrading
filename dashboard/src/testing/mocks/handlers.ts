@@ -115,6 +115,7 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   openings_resume: configuration.openingsResume,
   memory: configuration.memory,
   trailing_stop: configuration.trailingStop,
+  consecutive_loss_limit: configuration.consecutiveLossLimit,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).
@@ -239,6 +240,7 @@ const flowState = (user: FakeUser, flow: FakeFlow, request: Request) => ({
   positions: fakePlatform.openPositionsOf(flow.id),
   summary: resultsSummaryOf(flow, request),
   openings_suspension: openingsSuspensionOf(user, flow),
+  reopening_blocks: flow.reopeningBlocks,
 });
 
 // The API counts a position won or lost by its result after the fees, as the statistics do (R6.4.4).

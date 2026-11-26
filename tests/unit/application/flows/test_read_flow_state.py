@@ -9,10 +9,13 @@ from autotrading.application.flows.errors import FlowExchangeUnavailableError, F
 from autotrading.application.flows.ports import OpenPositionRecords
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.reopening_block import ReopeningBlock
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.flows.watched_position import WatchedPosition
 from autotrading.domain.orders.client_order_id import ClientOrderId
@@ -21,6 +24,7 @@ from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
+from tests.fakes.closed_position_repository import ClosedPositionStore
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
@@ -28,6 +32,7 @@ from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
 from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_position, an_activity
+from tests.support.closings import NOW, a_closing, closing_readings
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -44,6 +49,8 @@ class Bench:
         protections = ProtectionStore()
         self.watched = WatchedPositionStore()
         self.protections = InMemoryProtectionRepositoryAdapter(protections, TENANT)
+        self.closings = ClosedPositionStore()
+        self.clock_readings: list[datetime] = []
         self.use_case = ReadFlowStateUseCase(
             InMemoryFlowRepositoryAdapter(self.store, TENANT),
             self.activity,
@@ -53,10 +60,25 @@ class Bench:
                 InMemoryFlowProtectionLevelsAdapter(protections, TENANT),
                 InMemoryWatchedPositionsAdapter(self.watched, self.store, TENANT),
             ),
+            closing_readings(TENANT, self.closings, self.clock),
         )
 
-    def flow(self, *assets: str, tenant_id: TenantId = TENANT, trailing: TrailingStop = OFF) -> Flow:
-        configuration = replace(a_configuration(assets=assets, allocated_capital=Decimal(500)), trailing_stop=trailing)
+    def clock(self) -> datetime:
+        self.clock_readings.append(NOW)
+        return NOW
+
+    def flow(
+        self,
+        *assets: str,
+        tenant_id: TenantId = TENANT,
+        trailing: TrailingStop = OFF,
+        loss_limit: ConsecutiveLossLimit | None = None,
+    ) -> Flow:
+        configuration = replace(
+            a_configuration(assets=assets, allocated_capital=Decimal(500)),
+            trailing_stop=trailing,
+            consecutive_loss_limit=loss_limit,
+        )
         flow = a_flow(tenant_id, account_id=ACCOUNT, configuration=configuration)
         self.store.flows.append(flow)
         return flow
@@ -224,3 +246,35 @@ def test_a_flow_whose_stop_does_not_follow_the_price_has_no_largest_profit(bench
 
     assert state.max_profit_of("BTC") is None
     assert state.watched == {}
+
+
+# R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive: the blocks of the reopenings in the state.
+LIMIT = ConsecutiveLossLimit(2, 24, 120)
+
+
+def test_a_flow_with_the_limit_carries_the_blocks_its_losses_put_in_force(bench: Bench) -> None:
+    flow = bench.flow("NEAR", loss_limit=LIMIT)
+    bench.closings.positions += [
+        a_closing(
+            TradeSide.SHORT,
+            "NEAR",
+            NOW.replace(hour=hour, minute=minute),
+            Decimal(-3),
+            tenant_id=TENANT,
+            flow_id=flow.id,
+        )
+        for hour, minute in ((13, 0), (13, 30))
+    ]
+
+    state = bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+    assert state.reopening_blocks == (ReopeningBlock(TradeSide.SHORT, "NEAR", 2, NOW.replace(hour=15, minute=30)),)
+
+
+def test_a_flow_without_the_limit_reads_no_closing_and_has_no_block(bench: Bench) -> None:
+    flow = bench.flow("NEAR")
+
+    state = bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+    assert state.reopening_blocks == ()
+    assert bench.clock_readings == []

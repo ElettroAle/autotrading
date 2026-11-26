@@ -8,7 +8,12 @@ import pytest
 from autotrading.application.flows.archive_flow import ArchiveFlowCommand, ArchiveFlowUseCase
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand, ChangeFlowStatusUseCase
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand, CompareFlowVersionsUseCase
-from autotrading.application.flows.create_flow import FlowChecks, MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
+    FlowChecks,
+    MemoryRequest,
+    SourceRequest,
+)
 from autotrading.application.flows.errors import (
     AssetNotTradableError,
     AssetUnderVerificationError,
@@ -23,6 +28,7 @@ from autotrading.application.flows.list_flows import ListFlowsUseCase
 from autotrading.application.flows.modify_flow import ModifyFlowCommand, ModifyFlowUseCase
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import (
     AccountNotChangeableError,
@@ -823,3 +829,15 @@ def test_an_account_out_of_reach_refuses_the_removal_of_an_asset(flows: Flows) -
         flows.modify.execute(ModifyFlowCommand(flow.id, assets=("BTC",)))
 
     assert flows.current(flow) == flow
+
+
+def test_a_change_sets_keeps_and_removes_the_limit_of_consecutive_losses(flows: Flows) -> None:
+    flow = flows.saved()
+
+    def modified(request: ConsecutiveLossLimitRequest) -> ConsecutiveLossLimit | None:
+        command = ModifyFlowCommand(flow.id, consecutive_loss_limit=request)
+        return flows.modify.execute(command).configuration.consecutive_loss_limit
+
+    assert modified(ConsecutiveLossLimitRequest(2, 24, 120)) == ConsecutiveLossLimit(2, 24, 120, LossCountScope.ASSET)
+    assert modified(ConsecutiveLossLimitRequest()) == ConsecutiveLossLimit(2, 24, 120, LossCountScope.ASSET)
+    assert modified(ConsecutiveLossLimitRequest(remove_limit=True)) is None

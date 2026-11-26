@@ -6,6 +6,7 @@ import pytest
 
 from autotrading.domain.flows.asset_conflict import require_assets_free
 from autotrading.domain.flows.configuration_difference import ConfigurationDifference, differences
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import (
     ArchivedFlowNotModifiableError,
@@ -165,6 +166,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
         minimum_confidence=MinimumConfidence(60),
         memory=FlowMemory(active=True, decisions=5, days=14),
+        consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120),
     )
 
     assert differences(before, after) == (
@@ -193,6 +195,11 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
             "memoria",
             "non attiva",
             "attiva, 5 decisioni, 14 giorni, motivo fino a 160 caratteri, solo aperture, chiusure e inversioni",
+        ),
+        ConfigurationDifference(
+            "blocco delle riaperture dopo perdite consecutive",
+            "nessuno",
+            "2 perdite consecutive in 24 ore, blocco di 120 minuti, ambito asset",
         ),
     )
 

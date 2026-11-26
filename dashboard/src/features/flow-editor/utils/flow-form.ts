@@ -71,6 +71,17 @@ const trailingStopValuesSchema = z.object({
   max_profit_in_context: z.boolean(),
 });
 
+export const LOSS_COUNT_SCOPES = ['asset', 'flusso'] as const;
+
+// Whole numbers as typed, blank for a part left empty; the API checks the values and that the three go together
+// (R5.5.2).
+const consecutiveLossLimitValuesSchema = z.object({
+  max_consecutive_losses: numberText,
+  loss_window_hours: numberText,
+  block_minutes: numberText,
+  count_scope: z.enum(LOSS_COUNT_SCOPES),
+});
+
 export const flowFormSchema = z.object({
   name: z.string(),
   account_id: z.string(),
@@ -99,6 +110,7 @@ export const flowFormSchema = z.object({
   openings_resume: z.enum(OPENINGS_RESUMES, 'Scegli la ripresa delle aperture'),
   memory: memoryValuesSchema,
   trailing_stop: trailingStopValuesSchema,
+  consecutive_loss_limit: consecutiveLossLimitValuesSchema,
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
@@ -106,6 +118,7 @@ export type SourceValues = z.infer<typeof sourceValuesSchema>;
 export type AdapterValues = z.infer<typeof adapterValuesSchema>;
 type MemoryValues = z.infer<typeof memoryValuesSchema>;
 type TrailingStopValues = z.infer<typeof trailingStopValuesSchema>;
+type ConsecutiveLossLimitValues = z.infer<typeof consecutiveLossLimitValuesSchema>;
 
 type AdapterRequest = {
   readonly name: string;
@@ -167,6 +180,14 @@ type SettingsRequest = {
     remove_activation: boolean;
     remove_breakeven: boolean;
   };
+  // The three blank take the whole limit away, as the API does with its remove flag (R5.5.2).
+  consecutive_loss_limit: {
+    max_consecutive_losses: number | null;
+    loss_window_hours: number | null;
+    block_minutes: number | null;
+    count_scope: string | null;
+    remove_limit: boolean;
+  };
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -215,6 +236,12 @@ export const emptyFormValues = (): FlowFormValues => ({
     activation_percent: '',
     breakeven_percent: '',
     max_profit_in_context: false,
+  },
+  consecutive_loss_limit: {
+    max_consecutive_losses: '',
+    loss_window_hours: '',
+    block_minutes: '',
+    count_scope: 'asset',
   },
 });
 
@@ -293,6 +320,20 @@ const trailingStopOf = (trailing: TrailingStopValues): SettingsRequest['trailing
   remove_breakeven: isBlank(trailing.breakeven_percent),
 });
 
+const consecutiveLossLimitOf = (
+  limit: ConsecutiveLossLimitValues,
+): SettingsRequest['consecutive_loss_limit'] => {
+  const parts = [limit.max_consecutive_losses, limit.loss_window_hours, limit.block_minutes];
+  const removed = parts.every(isBlank);
+  return {
+    max_consecutive_losses: numberOrNull(limit.max_consecutive_losses),
+    loss_window_hours: numberOrNull(limit.loss_window_hours),
+    block_minutes: numberOrNull(limit.block_minutes),
+    count_scope: removed ? null : limit.count_scope,
+    remove_limit: removed,
+  };
+};
+
 const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   account_id: values.account_id,
   assets: values.assets,
@@ -317,6 +358,7 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   openings_resume: values.openings_resume,
   memory: memoryOf(values.memory),
   trailing_stop: trailingStopOf(values.trailing_stop),
+  consecutive_loss_limit: consecutiveLossLimitOf(values.consecutive_loss_limit),
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -405,6 +447,12 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
     breakeven_percent: textOf(flow.trailing_stop.breakeven_percent),
     max_profit_in_context: flow.trailing_stop.max_profit_in_context,
   },
+  consecutive_loss_limit: {
+    max_consecutive_losses: textOf(flow.consecutive_loss_limit?.max_consecutive_losses ?? null),
+    loss_window_hours: textOf(flow.consecutive_loss_limit?.loss_window_hours ?? null),
+    block_minutes: textOf(flow.consecutive_loss_limit?.block_minutes ?? null),
+    count_scope: flow.consecutive_loss_limit?.count_scope ?? 'asset',
+  },
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>
@@ -471,10 +519,17 @@ const TRAILING_STOP_FIELDS: readonly Path<FlowFormValues>[] = [
   'trailing_stop.activation_percent',
   'trailing_stop.breakeven_percent',
 ];
+const CONSECUTIVE_LOSS_LIMIT_FIELDS: readonly Path<FlowFormValues>[] = [
+  'consecutive_loss_limit.max_consecutive_losses',
+  'consecutive_loss_limit.loss_window_hours',
+  'consecutive_loss_limit.block_minutes',
+  'consecutive_loss_limit.count_scope',
+];
 const FORM_FIELDS = new Set<string>([
   ...Object.keys(flowFormSchema.shape),
   ...MEMORY_FIELDS,
   ...TRAILING_STOP_FIELDS,
+  ...CONSECUTIVE_LOSS_LIMIT_FIELDS,
 ]);
 
 /** The field of the form a setting named by the API is typed in, when the form has it. */

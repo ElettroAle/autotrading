@@ -9,7 +9,7 @@ from autotrading.adapters.inbound.mcp.flow_requests import (
     StrategyImport,
 )
 from autotrading.adapters.inbound.mcp.reading_filters import ClosedPositionFilters, CycleFilters
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import ConsecutiveLossLimitRequest, MemoryRequest, SourceRequest
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.flows.closed_position_filter import ClosedPositionFilter
 from autotrading.domain.flows.cycle_filter import CycleFilter
@@ -128,3 +128,16 @@ def test_the_filters_are_those_of_the_readings_of_the_api() -> None:
         "BTC", "long", "vinta"
     )
     assert CycleFilters(outcome="fallito", decision="apertura").criteria() == CycleFilter.named("fallito", "apertura")
+
+
+def test_the_limit_of_consecutive_losses_reaches_every_command_as_given() -> None:
+    # R5.5.2, ADR limite-di-perdite-consecutive-del-flusso: one request type for the API and the tools.
+    limit = ConsecutiveLossLimitRequest(2, 24, 120, "flusso")
+    creation = FlowCreation(
+        account_id=uuid4(), allocated_capital=Decimal(100), name="alfa", assets=["BTC"], consecutive_loss_limit=limit
+    )
+
+    assert creation.command().consecutive_loss_limit == limit
+    assert StrategyImport(consecutive_loss_limit=limit).command("copia").consecutive_loss_limit == limit
+    assert FlowModification(consecutive_loss_limit=limit).command(uuid4()).consecutive_loss_limit == limit
+    assert FlowModification().command(uuid4()).consecutive_loss_limit == ConsecutiveLossLimitRequest()

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from autotrading.adapters.inbound.mcp.formats import optional_amount, optional_text
 from autotrading.domain.flows.cash_out import CashOutOutcome
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.risk_limits import RiskLimits
@@ -92,6 +93,8 @@ class FlowView:
     minimum_confidence: int | None
     memory: FlowMemory
     trailing_stop: TrailingStop
+    # None for a flow without the limit (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimit | None
     missing: list[str]
 
     @classmethod
@@ -124,6 +127,7 @@ class FlowView:
             minimum_confidence=None if confidence is None else confidence.value,
             memory=configuration.memory,
             trailing_stop=configuration.trailing_stop,
+            consecutive_loss_limit=configuration.consecutive_loss_limit,
             missing=list(flow.missing_before_start),
         )
 

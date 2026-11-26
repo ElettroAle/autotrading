@@ -25,6 +25,7 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_statistics import FlowStatistics
 from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
+from autotrading.domain.flows.reopening_block import ReopeningBlock
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,29 @@ class OpeningsSuspensionView:
             suspended_at=instant_text(suspension.suspended_at),
             cause=suspension.cause.value,
             resumable=suspension.resumable,
+        )
+
+
+@dataclass(frozen=True)
+class ReopeningBlockView:
+    """The openings on a side stopped after consecutive losses until an instant, on the asset or on every asset of the
+    flow when it is null, with the text of the API (R5.5.2).
+    """
+
+    side: str
+    asset: str | None
+    consecutive_losses: int
+    until: str
+    text: str
+
+    @classmethod
+    def of(cls, block: ReopeningBlock) -> ReopeningBlockView:
+        return cls(
+            side=block.side.value,
+            asset=block.asset,
+            consecutive_losses=block.consecutive_losses,
+            until=instant_text(block.until),
+            text=block.state_text,
         )
 
 
@@ -177,7 +201,8 @@ class PositionView:
 
 @dataclass(frozen=True)
 class FlowStateView:
-    """The state of a flow read from the exchange now (R1.6.1), with its open positions and results (R6.4.2)."""
+    """The state of a flow read from the exchange now (R1.6.1), with its open positions and results (R6.4.2) and the
+    openings blocked after consecutive losses (R5.5.2)."""
 
     flow_id: str
     currency: str
@@ -192,6 +217,7 @@ class FlowStateView:
     positions: list[PositionView]
     summary: ResultsView
     openings_suspension: OpeningsSuspensionView | None
+    reopening_blocks: list[ReopeningBlockView]
 
     @classmethod
     def of(cls, results: FlowResults) -> FlowStateView:
@@ -210,6 +236,7 @@ class FlowStateView:
             positions=[PositionView.of(position, state) for position in state.positions],
             summary=ResultsView.of(results),
             openings_suspension=OpeningsSuspensionView.of(results.openings_suspension),
+            reopening_blocks=[ReopeningBlockView.of(block) for block in state.reopening_blocks],
         )
 
 

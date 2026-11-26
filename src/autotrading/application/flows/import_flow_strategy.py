@@ -3,7 +3,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest, TrailingStopRequest
+from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
+    MemoryRequest,
+    SourceRequest,
+    TrailingStopRequest,
+)
 from autotrading.application.flows.errors import FlowNameInUseError
 from autotrading.application.flows.ports import FlowRepositoryPort, ModelSettingsPort, SourceSettingsPort
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -48,6 +53,7 @@ class ImportFlowStrategyCommand:
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
 
 
 class ImportFlowStrategyUseCase:
@@ -106,4 +112,5 @@ class ImportFlowStrategyUseCase:
             minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
             memory=command.memory.applied_to(FlowMemory()),
             trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
+            consecutive_loss_limit=command.consecutive_loss_limit.applied_to(None),
         )
