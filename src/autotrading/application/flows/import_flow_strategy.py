@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest, TrailingStopRequest
 from autotrading.application.flows.errors import FlowNameInUseError
 from autotrading.application.flows.ports import FlowRepositoryPort, ModelSettingsPort, SourceSettingsPort
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -15,6 +15,7 @@ from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 operations = logging.getLogger("autotrading.flows")
@@ -46,6 +47,7 @@ class ImportFlowStrategyCommand:
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
+    trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
 
 
 class ImportFlowStrategyUseCase:
@@ -103,4 +105,5 @@ class ImportFlowStrategyUseCase:
             ),
             minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
             memory=command.memory.applied_to(FlowMemory()),
+            trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
         )

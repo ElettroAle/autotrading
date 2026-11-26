@@ -9,3 +9,5 @@ class ProtectionNote:
 
     asset: str
     text: str
+    # A protection the exchange refused: the stop that follows the price tells it to the next cycle (R5.5.1).
+    refused: bool = False

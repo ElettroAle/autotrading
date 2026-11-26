@@ -202,3 +202,15 @@ def test_the_time_since_the_start_is_spoken(elapsed: timedelta, text: str) -> No
 
 def test_the_first_cycle_runs_at_the_start() -> None:
     assert user_document(context(now=STARTED))["tempo_dall_avvio"] == "0 minuti"
+
+
+def test_a_position_carries_the_largest_profit_it_reached_only_when_the_flow_gives_it() -> None:
+    # R5.5.1, ADR massimo-profitto-raggiunto-nello-stato-della-posizione: without it the state is the one of before.
+    state = replace(STATE, positions=(replace(LONG_BTC, max_profit=Decimal("30.5")), LONG_BTC))
+
+    document = user_document(context(state=state))["stato_del_flusso"]
+
+    assert isinstance(document, dict)
+    reached, plain = document["posizioni_aperte"]
+    assert reached["massimo_profitto_raggiunto"] == "30.5"
+    assert "massimo_profitto_raggiunto" not in plain

@@ -49,6 +49,12 @@ const configurationSchema = z.object({
     text_length: z.number().nullable(),
     all_decisions: z.boolean(),
   }),
+  trailing_stop: z.object({
+    distance_percent: z.string().nullable(),
+    activation_percent: z.string().nullable(),
+    breakeven_percent: z.string().nullable(),
+    max_profit_in_context: z.boolean(),
+  }),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

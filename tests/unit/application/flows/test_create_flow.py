@@ -11,6 +11,7 @@ from autotrading.application.flows.create_flow import (
     FlowChecks,
     MemoryRequest,
     SourceRequest,
+    TrailingStopRequest,
 )
 from autotrading.application.flows.errors import (
     AssetNotTradableError,
@@ -34,6 +35,7 @@ from autotrading.domain.flows.free_capital import FreeCapital
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
@@ -322,3 +324,54 @@ def test_the_flows_are_listed_by_name(flows: Flows) -> None:
 )
 def test_a_memory_given_whole_comes_back_as_it_was(memory: FlowMemory) -> None:
     assert MemoryRequest.of(memory).applied_to(FlowMemory(active=True, text_length=40)) == memory
+
+
+# R5.5.1, ADR impostazioni-dello-stop-che-segue-il-prezzo: what a request changes of the stop that follows the price.
+IN_FORCE = TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True)
+
+
+def test_the_parts_of_the_stop_that_follows_the_price_not_given_keep_their_value() -> None:
+    assert TrailingStopRequest().applied_to(IN_FORCE) == IN_FORCE
+
+
+def test_the_parts_of_the_stop_that_follows_the_price_given_replace_those_in_force() -> None:
+    request = TrailingStopRequest(Decimal(4), Decimal(5), Decimal("2.5"), max_profit_in_context=False)
+
+    assert request.applied_to(IN_FORCE) == TrailingStop(Decimal(4), Decimal(5), Decimal("2.5"))
+
+
+@pytest.mark.parametrize(
+    ("request_given", "expected"),
+    [
+        (TrailingStopRequest(remove_activation=True), replace(IN_FORCE, activation_percent=None)),
+        (TrailingStopRequest(remove_breakeven=True), replace(IN_FORCE, breakeven_percent=None)),
+        (
+            TrailingStopRequest(remove_distance=True, remove_activation=True),
+            replace(IN_FORCE, distance_percent=None, activation_percent=None),
+        ),
+    ],
+)
+def test_a_remove_flag_takes_the_part_of_the_stop_that_follows_the_price_away(
+    request_given: TrailingStopRequest, expected: TrailingStop
+) -> None:
+    assert request_given.applied_to(IN_FORCE) == expected
+
+
+def test_a_remove_flag_prevails_over_a_value_given_with_it() -> None:
+    request = TrailingStopRequest(
+        distance_percent=Decimal(4),
+        activation_percent=Decimal(5),
+        breakeven_percent=Decimal(6),
+        remove_distance=True,
+        remove_activation=True,
+        remove_breakeven=True,
+    )
+
+    assert request.applied_to(IN_FORCE) == TrailingStop(max_profit_in_context=True)
+
+
+def test_the_option_of_the_largest_profit_not_given_keeps_its_value() -> None:
+    request = TrailingStopRequest(distance_percent=Decimal(4))
+
+    assert request.applied_to(IN_FORCE).max_profit_in_context is True
+    assert request.applied_to(TrailingStop()).max_profit_in_context is False

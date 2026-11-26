@@ -27,6 +27,7 @@ from autotrading.domain.flows.system_prompt import (
     checked_system_prompt,
     rendered_system_prompt,
 )
+from autotrading.domain.flows.trailing_stop import TrailingStop
 
 FEWEST_CONSECUTIVE_FAILURES = 1
 MOST_CONSECUTIVE_FAILURES = 100
@@ -76,6 +77,8 @@ class FlowConfiguration:
     minimum_confidence: MinimumConfidence | None = None
     # Off unless the user turns it on: the agent decides on the data of the cycle alone (R5.3.4).
     memory: FlowMemory = field(default_factory=FlowMemory)
+    # Empty and off unless the user sets it: the stop moves only when the agent updates it (R5.5.1).
+    trailing_stop: TrailingStop = field(default_factory=TrailingStop)
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]

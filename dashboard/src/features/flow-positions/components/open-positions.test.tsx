@@ -40,6 +40,7 @@ describe('OpenPositions', () => {
       'Prezzo di ingresso60.000',
       'Obiettivo—',
       'Stop—',
+      'Massimo profitto raggiunto—',
       'Margine200 USDC',
       'PnL+12 USDC',
       'PnL %+6,00%',
@@ -76,6 +77,16 @@ describe('OpenPositions', () => {
     const table = screen.getByRole('table', { name: 'Posizioni aperte' });
     const [, , detail] = within(table).getAllByRole('row');
     expect(detail).toHaveTextContent('Invalidazionechiusura a 4 ore sotto 59000');
+  });
+
+  // ADR stop-che-segue-il-prezzo-nella-dashboard: the largest profit reached as the API gives it, empty without it.
+  it('shows the largest profit the position reached, in the currency of the account (R5.5.1)', async () => {
+    fakePlatform.holdPositions('alfa', [anOpenPosition({ stop: '61740', maxProfit: '30.5' })]);
+    await renderApp({ account: 'anna', url: URL });
+
+    const cells = await cellsOfFirstRow();
+    expect(cells[6]?.textContent).toBe('Stop61.740');
+    expect(cells[7]?.textContent).toBe('Massimo profitto raggiunto30,5 USDC');
   });
 
   it('rounds an entry price averaged over several fills (Bug 431)', async () => {

@@ -138,6 +138,28 @@ class MemoryTextLengthNotPositiveError(FlowSettingError):
         super().__init__("la lunghezza del motivo della memoria è un intero positivo", FlowSetting.MEMORY_TEXT_LENGTH)
 
 
+class TrailingDistanceOutOfRangeError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("la distanza dello stop che segue va da 0,1 a 50", FlowSetting.TRAILING_STOP_DISTANCE)
+
+
+class TrailingActivationNotPositiveError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("l'attivazione dello stop che segue è maggiore di 0", FlowSetting.TRAILING_STOP_ACTIVATION)
+
+
+class TrailingActivationWithoutDistanceError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__(
+            "l'attivazione richiede la distanza dello stop che segue", FlowSetting.TRAILING_STOP_ACTIVATION
+        )
+
+
+class TrailingBreakevenNotPositiveError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("il pareggio è maggiore di 0", FlowSetting.TRAILING_STOP_BREAKEVEN)
+
+
 class CapitalAboveFreeCapitalError(FlowSettingError):
     def __init__(self, free_capital: str) -> None:
         super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}", FlowSetting.ALLOCATED_CAPITAL)

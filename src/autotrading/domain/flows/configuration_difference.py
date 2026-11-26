@@ -20,6 +20,10 @@ DEFAULT_TAKE_PROFIT = "take profit predefinito"
 MINIMUM_CONFIDENCE = "confidenza minima"
 NO_MINIMUM_CONFIDENCE = "nessuna"
 MEMORY = "memoria"
+TRAILING_DISTANCE = "distanza dello stop che segue"
+TRAILING_ACTIVATION = "attivazione dello stop che segue"
+TRAILING_BREAKEVEN = "pareggio"
+TRAILING_MAX_PROFIT = "massimo profitto raggiunto nel contesto dell'agente"
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,4 +112,8 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
         lambda configuration: str(configuration.minimum_confidence or NO_MINIMUM_CONFIDENCE),
     ),
     (MEMORY, lambda configuration: str(configuration.memory)),
+    (TRAILING_DISTANCE, lambda configuration: _percent(configuration.trailing_stop.distance_percent)),
+    (TRAILING_ACTIVATION, lambda configuration: _percent(configuration.trailing_stop.activation_percent)),
+    (TRAILING_BREAKEVEN, lambda configuration: _percent(configuration.trailing_stop.breakeven_percent)),
+    (TRAILING_MAX_PROFIT, lambda configuration: "sì" if configuration.trailing_stop.max_profit_in_context else "no"),
 )

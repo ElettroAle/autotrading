@@ -23,6 +23,12 @@ const columnsIn = (currency: string): DataTableColumn<OpenPosition>[] => [
   { header: 'Prezzo di ingresso', cell: (position) => formatPrice(position.entry_price) },
   { header: 'Obiettivo', cell: (position) => priceOrNone(position.target_price) },
   { header: 'Stop', cell: (position) => priceOrNone(position.stop_price) },
+  // Empty when the API gives no value: the dashboard computes nothing (ADR stop-che-segue-il-prezzo-nella-dashboard).
+  {
+    header: 'Massimo profitto raggiunto',
+    cell: ({ max_profit_reached: reached }) =>
+      reached === null ? NONE : `${formatAmount(reached)} ${currency}`,
+  },
   { header: 'Margine', cell: (position) => `${formatAmount(position.margin)} ${currency}` },
   {
     header: 'PnL',

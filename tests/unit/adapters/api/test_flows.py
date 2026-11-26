@@ -110,6 +110,12 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "default_take_profit_percent": None,
         "minimum_confidence": None,
         "memory": {"active": False, "decisions": 10, "days": 30, "text_length": 160, "all_decisions": False},
+        "trailing_stop": {
+            "distance_percent": None,
+            "activation_percent": None,
+            "breakeven_percent": None,
+            "max_profit_in_context": False,
+        },
         "missing": [],
     }
     assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]
@@ -880,3 +886,17 @@ def test_an_account_with_an_active_flow_is_removed_only_confirming(client_of: Cl
     )
     assert removed.status_code == 204
     assert [flow["status"] for flow in anna.get("/flows", params={"archived": True}).json()] == ["archiviato"]
+
+
+def test_every_part_of_the_stop_that_follows_the_price_is_in_the_answer_even_when_empty(platform: Platform) -> None:
+    # R5.5.1: the dashboard generates its types from the document; an empty part is a null, never a missing field.
+    api = create_api(HealthReport("1.0.0", "dev"), ResolveTenantUseCase(platform.tenants), platform.for_tenant)
+    schemas = api.openapi()["components"]["schemas"]
+    trailing = schemas["FlowResponse"]["properties"]["trailing_stop"]["$ref"].rsplit("/", 1)[-1]
+
+    assert set(schemas[trailing]["required"]) == {
+        "distance_percent",
+        "activation_percent",
+        "breakeven_percent",
+        "max_profit_in_context",
+    }

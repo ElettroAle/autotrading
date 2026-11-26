@@ -63,6 +63,14 @@ const memoryValuesSchema = z.object({
   all_decisions: z.boolean().optional(),
 });
 
+// Percentages as typed, blank for a part left empty; the API checks the values and their combination (R5.5.1).
+const trailingStopValuesSchema = z.object({
+  distance_percent: numberText,
+  activation_percent: numberText,
+  breakeven_percent: numberText,
+  max_profit_in_context: z.boolean(),
+});
+
 export const flowFormSchema = z.object({
   name: z.string(),
   account_id: z.string(),
@@ -90,12 +98,14 @@ export const flowFormSchema = z.object({
   max_drawdown_percent: maxLossText,
   openings_resume: z.enum(OPENINGS_RESUMES, 'Scegli la ripresa delle aperture'),
   memory: memoryValuesSchema,
+  trailing_stop: trailingStopValuesSchema,
 });
 
 export type FlowFormValues = z.infer<typeof flowFormSchema>;
 export type SourceValues = z.infer<typeof sourceValuesSchema>;
 export type AdapterValues = z.infer<typeof adapterValuesSchema>;
 type MemoryValues = z.infer<typeof memoryValuesSchema>;
+type TrailingStopValues = z.infer<typeof trailingStopValuesSchema>;
 
 type AdapterRequest = {
   readonly name: string;
@@ -147,6 +157,16 @@ type SettingsRequest = {
     all_decisions: boolean | null;
     unlimited_text_length: boolean;
   };
+  // A blank part is taken away, as the API does with its remove flags (R5.5.1).
+  trailing_stop: {
+    distance_percent: string | null;
+    activation_percent: string | null;
+    breakeven_percent: string | null;
+    max_profit_in_context: boolean;
+    remove_distance: boolean;
+    remove_activation: boolean;
+    remove_breakeven: boolean;
+  };
 };
 
 export type CreationRequest = SettingsRequest & { name: string; allocated_capital?: string };
@@ -189,6 +209,12 @@ export const emptyFormValues = (): FlowFormValues => ({
     text_length: '',
     unlimited_text_length: false,
     all_decisions: false,
+  },
+  trailing_stop: {
+    distance_percent: '',
+    activation_percent: '',
+    breakeven_percent: '',
+    max_profit_in_context: false,
   },
 });
 
@@ -257,6 +283,16 @@ const memoryOf = (memory: MemoryValues): SettingsRequest['memory'] =>
         unlimited_text_length: false,
       };
 
+const trailingStopOf = (trailing: TrailingStopValues): SettingsRequest['trailing_stop'] => ({
+  distance_percent: decimalOrNull(trailing.distance_percent),
+  activation_percent: decimalOrNull(trailing.activation_percent),
+  breakeven_percent: decimalOrNull(trailing.breakeven_percent),
+  max_profit_in_context: trailing.max_profit_in_context,
+  remove_distance: isBlank(trailing.distance_percent),
+  remove_activation: isBlank(trailing.activation_percent),
+  remove_breakeven: isBlank(trailing.breakeven_percent),
+});
+
 const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   account_id: values.account_id,
   assets: values.assets,
@@ -280,6 +316,7 @@ const settingsOf = (values: FlowFormValues): SettingsRequest => ({
   max_drawdown_percent: decimalOrNull(values.max_drawdown_percent),
   openings_resume: values.openings_resume,
   memory: memoryOf(values.memory),
+  trailing_stop: trailingStopOf(values.trailing_stop),
 });
 
 /** The whole configuration of a new flow (R1.1.1); a blank capital is left out, so the API names it as missing. */
@@ -362,6 +399,12 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
     unlimited_text_length: flow.memory.text_length === null,
     all_decisions: flow.memory.all_decisions,
   },
+  trailing_stop: {
+    distance_percent: textOf(flow.trailing_stop.distance_percent),
+    activation_percent: textOf(flow.trailing_stop.activation_percent),
+    breakeven_percent: textOf(flow.trailing_stop.breakeven_percent),
+    max_profit_in_context: flow.trailing_stop.max_profit_in_context,
+  },
 });
 
 const sameValue = (one: unknown, other: unknown): boolean =>
@@ -423,7 +466,16 @@ const MEMORY_FIELDS: readonly Path<FlowFormValues>[] = [
   'memory.days',
   'memory.text_length',
 ];
-const FORM_FIELDS = new Set<string>([...Object.keys(flowFormSchema.shape), ...MEMORY_FIELDS]);
+const TRAILING_STOP_FIELDS: readonly Path<FlowFormValues>[] = [
+  'trailing_stop.distance_percent',
+  'trailing_stop.activation_percent',
+  'trailing_stop.breakeven_percent',
+];
+const FORM_FIELDS = new Set<string>([
+  ...Object.keys(flowFormSchema.shape),
+  ...MEMORY_FIELDS,
+  ...TRAILING_STOP_FIELDS,
+]);
 
 /** The field of the form a setting named by the API is typed in, when the form has it. */
 export const formFieldOf = (setting: string): Path<FlowFormValues> | undefined =>

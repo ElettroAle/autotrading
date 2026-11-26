@@ -114,6 +114,7 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   max_drawdown_percent: configuration.maxDrawdownPercent,
   openings_resume: configuration.openingsResume,
   memory: configuration.memory,
+  trailing_stop: configuration.trailingStop,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).

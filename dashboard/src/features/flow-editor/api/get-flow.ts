@@ -58,6 +58,13 @@ export const flowSchema = z.object({
     text_length: z.number().nullable(),
     all_decisions: z.boolean(),
   }),
+  // Every part empty and the option off unless the user sets them: the flow behaves as before (R5.5.1).
+  trailing_stop: z.object({
+    distance_percent: z.string().nullable(),
+    activation_percent: z.string().nullable(),
+    breakeven_percent: z.string().nullable(),
+    max_profit_in_context: z.boolean(),
+  }),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

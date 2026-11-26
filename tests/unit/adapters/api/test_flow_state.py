@@ -21,6 +21,8 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.flows.trailing_stop import TrailingStop
+from autotrading.domain.flows.watched_position import WatchedPosition
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
@@ -113,6 +115,7 @@ def test_the_state_of_a_flow_answers_its_attributed_values(client_of: Client, pl
                 "target_price": None,
                 "stop_price": None,
                 "invalidation": None,
+                "max_profit_reached": None,
             }
         ],
         "summary": {
@@ -202,6 +205,23 @@ def test_a_position_answers_its_exit_plan_in_force(client_of: Client, platform: 
         "58500",
         "chiusura a 4 ore sotto 59000",
     )
+
+
+def test_a_position_whose_stop_follows_the_price_answers_the_largest_profit_it_reached(
+    client_of: Client, platform: Platform
+) -> None:
+    # R5.5.1, ADR massimo-profitto-raggiunto-nello-stato-della-posizione.
+    anna = client_of("anna")
+    flow = flow_of(platform, "anna")
+    following = replace(flow, configuration=replace(flow.configuration, trailing_stop=TrailingStop(Decimal(2))))
+    platform.flows.flows[platform.flows.flows.index(flow)] = following
+    platform.account_activity.activities[flow.assigned_account_id] = an_activity(positions=(a_position("BTC"),))
+    watched = WatchedPosition("BTC", NOW, Decimal(63000), Decimal("30.50"))
+    platform.watched_positions.positions[platform.tenant_of("anna"), flow.id, "BTC"] = watched
+
+    [position] = anna.get(f"/flows/{flow.id.value}/state").json()["positions"]
+
+    assert position["max_profit_reached"] == "30.5"
 
 
 def test_a_flow_of_another_tenant_is_not_found(client_of: Client, platform: Platform) -> None:

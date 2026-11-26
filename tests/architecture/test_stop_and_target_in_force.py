@@ -56,7 +56,10 @@ def _sources_of_orders() -> dict[str, str]:
 
 
 def test_adr_stop_e_obiettivo_in_vigore_the_one_reading_of_the_state_reads_the_protections_recorded() -> None:
-    hints = get_type_hints(ReadFlowStateUseCase.__init__)
+    # The records of the open positions carry them, beside the positions watched for the stop that follows the price
+    # (R5.5.1).
+    assert get_type_hints(ReadFlowStateUseCase.__init__)["records"] is flow_ports.OpenPositionRecords
+    hints = get_type_hints(flow_ports.OpenPositionRecords)
 
     assert hints["protection_levels"] is flow_ports.FlowProtectionLevelsPort
     assert get_type_hints(TenantPorts)["protection_levels"] is flow_ports.FlowProtectionLevelsPort

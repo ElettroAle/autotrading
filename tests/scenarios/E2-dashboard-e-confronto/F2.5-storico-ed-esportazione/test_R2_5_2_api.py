@@ -180,6 +180,8 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         "minimum_confidence",
         # The memory travels with the strategy (ADR memoria-del-flusso-dalle-decisioni-operative-precedenti).
         "memory",
+        # The stop that follows the price travels with the strategy (ADR impostazioni-dello-stop-che-segue-il-prezzo).
+        "trailing_stop",
     }
 
 

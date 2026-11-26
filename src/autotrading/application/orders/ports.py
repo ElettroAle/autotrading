@@ -185,6 +185,27 @@ class HeldFlowAssetsPort(Protocol):
     def assets(self) -> Sequence[str]: ...
 
 
+class StopMovePort(Protocol):
+    """The stop loss of the open position of a flow moved closer to the price between the cycles, with the default stop
+    of the flow every stop stays within (R5.5.1).
+    """
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def flow_id(self) -> UUID: ...
+
+    @property
+    def asset(self) -> str: ...
+
+    @property
+    def stop(self) -> Decimal: ...
+
+    @property
+    def default_stop_loss_percent(self) -> Decimal: ...
+
+
 class ProtectedPositionPort(Protocol):
     """The position of an account on an asset whose protections are left behind by its closing (R3.1.2)."""
 

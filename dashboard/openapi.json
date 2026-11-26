@@ -7179,6 +7179,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/FlowMemory"
+          },
+          "trailing_stop": {
+            "$ref": "#/components/schemas/TrailingStopResponse"
           }
         },
         "type": "object",
@@ -7202,7 +7205,8 @@
           "default_stop_loss_percent",
           "default_take_profit_percent",
           "minimum_confidence",
-          "memory"
+          "memory",
+          "trailing_stop"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -8336,6 +8340,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemoryRequest"
+          },
+          "trailing_stop": {
+            "$ref": "#/components/schemas/TrailingStopRequest-Input"
           }
         },
         "type": "object",
@@ -8813,6 +8820,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemoryRequest"
+          },
+          "trailing_stop": {
+            "$ref": "#/components/schemas/TrailingStopRequest-Input"
           }
         },
         "type": "object",
@@ -9063,6 +9073,17 @@
               }
             ],
             "title": "Invalidation"
+          },
+          "max_profit_reached": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Profit Reached"
           }
         },
         "type": "object",
@@ -9078,10 +9099,11 @@
           "unrealized_pnl_percent",
           "target_price",
           "stop_price",
-          "invalidation"
+          "invalidation",
+          "max_profit_reached"
         ],
         "title": "FlowPositionResponse",
-        "description": "An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a\nposition without margin, each level of the plan when the agent declared none."
+        "description": "An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a\nposition without margin, each level of the plan when the agent declared none. The largest profit the position\nreached is null unless the stop of the flow follows the price (R5.5.1)."
       },
       "FlowRankingResponse": {
         "properties": {
@@ -9310,6 +9332,9 @@
           "memory": {
             "$ref": "#/components/schemas/FlowMemory"
           },
+          "trailing_stop": {
+            "$ref": "#/components/schemas/TrailingStopResponse"
+          },
           "missing": {
             "items": {
               "type": "string"
@@ -9344,6 +9369,7 @@
           "default_take_profit_percent",
           "minimum_confidence",
           "memory",
+          "trailing_stop",
           "missing"
         ],
         "title": "FlowResponse",
@@ -12484,6 +12510,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemoryRequest"
+          },
+          "trailing_stop": {
+            "$ref": "#/components/schemas/TrailingStopRequest-Input"
           }
         },
         "type": "object",
@@ -12623,6 +12652,9 @@
           },
           "memory": {
             "$ref": "#/components/schemas/MemoryRequest"
+          },
+          "trailing_stop": {
+            "$ref": "#/components/schemas/TrailingStopRequest-Output"
           }
         },
         "type": "object",
@@ -12924,6 +12956,197 @@
           "short"
         ],
         "title": "TradeSide"
+      },
+      "TrailingStopRequest-Input": {
+        "properties": {
+          "distance_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Percent"
+          },
+          "activation_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Percent"
+          },
+          "breakeven_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breakeven Percent"
+          },
+          "max_profit_in_context": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Profit In Context"
+          },
+          "remove_distance": {
+            "type": "boolean",
+            "title": "Remove Distance",
+            "default": false
+          },
+          "remove_activation": {
+            "type": "boolean",
+            "title": "Remove Activation",
+            "default": false
+          },
+          "remove_breakeven": {
+            "type": "boolean",
+            "title": "Remove Breakeven",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "TrailingStopRequest",
+        "description": "The parts of the stop that follows the price the user gives; a part not given keeps the value it has, empty for a\nnew flow (R5.5.1, ADR impostazioni-dello-stop-che-segue-il-prezzo).\n\nA part not given cannot say «none»: the `remove_*` flags take a part away, as the parts of a configuration that may\nbe removed, and prevail over a value given with them."
+      },
+      "TrailingStopRequest-Output": {
+        "properties": {
+          "distance_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Percent"
+          },
+          "activation_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Percent"
+          },
+          "breakeven_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breakeven Percent"
+          },
+          "max_profit_in_context": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Profit In Context"
+          },
+          "remove_distance": {
+            "type": "boolean",
+            "title": "Remove Distance",
+            "default": false
+          },
+          "remove_activation": {
+            "type": "boolean",
+            "title": "Remove Activation",
+            "default": false
+          },
+          "remove_breakeven": {
+            "type": "boolean",
+            "title": "Remove Breakeven",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "TrailingStopRequest",
+        "description": "The parts of the stop that follows the price the user gives; a part not given keeps the value it has, empty for a\nnew flow (R5.5.1, ADR impostazioni-dello-stop-che-segue-il-prezzo).\n\nA part not given cannot say «none»: the `remove_*` flags take a part away, as the parts of a configuration that may\nbe removed, and prevail over a value given with them."
+      },
+      "TrailingStopResponse": {
+        "properties": {
+          "distance_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Percent"
+          },
+          "activation_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Percent"
+          },
+          "breakeven_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Breakeven Percent"
+          },
+          "max_profit_in_context": {
+            "type": "boolean",
+            "title": "Max Profit In Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "distance_percent",
+          "activation_percent",
+          "breakeven_percent",
+          "max_profit_in_context"
+        ],
+        "title": "TrailingStopResponse",
+        "description": "The stop that follows the price of a version, every part present, null when empty (R5.5.1)."
       },
       "TrialOutcome": {
         "type": "string",

@@ -16,6 +16,8 @@ from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.selections import ActiveSource, AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.flows.trailing_stop import TrailingStop
+from autotrading.domain.flows.watched_position import WatchedPosition
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 
@@ -172,3 +174,40 @@ def test_the_sources_of_the_cycle_are_the_active_sources_of_the_configuration_in
     )
 
     assert cycle.sources == (ActiveSource("notizie", "RSS"), ActiveSource("notizie", "altro"))
+
+
+def following(trailing: TrailingStop, best_price: int | None = None) -> CycleFlow:
+    """A flow whose stop follows the price, with the position on BTC entered at 100 and now at 105 (R5.5.1)."""
+    flow = replace(FLOW, configuration=replace(FLOW.configuration, trailing_stop=trailing))
+    state = attributed(margin=Decimal(50))
+    if best_price is not None:
+        state = state.watching({"BTC": WatchedPosition("BTC", READ_AT, Decimal(best_price), Decimal(10))})
+    return replace(cycle_flow(state), flow=flow)
+
+
+def test_the_risk_bounds_the_stop_of_each_position_with_the_stop_that_follows_its_best_price() -> None:
+    # R5.5.1, ADR sorveglianza-del-prezzo-per-lo-stop-che-segue.
+    assert following(TrailingStop(Decimal(2)), best_price=110).risk_state().trailing_stops == {"BTC": Decimal("107.8")}
+
+
+def test_a_position_never_watched_counts_from_the_price_of_now() -> None:
+    assert following(TrailingStop(Decimal(2))).risk_state().trailing_stops == {"BTC": Decimal("102.9")}
+
+
+def test_a_position_before_the_activation_has_no_stop_that_follows_the_price() -> None:
+    trailing = TrailingStop(Decimal(2), activation_percent=Decimal(20))
+
+    assert following(trailing, best_price=110).risk_state().trailing_stops == {}
+
+
+def test_a_flow_whose_stop_does_not_follow_the_price_bounds_no_stop() -> None:
+    assert following(TrailingStop(), best_price=110).risk_state().trailing_stops == {}
+
+
+def test_the_agent_sees_the_largest_profit_reached_only_with_the_option_on() -> None:
+    # R5.5.1, ADR massimo-profitto-raggiunto-nello-stato-della-posizione.
+    on = following(TrailingStop(Decimal(2), max_profit_in_context=True), best_price=110)
+    off = following(TrailingStop(Decimal(2)), best_price=110)
+
+    assert [position.max_profit for position in on.state_view().positions] == [Decimal(10)]
+    assert [position.max_profit for position in off.state_view().positions] == [None]

@@ -40,6 +40,7 @@ from autotrading.domain.flows.selections import (
     SourceSelection,
 )
 from autotrading.domain.flows.statistics_period import TimeWindow
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
 
@@ -83,6 +84,13 @@ class _MemoryDocument(TypedDict):
     all_decisions: NotRequired[bool]
 
 
+class _TrailingStopDocument(TypedDict):
+    distance_percent: str | None
+    activation_percent: str | None
+    breakeven_percent: str | None
+    max_profit_in_context: bool
+
+
 class _ConfigurationDocument(TypedDict):
     """A configuration version as saved in JSON; a wrong shape fails while it is read."""
 
@@ -108,6 +116,8 @@ class _ConfigurationDocument(TypedDict):
     minimum_confidence: int | None
     # Every version has it: the migration gave the versions saved before it off, with 10 decisions and 30 days (R5.3.4).
     memory: _MemoryDocument
+    # Absent in the versions saved before it: no stop that follows the price, and no new version for them (R5.5.1).
+    trailing_stop: NotRequired[_TrailingStopDocument]
 
 
 class SqlAlchemyFlowRepositoryAdapter:
@@ -377,6 +387,7 @@ def document_of(configuration: FlowConfiguration) -> dict[str, object]:
             "text_length": configuration.memory.text_length,
             "all_decisions": configuration.memory.all_decisions,
         },
+        "trailing_stop": _trailing_stop_document(configuration.trailing_stop),
     }
 
 
@@ -423,6 +434,7 @@ def configuration_of(version: int, saved: Mapping[str, object]) -> FlowConfigura
         ),
         minimum_confidence=MinimumConfidence.optional(document["minimum_confidence"]),
         memory=FlowMemory(**document["memory"]),
+        trailing_stop=_trailing_stop_of(document.get("trailing_stop")),
     )
 
 
@@ -434,6 +446,26 @@ def flow_of(row: RowMapping) -> Flow:
         FlowName(row["name"]),
         FlowStatus[row["status"].upper()],
         configuration_of(row["version"], row["configuration"]),
+    )
+
+
+def _trailing_stop_document(trailing: TrailingStop) -> _TrailingStopDocument:
+    return {
+        "distance_percent": _text(trailing.distance_percent),
+        "activation_percent": _text(trailing.activation_percent),
+        "breakeven_percent": _text(trailing.breakeven_percent),
+        "max_profit_in_context": trailing.max_profit_in_context,
+    }
+
+
+def _trailing_stop_of(document: _TrailingStopDocument | None) -> TrailingStop:
+    if document is None:
+        return TrailingStop()
+    return TrailingStop(
+        _decimal(document["distance_percent"]),
+        _decimal(document["activation_percent"]),
+        _decimal(document["breakeven_percent"]),
+        document["max_profit_in_context"],
     )
 
 

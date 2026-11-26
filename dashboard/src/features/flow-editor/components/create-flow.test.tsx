@@ -238,6 +238,13 @@ describe('CreateFlow', () => {
       openings_resume: 'manual',
       // Left untouched, the memory stays off with the defaults of the platform (R5.3.4).
       memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
+      // Left untouched, the stop does not follow the price: the flow behaves as before (R5.5.1).
+      trailing_stop: {
+        distance_percent: null,
+        activation_percent: null,
+        breakeven_percent: null,
+        max_profit_in_context: false,
+      },
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');

@@ -186,6 +186,11 @@ class QuestionPositionPort(Protocol):
     @property
     def exit_plan(self) -> QuestionExitPlanPort: ...
 
+    @property
+    def max_profit(self) -> Decimal | None:
+        """The largest unrealized profit the position reached, only when the user wants the agent to see it (R5.5.1)."""
+        ...
+
 
 class QuestionStatePort(Protocol):
     """The state of the flow alone, as the cycle of the flow hands it to the agent (R1.4.3)."""

@@ -2034,6 +2034,7 @@ export interface components {
             /** Minimum Confidence */
             minimum_confidence: number | null;
             memory: components["schemas"]["FlowMemory"];
+            trailing_stop: components["schemas"]["TrailingStopResponse"];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -2452,6 +2453,7 @@ export interface components {
             /** Minimum Confidence */
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
+            trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2597,6 +2599,7 @@ export interface components {
             /** Minimum Confidence */
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
+            trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
         };
         /**
          * FlowOverviewResponse
@@ -2644,7 +2647,8 @@ export interface components {
         /**
          * FlowPositionResponse
          * @description An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a
-         *     position without margin, each level of the plan when the agent declared none.
+         *     position without margin, each level of the plan when the agent declared none. The largest profit the position
+         *     reached is null unless the stop of the flow follows the price (R5.5.1).
          */
         FlowPositionResponse: {
             /** Asset */
@@ -2671,6 +2675,8 @@ export interface components {
             stop_price: string | null;
             /** Invalidation */
             invalidation: string | null;
+            /** Max Profit Reached */
+            max_profit_reached: string | null;
         };
         /**
          * FlowRankingResponse
@@ -2751,6 +2757,7 @@ export interface components {
             /** Minimum Confidence */
             minimum_confidence: number | null;
             memory: components["schemas"]["FlowMemory"];
+            trailing_stop: components["schemas"]["TrailingStopResponse"];
             /** Missing */
             missing: string[];
         };
@@ -3920,6 +3927,7 @@ export interface components {
             /** Minimum Confidence */
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
+            trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
         };
         /**
          * StrategyBody
@@ -3961,6 +3969,7 @@ export interface components {
             /** Minimum Confidence */
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
+            trailing_stop?: components["schemas"]["TrailingStopRequest-Output"];
         };
         /**
          * StrategyDocument
@@ -4069,6 +4078,86 @@ export interface components {
          * @enum {string}
          */
         TradeSide: "long" | "short";
+        /**
+         * TrailingStopRequest
+         * @description The parts of the stop that follows the price the user gives; a part not given keeps the value it has, empty for a
+         *     new flow (R5.5.1, ADR impostazioni-dello-stop-che-segue-il-prezzo).
+         *
+         *     A part not given cannot say «none»: the `remove_*` flags take a part away, as the parts of a configuration that may
+         *     be removed, and prevail over a value given with them.
+         */
+        "TrailingStopRequest-Input": {
+            /** Distance Percent */
+            distance_percent?: number | string | null;
+            /** Activation Percent */
+            activation_percent?: number | string | null;
+            /** Breakeven Percent */
+            breakeven_percent?: number | string | null;
+            /** Max Profit In Context */
+            max_profit_in_context?: boolean | null;
+            /**
+             * Remove Distance
+             * @default false
+             */
+            remove_distance: boolean;
+            /**
+             * Remove Activation
+             * @default false
+             */
+            remove_activation: boolean;
+            /**
+             * Remove Breakeven
+             * @default false
+             */
+            remove_breakeven: boolean;
+        };
+        /**
+         * TrailingStopRequest
+         * @description The parts of the stop that follows the price the user gives; a part not given keeps the value it has, empty for a
+         *     new flow (R5.5.1, ADR impostazioni-dello-stop-che-segue-il-prezzo).
+         *
+         *     A part not given cannot say «none»: the `remove_*` flags take a part away, as the parts of a configuration that may
+         *     be removed, and prevail over a value given with them.
+         */
+        "TrailingStopRequest-Output": {
+            /** Distance Percent */
+            distance_percent?: string | null;
+            /** Activation Percent */
+            activation_percent?: string | null;
+            /** Breakeven Percent */
+            breakeven_percent?: string | null;
+            /** Max Profit In Context */
+            max_profit_in_context?: boolean | null;
+            /**
+             * Remove Distance
+             * @default false
+             */
+            remove_distance: boolean;
+            /**
+             * Remove Activation
+             * @default false
+             */
+            remove_activation: boolean;
+            /**
+             * Remove Breakeven
+             * @default false
+             */
+            remove_breakeven: boolean;
+        };
+        /**
+         * TrailingStopResponse
+         * @description The stop that follows the price of a version, every part present, null when empty (R5.5.1).
+         */
+        TrailingStopResponse: {
+            /** Distance Percent */
+            distance_percent: string | null;
+            /** Activation Percent */
+            activation_percent: string | null;
+            /** Breakeven Percent */
+            breakeven_percent: string | null;
+            /** Max Profit In Context */
+            max_profit_in_context: boolean;
+        };
         /**
          * TrialOutcome
          * @enum {string}

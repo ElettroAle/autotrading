@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -5,12 +6,15 @@ from uuid import uuid4
 import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
+from autotrading.application.flows.ports import OpenPositionRecords
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.trailing_stop import TrailingStop
+from autotrading.domain.flows.watched_position import WatchedPosition
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
@@ -22,10 +26,12 @@ from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
+OFF = TrailingStop()
 ACCOUNT = uuid4()
 
 
@@ -36,21 +42,22 @@ class Bench:
         self.ledger = InMemoryFlowLedgerAdapter()
         self.exit_plans = InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
         protections = ProtectionStore()
+        self.watched = WatchedPositionStore()
         self.protections = InMemoryProtectionRepositoryAdapter(protections, TENANT)
         self.use_case = ReadFlowStateUseCase(
             InMemoryFlowRepositoryAdapter(self.store, TENANT),
             self.activity,
             self.ledger,
-            self.exit_plans,
-            InMemoryFlowProtectionLevelsAdapter(protections, TENANT),
+            OpenPositionRecords(
+                self.exit_plans,
+                InMemoryFlowProtectionLevelsAdapter(protections, TENANT),
+                InMemoryWatchedPositionsAdapter(self.watched, self.store, TENANT),
+            ),
         )
 
-    def flow(self, *assets: str, tenant_id: TenantId = TENANT) -> Flow:
-        flow = a_flow(
-            tenant_id,
-            account_id=ACCOUNT,
-            configuration=a_configuration(assets=assets, allocated_capital=Decimal(500)),
-        )
+    def flow(self, *assets: str, tenant_id: TenantId = TENANT, trailing: TrailingStop = OFF) -> Flow:
+        configuration = replace(a_configuration(assets=assets, allocated_capital=Decimal(500)), trailing_stop=trailing)
+        flow = a_flow(tenant_id, account_id=ACCOUNT, configuration=configuration)
         self.store.flows.append(flow)
         return flow
 
@@ -183,3 +190,37 @@ def test_the_state_carries_the_changes_of_the_capital_of_the_flow_oldest_first(b
 
     assert state.capital_changes == (earlier, later)
     assert state.cashed_profit == Decimal(20)
+
+
+WATCHED = WatchedPosition("BTC", datetime(2026, 11, 26, 9, tzinfo=UTC), Decimal(63000), Decimal(30))
+
+
+def test_a_position_whose_stop_follows_the_price_carries_the_largest_profit_it_reached(bench: Bench) -> None:
+    # R5.5.1, ADR massimo-profitto-raggiunto-nello-stato-della-posizione.
+    flow = bench.flow("BTC", "ETH", trailing=TrailingStop(Decimal(2)))
+    bench.watched.positions[TENANT, flow.id, "BTC"] = WATCHED
+    bench.watched.positions[TENANT, flow.id, "ETH"] = replace(WATCHED, asset="ETH")
+    bench.activity.activities[ACCOUNT] = an_activity(positions=(a_position("BTC"),))
+
+    state = bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+    assert (state.max_profit_of("BTC"), state.max_profit_of("ETH")) == (Decimal(30), None)
+
+
+def test_the_breakeven_alone_is_enough_for_the_largest_profit_reached(bench: Bench) -> None:
+    flow = bench.flow("BTC", trailing=TrailingStop(breakeven_percent=Decimal("1.5")))
+    bench.watched.positions[TENANT, flow.id, "BTC"] = WATCHED
+    bench.activity.activities[ACCOUNT] = an_activity(positions=(a_position("BTC"),))
+
+    assert bench.use_case.execute(ReadFlowStateCommand(flow.id)).max_profit_of("BTC") == Decimal(30)
+
+
+def test_a_flow_whose_stop_does_not_follow_the_price_has_no_largest_profit(bench: Bench) -> None:
+    flow = bench.flow("BTC")
+    bench.watched.positions[TENANT, flow.id, "BTC"] = WATCHED
+    bench.activity.activities[ACCOUNT] = an_activity(positions=(a_position("BTC"),))
+
+    state = bench.use_case.execute(ReadFlowStateCommand(flow.id))
+
+    assert state.max_profit_of("BTC") is None
+    assert state.watched == {}

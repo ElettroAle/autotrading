@@ -1,9 +1,11 @@
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from autotrading.adapters.outbound.apscheduler.check_scheduler import _check_background_scheduler
 from autotrading.adapters.outbound.apscheduler.configuration import _ApSchedulerSettings
 from autotrading.adapters.outbound.apscheduler.cycle_scheduler import ApSchedulerCycleSchedulerAdapter
 from autotrading.adapters.outbound.apscheduler.daily_check_scheduler import ApSchedulerDailyCheckSchedulerAdapter
+from autotrading.adapters.outbound.apscheduler.periodic_check_scheduler import ApSchedulerPeriodicCheckSchedulerAdapter
 
 
 def apscheduler_adapters() -> ApSchedulerCycleSchedulerAdapter:
@@ -26,10 +28,15 @@ def apscheduler_daily_check_adapters() -> ApSchedulerDailyCheckSchedulerAdapter:
     """The scheduler of the daily checks of the worker, one thread: a check never runs beside itself (ADR
     controllo-giornaliero-delle-scadenze)."""
     settings = _ApSchedulerSettings()
-    scheduler = BackgroundScheduler(
-        executors={"default": ThreadPoolExecutor(settings.daily_check_threads)},
-        # A check woken late still runs, once.
-        job_defaults={"coalesce": True, "misfire_grace_time": None, "max_instances": 1},
-        timezone=settings.zone,
+    return ApSchedulerDailyCheckSchedulerAdapter(
+        _check_background_scheduler(settings.daily_check_threads, settings.zone)
     )
-    return ApSchedulerDailyCheckSchedulerAdapter(scheduler)
+
+
+def apscheduler_periodic_check_adapters() -> ApSchedulerPeriodicCheckSchedulerAdapter:
+    """The scheduler of the periodic checks of the worker, one thread: a check never runs beside itself (ADR
+    sorveglianza-del-prezzo-per-lo-stop-che-segue)."""
+    settings = _ApSchedulerSettings()
+    return ApSchedulerPeriodicCheckSchedulerAdapter(
+        _check_background_scheduler(settings.periodic_check_threads, settings.zone)
+    )

@@ -162,6 +162,7 @@ from tests.fakes.source_trials import FakeSourceTrialAdapter
 from tests.fakes.tenant_repository import InMemoryTenantRepositoryAdapter
 from tests.fakes.verification import FakeVerificationAdapter
 from tests.fakes.verification_run_repository import InMemoryVerificationRunRepositoryAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import an_activity
 from tests.support.credentials import hyperliquid_credentials
 from tests.support.directory import Directory
@@ -242,9 +243,10 @@ class Platform:
         self.account_activity, self.remembered_readings = FakeAccountActivityAdapter(), RememberedReadings()
         self.account_activity.unread = self.reading_on_exchange
         self.account_transfers = FakeAccountTransfersAdapter()
-        # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2).
+        # The stop loss and take profit on the exchange and those the platform recorded (R3.1.2), and the positions it
+        # watches for the stop that follows the price (R5.5.1).
         self.protection_exchange = FakeProtectionExchangeAdapter()
-        self.protections = ProtectionStore()
+        self.protections, self.watched_positions = ProtectionStore(), WatchedPositionStore()
         # The orders every tenant recorded are those the ledger reads, as the real adapter reads them from the table.
         self.platform_orders = InMemoryPlatformOrdersAdapter(
             self.protections, lambda: [order for orders in self.orders.values() for order in orders.orders]
@@ -406,6 +408,7 @@ class Platform:
             closed_positions=closed_positions,
             exit_plans=exit_plans,
             protection_levels=InMemoryFlowProtectionLevelsAdapter(self.protections, tenant_id),
+            watched_positions=InMemoryWatchedPositionsAdapter(self.watched_positions, self.flows, tenant_id),
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             decision_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,

@@ -4,15 +4,15 @@ from uuid import UUID
 
 from autotrading.application.flows.ports import (
     CycleOrderExecutionPort,
-    ExitPlanRepositoryPort,
     FlowOpeningsPort,
-    FlowProtectionLevelsPort,
     FlowRepositoryPort,
+    OpenPositionRecords,
 )
 from autotrading.domain.flows.cycle_order import CycleOrder, CycleOrders
 from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.risk_outcome import ApprovedOpening, ApprovedUpdate
+from autotrading.domain.flows.watched_position import TrailingStopNote
 
 
 class SendCycleOrdersUseCase:
@@ -23,22 +23,23 @@ class SendCycleOrdersUseCase:
     execution, because the exchange refused its stop loss, is removed by its closing (R3.1.2). The execution runs even
     without orders: a position of the flow without a stop loss gets the default one at every cycle, with the defaults of
     the version in force (R3.1.2). After an update the plan in force holds the levels the exchange has waiting, never
-    those it refused (R3.1.3).
+    those it refused (R3.1.3). A move of the stop that follows the price the exchange refused since the previous cycle
+    is recorded once, beside the notes of the protections (R5.5.1).
     """
 
     def __init__(
         self,
         execution: CycleOrderExecutionPort,
         openings: FlowOpeningsPort,
-        exit_plans: ExitPlanRepositoryPort,
         flows: FlowRepositoryPort,
-        protection_levels: FlowProtectionLevelsPort,
+        records: OpenPositionRecords,
     ) -> None:
         self._execution = execution
         self._openings = openings
-        self._exit_plans = exit_plans
         self._flows = flows
-        self._protection_levels = protection_levels
+        self._exit_plans = records.exit_plans
+        self._protection_levels = records.protection_levels
+        self._watched = records.watched
 
     def execute(self, flow_id: UUID, planned_at: datetime, orders: Sequence[CycleOrder]) -> Sequence[object]:
         cycle = self._cycle_of(FlowId(flow_id), planned_at, orders)
@@ -51,7 +52,17 @@ class SendCycleOrdersUseCase:
                 self._exit_plans.remove(FlowId(flow_id), opening.asset)
         for update in (order for order in cycle.orders if isinstance(order, ApprovedUpdate)):
             self._put_in_force(FlowId(flow_id), update)
-        return sent
+        return (*sent, *self._refused_stop_moves(FlowId(flow_id)))
+
+    def _refused_stop_moves(self, flow_id: FlowId) -> list[TrailingStopNote]:
+        notes: list[TrailingStopNote] = []
+        for position in self._watched.watched_of(flow_id):
+            note = position.note()
+            if note is None:
+                continue
+            self._watched.save(flow_id, position.told())
+            notes.append(note)
+        return notes
 
     def _put_in_force(self, flow_id: FlowId, update: ApprovedUpdate) -> None:
         current = self._exit_plans.current(flow_id, update.asset) or ExitPlan()

@@ -8,8 +8,8 @@ from autotrading.adapters.inbound.api.tenant_use_cases import TenantPorts, Tenan
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
     CyclePolling,
-    DailyChecks,
     OutboxProcessing,
+    ScheduledChecks,
     WorkerAnswers,
     WorkerLoops,
     WorkerUseCases,
@@ -19,7 +19,11 @@ from autotrading.adapters.inbound.mcp.composition import mcp_adapters
 from autotrading.adapters.inbound.mcp.server import McpApplication
 from autotrading.adapters.inbound.mcp.use_cases import McpUseCases
 from autotrading.adapters.outbound.alternative_me.composition import alternative_me_adapters
-from autotrading.adapters.outbound.apscheduler.composition import apscheduler_adapters, apscheduler_daily_check_adapters
+from autotrading.adapters.outbound.apscheduler.composition import (
+    apscheduler_adapters,
+    apscheduler_daily_check_adapters,
+    apscheduler_periodic_check_adapters,
+)
 from autotrading.adapters.outbound.arkham.composition import arkham_adapters
 from autotrading.adapters.outbound.binance.composition import binance_adapters
 from autotrading.adapters.outbound.coinmarketcap.composition import coinmarketcap_adapters
@@ -141,6 +145,7 @@ from autotrading.adapters.outbound.sqlalchemy.verification_locks import SqlAlche
 from autotrading.adapters.outbound.sqlalchemy.verification_run_repository import (
     SqlAlchemyVerificationRunRepositoryAdapter,
 )
+from autotrading.adapters.outbound.sqlalchemy.watched_positions import SqlAlchemyWatchedPositionsAdapter
 from autotrading.adapters.outbound.system_clock.composition import system_clock_adapters, system_clock_pause_adapters
 from autotrading.adapters.outbound.telegram.composition import telegram_adapters
 from autotrading.adapters.outbound.threads.concurrent_calls import ThreadPoolConcurrentCallsAdapter
@@ -165,6 +170,12 @@ from autotrading.application.flows.create_flow import FlowChecks
 from autotrading.application.flows.cycle_graph import CycleGraph, CycleSteps
 from autotrading.application.flows.decide_cycle import DecideCycleUseCase
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
+from autotrading.application.flows.follow_trailing_stops import (
+    FollowTrailingStopsCommand,
+    FollowTrailingStopsUseCase,
+    StopMoves,
+    WatchedPositionReadings,
+)
 from autotrading.application.flows.guard_flow_loss import GuardFlowLossUseCase
 from autotrading.application.flows.list_flow_summaries import ListFlowSummariesUseCase
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
@@ -185,6 +196,7 @@ from autotrading.application.flows.ports import (
     CycleDecisions,
     FlowAccountPorts,
     FlowModelsPort,
+    OpenPositionRecords,
     ReconciliationAlarmPorts,
 )
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
@@ -212,6 +224,7 @@ from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePo
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
 from autotrading.application.flows.run_cycle_on_demand import RunCycleOnDemandUseCase
+from autotrading.application.flows.schedule_trailing_stop_checks import ScheduleTrailingStopChecksUseCase
 from autotrading.application.flows.select_model import SelectModelUseCase
 from autotrading.application.flows.select_source import SelectSourceUseCase
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
@@ -266,6 +279,7 @@ from autotrading.application.orders.follow_flow_orders import (
     FlowOrderFollowers,
     FollowFlowOrdersUseCase,
 )
+from autotrading.application.orders.move_flow_stop import MoveFlowStopUseCase
 from autotrading.application.orders.open_position import OpenPositionUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.open_verification_position import OpenVerificationPositionUseCase
@@ -419,6 +433,7 @@ def tenant_use_cases(
             closed_positions=closed_positions,
             exit_plans=exit_plans,
             protection_levels=SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
+            watched_positions=SqlAlchemyWatchedPositionsAdapter(engine, tenant_id),
             cycle_history=cycle_history,
             decision_history=cycle_history,
             flow_directory=flows,
@@ -573,6 +588,8 @@ def cycle_of(
         ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         protections = SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)
         protection_levels = SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id)
+        watched = SqlAlchemyWatchedPositionsAdapter(engine, tenant_id)
+        records = OpenPositionRecords(exit_plans, protection_levels, watched)
         cancel_protections = CancelProtectionsUseCase(access, order_exchanges, protections)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
@@ -617,7 +634,13 @@ def cycle_of(
                 RecordWaitingProtectionsUseCase(access, order_exchanges, protections),
             ),
             ReadCycleFlowStateUseCase(
-                ReadFlowStateUseCase(flows, activity, ledger, exit_plans, protection_levels), reconcile_for_cycle
+                ReadFlowStateUseCase(
+                    flows,
+                    activity,
+                    ledger,
+                    records,
+                ),
+                reconcile_for_cycle,
             ),
             readings,
         )
@@ -660,9 +683,8 @@ def cycle_of(
                 ProtectOpenPositionsUseCase(access, order_exchanges, protections, retry),
             ),
             openings,
-            exit_plans,
             flows,
-            protection_levels,
+            records,
         )
         steps = CycleSteps(
             start=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
@@ -755,6 +777,38 @@ def check_key_expiries(
         flows, SqlAlchemyAutomaticPauseAdapter(engine, tenant_id), NotifyFlowPausedUseCase(notify_flow, alerts)
     )
     PauseFlowsOnExpiredKeysUseCase(keys, flows, pause, clock).execute(PauseFlowsOnExpiredKeysCommand())
+
+
+def follow_trailing_stops(
+    engine: SqlAlchemyEngine,
+    opener: SodiumCredentialOpenerAdapter,
+    markets: tuple[HyperliquidAdaptersOfInstallation, SimulatedExecution],
+    tenant_id: TenantId,
+) -> None:
+    """The check of one tenant: the stops that follow the price of its flows, moved through the replacement of the
+    update of the exit plan, with the lock the cycles hold (R5.5.1, ADR sorveglianza-del-prezzo-per-lo-stop-che-segue).
+    """
+    hyperliquid, simulation = markets
+    _, _, order_exchanges, activity_readers, *_ = exchanges_of_tenant(engine, simulation, hyperliquid, tenant_id)
+    accounts = SqlAlchemyAccountRepositoryAdapter(engine, tenant_id)
+    clock = system_clock_adapters()
+    retry = TransientRetry(system_clock_pause_adapters(), clock)
+    move = MoveFlowStopUseCase(
+        OpenTradingAccessUseCase(accounts, opener),
+        UpdateFlowProtectionUseCase(order_exchanges, SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)),
+        retry,
+    )
+    FollowTrailingStopsUseCase(
+        SqlAlchemyFlowRepositoryAdapter(engine, tenant_id),
+        SqlAlchemyWatchedPositionsAdapter(engine, tenant_id),
+        SqlAlchemyFlowLockAdapter(engine),
+        WatchedPositionReadings(
+            ReadAccountActivityUseCase(accounts, opener, activity_readers),
+            SqlAlchemyFlowOpeningsAdapter(engine, tenant_id),
+            SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
+        ),
+        StopMoves(move, retry, clock),
+    ).execute(FollowTrailingStopsCommand())
 
 
 def notify_for(
@@ -967,14 +1021,19 @@ def create_worker_application(configuration: Mapping[str, str] = PROCESS_ENVIRON
         messenger, mailer, partial(mail_server_access_for, engine, mail_password_opener)
     )
     delivery = OutboxProcessing(ProcessOutboxUseCase(outbox, deliver).execute)
-    daily = DailyChecks(
+    checks = ScheduledChecks(
         ScheduleKeyExpiryChecksUseCase(
             apscheduler_daily_check_adapters(),
             SqlAlchemyTenantRepositoryAdapter(engine),
             partial(check_key_expiries, engine, (outbox, links)),
-        ).execute
+        ).execute,
+        ScheduleTrailingStopChecksUseCase(
+            apscheduler_periodic_check_adapters(),
+            SqlAlchemyTenantRepositoryAdapter(engine),
+            partial(follow_trailing_stops, engine, opener, (hyperliquid, simulation)),
+        ).execute,
     )
-    loops = WorkerLoops(bot, cycles, delivery, daily)
+    loops = WorkerLoops(bot, cycles, delivery, checks)
     return worker_api_adapters(source, for_tenant, loops, WorkerAnswers(start_link, library_catalog))
 
 

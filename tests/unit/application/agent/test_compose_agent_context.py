@@ -31,6 +31,7 @@ class Position:
     unrealized_pnl: Decimal = Decimal(-2)
     liquidation_price: Decimal | None = None
     exit_plan: Plan = Plan()
+    max_profit: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,3 +100,12 @@ def test_each_position_keeps_the_exit_plan_in_force() -> None:
     [position] = ComposeAgentContextUseCase().execute(question).state.positions
 
     assert position.exit_plan == ExitPlan(Decimal(57000), Decimal(61000), "chiusura sopra 60500")
+
+
+def test_each_position_keeps_the_largest_profit_it_reached_when_the_flow_hands_it() -> None:
+    # R5.5.1, ADR massimo-profitto-raggiunto-nello-stato-della-posizione.
+    question = replace(Question(), state=State(positions=(Position(max_profit=Decimal(30)), Position(asset="ETH"))))
+
+    positions = ComposeAgentContextUseCase().execute(question).state.positions
+
+    assert [position.max_profit for position in positions] == [Decimal(30), None]

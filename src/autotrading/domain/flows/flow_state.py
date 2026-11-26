@@ -1,5 +1,5 @@
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
 from autotrading.domain.flows.account_activity import AccountActivity, AccountPosition
@@ -9,6 +9,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.flows.watched_position import WatchedPosition
 
 ZERO = Decimal(0)
 
@@ -24,6 +25,12 @@ class PositionMismatch:
     held: Decimal
 
 
+def _of_held[T](positions: Sequence[AccountPosition], by_asset: Mapping[str, T]) -> Mapping[str, T]:
+    return frozendict(
+        {position.asset: by_asset[position.asset] for position in positions if position.asset in by_asset}
+    )
+
+
 def _signed(position: AccountPosition) -> Decimal:
     return position.size if position.side is TradeSide.LONG else -position.size
 
@@ -35,7 +42,8 @@ class FlowState:
     Positions belong to the flow by asset; realized PnL, fees and funding come from the running totals of the ledger
     the platform keeps (ADR 0063), never from the executions the exchange still holds. The changes of its capital,
     oldest first, carry the profits it cashed out and chain its return (R3.4.1, R3.4.3). Every open position carries
-    the exit plan in force, while it stays open (R3.1.1).
+    the exit plan in force, while it stays open (R3.1.1), and, when the stop of the flow follows the price, the
+    position as the platform watches it (R5.5.1).
     """
 
     flow_id: FlowId
@@ -48,6 +56,7 @@ class FlowState:
     expected_positions: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
     exit_plans: Mapping[str, ExitPlan] = field(default_factory=lambda: frozendict({}))
     capital_changes: tuple[CapitalChange, ...] = ()
+    watched: Mapping[str, WatchedPosition] = field(default_factory=lambda: frozendict({}))
 
     @classmethod
     def attributed(
@@ -68,15 +77,23 @@ class FlowState:
             fees=totals.fees,
             funding=totals.funding,
             expected_positions=totals.positions,
-            exit_plans=frozendict(
-                {position.asset: exit_plans[position.asset] for position in positions if position.asset in exit_plans}
-            ),
+            exit_plans=_of_held(positions, exit_plans),
             capital_changes=tuple(capital_changes),
         )
 
     def exit_plan_of(self, asset: str) -> ExitPlan:
         """The exit plan in force of the position open on the asset; the empty plan when there is none (R3.1.1)."""
         return self.exit_plans.get(asset, ExitPlan())
+
+    def watching(self, watched: Mapping[str, WatchedPosition]) -> FlowState:
+        """The state with the positions the platform watches among those still open (R5.5.1)."""
+        return replace(self, watched=_of_held(self.positions, watched))
+
+    def max_profit_of(self, asset: str) -> Decimal | None:
+        """The largest unrealized profit the position open on the asset reached, in the currency of the account; None
+        when the platform does not watch it (R5.5.1, ADR massimo-profitto-raggiunto-nello-stato-della-posizione)."""
+        watched = self.watched.get(asset)
+        return None if watched is None else watched.max_profit
 
     def position_mismatch(self) -> PositionMismatch | None:
         """The first asset of the flow whose position on the account is not the one its ledger expects (ADR 0064)."""

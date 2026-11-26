@@ -42,6 +42,12 @@ const CONFIGURATION: Configuration = {
   max_drawdown_percent: '12.5',
   openings_resume: 'next_day',
   memory: { active: true, decisions: 5, days: 14, text_length: null, all_decisions: true },
+  trailing_stop: {
+    distance_percent: '2',
+    activation_percent: null,
+    breakeven_percent: '1.5',
+    max_profit_in_context: true,
+  },
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -62,6 +68,12 @@ const PARTS_OF_FIELD = {
   ],
   default_stop_loss_percent: ['stop loss predefinito'],
   default_take_profit_percent: ['take profit predefinito'],
+  trailing_stop: [
+    'distanza dello stop che segue',
+    'attivazione dello stop che segue',
+    'pareggio',
+    "massimo profitto raggiunto nel contesto dell'agente",
+  ],
   minimum_confidence: ['confidenza minima'],
   allocated_capital: ['capitale allocato'],
   bring_to_minimum: ['porta al minimo'],
@@ -98,6 +110,10 @@ describe('configurationRows', () => {
       { part: 'esposizione complessiva massima del valore', value: 'nessuno' },
       { part: 'stop loss predefinito', value: '5%' },
       { part: 'take profit predefinito', value: '10%' },
+      { part: 'distanza dello stop che segue', value: '2%' },
+      { part: 'attivazione dello stop che segue', value: 'nessuno' },
+      { part: 'pareggio', value: '1.5%' },
+      { part: "massimo profitto raggiunto nel contesto dell'agente", value: 'sì' },
       { part: 'confidenza minima', value: '60' },
       { part: 'capitale allocato', value: '400' },
       { part: 'porta al minimo', value: 'sì' },

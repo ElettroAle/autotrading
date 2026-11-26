@@ -15,6 +15,7 @@ export type FakeOpenPosition = {
   readonly target_price: string | null;
   readonly stop_price: string | null;
   readonly invalidation: string | null;
+  readonly max_profit_reached: string | null;
 };
 
 export type FakeClosedPosition = {
@@ -52,6 +53,7 @@ export const anOpenPosition = ({
   target = null,
   stop = null,
   invalidation = null,
+  maxProfit = null,
 }: {
   asset?: string;
   side?: string;
@@ -63,6 +65,7 @@ export const anOpenPosition = ({
   target?: string | null;
   stop?: string | null;
   invalidation?: string | null;
+  maxProfit?: string | null;
 } = {}): FakeOpenPosition => ({
   asset,
   side,
@@ -75,6 +78,7 @@ export const anOpenPosition = ({
   target_price: target,
   stop_price: stop,
   invalidation,
+  max_profit_reached: maxProfit,
 });
 
 export const aClosedPosition = ({

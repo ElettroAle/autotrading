@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 from pytest_bdd import parsers
 
 from autotrading.application.flows.notify_unattributable import NotifyUnattributableUseCase, UnattributableNotices
-from autotrading.application.flows.ports import ReconciliationAlarmPorts
+from autotrading.application.flows.ports import OpenPositionRecords, ReconciliationAlarmPorts
 from autotrading.application.flows.read_flow_state import ReadFlowStateCommand, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountCommand, ReconcileAccountUseCase
 from autotrading.application.flows.record_account_executions import (
@@ -41,6 +41,7 @@ from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.unattributable_notices import FakeUnattributableAssetNoticeAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import READ_AT, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -80,8 +81,11 @@ class AttributionBench:
             flows,
             self.exchange,
             self.ledger,
-            InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
-            InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+            OpenPositionRecords(
+                InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
+            ),
         )
         self.thresholds = FakeAccountThresholdsAdapter({})
         self.alarm_notices = FakeReconciliationAlarmNoticeAdapter()

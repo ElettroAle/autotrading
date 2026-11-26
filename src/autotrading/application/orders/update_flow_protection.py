@@ -48,7 +48,9 @@ class _Replacement:
     exchange: ProtectionExchangePort
     protections: ProtectionRepositoryPort
 
-    def replaced(self, kind: ProtectionKind, price: Decimal, previous: PlacedProtection | None) -> tuple[str, ...]:
+    def replaced(
+        self, kind: ProtectionKind, price: Decimal, previous: PlacedProtection | None
+    ) -> tuple[ProtectionNote, ...]:
         """The new protection placed first and the previous one cancelled only after: the position is never left
         without its stop loss. A refusal leaves the previous one in force.
         """
@@ -58,7 +60,8 @@ class _Replacement:
         placing = ProtectionPlacing(self.exchange, self.command.access, order)
         order_id = self.command.calls.run(order.asset, placing.attempt)
         if isinstance(order_id, Rejection):
-            return (f"{LEVEL_LABELS[kind]} {order.asset} non aggiornato, {order_id.exchange_message}",)
+            refusal = f"{LEVEL_LABELS[kind]} {order.asset} non aggiornato, {order_id.exchange_message}"
+            return (ProtectionNote(order.asset, refusal, refused=True),)
         self.removed(kind, previous)
         self.protections.add(
             PlacedProtection(
@@ -71,7 +74,7 @@ class _Replacement:
                 order.client_order_id,
             )
         )
-        return (_change(kind, order.asset, previous, order.trigger_price),)
+        return (ProtectionNote(order.asset, _change(kind, order.asset, previous, order.trigger_price)),)
 
     def removed(self, kind: ProtectionKind, previous: PlacedProtection | None) -> None:
         if previous is None:
@@ -114,25 +117,27 @@ class UpdateFlowProtectionUseCase:
             exchange.protections,
             self._protections,
         )
-        texts = self._replaced(replacement, update, position)
-        return tuple(ProtectionNote(update.asset, text) for text in texts)
+        return self._replaced(replacement, update, position)
 
-    def _replaced(self, replacement: _Replacement, update: FlowUpdate, position: HeldPosition) -> tuple[str, ...]:
+    def _replaced(
+        self, replacement: _Replacement, update: FlowUpdate, position: HeldPosition
+    ) -> tuple[ProtectionNote, ...]:
         recorded = self._protections.placed(replacement.command.account_id, update.asset)
         placed = {protection.kind: protection for protection in recorded}
         levels = update.protection.levels_at(position.direction, position.entry_price)
-        texts: tuple[str, ...] = ()
+        notes: tuple[ProtectionNote, ...] = ()
         if update.protection.stop is not None:
             stop = ProtectionKind.STOP_LOSS
-            texts = (*levels.notes, *replacement.replaced(stop, levels.stop, placed.get(stop)))
+            limited = tuple(ProtectionNote(update.asset, text) for text in levels.notes)
+            notes = (*limited, *replacement.replaced(stop, levels.stop, placed.get(stop)))
         take_profit = ProtectionKind.TAKE_PROFIT
         if levels.take_profit is not None:
-            return (*texts, *replacement.replaced(take_profit, levels.take_profit, placed.get(take_profit)))
+            return (*notes, *replacement.replaced(take_profit, levels.take_profit, placed.get(take_profit)))
         previous = placed.get(take_profit)
         if not update.remove_target or previous is None:
-            return texts
+            return notes
         replacement.removed(take_profit, previous)
-        return (*texts, _change(take_profit, update.asset, previous, None))
+        return (*notes, ProtectionNote(update.asset, _change(take_profit, update.asset, previous, None)))
 
 
 def _change(kind: ProtectionKind, asset: str, previous: PlacedProtection | None, price: Decimal | None) -> str:

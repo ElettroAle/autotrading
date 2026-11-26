@@ -298,5 +298,5 @@ def test_a_refused_new_stop_is_not_tried_again(bench: Bench) -> None:
 
     notes = bench.update(stop=58000)
 
-    assert notes == (ProtectionNote("BTC", "stop BTC non aggiornato, Invalid trigger price"),)
+    assert notes == (ProtectionNote("BTC", "stop BTC non aggiornato, Invalid trigger price", refused=True),)
     assert bench.waits.pauses == []
