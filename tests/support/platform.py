@@ -95,6 +95,7 @@ from tests.fakes.flow_history import HistoryStore, InMemoryFlowHistoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_openings import InMemoryFlowOpeningsAdapter
 from tests.fakes.flow_operations import InMemoryFlowOperationsAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import (
     FlowStore,
     InMemoryAutomaticPauseAdapter,
@@ -404,6 +405,7 @@ class Platform:
             clock=lambda: self.now,
             closed_positions=closed_positions,
             exit_plans=exit_plans,
+            protection_levels=InMemoryFlowProtectionLevelsAdapter(self.protections, tenant_id),
             cycle_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             decision_history=InMemoryCycleHistoryAdapter(self.cycles, self.flows, tenant_id),
             flow_directory=flows,

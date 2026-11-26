@@ -31,8 +31,10 @@ from tests.fakes.cycles import InMemoryCycleHistoryAdapter, InMemoryCycleReposit
 from tests.fakes.equity_snapshots import EquitySnapshotStore, InMemoryEquitySnapshotRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
+from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import CURRENCY, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
@@ -53,7 +55,11 @@ class Bench:
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         self.use_case = ReadFlowResultsUseCase(
             ReadFlowStateUseCase(
-                flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+                flows,
+                self.activity,
+                self.ledger,
+                InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
             ),
             ReadOpeningsSuspensionUseCase(
                 flows, InMemoryOpeningsSuspensionAdapter(self.store, TENANT), self.readings, self.accounts, lambda: NOW

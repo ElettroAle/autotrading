@@ -46,7 +46,14 @@ class ExitPlan:
         """The plan after an update: the levels waiting on the exchange, which an update the exchange refused leaves as
         they were, and the new invalidation or the one in force (R3.1.3).
         """
-        return ExitPlan(placed.take_profit, placed.stop, change.invalidation or self.invalidation)
+        return replace(self, invalidation=change.invalidation or self.invalidation).in_force(placed)
+
+    def in_force(self, placed: PlacedLevels) -> ExitPlan:
+        """The plan that protects the position: the stop and the target are the levels waiting on the exchange, whatever
+        their origin (default of the flow, level of the agent, stop brought within the default), none where nothing of
+        that kind waits; the invalidation stays the one of the agent (R5.5.3).
+        """
+        return ExitPlan(placed.take_profit, placed.stop, self.invalidation)
 
 
 @dataclass(frozen=True, slots=True)

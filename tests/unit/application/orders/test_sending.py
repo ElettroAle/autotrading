@@ -8,16 +8,20 @@ from uuid import uuid4
 import pytest
 
 from autotrading.application.orders.errors import OrderExchangeUnavailableError
-from autotrading.application.orders.sending import ProtectionPlacing, RetriedCalls, cancel_protection
+from autotrading.application.orders.sending import ProtectionPlacing, RetriedCalls, cancel_protection, held_protections
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
+from autotrading.domain.orders.held_position import HeldPosition
+from autotrading.domain.orders.held_protections import HeldProtections
 from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
-from autotrading.domain.orders.protection_order import ProtectionOrder
+from autotrading.domain.orders.protection_order import ActiveProtection, ProtectionOrder
 from autotrading.domain.orders.rejection import Rejection
+from tests.fakes.order_exchange import FakeOrderExchangeAdapter
 from tests.fakes.pause import FakePauseAdapter
 from tests.fakes.protection_exchange import FakeProtectionExchangeAdapter
+from tests.support.exchange_connections import connection_of
 from tests.support.retries import unlimited_retry
 from tests.support.trading import new_access
 
@@ -157,3 +161,21 @@ def test_a_cancellation_tried_again_of_a_protection_the_exchange_no_longer_has_g
     assert placed(exchange) == []
     assert exchange.cancelled == [order_id]
     assert [attempt.attempt for attempt in calls.failed] == [1]
+
+
+def test_a_position_held_is_read_with_the_protections_waiting_for_it() -> None:
+    position = HeldPosition("BTC", Direction.LONG, Decimal("0.5"), 2, Decimal(60000))
+    exchange, protections = FakeOrderExchangeAdapter(), FakeProtectionExchangeAdapter()
+    exchange.hold(ACCESS, position)
+    order_id = protections.place(ACCESS, STOP)
+
+    held = held_protections(connection_of(exchange, protections), ACCESS, "BTC")
+
+    assert held == HeldProtections(position, (ActiveProtection(order_id, STOP.kind, STOP.trigger_price),))
+
+
+def test_an_asset_without_a_position_has_no_protections_to_read() -> None:
+    protections = FakeProtectionExchangeAdapter()
+    protections.reachable = False
+
+    assert held_protections(connection_of(FakeOrderExchangeAdapter(), protections), ACCESS, "BTC") is None

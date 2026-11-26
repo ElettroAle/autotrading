@@ -285,6 +285,27 @@ class FlowProtectionLevelsPort(Protocol):
         ...
 
 
+@dataclass(frozen=True, slots=True)
+class FlowHeldAssets:
+    """The assets of a flow it holds a position on, on its account, as a cycle reads them at its start (R5.5.3)."""
+
+    account_id: UUID
+    flow_id: UUID
+    assets: tuple[str, ...]
+
+
+class WaitingProtectionsPort(Protocol):
+    """It is RecordWaitingProtectionsUseCase of the orders context, bound to the tenant of the cycle (R5.5.3, ADR
+    stop-e-obiettivo-in-vigore-nello-stato-della-posizione).
+    """
+
+    def execute(self, held: FlowHeldAssets) -> object:
+        """Records the protections waiting on the exchange of every position without protections recorded, so the
+        state of the flow shows their levels. Raises the errors of the orders context when the exchange cannot be read.
+        """
+        ...
+
+
 class RunningCyclePort(Protocol):
     def wait_until_finished(self, flow_id: FlowId) -> None:
         """Returns once no cycle of the flow is running, across processes; at once when none is (R1.1.5)."""

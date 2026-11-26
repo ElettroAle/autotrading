@@ -43,8 +43,10 @@ from tests.fakes.closed_position_repository import ClosedPositionStore, InMemory
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_account import FakeFlowAccountAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
+from tests.fakes.protection_repository import ProtectionStore
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 from tests.support.position_closings import NOTHING_TO_CLOSE, ClosingAnswer, closed_by, refused
@@ -127,7 +129,13 @@ class Flows:
         self.change_capital = ChangeAllocatedCapitalUseCase(
             self.repository,
             self.accounts.ports(),
-            ReadFlowStateUseCase(self.repository, self.activity, self.ledger, self.exit_plans),
+            ReadFlowStateUseCase(
+                self.repository,
+                self.activity,
+                self.ledger,
+                self.exit_plans,
+                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
+            ),
             lambda: NOW,
         )
 

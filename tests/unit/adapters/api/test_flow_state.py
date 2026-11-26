@@ -21,6 +21,10 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.ledger import FlowTotals
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.orders.client_order_id import ClientOrderId
+from autotrading.domain.orders.placed_protection import PlacedProtection
+from autotrading.domain.orders.protection_kind import ProtectionKind
+from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter
 from tests.support.activity import a_position, an_activity
 from tests.support.flows import a_configuration, a_flow, account_id_of
 from tests.support.identity_provider import IdentityProvider
@@ -184,6 +188,12 @@ def test_a_position_answers_its_exit_plan_in_force(client_of: Client, platform: 
     platform.exit_plans.plans[platform.tenant_of("anna"), flow.id, "BTC"] = ExitPlan(
         Decimal("63000.0"), Decimal(58500), "chiusura a 4 ore sotto 59000"
     )
+    # The stop and the target in force are those the platform placed on the exchange (R5.5.3).
+    protections = InMemoryProtectionRepositoryAdapter(platform.protections, platform.tenant_of("anna"))
+    for kind, price in ((ProtectionKind.STOP_LOSS, Decimal(58500)), (ProtectionKind.TAKE_PROFIT, Decimal("63000.0"))):
+        protections.add(
+            PlacedProtection(flow.assigned_account_id, flow.id.value, "BTC", kind, price, "1", ClientOrderId.new())
+        )
 
     [position] = anna.get(f"/flows/{flow.id.value}/state").json()["positions"]
 
