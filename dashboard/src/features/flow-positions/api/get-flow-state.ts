@@ -16,6 +16,7 @@ const openPositionSchema = z.object({
   target_price: z.string().nullable(),
   stop_price: z.string().nullable(),
   invalidation: z.string().nullable(),
+  max_profit_reached: z.string().nullable(),
 });
 
 const flowStateSchema = z.object({
@@ -25,8 +26,8 @@ const flowStateSchema = z.object({
 
 export type OpenPosition = z.infer<typeof openPositionSchema>;
 
-/** The state of the flow read from the exchange at the request, with its open positions and their exit plans
- * (R1.6.1, R3.1.1).
+/** The state of the flow read from the exchange at the request, with its open positions, their exit plans and the
+ * largest profit each reached when the stop of the flow follows the price (R1.6.1, R3.1.1, R5.5.1).
  */
 export const useFlowState = (flowId: string) => {
   const api = useApiClient();

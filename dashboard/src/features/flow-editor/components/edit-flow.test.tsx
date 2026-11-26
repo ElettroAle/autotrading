@@ -334,6 +334,68 @@ describe('EditFlow', () => {
     expect(configurationOf(fakePlatform.flowNamed('alfa')).minimum_confidence).toBeNull();
   });
 
+  // R5.5.1, ADR stop-che-segue-il-prezzo-nella-dashboard.
+  it('places the stop that follows the price right after the default protections, with what each part admits', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const risk = await screen.findByRole('group', { name: 'Rischio' });
+    const labels = within(risk)
+      .getAllByRole('textbox')
+      .map((control) => control.getAttribute('id'));
+    const takeProfit = labels.indexOf('flow-default-take-profit');
+    expect(labels.slice(takeProfit + 1, takeProfit + 4)).toEqual([
+      'flow-trailing-distance',
+      'flow-trailing-activation',
+      'flow-trailing-breakeven',
+    ]);
+    expect(field('Distanza dello stop che segue (%)')).toHaveValue('');
+    expect(field('Distanza dello stop che segue (%)')).toHaveAccessibleDescription(
+      'da 0,1 a 50, dal miglior prezzo raggiunto; vuota: lo stop non segue il prezzo',
+    );
+    expect(field('Attivazione (%)')).toHaveAccessibleDescription(
+      "maggiore di 0, solo con la distanza; vuota: lo stop segue dall'apertura",
+    );
+    expect(field('Pareggio (%)')).toHaveAccessibleDescription(
+      "maggiore di 0; raggiunta, lo stop va al prezzo d'ingresso",
+    );
+    const maxProfit = within(risk).getByRole('checkbox', {
+      name: "Massimo profitto raggiunto nel contesto dell'agente",
+    });
+    expect(maxProfit).not.toBeChecked();
+    expect(maxProfit).toHaveAccessibleDescription('ha effetto solo con la distanza o il pareggio');
+  });
+
+  it('sets the stop that follows the price as a new version, with the reason of a refusal under its part', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    await userEvent.type(await screen.findByLabelText('Attivazione (%)'), '3');
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(field('Attivazione (%)')).toHaveAccessibleDescription(
+        "maggiore di 0, solo con la distanza; vuota: lo stop segue dall'apertura l'attivazione richiede la distanza dello stop che segue",
+      ),
+    );
+    await userEvent.type(field('Distanza dello stop che segue (%)'), '2');
+    await userEvent.type(field('Pareggio (%)'), '1,5');
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: "Massimo profitto raggiunto nel contesto dell'agente" }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).trailing_stop).toEqual({
+      distance_percent: '2',
+      activation_percent: '3',
+      breakeven_percent: '1.5',
+      max_profit_in_context: true,
+    });
+  });
+
   // R5.3.4, ADR memoria-del-flusso-dalle-decisioni-operative-precedenti.
   it('turns the memory on with its decisions and days as a new version, refusing them out of range', async () => {
     fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });

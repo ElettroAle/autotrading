@@ -2,6 +2,7 @@ import { FAKE_MODELS, FAKE_SYSTEM_PROMPT, type FakeSource as FakeCatalogSource }
 import {
   fakePlatform,
   DEFAULT_MEMORY,
+  DEFAULT_TRAILING_STOP,
   type FakeAccount,
   type FakeAdapterChoice,
   type FakeFlow,
@@ -9,6 +10,7 @@ import {
   type FakeOpeningsResume,
   type FakeRiskLimits,
   type FakeSource,
+  type FakeTrailingStop,
   type FakeUser,
 } from './platform';
 import { fakeSourceCredentials, notConfiguredReason } from './source-credentials';
@@ -74,6 +76,15 @@ type ConfigurationRequest = {
     text_length?: unknown;
     all_decisions?: unknown;
     unlimited_text_length?: unknown;
+  };
+  trailing_stop?: {
+    distance_percent?: unknown;
+    activation_percent?: unknown;
+    breakeven_percent?: unknown;
+    max_profit_in_context?: unknown;
+    remove_distance?: unknown;
+    remove_activation?: unknown;
+    remove_breakeven?: unknown;
   };
 };
 
@@ -176,6 +187,58 @@ const memoryOf = (requested: ConfigurationRequest['memory'], current: FakeMemory
     text_length: textLengthOf(requested, current.text_length),
     all_decisions: allDecisions,
   };
+};
+
+// A part sent changes, a remove flag takes it away, a part not sent keeps the value in force (R5.5.1).
+const trailingPartOf = (sent: unknown, removed: unknown, kept: string | null): string | null => {
+  if (removed === true) {
+    return null;
+  }
+  return sent === undefined || sent === null ? kept : String(sent);
+};
+
+// The stop that follows the price with the rules the API checks, the reasons as it gives them (R5.5.1).
+const trailingStopOf = (
+  requested: ConfigurationRequest['trailing_stop'],
+  current: FakeTrailingStop,
+): FakeTrailingStop => {
+  const trailing = {
+    distance_percent: trailingPartOf(
+      requested?.distance_percent,
+      requested?.remove_distance,
+      current.distance_percent,
+    ),
+    activation_percent: trailingPartOf(
+      requested?.activation_percent,
+      requested?.remove_activation,
+      current.activation_percent,
+    ),
+    breakeven_percent: trailingPartOf(
+      requested?.breakeven_percent,
+      requested?.remove_breakeven,
+      current.breakeven_percent,
+    ),
+    max_profit_in_context:
+      typeof requested?.max_profit_in_context === 'boolean'
+        ? requested.max_profit_in_context
+        : current.max_profit_in_context,
+  };
+  const distance = trailing.distance_percent === null ? null : Number(trailing.distance_percent);
+  if (distance !== null && (distance < 0.1 || distance > 50)) {
+    throw new Refusal(
+      422,
+      'la distanza dello stop che segue va da 0,1 a 50',
+      'trailing_stop.distance_percent',
+    );
+  }
+  if (trailing.activation_percent !== null && distance === null) {
+    throw new Refusal(
+      422,
+      "l'attivazione richiede la distanza dello stop che segue",
+      'trailing_stop.activation_percent',
+    );
+  }
+  return trailing;
 };
 
 const assetsOf = (requested: unknown): string[] => {
@@ -484,6 +547,7 @@ const nextVersionOf = (flow: FakeFlow, changes: Partial<FakeFlow>): FakeFlow => 
       defaultTakeProfitPercent: flow.defaultTakeProfitPercent,
       minimumConfidence: flow.minimumConfidence,
       memory: flow.memory,
+      trailingStop: flow.trailingStop,
     },
   });
   return flow;
@@ -546,6 +610,7 @@ export const createFlow = (user: FakeUser, request: ConfigurationRequest): FakeF
     defaultTakeProfitPercent: optionalTextOf(request.default_take_profit_percent),
     minimumConfidence: minimumConfidenceOf(request.minimum_confidence),
     memory: memoryOf(request.memory, DEFAULT_MEMORY),
+    trailingStop: trailingStopOf(request.trailing_stop, DEFAULT_TRAILING_STOP),
     currentCapital: capital,
   });
 };
@@ -704,6 +769,7 @@ export const modifyFlow = (
         ? flow.openingsResume
         : openingsResumeOf(request.openings_resume),
     memory: memoryOf(request.memory, flow.memory),
+    trailingStop: trailingStopOf(request.trailing_stop, flow.trailingStop),
   };
   // A draft takes nothing on its account until it starts: the conflict on the assets waits for the start (ADR 0124).
   if (flow.status !== DRAFT) {

@@ -81,6 +81,12 @@ const FLOW: Flow = {
   max_drawdown_percent: null,
   openings_resume: 'manual',
   memory: { active: false, decisions: 10, days: 30, text_length: 160, all_decisions: false },
+  trailing_stop: {
+    distance_percent: null,
+    activation_percent: null,
+    breakeven_percent: null,
+    max_profit_in_context: false,
+  },
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -135,6 +141,35 @@ describe('creationRequestOf', () => {
         all_decisions: null,
         unlimited_text_length: false,
       },
+      trailing_stop: {
+        distance_percent: null,
+        activation_percent: null,
+        breakeven_percent: null,
+        max_profit_in_context: false,
+        remove_distance: true,
+        remove_activation: true,
+        remove_breakeven: true,
+      },
+    });
+  });
+
+  // ADR stop-che-segue-il-prezzo-nella-dashboard: blank parts stay empty, the API checks the values.
+  it('sends the stop that follows the price the user typed (R5.5.1)', () => {
+    const trailing_stop = {
+      distance_percent: ' 2 ',
+      activation_percent: '3',
+      breakeven_percent: '1,5',
+      max_profit_in_context: true,
+    };
+
+    expect(creationRequestOf(filled({ trailing_stop })).trailing_stop).toEqual({
+      distance_percent: '2',
+      activation_percent: '3',
+      breakeven_percent: '1.5',
+      max_profit_in_context: true,
+      remove_distance: false,
+      remove_activation: false,
+      remove_breakeven: false,
     });
   });
 
@@ -292,6 +327,31 @@ describe('formValuesOf', () => {
         unlimited_text_length: false,
         all_decisions: false,
       },
+      trailing_stop: {
+        distance_percent: '',
+        activation_percent: '',
+        breakeven_percent: '',
+        max_profit_in_context: false,
+      },
+    });
+  });
+
+  it('fills the stop that follows the price of the flow (R5.5.1)', () => {
+    const flow: Flow = {
+      ...FLOW,
+      trailing_stop: {
+        distance_percent: '2',
+        activation_percent: null,
+        breakeven_percent: '1.5',
+        max_profit_in_context: true,
+      },
+    };
+
+    expect(formValuesOf(flow).trailing_stop).toEqual({
+      distance_percent: '2',
+      activation_percent: '',
+      breakeven_percent: '1.5',
+      max_profit_in_context: true,
     });
   });
 
@@ -568,6 +628,32 @@ describe('changesOf', () => {
     });
   });
 
+  it('changes nothing for the stop that follows the price left as it is (R5.5.1)', () => {
+    expect(changesOf(FLOW, formValuesOf(FLOW))).toEqual({ settings: {} });
+  });
+
+  it('sends the whole stop that follows the price when the user changed a part, an emptied part removed', () => {
+    const following: Flow = {
+      ...FLOW,
+      trailing_stop: { ...FLOW.trailing_stop, distance_percent: '2', activation_percent: '3' },
+    };
+    const trailing_stop = { ...formValuesOf(following).trailing_stop, activation_percent: ' ' };
+
+    expect(changesOf(following, { ...formValuesOf(following), trailing_stop })).toEqual({
+      settings: {
+        trailing_stop: {
+          distance_percent: '2',
+          activation_percent: null,
+          breakeven_percent: null,
+          max_profit_in_context: false,
+          remove_distance: false,
+          remove_activation: true,
+          remove_breakeven: true,
+        },
+      },
+    });
+  });
+
   it('sends a system prompt the user wrote, and null to go back to the default', () => {
     const written = {
       ...formValuesOf(FLOW),
@@ -658,6 +744,14 @@ describe('formFieldOf', () => {
   it('places a refusal of the memory on its decisions or its days', () => {
     expect(formFieldOf('memory.decisions')).toBe('memory.decisions');
     expect(formFieldOf('memory.days')).toBe('memory.days');
+  });
+
+  it('places a refusal of the stop that follows the price on its part (R5.5.1)', () => {
+    expect(formFieldOf('trailing_stop.distance_percent')).toBe('trailing_stop.distance_percent');
+    expect(formFieldOf('trailing_stop.activation_percent')).toBe(
+      'trailing_stop.activation_percent',
+    );
+    expect(formFieldOf('trailing_stop.breakeven_percent')).toBe('trailing_stop.breakeven_percent');
   });
 
   it('places nowhere a setting the form does not have', () => {

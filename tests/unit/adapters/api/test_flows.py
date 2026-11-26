@@ -886,3 +886,17 @@ def test_an_account_with_an_active_flow_is_removed_only_confirming(client_of: Cl
     )
     assert removed.status_code == 204
     assert [flow["status"] for flow in anna.get("/flows", params={"archived": True}).json()] == ["archiviato"]
+
+
+def test_every_part_of_the_stop_that_follows_the_price_is_in_the_answer_even_when_empty(platform: Platform) -> None:
+    # R5.5.1: the dashboard generates its types from the document; an empty part is a null, never a missing field.
+    api = create_api(HealthReport("1.0.0", "dev"), ResolveTenantUseCase(platform.tenants), platform.for_tenant)
+    schemas = api.openapi()["components"]["schemas"]
+    trailing = schemas["FlowResponse"]["properties"]["trailing_stop"]["$ref"].rsplit("/", 1)[-1]
+
+    assert set(schemas[trailing]["required"]) == {
+        "distance_percent",
+        "activation_percent",
+        "breakeven_percent",
+        "max_profit_in_context",
+    }

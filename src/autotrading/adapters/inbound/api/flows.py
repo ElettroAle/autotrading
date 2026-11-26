@@ -274,6 +274,24 @@ class RiskLimitsResponse(BaseModel):
         )
 
 
+class TrailingStopResponse(BaseModel):
+    """The stop that follows the price of a version, every part present, null when empty (R5.5.1)."""
+
+    distance_percent: str | None
+    activation_percent: str | None
+    breakeven_percent: str | None
+    max_profit_in_context: bool
+
+    @classmethod
+    def of(cls, trailing: TrailingStop) -> TrailingStopResponse:
+        return cls(
+            distance_percent=_text(trailing.distance_percent),
+            activation_percent=_text(trailing.activation_percent),
+            breakeven_percent=_text(trailing.breakeven_percent),
+            max_profit_in_context=trailing.max_profit_in_context,
+        )
+
+
 class PromptPlaceholderResponse(BaseModel):
     """A placeholder the system prompt may use, with what it stands for (R1.4.8)."""
 
@@ -328,7 +346,7 @@ class ConfigurationResponse(BaseModel):
     default_take_profit_percent: str | None
     minimum_confidence: int | None
     memory: FlowMemory
-    trailing_stop: TrailingStop
+    trailing_stop: TrailingStopResponse
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -356,7 +374,7 @@ class ConfigurationResponse(BaseModel):
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
             memory=configuration.memory,
-            trailing_stop=configuration.trailing_stop,
+            trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
         )
 
 
@@ -408,7 +426,7 @@ class FlowResponse(BaseModel):
     default_take_profit_percent: str | None
     minimum_confidence: int | None
     memory: FlowMemory
-    trailing_stop: TrailingStop
+    trailing_stop: TrailingStopResponse
     missing: list[str]
 
     @classmethod
@@ -442,7 +460,7 @@ class FlowResponse(BaseModel):
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
             memory=configuration.memory,
-            trailing_stop=configuration.trailing_stop,
+            trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
             missing=list(flow.missing_before_start),
         )
 

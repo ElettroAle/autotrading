@@ -75,6 +75,23 @@ export const DEFAULT_MEMORY: FakeMemory = {
   all_decisions: false,
 };
 
+/**
+ * The stop that follows the price of a flow: every part empty and the option off unless the user sets them (R5.5.1).
+ */
+export type FakeTrailingStop = {
+  readonly distance_percent: string | null;
+  readonly activation_percent: string | null;
+  readonly breakeven_percent: string | null;
+  readonly max_profit_in_context: boolean;
+};
+
+export const DEFAULT_TRAILING_STOP: FakeTrailingStop = {
+  distance_percent: null,
+  activation_percent: null,
+  breakeven_percent: null,
+  max_profit_in_context: false,
+};
+
 export type FakeConfiguration = {
   readonly assets: string[];
   readonly cycleMinutes: number;
@@ -91,6 +108,7 @@ export type FakeConfiguration = {
   readonly defaultTakeProfitPercent: string | null;
   readonly minimumConfidence: number | null;
   readonly memory: FakeMemory;
+  readonly trailingStop: FakeTrailingStop;
 };
 
 export type FakeVersion = {
@@ -156,6 +174,7 @@ export type FakeFlow = {
   maxDrawdownPercent: string | null;
   openingsResume: FakeOpeningsResume;
   memory: FakeMemory;
+  trailingStop: FakeTrailingStop;
   /** What the agent would receive of the memory if the cycle started now, for every asset (R5.3.4). */
   remembered: FakeAssetMemory[];
   /** The suspension of the openings in force, null when the flow may open (R3.2.2). */
@@ -248,6 +267,7 @@ export type FakeFlowConfiguration = {
   max_drawdown_percent: string | null;
   openings_resume: FakeOpeningsResume;
   memory: FakeMemory;
+  trailing_stop: FakeTrailingStop;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -282,6 +302,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   max_drawdown_percent: flow.maxDrawdownPercent,
   openings_resume: flow.openingsResume,
   memory: { ...flow.memory },
+  trailing_stop: { ...flow.trailingStop },
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -465,6 +486,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   defaultTakeProfitPercent: null,
   minimumConfidence: null,
   memory: DEFAULT_MEMORY,
+  trailingStop: DEFAULT_TRAILING_STOP,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -588,6 +610,7 @@ const draftOf = (
   maxDrawdownPercent: null,
   openingsResume: 'manual',
   memory: DEFAULT_MEMORY,
+  trailingStop: DEFAULT_TRAILING_STOP,
   remembered: [],
   openingsSuspension: null,
   cycles: 0,
@@ -788,6 +811,7 @@ export const fakePlatform = {
       maxDrawdownPercent: null,
       openingsResume: 'manual',
       memory: DEFAULT_MEMORY,
+      trailingStop: DEFAULT_TRAILING_STOP,
       remembered: [],
       openingsSuspension: null,
       cycles: 0,

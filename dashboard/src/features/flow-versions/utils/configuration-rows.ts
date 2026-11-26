@@ -86,6 +86,20 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       part: 'take profit predefinito',
       value: percentText(configuration.default_take_profit_percent),
     },
+    // The stop that follows the price beside the other protections, as the API names its parts (R5.5.1).
+    {
+      part: 'distanza dello stop che segue',
+      value: percentText(configuration.trailing_stop.distance_percent),
+    },
+    {
+      part: 'attivazione dello stop che segue',
+      value: percentText(configuration.trailing_stop.activation_percent),
+    },
+    { part: 'pareggio', value: percentText(configuration.trailing_stop.breakeven_percent) },
+    {
+      part: "massimo profitto raggiunto nel contesto dell'agente",
+      value: configuration.trailing_stop.max_profit_in_context ? 'sì' : 'no',
+    },
     {
       part: 'confidenza minima',
       value: String(configuration.minimum_confidence ?? NO_MINIMUM_CONFIDENCE),

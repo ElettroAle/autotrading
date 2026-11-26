@@ -19,6 +19,7 @@ import { MemoryFields } from './memory-fields';
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
 import { SystemPromptField } from './system-prompt-field';
+import { TrailingStopFields } from './trailing-stop-fields';
 
 // How suspended openings resume: by the user, or on their own at the next midnight UTC (R3.2.2).
 const OPENINGS_RESUME_CHOICES: readonly SelectOption[] = [
@@ -299,6 +300,7 @@ export const FlowForm = ({
                 />
               )}
             </FormField>
+            <TrailingStopFields />
             <FormField
               id="flow-minimum-confidence"
               label="Confidenza minima (0-100)"
