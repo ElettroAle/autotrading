@@ -7,9 +7,13 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.ports import ReconciliationAlarmPorts
+from autotrading.application.flows.ports import FlowHeldAssets, ReconciliationAlarmPorts
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
-from autotrading.application.flows.read_cycle_flow import ReadCycleFlowCommand, ReadCycleFlowUseCase
+from autotrading.application.flows.read_cycle_flow import (
+    CycleAccountReadings,
+    ReadCycleFlowCommand,
+    ReadCycleFlowUseCase,
+)
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
@@ -17,11 +21,13 @@ from autotrading.application.flows.reconcile_account_for_cycle import ReconcileA
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.domain.flows.balance_comparison import BalanceComparison
 from autotrading.domain.flows.cycle_access import CycleAccess
-from autotrading.domain.flows.cycle_account import CycleAccount
+from autotrading.domain.flows.cycle_account import CycleAccount, CyclePosition
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.sealed_address import SealedAddress
+from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.flows.unattributable import UnattributableItem
+from autotrading.domain.orders.protection_kind import ProtectionKind
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
@@ -29,12 +35,15 @@ from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter, InMemoryFlowTimingAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
+from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
-from tests.support.activity import READ_AT
+from tests.fakes.waiting_protections import FakeWaitingProtectionsAdapter
+from tests.support.activity import READ_AT, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
 TENANT = TenantId(uuid4())
@@ -59,8 +68,11 @@ class Opener:
 
 
 class Reader:
+    def __init__(self) -> None:
+        self.positions: tuple[CyclePosition, ...] = ()
+
     def cycle_reading(self, access: CycleAccess) -> CycleAccount:  # noqa: ARG002 - one reading for every account
-        return CycleAccount("USDC", Decimal(1000), ())
+        return CycleAccount("USDC", Decimal(1000), self.positions)
 
 
 class Notices:
@@ -72,7 +84,10 @@ class Bench:
     def __init__(self) -> None:
         self.store = FlowStore()
         self.readings = InMemoryReconciliationRepositoryAdapter()
-        activity = FakeAccountActivityAdapter()
+        self.activity = activity = FakeAccountActivityAdapter()
+        self.reader = Reader()
+        protections = ProtectionStore()
+        self.waiting = FakeWaitingProtectionsAdapter(protections, TENANT)
         ledger = InMemoryFlowLedgerAdapter()
         flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
         accounts = Accounts()
@@ -92,19 +107,28 @@ class Bench:
         self.use_case = ReadCycleFlowUseCase(
             flows,
             InMemoryFlowTimingAdapter(self.store, TENANT),
-            ReadCycleAccountUseCase(accounts, accounts, Opener(), {"Hyperliquid": Reader()}),
+            CycleAccountReadings(
+                ReadCycleAccountUseCase(accounts, accounts, Opener(), {"Hyperliquid": self.reader}), self.waiting
+            ),
             ReadCycleFlowStateUseCase(
                 ReadFlowStateUseCase(
-                    flows, activity, ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+                    flows,
+                    activity,
+                    ledger,
+                    InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                    InMemoryFlowProtectionLevelsAdapter(protections, TENANT),
                 ),
                 ReconcileAccountForCycleUseCase(reconcile, Notices()),
             ),
             self.readings,
         )
 
-    def flow_on(self, account_id: UUID) -> ReadCycleFlowCommand:
+    def flow_on(self, account_id: UUID, *assets: str) -> ReadCycleFlowCommand:
         flow = a_flow(
-            TENANT, account_id=account_id, status=FlowStatus.ACTIVE, configuration=a_configuration(assets=("BTC",))
+            TENANT,
+            account_id=account_id,
+            status=FlowStatus.ACTIVE,
+            configuration=a_configuration(assets=assets or ("BTC",)),
         )
         self.store.flows.append(flow)
         return ReadCycleFlowCommand(flow.id, READ_AT, reconciled=False)
@@ -113,6 +137,14 @@ class Bench:
         alarm = ReconciliationAlarm.of(account_id, BalanceComparison(Decimal(1000), Decimal(980), READ_AT))
         self.readings.open(alarm)
         return alarm
+
+    def hold(self, *assets: str) -> None:
+        """Positions on the account, as the exchange shows them to the cycle and to the state of the flow."""
+        self.reader.positions = tuple(
+            CyclePosition(asset, TradeSide.LONG, Decimal(1), 1, Decimal(100), Decimal(100), Decimal(0), None)
+            for asset in assets
+        )
+        self.activity.activities[ACCOUNT] = an_activity(positions=tuple(a_position(asset) for asset in assets))
 
 
 @pytest.fixture
@@ -151,3 +183,23 @@ def test_the_flow_is_read_with_its_account_and_the_instant_its_cycle_began(bench
     cycle_flow = bench.use_case.execute(command)
 
     assert (cycle_flow.account_name, cycle_flow.exchange, cycle_flow.started_at) == ("test-1", "Hyperliquid", READ_AT)
+
+
+def test_the_protections_waiting_of_the_positions_are_recorded_before_the_state_is_read(bench: Bench) -> None:
+    # R5.5.3: a position opened before the platform recorded its protections shows the stop waiting on the exchange.
+    command = bench.flow_on(ACCOUNT)
+    bench.hold("BTC")
+    bench.waiting.waiting["BTC"] = [(ProtectionKind.STOP_LOSS, Decimal(63000))]
+
+    cycle_flow = bench.use_case.execute(command)
+
+    assert cycle_flow.attributed.exit_plan_of("BTC").stop == Decimal(63000)
+
+
+def test_only_the_assets_of_the_flow_held_on_the_account_are_asked_for_their_protections(bench: Bench) -> None:
+    command = bench.flow_on(ACCOUNT, "BTC", "ETH")
+    bench.hold("BTC", "SOL")
+
+    cycle_flow = bench.use_case.execute(command)
+
+    assert bench.waiting.asked == [FlowHeldAssets(ACCOUNT, cycle_flow.flow.id.value, ("BTC",))]

@@ -39,7 +39,7 @@ from autotrading.application.flows.ports import (
 from autotrading.application.flows.read_account_activity import ReadAccountActivityUseCase
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
-from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
+from autotrading.application.flows.read_cycle_flow import CycleAccountReadings, ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
@@ -77,6 +77,7 @@ from autotrading.application.orders.open_trading_access import OpenTradingAccess
 from autotrading.application.orders.ports import OrderRejectedNoticePort, PositionOpenedNoticePort
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
+from autotrading.application.orders.record_waiting_protections import RecordWaitingProtectionsUseCase
 from autotrading.application.orders.update_flow_protection import UpdateFlowProtectionUseCase
 from autotrading.application.sources.list_sources import ListSourcesUseCase, SourceSystems
 from autotrading.domain.accounts.credentials import Credentials
@@ -266,6 +267,8 @@ class FlowCycles:
         closing_notice = hold.closed(NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY))
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         protections = InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
+        protection_levels = InMemoryFlowProtectionLevelsAdapter(platform.protections, tenant_id)
+        order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
         cancel_protections = platform.cancel_protections(tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
@@ -304,13 +307,16 @@ class FlowCycles:
         read_cycle_flow = ReadCycleFlowUseCase(
             flows,
             InMemoryFlowTimingAdapter(platform.flows, tenant_id),
-            ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
+            CycleAccountReadings(
+                ReadCycleAccountUseCase(accounts, accounts, opener, {HYPERLIQUID: platform.hyperliquid}),
+                RecordWaitingProtectionsUseCase(access, order_exchanges, protections),
+            ),
             ReadCycleFlowStateUseCase(
-                ReadFlowStateUseCase(flows, activity, platform.ledger, exit_plans), reconcile_for_cycle
+                ReadFlowStateUseCase(flows, activity, platform.ledger, exit_plans, protection_levels),
+                reconcile_for_cycle,
             ),
             self.readings,
         )
-        order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
         retry = TransientRetry(self.pause, self.clock)
         execute_flow_orders = ExecuteFlowOrdersUseCase(
             access,
@@ -354,7 +360,7 @@ class FlowCycles:
                 openings,
                 exit_plans,
                 flows,
-                InMemoryFlowProtectionLevelsAdapter(platform.protections, tenant_id),
+                protection_levels,
             ),
             openings=openings,
             closed_positions=closed_positions,

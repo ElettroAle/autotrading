@@ -32,10 +32,12 @@ from tests.fakes.cash_out_notices import FakeCashOutNoticeAdapter
 from tests.fakes.closed_position_repository import ClosedPositionStore, InMemoryClosedPositionRepositoryAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
+from tests.fakes.protection_repository import ProtectionStore
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 from tests.support.position_closings import NOTHING_TO_CLOSE, ClosingAnswer, closed_by, refused
@@ -124,7 +126,13 @@ class Bench:
         self.recording = FakeLedgerRecordingAdapter(
             RecordAccountExecutionsUseCase(self.flows, self.activity, InMemoryPlatformOrdersAdapter(), self.ledger)
         )
-        flow_state = ReadFlowStateUseCase(self.flows, self.activity, self.ledger, self.exit_plans)
+        flow_state = ReadFlowStateUseCase(
+            self.flows,
+            self.activity,
+            self.ledger,
+            self.exit_plans,
+            InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
+        )
         self.notices = FakeCashOutNoticeAdapter()
         ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW, self.notices)
         self.cash_out = CashOutProfitsUseCase(self.flows, ports)

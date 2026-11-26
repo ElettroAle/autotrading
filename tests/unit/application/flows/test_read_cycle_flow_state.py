@@ -25,9 +25,11 @@ from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
+from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
+from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.support.activity import a_fill, a_position, an_activity
@@ -82,7 +84,11 @@ class Bench:
         self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
         self.read = ReadCycleFlowStateUseCase(
             ReadFlowStateUseCase(
-                flows, self.activity, self.ledger, InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT)
+                flows,
+                self.activity,
+                self.ledger,
+                InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
             ),
             self.reconcile,
         )

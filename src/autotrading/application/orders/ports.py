@@ -170,6 +170,21 @@ class ProtectionRepositoryPort(Protocol):
         ...
 
 
+class HeldFlowAssetsPort(Protocol):
+    """The assets a flow holds a position on, on its account, whose protections waiting on the exchange the platform
+    records when it has none recorded (R5.5.3).
+    """
+
+    @property
+    def account_id(self) -> UUID: ...
+
+    @property
+    def flow_id(self) -> UUID: ...
+
+    @property
+    def assets(self) -> Sequence[str]: ...
+
+
 class ProtectedPositionPort(Protocol):
     """The position of an account on an asset whose protections are left behind by its closing (R3.1.2)."""
 

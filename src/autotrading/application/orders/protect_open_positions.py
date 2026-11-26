@@ -5,7 +5,12 @@ from uuid import UUID
 
 from autotrading.application.orders.open_trading_access import OpenTradingAccessCommand, OpenTradingAccessUseCase
 from autotrading.application.orders.ports import ExchangeConnection, ProtectionRepositoryPort, SendingRetryPort
-from autotrading.application.orders.sending import ProtectionPlacing, RetriedCalls, supported_exchange
+from autotrading.application.orders.sending import (
+    ProtectionPlacing,
+    RetriedCalls,
+    held_protections,
+    supported_exchange,
+)
 from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
 from autotrading.domain.orders.held_position import HeldPosition
 from autotrading.domain.orders.placed_protection import PlacedProtection
@@ -66,13 +71,10 @@ class ProtectOpenPositionsUseCase:
 
     @staticmethod
     def _unprotected(account: _Account, asset: str) -> HeldPosition | None:
-        position = account.calls.run(asset, lambda: account.exchange.account.position(account.access, asset))
-        if position is None:
+        held = account.calls.run(asset, lambda: held_protections(account.exchange, account.access, asset))
+        if held is None or held.has_stop_loss:
             return None
-        waiting = account.calls.run(asset, lambda: account.exchange.protections.active(account.access, asset))
-        if any(protection.kind is ProtectionKind.STOP_LOSS for protection in waiting):
-            return None
-        return position
+        return held.position
 
     def _protected(
         self, account: _Account, command: ProtectOpenPositionsCommand, position: HeldPosition

@@ -127,3 +127,21 @@ def test_the_plan_after_an_update_without_invalidation_keeps_the_one_in_force() 
     updated = plan.updated(ExitPlanChange(target=Decimal(68000)), PlacedLevels(Decimal(57000), Decimal(68000)))
 
     assert updated == ExitPlan(Decimal(68000), Decimal(57000), "sotto 59000")
+
+
+def test_the_plan_in_force_holds_the_levels_placed_whatever_the_agent_asked() -> None:
+    plan = ExitPlan(Decimal(63000), Decimal(55000), "sotto 59000")
+
+    in_force = plan.in_force(PlacedLevels(Decimal(57000), Decimal(66000)))
+
+    assert in_force == ExitPlan(Decimal(66000), Decimal(57000), "sotto 59000")
+
+
+def test_the_plan_in_force_has_no_target_without_a_take_profit_placed() -> None:
+    plan = ExitPlan(Decimal(63000), Decimal(57000))
+
+    assert plan.in_force(PlacedLevels(Decimal(57000), None)) == ExitPlan(None, Decimal(57000))
+
+
+def test_the_plan_in_force_of_a_position_without_a_plan_of_the_agent_is_the_levels_placed() -> None:
+    assert ExitPlan().in_force(PlacedLevels(Decimal(57000), None)) == ExitPlan(None, Decimal(57000))

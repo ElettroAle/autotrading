@@ -5,8 +5,14 @@ from autotrading.application.orders.errors import (
     OrderNotAcknowledgedError,
     UnsupportedOrderExchangeError,
 )
-from autotrading.application.orders.ports import OrderExchangePort, ProtectionExchangePort, SendingRetryPort
+from autotrading.application.orders.ports import (
+    ExchangeConnection,
+    OrderExchangePort,
+    ProtectionExchangePort,
+    SendingRetryPort,
+)
 from autotrading.domain.orders.failed_order_attempt import FailedOrderAttempt
+from autotrading.domain.orders.held_protections import HeldProtections
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.order import Order, OrderRequest
 from autotrading.domain.orders.placed_protection import PlacedProtection
@@ -95,6 +101,16 @@ class ProtectionPlacing:
             return self._exchange.place(self._access, self._order)
         except ExchangeRejectedOrderError as error:
             return Rejection.of(error.exchange_message)
+
+
+def held_protections(exchange: ExchangeConnection, access: TradingAccess, asset: str) -> HeldProtections | None:
+    """The position of the account on the asset with the protections waiting for it, or None without a position: the
+    one reading of the protections on the exchange of a position (R3.1.2, R5.5.3).
+    """
+    position = exchange.account.position(access, asset)
+    if position is None:
+        return None
+    return HeldProtections(position, exchange.protections.active(access, asset))
 
 
 def cancel_protection(exchange: ProtectionExchangePort, access: TradingAccess, protection: PlacedProtection) -> None:

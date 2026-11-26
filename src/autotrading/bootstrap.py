@@ -191,7 +191,7 @@ from autotrading.application.flows.read_account_activity import ReadAccountActiv
 from autotrading.application.flows.read_account_executions import ReadAccountExecutionsUseCase
 from autotrading.application.flows.read_account_transfers import ReadAccountTransfersUseCase
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
-from autotrading.application.flows.read_cycle_flow import ReadCycleFlowUseCase
+from autotrading.application.flows.read_cycle_flow import CycleAccountReadings, ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
 from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
@@ -275,6 +275,7 @@ from autotrading.application.orders.protect_flow_position import ProtectFlowPosi
 from autotrading.application.orders.protect_open_positions import ProtectOpenPositionsUseCase
 from autotrading.application.orders.read_market import ReadMarketUseCase
 from autotrading.application.orders.read_minimum_value import ReadMinimumValueUseCase
+from autotrading.application.orders.record_waiting_protections import RecordWaitingProtectionsUseCase
 from autotrading.application.orders.settle_simulated_positions import (
     SettleSimulatedPositionsCommand,
     SettleSimulatedPositionsUseCase,
@@ -417,6 +418,7 @@ def tenant_use_cases(
             clock=system_clock_adapters().now,
             closed_positions=closed_positions,
             exit_plans=exit_plans,
+            protection_levels=SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
             cycle_history=cycle_history,
             decision_history=cycle_history,
             flow_directory=flows,
@@ -570,6 +572,7 @@ def cycle_of(
         activity = ReadAccountActivityUseCase(accounts, opener, activity_readers)
         ledger = SqlAlchemyFlowLedgerAdapter(engine, tenant_id)
         protections = SqlAlchemyProtectionRepositoryAdapter(engine, tenant_id)
+        protection_levels = SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id)
         cancel_protections = CancelProtectionsUseCase(access, order_exchanges, protections)
         record_executions = RecordAccountExecutionsUseCase(
             flows,
@@ -609,8 +612,13 @@ def cycle_of(
         read_cycle_flow = ReadCycleFlowUseCase(
             flows,
             SqlAlchemyFlowTimingAdapter(engine, tenant_id),
-            ReadCycleAccountUseCase(accounts, accounts, opener, exchanges),
-            ReadCycleFlowStateUseCase(ReadFlowStateUseCase(flows, activity, ledger, exit_plans), reconcile_for_cycle),
+            CycleAccountReadings(
+                ReadCycleAccountUseCase(accounts, accounts, opener, exchanges),
+                RecordWaitingProtectionsUseCase(access, order_exchanges, protections),
+            ),
+            ReadCycleFlowStateUseCase(
+                ReadFlowStateUseCase(flows, activity, ledger, exit_plans, protection_levels), reconcile_for_cycle
+            ),
             readings,
         )
         follow_flow_orders = FollowFlowOrdersUseCase(
@@ -654,7 +662,7 @@ def cycle_of(
             openings,
             exit_plans,
             flows,
-            SqlAlchemyFlowProtectionLevelsAdapter(engine, tenant_id),
+            protection_levels,
         )
         steps = CycleSteps(
             start=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),

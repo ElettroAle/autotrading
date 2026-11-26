@@ -81,6 +81,7 @@ from autotrading.application.flows.ports import (
     FlowLedgerPort,
     FlowOperationsPort,
     FlowPositionsPort,
+    FlowProtectionLevelsPort,
     FlowRepositoryPort,
     FlowSummaryPort,
     FlowTimingPort,
@@ -233,6 +234,8 @@ class TenantPorts:
     clock: Callable[[], datetime]
     closed_positions: ClosedPositionRepositoryPort
     exit_plans: ExitPlanRepositoryPort
+    # The levels of the protections in force, which the state of every open position shows (R5.5.3).
+    protection_levels: FlowProtectionLevelsPort
     cycle_history: CycleHistoryPort
     decision_history: DecisionHistoryPort
     flow_directory: FlowDirectoryPort
@@ -366,6 +369,9 @@ class TenantUseCases:
         keys = ports.provider_keys
         source_offers = ListSourceOffersUseCase(ports.sources, ports.source_credentials)
         key_services = ProviderKeyServices(ports.model_catalogs, ports.provider_key_sealer)
+        read_flow_state = ReadFlowStateUseCase(
+            ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans, ports.protection_levels
+        )
         return cls(
             register_account=RegisterAccountUseCase(
                 tenant_id, RegistrationPorts(accounts, sealer, exchanges, ports.virtual_balances)
@@ -415,7 +421,7 @@ class TenantUseCases:
                 ports.flows, ports.past_decisions, ports.account_activity, ports.clock
             ),
             read_flow_results=ReadFlowResultsUseCase(
-                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
+                read_flow_state,
                 ReadOpeningsSuspensionUseCase(
                     ports.flows, ports.openings_suspensions, ports.reconciliation, ports.account_names, ports.clock
                 ),
@@ -460,7 +466,7 @@ class TenantUseCases:
             cash_out_profits=CashOutProfitsUseCase(
                 ports.flows,
                 CashOutPorts(
-                    ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
+                    read_flow_state,
                     CloseFlowPositionsUseCase(ports.closing_ports),
                     ports.ledger_recording,
                     ports.clock,
@@ -472,7 +478,7 @@ class TenantUseCases:
             change_allocated_capital=ChangeAllocatedCapitalUseCase(
                 ports.flows,
                 ports.flow_checks.accounts,
-                ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
+                read_flow_state,
                 ports.clock,
             ),
             list_capital_changes=ListCapitalChangesUseCase(ports.flows, ports.settlement_currency),
@@ -498,7 +504,7 @@ class TenantUseCases:
                 ports.flow_summaries,
                 ports.cycle_history,
                 ReadFlowResultsUseCase(
-                    ReadFlowStateUseCase(ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans),
+                    read_flow_state,
                     ReadOpeningsSuspensionUseCase(
                         ports.flows, ports.openings_suspensions, ports.reconciliation, ports.account_names, ports.clock
                     ),
