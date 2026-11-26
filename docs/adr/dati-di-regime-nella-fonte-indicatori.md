@@ -23,6 +23,11 @@ la fonte dà gli stessi valori di oggi.
 - Le fonti si provano su risposte registrate (ADR fonti-provate-su-risposte-registrate).
 - Ordine del proprietario per F5.5: impostazioni facoltative, vuote di default, nessuna versione nuova dei flussi
   esistenti.
+- Ambiguità risolta: il requisito dice la distanza dal minimo «zero o positiva» e dal massimo «zero o negativa», ma il
+  prezzo corrente può uscire dall'intervallo delle candele chiuse (la candela in corso non conta). Vale la formula del
+  requisito, senza riportare a zero: una distanza dal minimo negativa dice all'agente che il prezzo ha rotto il minimo.
+- Ambiguità risolta: «la chiusura di N ore fa» è la chiusura della candela oraria N candele prima dell'ultima chiusa,
+  come la variazione a giorni; minimo e massimo sono il minimo e il massimo delle candele, non le chiusure.
 
 ## Decisione
 
