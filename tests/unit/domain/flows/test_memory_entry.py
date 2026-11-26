@@ -7,6 +7,7 @@ import pytest
 from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.memory_entry import (
     CLOSED_BY,
+    AssetMemory,
     MemoryEntry,
     MemoryOutcome,
     PastDecision,
@@ -179,3 +180,19 @@ def test_a_past_opening_knows_how_long_its_position_lasted_or_has_been_open() ->
     assert past.open_for(AT + timedelta(hours=1)) == timedelta(hours=1)
     assert PastDecision(AT, a_decision(), None, None).lasted is None
     assert PastDecision(AT, a_decision(), None, None).open_for(AT) is None
+
+
+def test_an_asset_without_summary_nor_decisions_has_nothing_to_remember() -> None:
+    entry = MemoryEntry(AT, "BTC", DecisionAction.CLOSE, None, None, "stop", None, None)
+
+    assert AssetMemory("BTC", ()).is_empty is True
+    assert AssetMemory("BTC", (entry,)).is_empty is False
+    assert AssetMemory("BTC", (), summary=("BTC long — riga",)).is_empty is False
+    assert AssetMemory("BTC", (), other_assets=("ETH short — riga",)).is_empty is False
+
+
+def test_the_lines_of_an_asset_are_its_summary_the_other_assets_and_its_decisions() -> None:
+    entry = MemoryEntry(AT, "BTC", DecisionAction.CLOSE, None, None, "stop", None, None)
+    memory = AssetMemory("BTC", (entry,), summary=("BTC long — riga",), other_assets=("ETH short — riga",))
+
+    assert memory.lines == ("BTC long — riga", "altro asset: ETH short — riga", entry.text)

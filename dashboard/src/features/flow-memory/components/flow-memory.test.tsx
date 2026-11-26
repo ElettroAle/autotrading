@@ -14,6 +14,8 @@ import { FLOW_MEMORY_TITLE, FlowMemory } from './flow-memory';
 const REMEMBERED = [
   {
     asset: 'BTC',
+    summary: [],
+    other_assets: [],
     entries: [
       {
         planned_at: '2026-11-24T09:00:00Z',

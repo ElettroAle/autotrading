@@ -511,7 +511,7 @@ def test_the_attempts_that_failed_in_the_reversal_go_in_the_record(cycles: Cycle
 
 # ADR memoria-del-flusso-dalle-decisioni-operative-precedenti: the memory the context gave the agent is read through the
 # journal and kept with the record of the cycle, also when the cycle fails after composing the context.
-MEMORY = (AssetMemory("BTC", ()),)
+MEMORY = (AssetMemory("BTC", (), summary=("BTC long — riga",), other_assets=("ETH short — riga",)),)
 
 
 def test_a_completed_cycle_records_the_memory_the_context_gave_the_agent(cycles: Cycles) -> None:

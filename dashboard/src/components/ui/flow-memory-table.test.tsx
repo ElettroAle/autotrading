@@ -7,6 +7,8 @@ import { FlowMemoryTable } from './flow-memory-table';
 const MEMORY: AssetMemory[] = [
   {
     asset: 'BTC',
+    summary: [],
+    other_assets: [],
     entries: [
       {
         planned_at: '2026-11-24T09:00:00Z',
@@ -28,7 +30,7 @@ const MEMORY: AssetMemory[] = [
       },
     ],
   },
-  { asset: 'ETH', entries: [] },
+  { asset: 'ETH', summary: [], other_assets: [], entries: [] },
 ];
 
 describe('FlowMemoryTable', () => {
@@ -52,6 +54,8 @@ describe('FlowMemoryTable', () => {
   it('says realized the PnL of a position closed', () => {
     const closed: AssetMemory = {
       asset: 'SOL',
+      summary: [],
+      other_assets: [],
       entries: [
         {
           planned_at: '2026-11-24T09:00:00Z',
@@ -75,6 +79,8 @@ describe('FlowMemoryTable', () => {
   it('says how and after how long the position of an opening closed, as the agent receives it (R5.3.5)', () => {
     const closed: AssetMemory = {
       asset: 'DOGE',
+      summary: [],
+      other_assets: [],
       entries: [
         {
           planned_at: '2026-11-24T09:00:00Z',
@@ -97,6 +103,34 @@ describe('FlowMemoryTable', () => {
     expect(screen.getByRole('table', { name: 'Memoria di DOGE' })).toHaveTextContent(
       'chiusa dallo stop loss dopo 12 minuti, -2,32 realizzato',
     );
+  });
+
+  it('shows before the decisions of an asset its summary lines and those of the other assets, as the API gives them (R5.3.7)', () => {
+    const summarized: AssetMemory = {
+      asset: 'NEAR',
+      summary: ['NEAR short — oggi: 3 chiuse, 0 vinte, 3 perse, PnL -6,27 USDC'],
+      other_assets: ['SUI short — oggi: 1 chiuse, 0 vinte, 1 perse, PnL -0,81 USDC'],
+      entries: MEMORY[0]?.entries ?? [],
+    };
+
+    render(<FlowMemoryTable memory={[summarized]} />);
+
+    const near = screen.getByRole('region', { name: 'NEAR' });
+    expect(within(near).getByRole('list', { name: 'Riepilogo di NEAR' })).toHaveTextContent(
+      'NEAR short — oggi: 3 chiuse, 0 vinte, 3 perse, PnL -6,27 USDC',
+    );
+    const others = within(near).getByRole('list', { name: 'Altri asset del flusso' });
+    expect(others).toHaveTextContent(
+      'SUI short — oggi: 1 chiuse, 0 vinte, 1 perse, PnL -0,81 USDC',
+    );
+    const table = within(near).getByRole('table', { name: 'Memoria di NEAR' });
+    expect(others.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows no summary list for an asset without summary lines', () => {
+    render(<FlowMemoryTable memory={MEMORY} />);
+
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
   it('says so for an asset without previous decisions', () => {

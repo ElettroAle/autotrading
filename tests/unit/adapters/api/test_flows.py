@@ -109,7 +109,15 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "default_stop_loss_percent": "5",
         "default_take_profit_percent": None,
         "minimum_confidence": None,
-        "memory": {"active": False, "decisions": 10, "days": 30, "text_length": 160, "all_decisions": False},
+        "memory": {
+            "active": False,
+            "decisions": 10,
+            "days": 30,
+            "text_length": 160,
+            "all_decisions": False,
+            "summary": False,
+            "other_assets": False,
+        },
         "trailing_stop": {
             "distance_percent": None,
             "activation_percent": None,
@@ -148,7 +156,7 @@ def test_the_memory_is_created_kept_and_changed_in_a_new_version(client_of: Clie
     untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
     changed = anna.patch(f"/flows/{flow_id}", json={"memory": {"active": True, "days": 14}}).json()
 
-    defaults = {"text_length": 160, "all_decisions": False}
+    defaults = {"text_length": 160, "all_decisions": False, "summary": False, "other_assets": False}
     assert created["memory"] == {"active": False, "decisions": 4, "days": 30} | defaults
     assert untouched["memory"] == created["memory"]
     assert (changed["version"], changed["memory"]) == (3, {"active": True, "decisions": 4, "days": 14} | defaults)
@@ -178,6 +186,33 @@ def test_the_motive_is_left_whole_and_every_decision_remembered_and_a_null_lengt
     assert (created["memory"]["text_length"], created["memory"]["all_decisions"]) == (None, True)
     assert (kept["memory"]["text_length"], kept["memory"]["days"]) == (None, 7)
     assert (limited["version"], limited["memory"]["text_length"]) == (3, 300)
+
+
+def test_the_summary_and_the_other_assets_are_switched_on_and_off_in_a_new_version(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+    memory = {"active": True, "summary": True}
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", memory=memory)).json()["id"]
+
+    kept = anna.patch(f"/flows/{flow_id}", json={"memory": {"other_assets": True}}).json()
+    off = anna.patch(f"/flows/{flow_id}", json={"memory": {"summary": False}}).json()
+
+    assert (kept["version"], kept["memory"]["summary"], kept["memory"]["other_assets"]) == (2, True, True)
+    assert (off["version"], off["memory"]["summary"], off["memory"]["other_assets"]) == (3, False, True)
+    assert anna.get(f"/flows/{flow_id}/versions/2/differences/3").json() == [
+        {
+            "part": "memoria",
+            "before": (
+                "attiva, 10 decisioni, 30 giorni, motivo fino a 160 caratteri, solo aperture, chiusure e inversioni,"
+                " riepilogo, altri asset"
+            ),
+            "after": (
+                "attiva, 10 decisioni, 30 giorni, motivo fino a 160 caratteri, solo aperture, chiusure e inversioni,"
+                " altri asset"
+            ),
+        }
+    ]
 
 
 @pytest.mark.parametrize(
@@ -241,8 +276,10 @@ def test_the_memory_of_a_flow_on_answers_what_the_next_cycle_receives(client_of:
                         "outcome": None,
                     }
                 ],
+                "summary": [],
+                "other_assets": [],
             },
-            {"asset": "ETH", "entries": []},
+            {"asset": "ETH", "entries": [], "summary": [], "other_assets": []},
         ],
     }
 

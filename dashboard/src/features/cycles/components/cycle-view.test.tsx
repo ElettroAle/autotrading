@@ -188,6 +188,8 @@ describe('CycleView', () => {
     const memory = [
       {
         asset: 'BTC',
+        summary: [],
+        other_assets: [],
         entries: [
           {
             planned_at: '2026-11-14T08:07:00Z',

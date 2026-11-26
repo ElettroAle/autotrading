@@ -53,7 +53,7 @@ export const adapterKeyOf = (name: string): string =>
 const adapterNameOf = (key: string): string => decodeURIComponent(key);
 
 // Decisions, days, length and choice are disabled while the memory is off, and a disabled field gives no value (R5.3.4);
-// the length is disabled too while the motive is whole (R5.3.5).
+// the length is disabled too while the motive is whole (R5.3.5); so are the summary and the other assets (R5.3.7).
 const memoryValuesSchema = z.object({
   active: z.boolean(),
   decisions: numberText.optional(),
@@ -61,6 +61,8 @@ const memoryValuesSchema = z.object({
   text_length: numberText.optional(),
   unlimited_text_length: z.boolean().optional(),
   all_decisions: z.boolean().optional(),
+  summary: z.boolean().optional(),
+  other_assets: z.boolean().optional(),
 });
 
 // Percentages as typed, blank for a part left empty; the API checks the values and their combination (R5.5.1).
@@ -168,6 +170,8 @@ type SettingsRequest = {
     days: number | null;
     text_length: number | null;
     all_decisions: boolean | null;
+    summary: boolean | null;
+    other_assets: boolean | null;
     unlimited_text_length: boolean;
   };
   // A blank part is taken away, as the API does with its remove flags (R5.5.1).
@@ -230,6 +234,8 @@ export const emptyFormValues = (): FlowFormValues => ({
     text_length: '',
     unlimited_text_length: false,
     all_decisions: false,
+    summary: false,
+    other_assets: false,
   },
   trailing_stop: {
     distance_percent: '',
@@ -299,6 +305,8 @@ const memoryOf = (memory: MemoryValues): SettingsRequest['memory'] =>
         days: numberOrNull(memory.days ?? ''),
         text_length: memory.unlimited_text_length ? null : numberOrNull(memory.text_length ?? ''),
         all_decisions: memory.all_decisions ?? false,
+        summary: memory.summary ?? false,
+        other_assets: memory.other_assets ?? false,
         unlimited_text_length: memory.unlimited_text_length ?? false,
       }
     : {
@@ -307,6 +315,8 @@ const memoryOf = (memory: MemoryValues): SettingsRequest['memory'] =>
         days: null,
         text_length: null,
         all_decisions: null,
+        summary: null,
+        other_assets: null,
         unlimited_text_length: false,
       };
 
@@ -440,6 +450,8 @@ export const formValuesOf = (flow: Flow): FlowFormValues => ({
     text_length: textOf(flow.memory.text_length),
     unlimited_text_length: flow.memory.text_length === null,
     all_decisions: flow.memory.all_decisions,
+    summary: flow.memory.summary,
+    other_assets: flow.memory.other_assets,
   },
   trailing_stop: {
     distance_percent: textOf(flow.trailing_stop.distance_percent),

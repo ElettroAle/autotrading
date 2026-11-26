@@ -94,6 +94,25 @@ def test_the_memory_is_a_block_for_every_asset_with_previous_decisions_from_the_
     assert PromptPlaceholder.MEMORY.value_of(PromptSubject(CONFIGURATION, ACTIONS, MEMORY)) == MEMORY_TEXT
 
 
+def test_the_memory_of_an_asset_begins_with_its_summary_then_the_other_assets_then_the_decisions() -> None:
+    summarized = (
+        AssetMemory("BTC", (UPDATE,), summary=("BTC long — riga",), other_assets=("ETH short — riga",)),
+        AssetMemory("ETH", (), other_assets=("BTC long — riga",)),
+    )
+
+    assert PromptPlaceholder.MEMORY.value_of(PromptSubject(CONFIGURATION, ACTIONS, summarized)) == "\n".join(
+        (
+            "Memoria del flusso, le tue decisioni precedenti per asset, dalla più recente:",
+            "BTC:",
+            "- BTC long — riga",
+            "- altro asset: ETH short — riga",
+            "- 2026-11-23T10:00+00:00 aggiorna: stop più alto",
+            "ETH:",
+            "- altro asset: BTC long — riga",
+        )
+    )
+
+
 @pytest.mark.parametrize("memory", [None, (AssetMemory("BTC", ()), AssetMemory("ETH", ()))])
 def test_the_memory_off_or_without_decisions_is_an_empty_text(memory: tuple[AssetMemory, ...] | None) -> None:
     assert PromptPlaceholder.MEMORY.value_of(PromptSubject(CONFIGURATION, ACTIONS, memory)) == ""

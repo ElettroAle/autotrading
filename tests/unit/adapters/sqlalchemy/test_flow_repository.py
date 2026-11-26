@@ -46,7 +46,9 @@ CONFIGURATION = replace(
     openings_resume=OpeningsResume.NEXT_DAY,
     protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
     minimum_confidence=MinimumConfidence(60),
-    memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
+    memory=FlowMemory(
+        active=True, decisions=5, days=14, text_length=None, all_decisions=True, summary=True, other_assets=True
+    ),
     trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
     consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
 )
@@ -79,7 +81,15 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "default_stop_loss_percent": "2.5",
         "default_take_profit_percent": "10",
         "minimum_confidence": 60,
-        "memory": {"active": True, "decisions": 5, "days": 14, "text_length": None, "all_decisions": True},
+        "memory": {
+            "active": True,
+            "decisions": 5,
+            "days": 14,
+            "text_length": None,
+            "all_decisions": True,
+            "summary": True,
+            "other_assets": True,
+        },
         "trailing_stop": {
             "distance_percent": "2",
             "activation_percent": "3",
@@ -232,6 +242,16 @@ def test_a_memory_saved_before_its_length_and_its_choice_of_decisions_cuts_at_16
     document["memory"] = {"active": True, "decisions": 5, "days": 14}
 
     assert configuration_of(1, document).memory == FlowMemory(active=True, decisions=5, days=14)
+
+
+def test_a_memory_saved_before_the_summary_and_the_other_assets_reads_them_off() -> None:
+    document = json.loads(json.dumps(document_of(CONFIGURATION)))
+    document["memory"] = {"active": True, "decisions": 5, "days": 14, "text_length": 160, "all_decisions": False}
+
+    memory = configuration_of(1, document).memory
+
+    assert (memory.summary, memory.other_assets) == (False, False)
+    assert memory == FlowMemory(active=True, decisions=5, days=14)
 
 
 def a_draft() -> Flow:

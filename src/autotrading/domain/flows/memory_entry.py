@@ -8,6 +8,8 @@ from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedD
 from autotrading.domain.flows.trade_side import TradeSide
 
 CUT = "…"
+# The summary of another asset of the flow reads apart from the asset of the block (R5.3.7).
+OTHER_ASSET = "altro asset: "
 # Only an opening and a reversal open a position: the invalidation of its idea and its course are theirs.
 OPENINGS = frozenset({DecisionAction.OPEN, DecisionAction.REVERSE})
 # How every cause of closing the platform records reads in the memory (R5.3.5).
@@ -148,10 +150,25 @@ class MemoryEntry:
 
 @dataclass(frozen=True, slots=True)
 class AssetMemory:
-    """The previous decisions of the flow on one of its assets, from the most recent (R5.3.4)."""
+    """The previous decisions of the flow on one of its assets, from the most recent (R5.3.4); before them, with the
+    options of the memory on, the summary lines of the asset and those of the other assets of the flow (R5.3.7).
+    """
 
     asset: str
     entries: tuple[MemoryEntry, ...]
+    summary: tuple[str, ...] = ()
+    other_assets: tuple[str, ...] = ()
+
+    @property
+    def is_empty(self) -> bool:
+        """Whether the asset has nothing to remember: no summary line and no decision."""
+        return not (self.summary or self.other_assets or self.entries)
+
+    @property
+    def lines(self) -> tuple[str, ...]:
+        """The memory of the asset as the agent receives it: its summary, the other assets, then the decisions."""
+        others = (f"{OTHER_ASSET}{line}" for line in self.other_assets)
+        return (*self.summary, *others, *(entry.text for entry in self.entries))
 
 
 def cut_to(text: str, length: int | None) -> str:

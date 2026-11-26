@@ -499,6 +499,8 @@ describe('EditFlow', () => {
       days: 14,
       text_length: 160,
       all_decisions: false,
+      summary: false,
+      other_assets: false,
     });
   });
 
@@ -544,6 +546,41 @@ describe('EditFlow', () => {
       days: 30,
       text_length: null,
       all_decisions: true,
+      summary: false,
+      other_assets: false,
+    });
+  });
+
+  // R5.3.7, ADR opzioni-della-memoria-nella-dashboard.
+  it('switches on the summary and the other assets of the memory, each with its help, as a new version', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const memory = await screen.findByRole('group', { name: 'Memoria' });
+    const summary = within(memory).getByRole('checkbox', {
+      name: 'Riepilogo per asset e direzione',
+    });
+    const otherAssets = within(memory).getByRole('checkbox', { name: 'Altri asset del flusso' });
+    expect(summary).toHaveAccessibleDescription(
+      'in testa alla memoria di ogni asset, una riga per direzione con le posizioni chiuse nei giorni della memoria',
+    );
+    expect(otherAssets).toHaveAccessibleDescription(
+      'nella memoria di ogni asset, le righe di riepilogo degli altri asset del flusso, senza le loro decisioni',
+    );
+    expect(summary).toBeDisabled();
+    expect(otherAssets).toBeDisabled();
+    await userEvent.click(within(memory).getByRole('checkbox', { name: 'Memoria attiva' }));
+    await userEvent.click(summary);
+    await userEvent.click(otherAssets);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).memory).toMatchObject({
+      active: true,
+      summary: true,
+      other_assets: true,
     });
   });
 

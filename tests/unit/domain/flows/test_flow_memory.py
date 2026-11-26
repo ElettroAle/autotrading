@@ -3,18 +3,21 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.domain.flows.closed_position import CloseReason
+from autotrading.domain.flows.closed_position import ClosedPosition, CloseReason, PositionEnd
 from autotrading.domain.flows.errors import (
     MemoryDaysOutOfRangeError,
     MemoryDecisionsOutOfRangeError,
     MemoryTextLengthNotPositiveError,
 )
+from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_setting import FlowSetting
 from autotrading.domain.flows.memory_entry import AssetMemory, MemoryOutcome, PastDecision
+from autotrading.domain.flows.memory_summary import MemorySummary
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.tenancy.tenant_id import TenantId
 
 NOW = datetime(2026, 11, 24, 12, 0, tzinfo=UTC)
 
@@ -135,6 +138,11 @@ def test_reads_as_the_part_of_the_configuration() -> None:
     assert str(FlowMemory(active=True, text_length=None, all_decisions=True)) == (
         "attiva, 10 decisioni, 30 giorni, motivo intero, tutte le decisioni"
     )
+    assert str(FlowMemory(active=True, summary=True, other_assets=True)) == (
+        "attiva, 10 decisioni, 30 giorni, motivo fino a 160 caratteri, solo aperture, chiusure e inversioni,"
+        " riepilogo, altri asset"
+    )
+    assert str(FlowMemory(active=True, other_assets=True)).endswith("inversioni, altri asset")
 
 
 def test_reaches_back_its_days_from_the_instant_excluded() -> None:
@@ -252,3 +260,81 @@ def test_an_update_of_the_protections_has_no_outcome() -> None:
     )
 
     assert entry.outcome is None
+
+
+def a_closing(asset: str, pnl: str, *, ago: timedelta = timedelta(hours=1)) -> ClosedPosition:
+    closed_at = NOW - ago
+    return ClosedPosition(
+        tenant_id=TenantId.new(),
+        flow_id=FlowId.new(),
+        asset=asset,
+        side=TradeSide.SHORT,
+        leverage=2,
+        margin=Decimal(50),
+        opening=PositionEnd(Decimal(3), closed_at - timedelta(minutes=10)),
+        closing=PositionEnd(Decimal(3), closed_at),
+        fees=Decimal(0),
+        reason=CloseReason.AGENT,
+        realized_pnl=Decimal(pnl),
+    )
+
+
+def test_has_the_summary_and_the_other_assets_off_by_default() -> None:
+    memory = FlowMemory()
+
+    assert (memory.summary, memory.other_assets) == (False, False)
+    assert memory.summarizes is False
+
+
+def test_summarizes_with_the_summary_or_the_other_assets_on() -> None:
+    assert FlowMemory(summary=True).summarizes is True
+    assert FlowMemory(other_assets=True).summarizes is True
+    assert FlowMemory(active=True).changed(summary=True, other_assets=True) == FlowMemory(
+        active=True, summary=True, other_assets=True
+    )
+
+
+def test_summarizes_the_positions_closed_within_its_days_only() -> None:
+    within, too_old, at_the_instant = (
+        a_closing("NEAR", "-1"),
+        a_closing("NEAR", "-1", ago=timedelta(days=3)),
+        a_closing("NEAR", "-1", ago=timedelta(0)),
+    )
+
+    summary = FlowMemory(active=True, days=2).summary_of((within, too_old, at_the_instant), NOW, "USDC")
+
+    assert summary == MemorySummary((within,), NOW, 2, "USDC")
+
+
+def test_puts_the_summary_of_the_asset_first_with_the_summary_on() -> None:
+    memory = FlowMemory(active=True, days=2, summary=True)
+    summary = memory.summary_of((a_closing("NEAR", "-1"), a_closing("SUI", "2")), NOW, "USDC")
+
+    recalled = memory.recalled(("NEAR", "SUI"), (a_past("NEAR"),), NOW, {}, summary)
+
+    assert recalled[0].summary == summary.lines_of("NEAR")
+    assert recalled[0].other_assets == ()
+    assert len(recalled[0].entries) == 1
+    assert recalled[1].summary == summary.lines_of("SUI")
+
+
+def test_gives_every_asset_the_summary_of_the_other_assets_with_the_other_assets_on() -> None:
+    memory = FlowMemory(active=True, days=2, other_assets=True)
+    summary = memory.summary_of((a_closing("NEAR", "-1"), a_closing("SUI", "2"), a_closing("ETH", "3")), NOW, "USDC")
+
+    recalled = memory.recalled(("NEAR", "SUI", "ETH"), (a_past("SUI"),), NOW, {}, summary)
+
+    assert recalled[0].summary == ()
+    assert recalled[0].other_assets == (*summary.lines_of("SUI"), *summary.lines_of("ETH"))
+    assert recalled[0].entries == ()
+    assert recalled[1].other_assets == (*summary.lines_of("NEAR"), *summary.lines_of("ETH"))
+
+
+def test_gives_no_summary_with_both_options_off_or_without_the_summary_read() -> None:
+    summary = FlowMemory(active=True).summary_of((a_closing("NEAR", "-1"),), NOW, "USDC")
+
+    off = FlowMemory(active=True).recalled(("NEAR", "SUI"), (), NOW, {}, summary)
+    not_read = FlowMemory(active=True, summary=True, other_assets=True).recalled(("NEAR", "SUI"), (), NOW, {})
+
+    assert off == (AssetMemory("NEAR", ()), AssetMemory("SUI", ()))
+    assert not_read == (AssetMemory("NEAR", ()), AssetMemory("SUI", ()))

@@ -6559,6 +6559,22 @@
             },
             "type": "array",
             "title": "Entries"
+          },
+          "summary": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Summary",
+            "default": []
+          },
+          "other_assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Other Assets",
+            "default": []
           }
         },
         "type": "object",
@@ -6567,7 +6583,7 @@
           "entries"
         ],
         "title": "AssetMemory",
-        "description": "The previous decisions of the flow on one of its assets, from the most recent (R5.3.4)."
+        "description": "The previous decisions of the flow on one of its assets, from the most recent (R5.3.4); before them, with the\noptions of the memory on, the summary lines of the asset and those of the other assets of the flow (R5.3.7)."
       },
       "BalanceComparisonResponse": {
         "properties": {
@@ -8590,11 +8606,21 @@
             "type": "boolean",
             "title": "All Decisions",
             "default": false
+          },
+          "summary": {
+            "type": "boolean",
+            "title": "Summary",
+            "default": false
+          },
+          "other_assets": {
+            "type": "boolean",
+            "title": "Other Assets",
+            "default": false
           }
         },
         "type": "object",
         "title": "FlowMemory",
-        "description": "Whether the agent receives its previous decisions on every asset of the flow, how many from how far back, how\nlong the motive of each and whether every decision or only those that open or close a position: off, 10 decisions,\n30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5).\n\nThe decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule. A\nlength of None is no limit."
+        "description": "Whether the agent receives its previous decisions on every asset of the flow, how many from how far back, how\nlong the motive of each and whether every decision or only those that open or close a position: off, 10 decisions,\n30 days, 160 characters and only openings, closings and reversals unless the user says otherwise (R5.3.4, R5.3.5);\nwhether every asset begins with the summary of its closed positions and gives the summary of the other assets of the\nflow, both off unless the user says otherwise (R5.3.7).\n\nThe decisions are those of the flow alone, before the instant of the cycle, so the replay keeps the same rule. A\nlength of None is no limit."
       },
       "FlowMemoryReading": {
         "properties": {
@@ -10832,6 +10858,28 @@
             ],
             "title": "All Decisions"
           },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "other_assets": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Assets"
+          },
           "unlimited_text_length": {
             "type": "boolean",
             "title": "Unlimited Text Length",
@@ -10840,7 +10888,7 @@
         },
         "type": "object",
         "title": "MemoryRequest",
-        "description": "The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a\nnew flow (R5.3.4, R5.3.5).\n\nA length not given cannot say «no limit»: `unlimited_text_length` takes the limit away, as the parts of a\nconfiguration that may be removed, and prevails over a length given with it."
+        "description": "The parts of the memory of the flow the user gives; a part not given keeps the value it has, the default for a\nnew flow (R5.3.4, R5.3.5, R5.3.7).\n\nA length not given cannot say «no limit»: `unlimited_text_length` takes the limit away, as the parts of a\nconfiguration that may be removed, and prevails over a length given with it."
       },
       "ModelCatalogResponse": {
         "properties": {

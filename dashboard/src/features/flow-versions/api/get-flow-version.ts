@@ -48,6 +48,8 @@ const configurationSchema = z.object({
     days: z.number(),
     text_length: z.number().nullable(),
     all_decisions: z.boolean(),
+    summary: z.boolean(),
+    other_assets: z.boolean(),
   }),
   trailing_stop: z.object({
     distance_percent: z.string().nullable(),

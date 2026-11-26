@@ -220,6 +220,7 @@ from autotrading.application.flows.record_flow_closing import RecordFlowClosingU
 from autotrading.application.flows.record_manual_closing import RecordManualClosingUseCase
 from autotrading.application.flows.record_outside_closing import RecordOutsideClosingUseCase
 from autotrading.application.flows.record_protection_closing import RecordProtectionClosingUseCase
+from autotrading.application.flows.remembered_decisions import MemoryReadings
 from autotrading.application.flows.reverse_cycle_positions import ReverseCyclePositionsUseCase
 from autotrading.application.flows.review_cycle_risk import ReviewCycleRiskUseCase
 from autotrading.application.flows.run_cycle import CycleGuards, RunCycleUseCase
@@ -708,7 +709,7 @@ def cycle_of(
                 ListAgentActionsUseCase(),
                 AggregateCycleSourcesUseCase(),
                 clock,
-                SqlAlchemyPastDecisionsAdapter(engine, tenant_id),
+                MemoryReadings(SqlAlchemyPastDecisionsAdapter(engine, tenant_id), closed_positions),
             ),
             agent=DecideCycleUseCase(
                 AskFlowAgentUseCase(

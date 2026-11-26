@@ -90,9 +90,9 @@ def test_a_modification_changes_only_the_parts_given() -> None:
 
 
 def test_a_modification_changes_only_the_parts_of_the_memory_given() -> None:
-    command = FlowModification(memory=MemoryRequest(active=True)).command(uuid4())
+    command = FlowModification(memory=MemoryRequest(active=True, summary=True, other_assets=False)).command(uuid4())
 
-    assert command.memory == MemoryRequest(active=True)
+    assert command.memory == MemoryRequest(active=True, summary=True, other_assets=False)
 
 
 def test_a_part_named_to_remove_goes_back_to_none_or_to_the_default() -> None:
