@@ -7,6 +7,7 @@ import { CommandButton } from '@/components/ui/command-button';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField } from '@/components/ui/form/select-field';
+import { EXPIRY_INFO } from '@/components/ui/key-expiry';
 import { NetworkNotice } from '@/components/ui/network-notice';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { showRefusal } from '@/lib/form-errors';
@@ -16,6 +17,7 @@ import {
   useRegisterAccount,
   type AccountRegistrationInput,
 } from '../api/register-account';
+import { ACCOUNT_SETTING_INFO, credentialInfoOf } from '../utils/setting-info';
 
 const FIELDS = ['name', 'exchange', 'expires_on', 'virtual_balance'] as const;
 
@@ -83,9 +85,15 @@ export const RegisterAccountForm = () => {
       </h2>
       <form onSubmit={(event) => void onSubmit(event)} noValidate className="space-y-3">
         <FormAlert error={errors.root?.server} />
-        <InputField label="Nome" error={errors.name} {...register('name')} />
+        <InputField
+          label="Nome"
+          info={ACCOUNT_SETTING_INFO.name}
+          error={errors.name}
+          {...register('name')}
+        />
         <SelectField
           label="Exchange"
+          info={ACCOUNT_SETTING_INFO.exchange}
           placeholder="Scegli un exchange"
           choices={(exchanges.data ?? []).map(({ name }) => ({ value: name, label: name }))}
           loading={exchanges.isPending}
@@ -106,6 +114,7 @@ export const RegisterAccountForm = () => {
         )}
         <DeclaredFields
           fields={fields}
+          infoOf={credentialInfoOf}
           registerField={(name) => register(`credentials.${name}`)}
           reasonOf={(name) => errors.credentials?.[name]?.message}
         />
@@ -113,6 +122,7 @@ export const RegisterAccountForm = () => {
         {exchange?.virtual_balance === true && (
           <InputField
             label="Saldo virtuale"
+            info={ACCOUNT_SETTING_INFO.virtualBalance}
             inputMode="decimal"
             error={errors.virtual_balance}
             {...register('virtual_balance')}
@@ -122,6 +132,7 @@ export const RegisterAccountForm = () => {
         {exchange?.expiry_editable === true && (
           <InputField
             label="Scadenza"
+            info={EXPIRY_INFO}
             type="date"
             error={errors.expires_on}
             {...register('expires_on')}

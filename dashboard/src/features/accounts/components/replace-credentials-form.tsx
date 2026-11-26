@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { CommandButton } from '@/components/ui/command-button';
 import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
+import { EXPIRY_INFO } from '@/components/ui/key-expiry';
 import { useSupportedExchanges } from '@/hooks/use-supported-exchanges';
 import { showRefusal } from '@/lib/form-errors';
 
@@ -13,6 +14,7 @@ import {
   useReplaceCredentials,
   type CredentialsInput,
 } from '../api/replace-credentials';
+import { credentialInfoOf } from '../utils/setting-info';
 
 import { PublicFields } from './public-fields';
 
@@ -79,6 +81,7 @@ export const ReplaceCredentialsForm = ({
       <PublicFields fields={declared} values={account.public_fields} />
       <DeclaredFields
         fields={fields}
+        infoOf={credentialInfoOf}
         registerField={(name) => register(`credentials.${name}`)}
         reasonOf={(name) => errors.credentials?.[name]?.message}
       />
@@ -86,6 +89,7 @@ export const ReplaceCredentialsForm = ({
       {account.expiry_editable && (
         <InputField
           label="Scadenza"
+          info={EXPIRY_INFO}
           type="date"
           error={errors.expires_on}
           {...register('expires_on')}

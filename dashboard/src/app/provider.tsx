@@ -2,6 +2,7 @@ import type { IPublicClientApplication } from '@azure/msal-browser';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
+import { InfoProvider } from '@/components/ui/info-button';
 import { RuntimeConfigProvider, type RuntimeConfig } from '@/config/runtime-config';
 import { AuthProvider } from '@/lib/auth';
 import { queryConfig } from '@/lib/react-query';
@@ -17,7 +18,9 @@ export const AppProvider = ({ config, authClient, children }: AppProviderProps) 
   return (
     <RuntimeConfigProvider config={config}>
       <AuthProvider client={authClient} scope={config.scope}>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          <InfoProvider>{children}</InfoProvider>
+        </QueryClientProvider>
       </AuthProvider>
     </RuntimeConfigProvider>
   );

@@ -7,6 +7,8 @@ export type FakeModelParameter = {
   readonly maximum?: string;
   readonly whole?: boolean;
   readonly choices?: string[];
+  // What the parameter does, as the platform describes it: the text of its info button (R5.5.7).
+  readonly description: string;
 };
 
 export type FakeModel = {
@@ -27,9 +29,12 @@ export type FakeSourceParameter = {
   readonly choices: readonly { readonly value: number; readonly label: string }[];
   // How many values a list admits; none for a whole number.
   readonly maximum_values: number | null;
+  // What the parameter does, what it admits and its default, as its declaration says: the text of its info button
+  // (R5.5.7).
+  readonly description: string;
 };
 
-/** A whole number parameter of a source, as the API declares it. */
+/** A whole number parameter of a source, as the API declares it, with the description of its info button. */
 export const numberParameter = (
   key: string,
   label: string,
@@ -43,9 +48,10 @@ export const numberParameter = (
   maximum,
   choices: [],
   maximum_values: null,
+  description: `Valore di ${label}. Da ${minimum} a ${maximum}. Predefinito: ${defaultValue}.`,
 });
 
-/** A list parameter of a source, as the API declares it, with at most 8 values. */
+/** A list parameter of a source, as the API declares it, with at most 8 values and the description of its info button. */
 export const listParameter = (
   key: string,
   label: string,
@@ -60,6 +66,7 @@ export const listParameter = (
   maximum,
   choices: [],
   maximum_values: 8,
+  description: `Valori di ${label}. Da ${minimum} a ${maximum}, al massimo 8 valori. Vuoto: nessun valore.`,
 });
 
 /** An adapter of a source as it declares itself; no configuration field means none needed (R4.1.1). */
@@ -98,6 +105,11 @@ const adapterOf = (
 
 const SERIES_LENGTH = numberParameter('lunghezza_serie', 'lunghezza serie', [10, 1, 50]);
 const AVERAGE_PERIODS = listParameter('medie_periodi', 'medie periodi', [20, 50], [2, 10000]);
+const RSI_PERIODS: FakeSourceParameter = {
+  ...listParameter('rsi_periodi', 'rsi periodi', [7, 14], [2, 10000]),
+  description:
+    "Periodi in candele dell'RSI, uno per periodo. Da 2 a 10000, al massimo 8 valori. Predefinito: 7, 14; vuoto: nessun RSI.",
+};
 const TREND_DAYS = listParameter('tendenza_giorni', 'tendenza giorni', [], [1, 3650]);
 const NEWS_COUNT = numberParameter('numero_notizie', 'numero notizie', [10, 1, 50]);
 const HISTORY_DAYS = numberParameter(
@@ -134,6 +146,8 @@ const TEMPERATURE: FakeModelParameter = {
   minimum: '0',
   maximum: '2',
   whole: false,
+  description:
+    "Quanto variano le risposte del modello: più bassa, risposte più ripetibili; più alta, più varie. Un numero nell'intervallo che il modello ammette. Vuoto: il valore predefinito del modello, mostrato nel campo.",
 };
 
 export const FAKE_MODELS: FakeModel[] = [
@@ -149,12 +163,16 @@ export const FAKE_MODELS: FakeModel[] = [
         minimum: '1',
         maximum: '8192',
         whole: true,
+        description:
+          "Lunghezza massima della risposta del modello, in token: una risposta più lunga si interrompe. Un intero nell'intervallo che il modello ammette. Vuoto: il valore predefinito del modello, mostrato nel campo.",
       },
       {
         key: 'reasoning_effort',
         label: 'livello di ragionamento',
         default: 'medium',
         choices: ['low', 'medium', 'high'],
+        description:
+          'Quanto ragiona il modello prima di rispondere: più ragionamento dà risposte più meditate, più lente e più costose. Uno dei livelli che il modello ammette. Vuoto: il livello predefinito del modello.',
       },
     ],
   },
@@ -173,12 +191,12 @@ export const FAKE_SOURCES: FakeSource[] = [
     name: 'indicatori',
     description: 'Prezzo e indicatori tecnici su due timeframe.',
     per_asset: true,
-    parameters: [SERIES_LENGTH, AVERAGE_PERIODS, TREND_DAYS],
+    parameters: [SERIES_LENGTH, AVERAGE_PERIODS, RSI_PERIODS, TREND_DAYS],
     adapters: [
       adapterOf(
         'Hyperliquid',
         'Dati di mercato pubblici di Hyperliquid.',
-        [SERIES_LENGTH, AVERAGE_PERIODS, TREND_DAYS, ...REGIME_PARAMETERS],
+        [SERIES_LENGTH, AVERAGE_PERIODS, RSI_PERIODS, TREND_DAYS, ...REGIME_PARAMETERS],
         true,
       ),
     ],

@@ -1,7 +1,9 @@
 import { useFormContext, useWatch } from 'react-hook-form';
 
+import { CheckboxField } from '@/components/ui/form/checkbox-field';
 import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 import type { FlowFormValues } from '../utils/flow-form';
 
 /**
@@ -14,24 +16,23 @@ import type { FlowFormValues } from '../utils/flow-form';
 type MemoryOptionProps = {
   readonly name: 'memory.summary' | 'memory.other_assets';
   readonly label: string;
+  readonly info: string;
   readonly hint: string;
   readonly disabled: boolean;
 };
 
 // A switch of the memory with the line that says what it adds.
-const MemoryOption = ({ name, label, hint, disabled }: MemoryOptionProps) => {
+const MemoryOption = ({ name, label, info, hint, disabled }: MemoryOptionProps) => {
   const { register } = useFormContext<FlowFormValues>();
-  const hintId = `flow-${name.replace('.', '-').replace('_', '-')}-hint`;
   return (
-    <>
-      <label className="flex items-center gap-2">
-        <input type="checkbox" {...register(name)} disabled={disabled} aria-describedby={hintId} />
-        {label}
-      </label>
-      <p id={hintId} className="text-xs text-slate-600">
-        {hint}
-      </p>
-    </>
+    <CheckboxField
+      id={`flow-${name.replace('.', '-').replace('_', '-')}`}
+      label={label}
+      info={info}
+      hint={hint}
+      disabled={disabled}
+      {...register(name)}
+    />
   );
 };
 
@@ -46,13 +47,15 @@ export const MemoryFields = () => {
   return (
     <fieldset className="min-w-0 space-y-2">
       <legend className="font-semibold">Memoria</legend>
-      <label className="flex items-center gap-2">
-        <input type="checkbox" {...register('memory.active')} />
-        Memoria attiva
-      </label>
+      <CheckboxField
+        label="Memoria attiva"
+        info={FLOW_FIELD_INFO.memoryActive}
+        {...register('memory.active')}
+      />
       <FormField
         id="flow-memory-decisions"
         label="Decisioni per asset"
+        info={FLOW_FIELD_INFO.memoryDecisions}
         error={errors.memory?.decisions?.message}
       >
         {(fieldControl) => (
@@ -65,7 +68,12 @@ export const MemoryFields = () => {
           />
         )}
       </FormField>
-      <FormField id="flow-memory-days" label="Giorni" error={errors.memory?.days?.message}>
+      <FormField
+        id="flow-memory-days"
+        label="Giorni"
+        info={FLOW_FIELD_INFO.memoryDays}
+        error={errors.memory?.days?.message}
+      >
         {(fieldControl) => (
           <input
             {...fieldControl}
@@ -79,6 +87,7 @@ export const MemoryFields = () => {
       <FormField
         id="flow-memory-text-length"
         label="Lunghezza del motivo"
+        info={FLOW_FIELD_INFO.memoryTextLength}
         error={errors.memory?.text_length?.message}
         hint="caratteri del motivo di ogni decisione ricordata"
       >
@@ -92,32 +101,31 @@ export const MemoryFields = () => {
           />
         )}
       </FormField>
-      <label className="flex items-center gap-2">
-        <input type="checkbox" {...register('memory.unlimited_text_length')} disabled={!active} />
-        Lunghezza illimitata
-      </label>
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          {...register('memory.all_decisions')}
-          disabled={!active}
-          aria-describedby="flow-memory-all-decisions-hint"
-        />
-        Tutte le decisioni
-      </label>
-      <p id="flow-memory-all-decisions-hint" className="text-xs text-slate-600">
-        spenta: solo aperture, chiusure e inversioni; accesa: anche aggiornamenti e decisioni di
-        mantenere
-      </p>
+      <CheckboxField
+        label="Lunghezza illimitata"
+        info={FLOW_FIELD_INFO.memoryUnlimitedLength}
+        disabled={!active}
+        {...register('memory.unlimited_text_length')}
+      />
+      <CheckboxField
+        id="flow-memory-all-decisions"
+        label="Tutte le decisioni"
+        info={FLOW_FIELD_INFO.memoryAllDecisions}
+        hint="spenta: solo aperture, chiusure e inversioni; accesa: anche aggiornamenti e decisioni di mantenere"
+        disabled={!active}
+        {...register('memory.all_decisions')}
+      />
       <MemoryOption
         name="memory.summary"
         label="Riepilogo per asset e direzione"
+        info={FLOW_FIELD_INFO.memorySummary}
         hint="in testa alla memoria di ogni asset, una riga per direzione con le posizioni chiuse nei giorni della memoria"
         disabled={!active}
       />
       <MemoryOption
         name="memory.other_assets"
         label="Altri asset del flusso"
+        info={FLOW_FIELD_INFO.memoryOtherAssets}
         hint="nella memoria di ogni asset, le righe di riepilogo degli altri asset del flusso, senza le loro decisioni"
         disabled={!active}
       />

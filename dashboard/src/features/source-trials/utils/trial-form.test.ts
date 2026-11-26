@@ -18,6 +18,7 @@ const SERIES: TrialParameter = {
   maximum: 50,
   choices: [],
   maximum_values: null,
+  description: 'Che cosa fa il parametro.',
 };
 const HORIZON: TrialParameter = {
   key: 'orizzonte',
@@ -31,6 +32,7 @@ const HORIZON: TrialParameter = {
     { value: 1440, label: '1 giorno' },
   ],
   maximum_values: null,
+  description: 'Che cosa fa il parametro.',
 };
 const TREND_DAYS: TrialParameter = {
   key: 'tendenza_giorni',
@@ -41,6 +43,7 @@ const TREND_DAYS: TrialParameter = {
   maximum: 3650,
   choices: [],
   maximum_values: 3,
+  description: 'Che cosa fa il parametro.',
 };
 const HYPERLIQUID: TrialAdapter = {
   name: 'Hyperliquid',

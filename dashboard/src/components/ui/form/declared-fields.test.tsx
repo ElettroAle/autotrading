@@ -1,7 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { useForm } from 'react-hook-form';
 
-import { DeclaredFields, declaredFieldOf, type DeclaredField } from './declared-fields';
+import {
+  DeclaredFields,
+  declaredFieldOf,
+  declaredInfoOf,
+  type DeclaredField,
+} from './declared-fields';
 
 const FIELDS: readonly DeclaredField[] = [
   { name: 'account_address', label: 'Indirizzo del conto', secret: false },
@@ -16,6 +21,7 @@ const Form = ({ reasons = {} }: { readonly reasons?: Record<string, string> }) =
     <form>
       <DeclaredFields
         fields={FIELDS}
+        infoOf={declaredInfoOf('che il conto chiede', "l'exchange")}
         registerField={(name) => register(`credentials.${name}`)}
         reasonOf={(name) => reasons[name]}
       />
@@ -65,5 +71,14 @@ describe('DeclaredFields', () => {
   it('finds a field the API names only among those declared', () => {
     expect(declaredFieldOf(FIELDS, 'secret_key')?.label).toBe("Chiave dell'API wallet");
     expect(declaredFieldOf(FIELDS, 'memo')).toBeUndefined();
+  });
+
+  it('says of each declared field what it is for, who gives it and whether it is kept secret (R5.5.7)', () => {
+    const infoOf = declaredInfoOf('che il conto chiede', "l'exchange");
+
+    expect(FIELDS.map(infoOf)).toEqual([
+      "Indirizzo del conto: dato che il conto chiede, conservato in chiaro. Il valore che ti dà l'exchange. Obbligatorio.",
+      "Chiave dell'API wallet: dato segreto che il conto chiede, conservato cifrato e mai più mostrato. Il valore che ti dà l'exchange. Obbligatorio.",
+    ]);
   });
 });

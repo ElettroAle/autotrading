@@ -19,6 +19,8 @@ const pickedBy = (matches: readonly string[], search: string): string | undefine
 
 type AssetPickerProps = {
   readonly id: string;
+  /** The text of the info button of the field (R5.5.7). */
+  readonly info: string;
   readonly chosen: readonly string[];
   readonly onChange: (assets: string[]) => void;
   /** The reason the API or the form refused the assets, shown beside the field. */
@@ -33,6 +35,7 @@ type AssetPickerProps = {
  */
 export const AssetPicker = ({
   id,
+  info,
   chosen,
   onChange,
   error,
@@ -61,7 +64,7 @@ export const AssetPicker = ({
   };
 
   return (
-    <FormField id={id} label="Asset" error={error}>
+    <FormField id={id} label="Asset" info={info} error={error}>
       {(control) => (
         <div className="min-w-0 space-y-2">
           {chosen.length > 0 && (

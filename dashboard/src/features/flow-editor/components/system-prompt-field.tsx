@@ -4,6 +4,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { FORM_TEXT_AREA, FormField } from '@/components/ui/form/form-field';
 
 import type { DefaultSystemPrompt } from '../api/get-system-prompt';
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 import type { FlowFormValues } from '../utils/flow-form';
 
 const FIELD_ID = 'flow-system-prompt';
@@ -53,7 +54,12 @@ export const SystemPromptField = ({ systemPrompt }: { systemPrompt: DefaultSyste
         </span>
       </summary>
       <div className="min-w-0 space-y-2 border-t border-slate-200 px-4 py-3">
-        <FormField id={FIELD_ID} label="System prompt" error={error}>
+        <FormField
+          id={FIELD_ID}
+          label="System prompt"
+          info={FLOW_FIELD_INFO.systemPrompt}
+          error={error}
+        >
           {(controlProps) => (
             <textarea
               {...controlProps}

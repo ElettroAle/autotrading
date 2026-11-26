@@ -13,7 +13,13 @@ const ChosenAssets = ({ initial = [] }: { initial?: string[] }) => {
   const [chosen, setChosen] = useState(initial);
   return (
     <form aria-label="Prova">
-      <AssetPicker id="assets" chosen={chosen} onChange={setChosen} error={undefined} />
+      <AssetPicker
+        info="Asset del flusso."
+        id="assets"
+        chosen={chosen}
+        onChange={setChosen}
+        error={undefined}
+      />
       <output aria-label="Scelti">{chosen.join(',')}</output>
     </form>
   );
@@ -106,7 +112,13 @@ describe('AssetPicker', () => {
 
   it('describes the field by the reason its value was refused', async () => {
     const Refused = () => (
-      <AssetPicker id="assets" chosen={[]} onChange={() => undefined} error="asset non valido" />
+      <AssetPicker
+        info="Asset del flusso."
+        id="assets"
+        chosen={[]}
+        onChange={() => undefined}
+        error="asset non valido"
+      />
     );
     await renderInApp(<Refused />, { account: 'anna' });
 

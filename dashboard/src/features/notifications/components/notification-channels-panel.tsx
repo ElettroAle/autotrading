@@ -241,6 +241,7 @@ const Exceptions = ({ channels, reasonsId }: ChannelsProps) => {
       <h3 className="font-semibold">Eccezioni di un flusso</h3>
       <SelectField
         label="Flusso"
+        info="Flusso le cui notifiche seguono canali diversi da quelli scelti per tutti. Uno dei tuoi flussi. Vuoto: nessuna eccezione da modificare."
         placeholder="Scegli un flusso"
         choices={channels.flows.map((each) => ({ value: each.flow_id, label: each.name }))}
         value={flowId}

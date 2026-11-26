@@ -87,10 +87,23 @@ const MailServerForm = ({ server, onDone }: MailServerFormProps) => {
         Gmail: smtp.gmail.com · 587 · STARTTLS · password per le app
       </p>
       <FormAlert error={errors.root?.server} />
-      <InputField label="Server" autoComplete="off" error={errors.host} {...register('host')} />
-      <InputField label="Porta" inputMode="numeric" error={errors.port} {...register('port')} />
+      <InputField
+        label="Server"
+        info="Nome del server di posta in uscita (SMTP) da cui partono le email. Un nome di host. Obbligatorio."
+        autoComplete="off"
+        error={errors.host}
+        {...register('host')}
+      />
+      <InputField
+        label="Porta"
+        info="Porta del server di posta. Un intero, di solito 587 con STARTTLS o 465 con TLS. Obbligatoria."
+        inputMode="numeric"
+        error={errors.port}
+        {...register('port')}
+      />
       <SelectField
         label="Sicurezza"
+        info="Come si protegge il collegamento al server di posta. Una delle sicurezze dell'elenco, come indica il fornitore della posta. Obbligatoria."
         placeholder="Scegli la sicurezza"
         choices={SECURITY_CHOICES}
         error={errors.security}
@@ -98,6 +111,7 @@ const MailServerForm = ({ server, onDone }: MailServerFormProps) => {
       />
       <InputField
         label="Utente"
+        info="Utente con cui si accede al server di posta, di solito l'indirizzo email. Testo. Obbligatorio."
         autoComplete="off"
         error={errors.username}
         {...register('username')}
@@ -105,11 +119,13 @@ const MailServerForm = ({ server, onDone }: MailServerFormProps) => {
       {/* A saved password never comes back: an empty field keeps it (ADR server-di-posta-per-tenant). */}
       <SecretField
         label={server === null ? 'Password' : 'Password (vuota per conservare quella salvata)'}
+        info="Password dell'utente del server di posta, conservata cifrata e mai più mostrata. Testo. Obbligatoria alla prima configurazione; vuota dopo: resta quella salvata."
         error={errors.password}
         {...register('password')}
       />
       <InputField
         label="Mittente (se vuoto, l'utente)"
+        info="Indirizzo che compare come mittente delle email. Un indirizzo email. Vuoto: l'utente del server."
         type="email"
         autoComplete="off"
         error={errors.sender}

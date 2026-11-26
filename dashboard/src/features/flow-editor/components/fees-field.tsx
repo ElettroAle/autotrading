@@ -1,6 +1,6 @@
-import { AgentContextOption } from './agent-context-option';
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 
-const HINT_ID = 'flow-fees-for-agent-hint';
+import { AgentContextOption } from './agent-context-option';
 
 /**
  * The option that gives the agent the round-trip cost of a position, beside the other options of the context of the
@@ -10,9 +10,9 @@ const HINT_ID = 'flow-fees-for-agent-hint';
 export const FeesField = () => (
   <AgentContextOption
     name="fees_for_agent"
-    aria-describedby={HINT_ID}
+    id="flow-fees-for-agent"
+    label="Commissioni nel contesto dell'agente"
+    info={FLOW_FIELD_INFO.feesForAgent}
     hint="lo stato inviato all'agente riporta il costo di andata e ritorno: la commissione del conto per un ordine a mercato, contata per l'apertura e per la chiusura"
-  >
-    Commissioni nel contesto dell&apos;agente
-  </AgentContextOption>
+  />
 );

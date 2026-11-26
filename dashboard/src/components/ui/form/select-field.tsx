@@ -28,6 +28,8 @@ type Reason = { readonly message?: string } | undefined;
 
 type SelectFieldProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'children'> & {
   readonly label: string;
+  /** The text of the info button of the field (R5.5.7). */
+  readonly info: string;
   /** The first option, which leaves the field empty. */
   readonly placeholder: string;
   readonly choices: readonly SelectChoice[];
@@ -54,6 +56,7 @@ const isGroup = (choice: SelectChoice): choice is SelectOptionGroup => 'options'
  */
 export const SelectField = ({
   label,
+  info,
   placeholder,
   choices,
   error,
@@ -66,7 +69,7 @@ export const SelectField = ({
   const generatedId = useId();
   const selectId = id ?? generatedId;
   return (
-    <FormField id={selectId} label={label} error={error?.message}>
+    <FormField id={selectId} label={label} info={info} error={error?.message}>
       {(control) => (
         <>
           <select

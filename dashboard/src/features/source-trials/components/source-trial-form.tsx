@@ -65,6 +65,7 @@ const AdapterChoice = ({
   return (
     <SelectField
       label="Adapter"
+      info="Adapter da cui la prova legge la fonte, come farebbe un ciclo. Uno degli adapter della fonte. Obbligatorio."
       placeholder="Scegli l'adapter"
       choices={source.adapters.map((adapter) => ({ value: adapter.name, label: adapter.name }))}
       error={error}
@@ -149,6 +150,7 @@ export const SourceTrialForm = ({
         {source.per_asset && (
           <SelectField
             label="Asset"
+            info="Asset per cui la prova legge la fonte. Uno degli asset che l'exchange negozia. Predefinito: il primo dell'elenco."
             placeholder="Scegli l'asset"
             choices={assets.names.map((name) => ({ value: name, label: name }))}
             loading={assets.loading}
@@ -162,6 +164,7 @@ export const SourceTrialForm = ({
             <InputField
               key={`${adapter.name}-${parameter.key}`}
               label={parameter.label}
+              info={parameter.description}
               type="text"
               inputMode="numeric"
               hint={listRangeOf(parameter)}
@@ -172,6 +175,7 @@ export const SourceTrialForm = ({
             <SelectField
               key={`${adapter.name}-${parameter.key}`}
               label={parameter.label}
+              info={parameter.description}
               placeholder={`Scegli ${parameter.label}`}
               choices={choiceOptionsOf(parameter)}
               error={errors.parameters?.[parameter.key]}
@@ -181,6 +185,7 @@ export const SourceTrialForm = ({
             <InputField
               key={`${adapter.name}-${parameter.key}`}
               label={parameter.label}
+              info={parameter.description}
               type="number"
               inputMode="numeric"
               min={parameter.minimum}

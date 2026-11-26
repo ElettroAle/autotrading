@@ -14,6 +14,7 @@ import {
   virtualBalanceInputSchema,
   type VirtualBalanceInput,
 } from '../api/reset-virtual-balance';
+import { ACCOUNT_SETTING_INFO } from '../utils/setting-info';
 
 // The name the API gives to the field of the request, as its refusals report it.
 const BALANCE = 'balance';
@@ -61,6 +62,7 @@ export const VirtualBalanceForm = ({ account }: { readonly account: Account }) =
         <FormAlert error={errors.root?.server} />
         <InputField
           label={`Nuovo saldo virtuale (${account.currency})`}
+          info={ACCOUNT_SETTING_INFO.newVirtualBalance}
           inputMode="decimal"
           error={errors.balance}
           {...register(BALANCE)}

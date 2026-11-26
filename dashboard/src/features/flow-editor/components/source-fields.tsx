@@ -1,11 +1,18 @@
 import { useFormContext, useWatch } from 'react-hook-form';
 
-import { describedBy, FieldError, FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
+import {
+  describedBy,
+  FieldError,
+  FORM_CONTROL,
+  FormField,
+  LabelRow,
+} from '@/components/ui/form/form-field';
 import { reasonOf } from '@/lib/form-errors';
 import { choiceOptionsOf, defaultChoiceLabelOf, hasChoices } from '@/lib/parameter-choices';
 import { defaultTextOf, isList, listRangeOf } from '@/lib/parameter-lists';
 
 import type { Source, SourceAdapter } from '../api/get-sources';
+import { adapterInfoOf, sourceInfoOf, weightInfoOf } from '../utils/field-info';
 import { adapterKeyOf, type FlowFormValues } from '../utils/flow-form';
 
 const SOURCES_ID = 'flow-sources';
@@ -28,6 +35,7 @@ const AdapterSettings = ({ source, adapter }: { source: Source; adapter: SourceA
       <FormField
         id={`${id}-weight`}
         label={`Peso di ${label}`}
+        info={weightInfoOf(source, adapter)}
         error={adapterErrors?.weight?.message}
       >
         {(props) => (
@@ -50,6 +58,7 @@ const AdapterSettings = ({ source, adapter }: { source: Source; adapter: SourceA
             key={parameter.key}
             id={`${id}-${parameter.key}`}
             label={`${parameter.label} di ${label}`}
+            info={parameter.description}
             error={adapterErrors?.lists?.[parameter.key]?.message}
             hint={listRangeOf(parameter)}
           >
@@ -69,6 +78,7 @@ const AdapterSettings = ({ source, adapter }: { source: Source; adapter: SourceA
             key={parameter.key}
             id={`${id}-${parameter.key}`}
             label={`${parameter.label} di ${label}`}
+            info={parameter.description}
             error={adapterErrors?.parameters?.[parameter.key]?.message}
           >
             {(control) =>
@@ -119,7 +129,7 @@ const AdapterChoice = ({ source, adapter }: { source: Source; adapter: SourceAda
   const unavailable = adapter.unavailable_reason !== null && !chosen;
   return (
     <li className="min-w-0 space-y-2">
-      <div className="flex items-center gap-2">
+      <LabelRow label={adapter.name} info={adapterInfoOf(source, adapter)}>
         <input
           id={id}
           type="checkbox"
@@ -130,7 +140,7 @@ const AdapterChoice = ({ source, adapter }: { source: Source; adapter: SourceAda
         <label htmlFor={id} className="font-medium break-words">
           {adapter.name}
         </label>
-      </div>
+      </LabelRow>
       <div id={`${id}-description`} className="space-y-1 text-sm text-slate-600">
         <p>{adapter.description}</p>
         <p>{configuration}</p>
@@ -158,12 +168,12 @@ const SourceChoice = ({ source }: { source: Source }) => {
   });
   return (
     <div className="min-w-0 space-y-2 border-t border-slate-100 pt-2">
-      <div className="flex items-center gap-2">
+      <LabelRow label={source.name} info={sourceInfoOf(source)}>
         <input id={id} type="checkbox" aria-describedby={`${id}-description`} {...activation} />
         <label htmlFor={id} className="font-medium">
           {source.name}
         </label>
-      </div>
+      </LabelRow>
       <p id={`${id}-description`} className="text-sm text-slate-600">
         {source.description}
       </p>

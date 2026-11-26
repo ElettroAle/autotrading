@@ -28,7 +28,7 @@ When(
     await dashboard.openAccounts();
     await dashboard.signInAs(account);
     const region = form(dashboard);
-    await region.getByLabel('Nome').fill(ACCOUNT_NAME);
+    await region.getByLabel('Nome', { exact: true }).fill(ACCOUNT_NAME);
     await expect(region.locator(`option[value="${exchange}"]`)).toBeEnabled();
     await dashboard.field('Exchange', region).selectOption(exchange);
   },
@@ -36,7 +36,7 @@ When(
 
 Then('il modulo non chiede credenziali ma il saldo virtuale', async ({ dashboard }) => {
   const region = form(dashboard);
-  await expect(region.getByLabel('Saldo virtuale')).toBeVisible();
+  await expect(region.getByLabel('Saldo virtuale', { exact: true })).toBeVisible();
   await expect(region.getByLabel('Indirizzo del conto')).toHaveCount(0);
   await expect(region.getByLabel("Chiave dell'API wallet")).toHaveCount(0);
 });
@@ -64,7 +64,7 @@ When(
     await dashboard.signInAs(account);
     await dashboard.openAccount(ACCOUNT_NAME, 'Impostazioni');
     const region = virtualBalanceOf(dashboard, ACCOUNT_NAME);
-    await region.getByLabel('Nuovo saldo virtuale (USDC)').fill(String(balance));
+    await region.getByLabel('Nuovo saldo virtuale (USDC)', { exact: true }).fill(String(balance));
     await region.getByRole('button', { name: RESET }).click();
     await region.getByRole('alertdialog').getByRole('button', { name: RESET }).click();
     await expect(region.getByRole('status')).toHaveText(

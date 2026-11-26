@@ -3,9 +3,14 @@ import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 
 import { Card } from '@/components/ui/card';
-import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
+import {
+  DeclaredFields,
+  declaredFieldOf,
+  declaredInfoOf,
+} from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
 import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
+import { EXPIRY_INFO } from '@/components/ui/key-expiry';
 import { showRefusal } from '@/lib/form-errors';
 
 import { useModelProviders, type ModelProvider } from '../api/get-model-providers';
@@ -80,6 +85,7 @@ export const RegisterProviderKeyForm = () => {
         <FormAlert error={errors.root?.server} />
         <SelectField
           label="Fornitore"
+          info="Fornitore di modelli IA della chiave: i flussi usano solo modelli dei fornitori di cui hai la chiave. Uno dei fornitori della piattaforma, una chiave per fornitore. Obbligatorio."
           placeholder="Scegli un fornitore"
           choices={(providers.data ?? []).map(optionOf)}
           loading={providers.isPending}
@@ -93,6 +99,7 @@ export const RegisterProviderKeyForm = () => {
         />
         <DeclaredFields
           fields={fields}
+          infoOf={declaredInfoOf('della chiave del fornitore', 'il fornitore')}
           registerField={(name) => register(`key.${name}`)}
           reasonOf={(name) => errors.key?.[name]?.message}
         />
@@ -100,6 +107,7 @@ export const RegisterProviderKeyForm = () => {
         {chosen?.expiry_editable === true && (
           <InputField
             label="Scadenza"
+            info={EXPIRY_INFO}
             type="date"
             error={errors.expires_on}
             {...register('expires_on')}

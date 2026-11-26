@@ -3,6 +3,7 @@ import { Controller, FormProvider, useForm } from 'react-hook-form';
 
 import { Card } from '@/components/ui/card';
 import { AssetPicker } from '@/components/ui/form/asset-picker';
+import { CheckboxField } from '@/components/ui/form/checkbox-field';
 import { FORM_CONTROL, FORM_TEXT_AREA, FormField } from '@/components/ui/form/form-field';
 import { InputField } from '@/components/ui/form/input-field';
 import { SelectField, type SelectOption } from '@/components/ui/form/select-field';
@@ -13,6 +14,7 @@ import type { Account } from '../api/get-accounts';
 import type { Model, Provider } from '../api/get-model-catalog';
 import type { Source } from '../api/get-sources';
 import type { DefaultSystemPrompt } from '../api/get-system-prompt';
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-form';
 
 import { AccountExposureField } from './account-exposure-field';
@@ -46,7 +48,7 @@ type FlowFormProps = {
 
 /** The account of the flow, read and not chosen, by its name when the accounts are read (R1.1.1). */
 const FixedAccount = ({ accountId, accounts }: { accountId: string; accounts: Account[] }) => (
-  <FormField id="flow-account" label="Conto" error={undefined}>
+  <FormField id="flow-account" label="Conto" info={FLOW_FIELD_INFO.account} error={undefined}>
     {(control) => (
       <input
         {...control}
@@ -106,11 +108,21 @@ export const FlowForm = ({
               {errors.root.server.message}
             </p>
           )}
-          <FormField id="flow-name" label="Nome" error={errors.name?.message}>
+          <FormField
+            id="flow-name"
+            label="Nome"
+            info={FLOW_FIELD_INFO.name}
+            error={errors.name?.message}
+          >
             {(control) => <input {...control} {...register('name')} className={FORM_CONTROL} />}
           </FormField>
           {accountChosen ? (
-            <FormField id="flow-account" label="Conto" error={errors.account_id?.message}>
+            <FormField
+              id="flow-account"
+              label="Conto"
+              info={FLOW_FIELD_INFO.account}
+              error={errors.account_id?.message}
+            >
               {(control) => (
                 <select {...control} {...register('account_id')} className={FORM_CONTROL}>
                   <option value="">Scegli un conto</option>
@@ -131,6 +143,7 @@ export const FlowForm = ({
             render={({ field }) => (
               <AssetPicker
                 id="flow-assets"
+                info={FLOW_FIELD_INFO.assets}
                 chosen={field.value}
                 onChange={field.onChange}
                 onBlur={field.onBlur}
@@ -142,6 +155,7 @@ export const FlowForm = ({
           <FormField
             id="flow-cycle-minutes"
             label="Intervallo del ciclo in minuti"
+            info={FLOW_FIELD_INFO.cycleMinutes}
             error={errors.cycle_minutes?.message}
           >
             {(control) => (
@@ -158,7 +172,12 @@ export const FlowForm = ({
           <MemoryFields />
           <AccountExposureField />
           <FeesField />
-          <FormField id="flow-instructions" label="Istruzioni" error={errors.instructions?.message}>
+          <FormField
+            id="flow-instructions"
+            label="Istruzioni"
+            info={FLOW_FIELD_INFO.instructions}
+            error={errors.instructions?.message}
+          >
             {(control) => (
               <textarea
                 {...control}
@@ -174,6 +193,7 @@ export const FlowForm = ({
             <FormField
               id="flow-max-leverage"
               label="Leva massima"
+              info={FLOW_FIELD_INFO.maxLeverage}
               error={errors.max_leverage?.message}
             >
               {(control) => (
@@ -188,6 +208,7 @@ export const FlowForm = ({
             <FormField
               id="flow-max-margin-exposure"
               label="Esposizione massima del margine (%)"
+              info={FLOW_FIELD_INFO.maxMarginExposure}
               error={errors.max_margin_exposure_percent?.message}
             >
               {(control) => (
@@ -202,6 +223,7 @@ export const FlowForm = ({
             <FormField
               id="flow-max-value-exposure"
               label="Esposizione massima del valore (%)"
+              info={FLOW_FIELD_INFO.maxValueExposure}
               error={errors.max_value_exposure_percent?.message}
             >
               {(control) => (
@@ -216,6 +238,7 @@ export const FlowForm = ({
             <FormField
               id="flow-max-total-margin-exposure"
               label="Esposizione complessiva massima del margine (%)"
+              info={FLOW_FIELD_INFO.maxTotalMarginExposure}
               error={errors.max_total_margin_exposure_percent?.message}
             >
               {(control) => (
@@ -230,6 +253,7 @@ export const FlowForm = ({
             <FormField
               id="flow-max-total-value-exposure"
               label="Esposizione complessiva massima del valore (%)"
+              info={FLOW_FIELD_INFO.maxTotalValueExposure}
               error={errors.max_total_value_exposure_percent?.message}
             >
               {(control) => (
@@ -244,6 +268,7 @@ export const FlowForm = ({
             <FormField
               id="flow-max-consecutive-failures"
               label="Massimo di cicli falliti consecutivi"
+              info={FLOW_FIELD_INFO.maxConsecutiveFailures}
               error={errors.max_consecutive_failures?.message}
             >
               {(control) => (
@@ -258,6 +283,7 @@ export const FlowForm = ({
             <InputField
               id="flow-max-daily-loss"
               label="Perdita giornaliera massima (%)"
+              info={FLOW_FIELD_INFO.maxDailyLoss}
               error={errors.max_daily_loss_percent}
               inputMode="decimal"
               {...register('max_daily_loss_percent')}
@@ -265,6 +291,7 @@ export const FlowForm = ({
             <InputField
               id="flow-max-drawdown"
               label="Perdita massima dal picco (%)"
+              info={FLOW_FIELD_INFO.maxDrawdown}
               error={errors.max_drawdown_percent}
               inputMode="decimal"
               {...register('max_drawdown_percent')}
@@ -272,6 +299,7 @@ export const FlowForm = ({
             <SelectField
               id="flow-openings-resume"
               label="Ripresa delle aperture"
+              info={FLOW_FIELD_INFO.openingsResume}
               placeholder="Scegli la ripresa"
               choices={OPENINGS_RESUME_CHOICES}
               error={errors.openings_resume}
@@ -281,6 +309,7 @@ export const FlowForm = ({
             <FormField
               id="flow-default-stop-loss"
               label="Stop loss predefinito (%)"
+              info={FLOW_FIELD_INFO.defaultStopLoss}
               error={errors.default_stop_loss_percent?.message}
             >
               {(control) => (
@@ -295,6 +324,7 @@ export const FlowForm = ({
             <FormField
               id="flow-default-take-profit"
               label="Take profit predefinito (%)"
+              info={FLOW_FIELD_INFO.defaultTakeProfit}
               error={errors.default_take_profit_percent?.message}
             >
               {(control) => (
@@ -310,6 +340,7 @@ export const FlowForm = ({
             <FormField
               id="flow-minimum-confidence"
               label="Confidenza minima (0-100)"
+              info={FLOW_FIELD_INFO.minimumConfidence}
               error={errors.minimum_confidence?.message}
             >
               {(control) => (
@@ -325,6 +356,7 @@ export const FlowForm = ({
           <FormField
             id="flow-allocated-capital"
             label="Capitale allocato"
+            info={FLOW_FIELD_INFO.allocatedCapital}
             error={errors.allocated_capital?.message}
           >
             {(control) => (
@@ -336,10 +368,11 @@ export const FlowForm = ({
               />
             )}
           </FormField>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" {...register('bring_to_minimum')} />
-            Porta le aperture al minimo dell&apos;exchange
-          </label>
+          <CheckboxField
+            label="Porta le aperture al minimo dell'exchange"
+            info={FLOW_FIELD_INFO.bringToMinimum}
+            {...register('bring_to_minimum')}
+          />
           <button
             type="submit"
             disabled={isSubmitting || !tradable.isSuccess}

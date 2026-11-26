@@ -17,6 +17,10 @@ FLOW_FORM = EDITOR / "components" / "flow-form.tsx"
 OPTION = EDITOR / "components" / "account-exposure-field.tsx"
 LIMIT_LABEL = "Esposizione massima per direzione (% del saldo)"
 OPTION_LABEL = "Esposizione degli altri flussi del conto nel contesto dell&apos;agente"
+# The same label given to the shared checkbox (ADR informazioni-sui-campi-di-configurazione).
+OPTION_LABEL_PROP = 'label="Esposizione degli altri flussi del conto nel contesto dell\'agente"'
+# The help line, written on the checkbox or given to the shared checkbox that describes the box with it.
+HELP_LINE = re.compile(r"aria-describedby|\bhint=")
 # The bound the API checks, written in the dashboard: it would repeat its rule.
 REPEATED_RULE = re.compile(r"\.positive\(|\.min\(|\.gt\(|maggiore di 0|> ?0\b")
 
@@ -47,7 +51,7 @@ def option_violations(flow_form: str, option: str) -> list[str]:
     memory, shown = flow_form.find("<MemoryFields />"), flow_form.find("<AccountExposureField />")
     if not 0 <= memory < shown or "<" in flow_form[memory + len("<MemoryFields />") : shown].strip():
         found.append("the option is not beside the options of the memory")
-    if OPTION_LABEL not in option or "aria-describedby" not in option:
+    if not (OPTION_LABEL in option or OPTION_LABEL_PROP in option) or not HELP_LINE.search(option):
         found.append("the option without its help line")
     return found
 

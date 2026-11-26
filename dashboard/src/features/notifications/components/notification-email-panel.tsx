@@ -85,6 +85,7 @@ const AddressForm = ({
         {/* The email keyboard on a phone; the form itself is judged by the API. */}
         <InputField
           label="Indirizzo email"
+          info="Indirizzo a cui arrivano le notifiche via email. Un indirizzo email. Obbligatorio; per non ricevere più email si rimuove l'indirizzo."
           type="email"
           autoComplete="email"
           error={errors.address}

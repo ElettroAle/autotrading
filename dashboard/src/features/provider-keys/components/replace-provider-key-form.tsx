@@ -1,8 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
+import {
+  DeclaredFields,
+  declaredFieldOf,
+  declaredInfoOf,
+} from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
+import { EXPIRY_INFO } from '@/components/ui/key-expiry';
 import { showRefusal } from '@/lib/form-errors';
 
 import { useModelProviders } from '../api/get-model-providers';
@@ -68,6 +73,7 @@ export const ReplaceProviderKeyForm = ({
       <FormAlert error={errors.root?.server} />
       <DeclaredFields
         fields={fields}
+        infoOf={declaredInfoOf('della chiave del fornitore', 'il fornitore')}
         registerField={(name) => register(`key.${name}`)}
         reasonOf={(name) => errors.key?.[name]?.message}
       />
@@ -75,6 +81,7 @@ export const ReplaceProviderKeyForm = ({
       {providerKey.expiry_editable && (
         <InputField
           label="Scadenza"
+          info={EXPIRY_INFO}
           type="date"
           error={errors.expires_on}
           {...register('expires_on')}

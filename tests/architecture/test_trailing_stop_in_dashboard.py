@@ -26,7 +26,9 @@ def form_violations(form: str, fields: str, values: str) -> list[str]:
     if not 0 <= take_profit < trailing or "<FormField" in form[take_profit:trailing]:
         found.append("the parts are not right after the default take profit")
     found.extend(f"the part {part} is not there" for part in FIELD_IDS if not re.search(f"['\"]{part}['\"]", fields))
-    if len(HINT.findall(fields)) < len(FIELD_IDS) or "aria-describedby" not in fields:
+    # The shared fields describe their control with their hint (ADR informazioni-sui-campi-di-configurazione).
+    described = "aria-describedby" in fields or "<FormField" in fields
+    if len(HINT.findall(fields)) < len(FIELD_IDS) or not described:
         found.append("a part without what it admits")
     if REPEATED_RULE.search(fields + values):
         found.append("a rule of the API repeated in the dashboard")
