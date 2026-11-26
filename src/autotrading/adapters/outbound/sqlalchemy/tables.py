@@ -594,6 +594,22 @@ flow_exit_plans = Table(
 )
 
 
+# The open positions of the flows whose stop follows the price, as the platform watches them between the cycles: the
+# opening, the best price and the largest unrealized profit reached, and the refusal the next cycle tells (R5.5.1).
+flow_watched_positions = Table(
+    "flow_watched_positions",
+    metadata,
+    Column("flow_id", Uuid, primary_key=True),
+    Column("asset", Text, primary_key=True),
+    Column("tenant_id", Uuid, nullable=False),
+    Column("opened_at", DateTime(timezone=True)),
+    Column("best_price", Numeric, nullable=False),
+    Column("max_profit", Numeric, nullable=False),
+    Column("refusal", Text),
+    ForeignKeyConstraint(["flow_id", "tenant_id"], ["flows.id", "flows.tenant_id"]),
+)
+
+
 # The protections the platform placed for the positions of the flows; a removed one stays, so that its execution read
 # later still belongs to its flow (R3.1.2).
 flow_protections = Table(

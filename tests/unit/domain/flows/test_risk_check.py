@@ -660,3 +660,46 @@ def test_the_close_of_a_reversal_frees_no_liquidity_before_it_is_executed() -> N
 
 def test_a_close_decided_by_the_agent_has_its_reason() -> None:
     assert ApprovedClose("BTC").reason is CloseReason.AGENT
+
+
+def trailing(side: TradeSide = TradeSide.LONG, stop: int = 61740) -> RiskCheck:
+    """A position whose stop follows the price, with the stop the platform computes for it (R5.5.1)."""
+    state = RiskState("USDC", Decimal(1000), Decimal(1000), {"BTC": side}, trailing_stops={"BTC": Decimal(stop)})
+    return RiskCheck(RiskPolicy(RiskLimits(50, Decimal(100))), state)
+
+
+def test_a_stop_of_the_agent_farther_than_the_one_that_follows_the_price_goes_back_to_it() -> None:
+    # R5.5.1, ADR sorveglianza-del-prezzo-per-lo-stop-che-segue.
+    market = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(63000))
+
+    outcome = trailing().outcome(UpdateIntent("BTC", ExitPlanChange(stop=Decimal(58000))), market)
+
+    reason = "stop 58000 riportato a 61740: oltre lo stop che segue il prezzo"
+    assert outcome == ApprovedUpdate(
+        "BTC",
+        ExitPlanChange(stop=Decimal(61740)),
+        (Adjustment(AdjustmentKind.EXIT_PLAN, Decimal(58000), Decimal(61740), reason),),
+    )
+
+
+def test_a_stop_of_the_agent_closer_than_the_one_that_follows_the_price_stands() -> None:
+    market = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(63000))
+    change = ExitPlanChange(stop=Decimal(62000))
+
+    assert trailing().outcome(UpdateIntent("BTC", change), market) == ApprovedUpdate("BTC", change, ())
+
+
+def test_the_stop_of_a_short_goes_back_below_when_the_agent_puts_it_higher() -> None:
+    market = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(57000))
+
+    outcome = trailing(TradeSide.SHORT, 58140).outcome(UpdateIntent("BTC", ExitPlanChange(stop=Decimal(59000))), market)
+
+    assert isinstance(outcome, ApprovedUpdate)
+    assert outcome.plan_change.stop == Decimal(58140)
+
+
+def test_an_update_without_a_stop_is_left_as_it_is_by_the_stop_that_follows_the_price() -> None:
+    market = AssetLimits(max_leverage=50, min_order_value=Decimal(10), market_price=Decimal(63000))
+    change = ExitPlanChange(target=Decimal(66000))
+
+    assert trailing().outcome(UpdateIntent("BTC", change), market) == ApprovedUpdate("BTC", change, ())

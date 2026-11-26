@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from autotrading.application.flows.errors import FlowNotFoundError
+from autotrading.application.flows.ports import OpenPositionRecords
 from autotrading.application.flows.read_flow_results import (
     FlowPeriodPorts,
     ReadFlowResultsCommand,
@@ -36,6 +37,7 @@ from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import CURRENCY, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -58,8 +60,11 @@ class Bench:
                 flows,
                 self.activity,
                 self.ledger,
-                InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
-                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                OpenPositionRecords(
+                    InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                    InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                    InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
+                ),
             ),
             ReadOpeningsSuspensionUseCase(
                 flows, InMemoryOpeningsSuspensionAdapter(self.store, TENANT), self.readings, self.accounts, lambda: NOW

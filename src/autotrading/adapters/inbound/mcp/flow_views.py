@@ -10,6 +10,7 @@ from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.sources.source_parameter import SourceParameterValue
 
 type ParameterValue = int | list[int]
@@ -90,6 +91,7 @@ class FlowView:
     default_take_profit_percent: str | None
     minimum_confidence: int | None
     memory: FlowMemory
+    trailing_stop: TrailingStop
     missing: list[str]
 
     @classmethod
@@ -121,6 +123,7 @@ class FlowView:
             default_take_profit_percent=optional_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=None if confidence is None else confidence.value,
             memory=configuration.memory,
+            trailing_stop=configuration.trailing_stop,
             missing=list(flow.missing_before_start),
         )
 

@@ -12,6 +12,7 @@ from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.selections import ActiveSource
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 
@@ -72,7 +73,32 @@ class CycleFlow:
             open_margin=attributed.margin,
             open_value=sum((position.size * position.mark_price for position in attributed.positions), Decimal(0)),
             openings_suspended=None if suspension is None else suspension.blocked_reason,
+            trailing_stops=frozendict(self._trailing_stops()),
         )
+
+    def _trailing_stops(self) -> dict[str, Decimal]:
+        """The stop the platform computes for each open position whose stop follows the price, from the best price it
+        reached and the price of now; none before the activation (R5.5.1, ADR
+        sorveglianza-del-prezzo-per-lo-stop-che-segue).
+        """
+        trailing = self.configuration.trailing_stop
+        if not trailing.active:
+            return {}
+        stops = {position.asset: self._trailing_stop_of(trailing, position) for position in self.positions}
+        return {asset: stop for asset, stop in stops.items() if stop is not None}
+
+    def _trailing_stop_of(self, trailing: TrailingStop, position: CyclePosition) -> Decimal | None:
+        watched = self.attributed.watched.get(position.asset)
+        previous = None if watched is None else watched.best_price
+        best = TrailingStop.best_price(position.side, previous, position.mark_price)
+        return trailing.stop_of(position.side, position.entry_price, best)
+
+    def _max_profit_for_agent(self, asset: str) -> Decimal | None:
+        """Only with the option on does the agent see the largest profit the position reached (ADR
+        massimo-profitto-raggiunto-nello-stato-della-posizione)."""
+        if not self.configuration.trailing_stop.max_profit_for_agent:
+            return None
+        return self.attributed.max_profit_of(asset)
 
     def openings_suspension(self, loss_suspension: OpeningsSuspension | None) -> OpeningsSuspension | None:
         alarm_suspension = None if self.alarm is None else self.alarm.suspension(self.account_name)
@@ -105,6 +131,7 @@ class CycleFlow:
                     position.unrealized_pnl,
                     position.liquidation_price,
                     self.attributed.exit_plan_of(position.asset),
+                    self._max_profit_for_agent(position.asset),
                 )
                 for position in self.positions
             ),

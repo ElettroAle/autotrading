@@ -18,7 +18,12 @@ from autotrading.application.flows.cash_out_profits import CashOutProfitsCommand
 from autotrading.application.flows.change_allocated_capital import ChangeAllocatedCapitalCommand
 from autotrading.application.flows.change_flow_status import ChangeFlowStatusCommand
 from autotrading.application.flows.compare_flow_versions import CompareFlowVersionsCommand
-from autotrading.application.flows.create_flow import CreateFlowCommand, MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import (
+    CreateFlowCommand,
+    MemoryRequest,
+    SourceRequest,
+    TrailingStopRequest,
+)
 from autotrading.application.flows.duplicate_flow import DuplicateFlowCommand
 from autotrading.application.flows.export_flow_strategy import ExportFlowStrategyCommand
 from autotrading.application.flows.get_flow import GetFlowCommand
@@ -46,6 +51,7 @@ from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
 from autotrading.domain.flows.stop_outcome import PositionLeftOpen, StopOutcome
 from autotrading.domain.flows.system_prompt import PromptPlaceholder
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.user_id import UserId
 
 
@@ -103,6 +109,8 @@ class FlowCreationRequest(BaseModel):
     # Missing: off, with 10 decisions and 30 days (R5.3.4), a motive of 160 characters and only openings, closings and
     # reversals; `unlimited_text_length` true leaves the motive whole (R5.3.5).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
+    # Missing: no stop that follows the price, the option of the agent off (R5.5.1).
+    trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -130,6 +138,7 @@ class FlowCreationRequest(BaseModel):
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
             memory=self.memory,
+            trailing_stop=self.trailing_stop,
         )
 
 
@@ -171,6 +180,8 @@ class FlowModificationRequest(BaseModel):
     # Only the parts of the memory sent change; the others keep the version in force (R5.3.4). A null length keeps it
     # too: `unlimited_text_length` true takes the limit away (R5.3.5).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
+    # Only the parts of the stop that follows the price sent change; `remove_*` takes a part away (R5.5.1).
+    trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -209,6 +220,7 @@ class FlowModificationRequest(BaseModel):
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence=self._sent_as_null("minimum_confidence"),
             memory=self.memory,
+            trailing_stop=self.trailing_stop,
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -316,6 +328,7 @@ class ConfigurationResponse(BaseModel):
     default_take_profit_percent: str | None
     minimum_confidence: int | None
     memory: FlowMemory
+    trailing_stop: TrailingStop
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -343,6 +356,7 @@ class ConfigurationResponse(BaseModel):
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
             memory=configuration.memory,
+            trailing_stop=configuration.trailing_stop,
         )
 
 
@@ -394,6 +408,7 @@ class FlowResponse(BaseModel):
     default_take_profit_percent: str | None
     minimum_confidence: int | None
     memory: FlowMemory
+    trailing_stop: TrailingStop
     missing: list[str]
 
     @classmethod
@@ -427,6 +442,7 @@ class FlowResponse(BaseModel):
             default_take_profit_percent=_text(configuration.protection_defaults.take_profit_percent),
             minimum_confidence=_confidence(configuration.minimum_confidence),
             memory=configuration.memory,
+            trailing_stop=configuration.trailing_stop,
             missing=list(flow.missing_before_start),
         )
 

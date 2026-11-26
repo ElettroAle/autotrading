@@ -28,3 +28,6 @@ class FlowSetting(StrEnum):
     MEMORY_DECISIONS = "memory.decisions"
     MEMORY_DAYS = "memory.days"
     MEMORY_TEXT_LENGTH = "memory.text_length"
+    TRAILING_STOP_DISTANCE = "trailing_stop.distance_percent"
+    TRAILING_STOP_ACTIVATION = "trailing_stop.activation_percent"
+    TRAILING_STOP_BREAKEVEN = "trailing_stop.breakeven_percent"

@@ -8,7 +8,12 @@ from decimal import Decimal
 from typing import Literal, TypedDict
 from uuid import UUID
 
-from autotrading.application.flows.create_flow import CreateFlowCommand, MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import (
+    CreateFlowCommand,
+    MemoryRequest,
+    SourceRequest,
+    TrailingStopRequest,
+)
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.modify_flow import ModifyFlowCommand
 from autotrading.application.flows.ports import AdapterRequest
@@ -74,6 +79,7 @@ class _StrategyArguments(TypedDict):
     default_take_profit_percent: Decimal | None
     minimum_confidence: int | None
     memory: MemoryRequest
+    trailing_stop: TrailingStopRequest
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -99,6 +105,7 @@ class FlowStrategy:
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
+    trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
 
     def _strategy_arguments(self) -> _StrategyArguments:
         return _StrategyArguments(
@@ -121,6 +128,7 @@ class FlowStrategy:
             default_take_profit_percent=self.default_take_profit_percent,
             minimum_confidence=self.minimum_confidence,
             memory=self.memory,
+            trailing_stop=self.trailing_stop,
         )
 
 
@@ -187,6 +195,7 @@ class FlowModification:
     default_take_profit_percent: Decimal | None = None
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
+    trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     remove: list[RemovablePart] = field(default_factory=list)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
@@ -227,4 +236,5 @@ class FlowModification:
             minimum_confidence=self.minimum_confidence,
             remove_minimum_confidence="minimum_confidence" in removed,
             memory=self.memory,
+            trailing_stop=self.trailing_stop,
         )

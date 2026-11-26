@@ -225,22 +225,25 @@ class OutboxProcessing:
             stopping.wait(self._pause_seconds)
 
 
-class DailyChecks:
-    """Hands the daily checks to their scheduler when the worker starts: the scheduler runs them at once and then every
-    day (ADR controllo-giornaliero-delle-scadenze). Handing them over touches no database, so it never waits.
+class ScheduledChecks:
+    """Hands the checks of the worker to their schedulers when the worker starts: each scheduler runs its check at once
+    and then at its instants, every day or every interval (ADR controllo-giornaliero-delle-scadenze, ADR
+    sorveglianza-del-prezzo-per-lo-stop-che-segue). Handing them over touches no database, so it never waits.
     """
 
-    thread_name = "daily-checks"
+    thread_name = "scheduled-checks"
 
-    def __init__(self, schedule: Callable[[], None]) -> None:
-        self._schedule = schedule
+    def __init__(self, *schedules: Callable[[], None]) -> None:
+        self._schedules = schedules
 
     def run(self, stopping: threading.Event) -> None:
-        if not stopping.is_set():
-            self._schedule()
+        if stopping.is_set():
+            return
+        for schedule in self._schedules:
+            schedule()
 
 
-type BackgroundLoop = BotPolling | CyclePolling | OutboxProcessing | DailyChecks
+type BackgroundLoop = BotPolling | CyclePolling | OutboxProcessing | ScheduledChecks
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,10 +253,10 @@ class WorkerLoops:
     bot: BotPolling | None = None
     cycles: CyclePolling | None = None
     outbox: OutboxProcessing | None = None
-    daily: DailyChecks | None = None
+    checks: ScheduledChecks | None = None
 
     def composed(self) -> list[BackgroundLoop]:
-        return [loop for loop in (self.bot, self.cycles, self.outbox, self.daily) if loop is not None]
+        return [loop for loop in (self.bot, self.cycles, self.outbox, self.checks) if loop is not None]
 
 
 NO_LOOPS = WorkerLoops()

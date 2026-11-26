@@ -53,6 +53,7 @@ def _position_of(position: QuestionPositionPort) -> PositionView:
         position.unrealized_pnl,
         position.liquidation_price,
         _exit_plan_of(position.exit_plan),
+        position.max_profit,
     )
 
 

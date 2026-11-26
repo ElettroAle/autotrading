@@ -7,7 +7,8 @@ from autotrading.domain.flows.trade_side import TradeSide
 
 @dataclass(frozen=True, slots=True)
 class PositionView:
-    """An open position of the flow as the exchange shows it, with the exit plan in force (R3.1.1)."""
+    """An open position of the flow as the exchange shows it, with the exit plan in force (R3.1.1) and, when the user
+    wants the agent to see it, the largest unrealized profit it reached in the currency of the account (R5.5.1)."""
 
     asset: str
     direction: TradeSide
@@ -18,6 +19,7 @@ class PositionView:
     unrealized_pnl: Decimal
     liquidation_price: Decimal | None
     exit_plan: ExitPlan = field(default_factory=ExitPlan)
+    max_profit: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,7 +1,7 @@
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
@@ -67,6 +67,7 @@ from autotrading.domain.flows.statistics_period import TimeWindow
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.unattributable import UnattributableItem
 from autotrading.domain.flows.unattributable_page import UnattributableCursor, UnattributableFilter, UnattributablePage
+from autotrading.domain.flows.watched_position import WatchedPosition
 from autotrading.domain.sources.source_catalog import SourceCatalog
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.user_id import UserId
@@ -304,6 +305,83 @@ class WaitingProtectionsPort(Protocol):
         state of the flow shows their levels. Raises the errors of the orders context when the exchange cannot be read.
         """
         ...
+
+
+class WatchedPositionsPort(Protocol):
+    """Bound to the tenant of the request: the open positions of the flows whose stop follows the price, as the platform
+    watches them between the cycles, one per flow and asset (R5.5.1, ADR sorveglianza-del-prezzo-per-lo-stop-che-segue).
+    """
+
+    def watched_of(self, flow_id: FlowId) -> tuple[WatchedPosition, ...]:
+        """Every position of the flow the platform watches; none for a flow never watched."""
+        ...
+
+    def save(self, flow_id: FlowId, position: WatchedPosition) -> None:
+        """Replaces the position of the flow on its asset.
+
+        Raises CrossTenantAccessError for a flow of another tenant.
+        """
+        ...
+
+    def forget(self, flow_id: FlowId, asset: str) -> None:
+        """The position closed: the next one on the asset counts from its own price."""
+        ...
+
+    def keep_only(self, flow_ids: Collection[FlowId]) -> None:
+        """Forgets the positions of every other flow: one whose stop no longer follows the price counts, when it follows
+        again, from the price of then."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class OpenPositionRecords:
+    """What the platform records of the open positions of a flow beside the exchange: the exit plan of the agent, the
+    protections it placed and, for a flow whose stop follows the price, the position as it watches it.
+    """
+
+    exit_plans: ExitPlanRepositoryPort
+    protection_levels: FlowProtectionLevelsPort
+    watched: WatchedPositionsPort
+
+
+@dataclass(frozen=True, slots=True)
+class FlowStopMove:
+    """The stop loss of the open position of a flow moved closer to the price, on its account, with the default stop of
+    the flow the orders context keeps every stop within (R5.5.1).
+    """
+
+    account_id: UUID
+    flow_id: UUID
+    asset: str
+    stop: Decimal
+    default_stop_loss_percent: Decimal
+
+
+class FlowStopMovePort(Protocol):
+    """It is MoveFlowStopUseCase of the orders context, bound to the tenant of the flow (R5.5.1, ADR
+    sorveglianza-del-prezzo-per-lo-stop-che-segue).
+    """
+
+    def execute(self, move: FlowStopMove) -> str | None:
+        """Replaces the stop loss on the exchange, the new one placed before the old one goes; the refusal of the
+        exchange as the cycle records it, None when the stop moved or no position is left to protect. Raises the errors
+        of the orders context when the exchange cannot be reached.
+        """
+        ...
+
+
+class PeriodicCheckSchedulerPort(Protocol):
+    def keep_every(self, name: str, every: timedelta, run: Callable[[], None]) -> None:
+        """Runs the check at once, then at every interval, never beside itself, while the worker is up; an error of the
+        project it raises is recorded, never raised (ADR sorveglianza-del-prezzo-per-lo-stop-che-segue).
+        """
+        ...
+
+
+class FlowTenantsPort(Protocol):
+    """Every tenant of the platform, for the checks the worker runs on the flows of each (R5.5.1)."""
+
+    def tenant_ids(self) -> tuple[TenantId, ...]: ...
 
 
 class RunningCyclePort(Protocol):

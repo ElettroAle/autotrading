@@ -13,14 +13,15 @@ from autotrading.adapters.inbound.api.openings_suspension_response import Openin
 from autotrading.adapters.inbound.api.tenant_use_cases import TenantUseCases
 from autotrading.application.flows.read_flow_results import ReadFlowResultsCommand
 from autotrading.domain.flows.account_activity import AccountPosition
-from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
+from autotrading.domain.flows.flow_state import FlowState
 
 
 class FlowPositionResponse(BaseModel):
     """An open position of the flow (R1.6.1, R2.2.4) with its exit plan in force (R3.1.1); the percent is absent for a
-    position without margin, each level of the plan when the agent declared none.
+    position without margin, each level of the plan when the agent declared none. The largest profit the position
+    reached is null unless the stop of the flow follows the price (R5.5.1).
     """
 
     asset: str
@@ -35,10 +36,12 @@ class FlowPositionResponse(BaseModel):
     target_price: str | None
     stop_price: str | None
     invalidation: str | None
+    max_profit_reached: str | None
 
     @classmethod
-    def of(cls, position: AccountPosition, plan: ExitPlan) -> FlowPositionResponse:
+    def of(cls, position: AccountPosition, state: FlowState) -> FlowPositionResponse:
         percent = position.unrealized_pnl_percent
+        plan = state.exit_plan_of(position.asset)
         return cls(
             asset=position.asset,
             side=position.side.value,
@@ -52,6 +55,7 @@ class FlowPositionResponse(BaseModel):
             target_price=_optional_amount(plan.target),
             stop_price=_optional_amount(plan.stop),
             invalidation=plan.invalidation,
+            max_profit_reached=_optional_amount(state.max_profit_of(position.asset)),
         )
 
 
@@ -89,9 +93,7 @@ class FlowStateResponse(BaseModel):
             fees=amount_text(state.fees),
             total_value=amount_text(state.total_value),
             return_percent=_optional_amount(FlowReturn.of(state).percent),
-            positions=[
-                FlowPositionResponse.of(position, state.exit_plan_of(position.asset)) for position in state.positions
-            ],
+            positions=[FlowPositionResponse.of(position, state) for position in state.positions],
             summary=FlowResultsResponse.of(results),
             openings_suspension=OpeningsSuspensionResponse.of(results.openings_suspension),
         )

@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.ports import FlowHeldAssets, ReconciliationAlarmPorts
+from autotrading.application.flows.ports import FlowHeldAssets, OpenPositionRecords, ReconciliationAlarmPorts
 from autotrading.application.flows.read_cycle_account import ReadCycleAccountUseCase
 from autotrading.application.flows.read_cycle_flow import (
     CycleAccountReadings,
@@ -43,6 +43,7 @@ from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
 from tests.fakes.waiting_protections import FakeWaitingProtectionsAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import READ_AT, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -115,8 +116,11 @@ class Bench:
                     flows,
                     activity,
                     ledger,
-                    InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
-                    InMemoryFlowProtectionLevelsAdapter(protections, TENANT),
+                    OpenPositionRecords(
+                        InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                        InMemoryFlowProtectionLevelsAdapter(protections, TENANT),
+                        InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
+                    ),
                 ),
                 ReconcileAccountForCycleUseCase(reconcile, Notices()),
             ),

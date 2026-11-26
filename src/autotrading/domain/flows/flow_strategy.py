@@ -10,15 +10,16 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection, SourceSelection
+from autotrading.domain.flows.trailing_stop import TrailingStop
 
 
 @dataclass(frozen=True, slots=True)
 class FlowStrategy:
     """What a flow does, without where and with how much: the part of a configuration a strategy file carries.
 
-    Interval, sources with weights and parameters, model with its parameters, instructions, risk rules, protection and
-    memory; account, allocated capital and assets belong to the flow that uses the strategy, assigned to its draft
-    (R2.5.2, ADR 0140, R5.3.4).
+    Interval, sources with weights and parameters, model with its parameters, instructions, risk rules, protection, the
+    stop that follows the price and memory; account, allocated capital and assets belong to the flow that uses the
+    strategy, assigned to its draft (R2.5.2, ADR 0140, R5.3.4, R5.5.1).
     """
 
     cycle_interval: CycleInterval
@@ -42,6 +43,8 @@ class FlowStrategy:
     minimum_confidence: MinimumConfidence | None = None
     # How the agent remembers its decisions, off unless the strategy has it on, as in the configuration (R5.3.4).
     memory: FlowMemory = field(default_factory=FlowMemory)
+    # How the stop follows the price, a risk rule like the protection; empty unless the strategy has it (R5.5.1).
+    trailing_stop: TrailingStop = field(default_factory=TrailingStop)
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -60,6 +63,7 @@ class FlowStrategy:
             configuration.protection_defaults,
             configuration.minimum_confidence,
             configuration.memory,
+            configuration.trailing_stop,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -82,6 +86,7 @@ class FlowStrategy:
             protection_defaults=self.protection_defaults,
             minimum_confidence=self.minimum_confidence,
             memory=self.memory,
+            trailing_stop=self.trailing_stop,
         )
 
 

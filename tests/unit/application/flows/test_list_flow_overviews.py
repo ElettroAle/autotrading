@@ -6,7 +6,7 @@ import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError
 from autotrading.application.flows.list_flow_overviews import ListFlowOverviewsCommand, ListFlowOverviewsUseCase
-from autotrading.application.flows.ports import FlowSummary
+from autotrading.application.flows.ports import FlowSummary, OpenPositionRecords
 from autotrading.application.flows.read_flow_results import FlowPeriodPorts, ReadFlowResultsUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.read_next_cycle import ReadNextCycleUseCase
@@ -30,6 +30,7 @@ from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.openings_suspension import InMemoryOpeningsSuspensionAdapter
 from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import CURRENCY, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -68,8 +69,11 @@ class Bench:
                 flows,
                 self.activity,
                 self.ledger,
-                InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
-                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                OpenPositionRecords(
+                    InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                    InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                    InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
+                ),
             ),
             suspension,
             ReadNextCycleUseCase(flows, InMemoryFlowTimingAdapter(self.store, TENANT), lambda: NOW),

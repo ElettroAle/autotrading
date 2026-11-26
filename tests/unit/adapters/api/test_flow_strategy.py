@@ -12,7 +12,7 @@ from autotrading.adapters.inbound.api.strategy_document import (
     StrategyFormatNotSupportedError,
     attachment_of,
 )
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest, TrailingStopRequest
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
 from autotrading.domain.flows.cycle_interval import CycleInterval
@@ -23,6 +23,7 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import ModelSelection
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from tests.support.flows import OPENROUTER_MODEL, account_id_of, scenario_catalog
 from tests.support.identity_provider import IdentityProvider
 from tests.support.platform import Platform
@@ -103,6 +104,7 @@ def a_strategy() -> FlowStrategy:
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
         minimum_confidence=MinimumConfidence(55),
         memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
+        trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
     )
 
 
@@ -142,6 +144,15 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "text_length": None,
                 "all_decisions": True,
                 "unlimited_text_length": True,
+            },
+            "trailing_stop": {
+                "distance_percent": "2",
+                "activation_percent": "3",
+                "breakeven_percent": "1.5",
+                "max_profit_in_context": True,
+                "remove_distance": False,
+                "remove_activation": False,
+                "remove_breakeven": False,
             },
         },
     }
@@ -185,6 +196,10 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         active=True, decisions=5, days=14, all_decisions=True, unlimited_text_length=True
     )
     assert command.memory.applied_to(FlowMemory()) == a_strategy().memory
+    assert command.trailing_stop == TrailingStopRequest(
+        Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True
+    )
+    assert command.trailing_stop.applied_to(TrailingStop()) == a_strategy().trailing_stop
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from uuid import UUID
 
-from autotrading.application.flows.create_flow import FlowChecks, MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import FlowChecks, MemoryRequest, SourceRequest, TrailingStopRequest
 from autotrading.application.flows.errors import AssetWithOpenPositionError, FlowNameInUseError
 from autotrading.application.flows.flow_account import read_free_capital
 from autotrading.application.flows.ports import AccountActivityPort, FlowRepositoryPort
@@ -76,6 +76,8 @@ class ModifyFlowCommand:
     # The minimum confidence taken away: every opening goes on again whatever the confidence (R3.1.4).
     remove_minimum_confidence: bool = False
     memory: MemoryRequest = field(default_factory=MemoryRequest)
+    # Only the parts sent change; a part taken away goes back to none (R5.5.1).
+    trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
 
 
 class ModifyFlowUseCase:
@@ -179,6 +181,7 @@ class ModifyFlowUseCase:
             protection_defaults=_protection_defaults(current.protection_defaults, command),
             minimum_confidence=_minimum_confidence(current.minimum_confidence, command),
             memory=command.memory.applied_to(current.memory),
+            trailing_stop=command.trailing_stop.applied_to(current.trailing_stop),
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

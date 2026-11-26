@@ -6,7 +6,7 @@ from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from autotrading.adapters.inbound.api.source_parameters import ParameterBody, parameters_body, parameters_of
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest, TrailingStopRequest
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.errors import AutotradingError
@@ -109,6 +109,8 @@ class StrategyBody(BaseModel):
     # Missing in the files written before it: off, with 10 decisions and 30 days (R5.3.4); missing length and choice of
     # the decisions: 160 characters and only openings, closings and reversals (R5.3.5).
     memory: MemoryRequest = Field(default_factory=MemoryRequest)
+    # Missing in the files written before it: no stop that follows the price (R5.5.1).
+    trailing_stop: TrailingStopRequest = Field(default_factory=TrailingStopRequest)
 
 
 class StrategyDocument(BaseModel):
@@ -160,6 +162,7 @@ class StrategyDocument(BaseModel):
                 default_take_profit_percent=strategy.protection_defaults.take_profit_percent,
                 minimum_confidence=None if strategy.minimum_confidence is None else strategy.minimum_confidence.value,
                 memory=MemoryRequest.of(strategy.memory),
+                trailing_stop=TrailingStopRequest.of(strategy.trailing_stop),
             ),
         )
 
@@ -189,6 +192,7 @@ class StrategyDocument(BaseModel):
             default_take_profit_percent=strategy.default_take_profit_percent,
             minimum_confidence=strategy.minimum_confidence,
             memory=strategy.memory,
+            trailing_stop=strategy.trailing_stop,
         )
 
     def _require_supported(self) -> None:

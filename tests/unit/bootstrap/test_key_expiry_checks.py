@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import create_engine
 
 from autotrading import bootstrap
-from autotrading.adapters.inbound.api.worker import DailyChecks, WorkerLoops
+from autotrading.adapters.inbound.api.worker import ScheduledChecks, WorkerLoops
 from autotrading.adapters.outbound.sqlalchemy.key_expiries import (
     SqlAlchemyKeyExpiriesAdapter,
     SqlAlchemyKeyExpiryNoticeRepositoryAdapter,
@@ -52,7 +52,7 @@ def test_the_worker_hands_the_daily_check_to_its_scheduler_when_it_starts(
 
     [(_, _, loops, _)] = composed
     assert isinstance(loops, WorkerLoops)
-    assert isinstance(loops.daily, DailyChecks)
+    assert isinstance(loops.checks, ScheduledChecks)
 
 
 def test_the_check_of_a_tenant_tells_its_keys_then_pauses_the_flows_of_an_expired_one(

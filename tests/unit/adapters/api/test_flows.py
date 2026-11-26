@@ -110,6 +110,12 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
         "default_take_profit_percent": None,
         "minimum_confidence": None,
         "memory": {"active": False, "decisions": 10, "days": 30, "text_length": 160, "all_decisions": False},
+        "trailing_stop": {
+            "distance_percent": None,
+            "activation_percent": None,
+            "breakeven_percent": None,
+            "max_profit_in_context": False,
+        },
         "missing": [],
     }
     assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]

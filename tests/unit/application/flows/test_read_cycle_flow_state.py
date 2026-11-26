@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowPositionMismatchError
-from autotrading.application.flows.ports import ReconciliationAlarmPorts
+from autotrading.application.flows.ports import OpenPositionRecords, ReconciliationAlarmPorts
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateCommand, ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
@@ -32,6 +32,7 @@ from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
 from tests.fakes.protection_repository import ProtectionStore
 from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
 from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 
@@ -87,8 +88,11 @@ class Bench:
                 flows,
                 self.activity,
                 self.ledger,
-                InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
-                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                OpenPositionRecords(
+                    InMemoryExitPlanRepositoryAdapter(ExitPlanStore(), TENANT),
+                    InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), TENANT),
+                    InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), TENANT),
+                ),
             ),
             self.reconcile,
         )

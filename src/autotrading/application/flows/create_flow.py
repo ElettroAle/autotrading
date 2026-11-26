@@ -26,6 +26,7 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import SourceSelection
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
 
 operations = logging.getLogger("autotrading.flows")
@@ -77,8 +78,52 @@ class MemoryRequest:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class TrailingStopRequest:
+    """The parts of the stop that follows the price the user gives; a part not given keeps the value it has, empty for a
+    new flow (R5.5.1, ADR impostazioni-dello-stop-che-segue-il-prezzo).
+
+    A part not given cannot say «none»: the `remove_*` flags take a part away, as the parts of a configuration that may
+    be removed, and prevail over a value given with them.
+    """
+
+    distance_percent: Decimal | None = None
+    activation_percent: Decimal | None = None
+    breakeven_percent: Decimal | None = None
+    max_profit_in_context: bool | None = None
+    remove_distance: bool = False
+    remove_activation: bool = False
+    remove_breakeven: bool = False
+
+    @classmethod
+    def of(cls, trailing: TrailingStop) -> TrailingStopRequest:
+        """Every part given, so a strategy file brings it back as it was (R2.5.2)."""
+        return cls(
+            distance_percent=trailing.distance_percent,
+            activation_percent=trailing.activation_percent,
+            breakeven_percent=trailing.breakeven_percent,
+            max_profit_in_context=trailing.max_profit_in_context,
+        )
+
+    def applied_to(self, trailing: TrailingStop) -> TrailingStop:
+        return trailing.changed(
+            distance_percent=_removable(self.distance_percent, trailing.distance_percent, removed=self.remove_distance),
+            activation_percent=_removable(
+                self.activation_percent, trailing.activation_percent, removed=self.remove_activation
+            ),
+            breakeven_percent=_removable(
+                self.breakeven_percent, trailing.breakeven_percent, removed=self.remove_breakeven
+            ),
+            max_profit_in_context=_given(self.max_profit_in_context, trailing.max_profit_in_context),
+        )
+
+
 def _given[T](sent: T | None, current: T) -> T:
     return current if sent is None else sent
+
+
+def _removable[T](sent: T | None, current: T | None, *, removed: bool) -> T | None:
+    return None if removed else _given(sent, current)
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +158,8 @@ class CreateFlowCommand:
     # None for a flow without a minimum confidence (R3.1.4).
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
+    # Nothing given: no stop that follows the price (R5.5.1).
+    trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +225,7 @@ class CreateFlowUseCase:
             ),
             minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
             memory=command.memory.applied_to(FlowMemory()),
+            trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

@@ -91,9 +91,11 @@ from autotrading.application.flows.ports import (
     LedgerRecordingPort,
     OnDemandCyclePort,
     OpeningsSuspensionPort,
+    OpenPositionRecords,
     PastDecisionsPort,
     ReconciliationRepositoryPort,
     RunningVerificationsPort,
+    WatchedPositionsPort,
 )
 from autotrading.application.flows.preview_emergency_closing import PreviewEmergencyClosingUseCase
 from autotrading.application.flows.query_closed_position_history import QueryClosedPositionHistoryUseCase
@@ -236,6 +238,8 @@ class TenantPorts:
     exit_plans: ExitPlanRepositoryPort
     # The levels of the protections in force, which the state of every open position shows (R5.5.3).
     protection_levels: FlowProtectionLevelsPort
+    # The positions watched for the stop that follows the price, with the largest profit each reached (R5.5.1).
+    watched_positions: WatchedPositionsPort
     cycle_history: CycleHistoryPort
     decision_history: DecisionHistoryPort
     flow_directory: FlowDirectoryPort
@@ -370,7 +374,10 @@ class TenantUseCases:
         source_offers = ListSourceOffersUseCase(ports.sources, ports.source_credentials)
         key_services = ProviderKeyServices(ports.model_catalogs, ports.provider_key_sealer)
         read_flow_state = ReadFlowStateUseCase(
-            ports.flows, ports.account_activity, ports.flow_ledger, ports.exit_plans, ports.protection_levels
+            ports.flows,
+            ports.account_activity,
+            ports.flow_ledger,
+            OpenPositionRecords(ports.exit_plans, ports.protection_levels, ports.watched_positions),
         )
         return cls(
             register_account=RegisterAccountUseCase(

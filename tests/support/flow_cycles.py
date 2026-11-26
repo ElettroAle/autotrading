@@ -20,6 +20,11 @@ from autotrading.adapters.outbound.process_memory.cycle_notices import (
 )
 from autotrading.adapters.outbound.threads.planned_flows import ThreadsPlannedFlowsAdapter
 from autotrading.application.flows.end_cycle_flow import EndCycleFlowUseCase
+from autotrading.application.flows.follow_trailing_stops import (
+    FollowTrailingStopsUseCase,
+    StopMoves,
+    WatchedPositionReadings,
+)
 from autotrading.application.flows.notify_cycle_failure import NotifyCycleFailureUseCase
 from autotrading.application.flows.notify_unattributable import (
     NotifyUnattributableUseCase,
@@ -31,6 +36,7 @@ from autotrading.application.flows.ports import (
     OpeningBlockedNoticePort,
     OpeningReducedNoticePort,
     OpeningsSuspendedNoticePort,
+    OpenPositionRecords,
     PositionClosedNoticePort,
     ReconciliationAlarmPorts,
     ScheduledFlow,
@@ -73,6 +79,7 @@ from autotrading.application.notifications.ports import FlowStatusPort
 from autotrading.application.orders.execute_cycle_orders import ExecuteCycleOrdersUseCase
 from autotrading.application.orders.execute_flow_orders import ExecuteFlowOrdersUseCase, FlowOrderProtection
 from autotrading.application.orders.follow_flow_orders import FlowOrderFollowers, FollowFlowOrdersUseCase
+from autotrading.application.orders.move_flow_stop import MoveFlowStopUseCase
 from autotrading.application.orders.open_trading_access import OpenTradingAccessUseCase
 from autotrading.application.orders.ports import OrderRejectedNoticePort, PositionOpenedNoticePort
 from autotrading.application.orders.protect_flow_position import ProtectFlowPositionUseCase
@@ -137,6 +144,7 @@ from tests.fakes.source_credentials import FakeSourceSecretsOpenerAdapter, InMem
 from tests.fakes.source_readers import InMemorySampleRepositoryAdapter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.fakes.volumes import FakeVolumesAdapter
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter
 from tests.fakes.whale_transfers import FakeWhaleTransfersAdapter
 from tests.support.cycle_composition import (
     CycleServices,
@@ -268,6 +276,8 @@ class FlowCycles:
         activity = ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader})
         protections = InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
         protection_levels = InMemoryFlowProtectionLevelsAdapter(platform.protections, tenant_id)
+        watched = InMemoryWatchedPositionsAdapter(platform.watched_positions, platform.flows, tenant_id)
+        records = OpenPositionRecords(exit_plans, protection_levels, watched)
         order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
         cancel_protections = platform.cancel_protections(tenant_id)
         record_executions = RecordAccountExecutionsUseCase(
@@ -312,7 +322,12 @@ class FlowCycles:
                 RecordWaitingProtectionsUseCase(access, order_exchanges, protections),
             ),
             ReadCycleFlowStateUseCase(
-                ReadFlowStateUseCase(flows, activity, platform.ledger, exit_plans, protection_levels),
+                ReadFlowStateUseCase(
+                    flows,
+                    activity,
+                    platform.ledger,
+                    records,
+                ),
                 reconcile_for_cycle,
             ),
             self.readings,
@@ -358,9 +373,8 @@ class FlowCycles:
                     ProtectOpenPositionsUseCase(access, order_exchanges, protections, retry),
                 ),
                 openings,
-                exit_plans,
                 flows,
-                protection_levels,
+                records,
             ),
             openings=openings,
             closed_positions=closed_positions,
@@ -385,6 +399,33 @@ class FlowCycles:
             past_decisions=InMemoryPastDecisionsAdapter(
                 self.records, platform.orders_of(tenant_id), platform.closed_positions
             ),
+        )
+
+    def trailing_stops_of(self, tenant_id: TenantId) -> FollowTrailingStopsUseCase:
+        """The check of the stops that follow the price of the tenant, as the worker composes it every minute (R5.5.1,
+        ADR sorveglianza-del-prezzo-per-lo-stop-che-segue): it meets the lock of the cycles."""
+        platform = self.platform
+        accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
+        opener = FakeCredentialOpenerAdapter(platform.vault, platform.openings)
+        order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
+        retry = TransientRetry(self.pause, self.clock)
+        move = MoveFlowStopUseCase(
+            OpenTradingAccessUseCase(accounts, opener),
+            UpdateFlowProtectionUseCase(
+                order_exchanges, InMemoryProtectionRepositoryAdapter(platform.protections, tenant_id)
+            ),
+            retry,
+        )
+        return FollowTrailingStopsUseCase(
+            InMemoryFlowRepositoryAdapter(platform.flows, tenant_id),
+            InMemoryWatchedPositionsAdapter(platform.watched_positions, platform.flows, tenant_id),
+            self.lock,
+            WatchedPositionReadings(
+                ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+                InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id)),
+                InMemoryFlowProtectionLevelsAdapter(platform.protections, tenant_id),
+            ),
+            StopMoves(move, retry, self.clock),
         )
 
     def services(self) -> CycleServices:

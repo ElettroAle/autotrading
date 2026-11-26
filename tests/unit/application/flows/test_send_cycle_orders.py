@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from autotrading.application.flows.ports import OpenPositionRecords
 from autotrading.application.flows.send_cycle_orders import SendCycleOrdersUseCase
 from autotrading.domain.flows.closed_position import PositionEnd
 from autotrading.domain.flows.cycle_account import CycleAccount
@@ -18,6 +19,7 @@ from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.flows.watched_position import TrailingStopNote, WatchedPosition
 from autotrading.domain.orders.client_order_id import ClientOrderId
 from autotrading.domain.orders.placed_protection import PlacedProtection
 from autotrading.domain.orders.protection_kind import ProtectionKind
@@ -26,6 +28,7 @@ from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepo
 from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.protection_repository import InMemoryProtectionRepositoryAdapter, ProtectionStore
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.flows import a_configuration, a_flow
 
 PLANNED_AT = datetime(2026, 11, 12, 10, 15, tzinfo=UTC)
@@ -79,12 +82,16 @@ class Bench:
         flows = FlowStore()
         flows.flows.append(FLOW)
         self.protections = ProtectionStore()
+        self.watched = WatchedPositionStore()
         self.use_case = SendCycleOrdersUseCase(
             self.execution,
             self.openings,
-            self.exit_plans,
             InMemoryFlowRepositoryAdapter(flows, TENANT),
-            InMemoryFlowProtectionLevelsAdapter(self.protections, TENANT),
+            OpenPositionRecords(
+                self.exit_plans,
+                InMemoryFlowProtectionLevelsAdapter(self.protections, TENANT),
+                InMemoryWatchedPositionsAdapter(self.watched, flows, TENANT),
+            ),
         )
 
     def protected(self, asset: str, kind: ProtectionKind, price: int) -> None:
@@ -233,3 +240,20 @@ def test_an_update_goes_to_the_execution_with_the_other_orders() -> None:
     bench.use_case.execute(FLOW.id.value, PLANNED_AT, [CycleOrder(CYCLE_FLOW, update)])
 
     assert bench.execution.cycles[0].orders == (update,)
+
+
+def test_the_cycle_after_a_move_of_the_stop_the_exchange_refused_records_it_once() -> None:
+    # R5.5.1, ADR sorveglianza-del-prezzo-per-lo-stop-che-segue.
+    bench = Bench()
+    refused = WatchedPosition(
+        "BTC", PLANNED_AT, Decimal(63000), Decimal(30), "stop BTC non aggiornato, Trigger rejected"
+    )
+    bench.watched.positions[TENANT, FLOW.id, "BTC"] = refused
+    bench.watched.positions[TENANT, FLOW.id, "ETH"] = WatchedPosition("ETH", PLANNED_AT, Decimal(3000), Decimal(0))
+
+    first = bench.use_case.execute(FLOW.id.value, PLANNED_AT, [])
+    second = bench.use_case.execute(FLOW.id.value, PLANNED_AT, [])
+
+    assert first == ("inviato", TrailingStopNote("BTC", "stop BTC non aggiornato, Trigger rejected"))
+    assert second == ("inviato",)
+    assert bench.watched.positions[TENANT, FLOW.id, "BTC"] == refused.told()

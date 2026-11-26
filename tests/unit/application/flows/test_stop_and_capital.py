@@ -12,7 +12,7 @@ from autotrading.application.flows.change_allocated_capital import (
 )
 from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.errors import FlowExchangeUnavailableError, FlowNotFoundError
-from autotrading.application.flows.ports import PositionToClose
+from autotrading.application.flows.ports import OpenPositionRecords, PositionToClose
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.stop_flow import StopFlowCommand, StopFlowUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
@@ -47,6 +47,7 @@ from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapt
 from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.fakes.protection_repository import ProtectionStore
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 from tests.support.position_closings import NOTHING_TO_CLOSE, ClosingAnswer, closed_by, refused
@@ -133,8 +134,11 @@ class Flows:
                 self.repository,
                 self.activity,
                 self.ledger,
-                self.exit_plans,
-                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
+                OpenPositionRecords(
+                    self.exit_plans,
+                    InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
+                    InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), self.tenant_id),
+                ),
             ),
             lambda: NOW,
         )

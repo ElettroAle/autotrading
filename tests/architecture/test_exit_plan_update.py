@@ -69,7 +69,10 @@ def test_adr_aggiornamento_del_piano_the_protections_are_replaced_through_the_po
 
 
 def test_adr_aggiornamento_del_piano_the_plan_in_force_follows_only_the_levels_placed() -> None:
-    hints = get_type_hints(SendCycleOrdersUseCase.__init__)
+    # The records of the open positions carry both, beside the positions watched for the stop that follows the price
+    # (R5.5.1).
+    assert get_type_hints(SendCycleOrdersUseCase.__init__)["records"] is flow_ports.OpenPositionRecords
+    hints = get_type_hints(flow_ports.OpenPositionRecords)
 
     assert hints["protection_levels"] is flow_ports.FlowProtectionLevelsPort
     assert hints["exit_plans"] is flow_ports.ExitPlanRepositoryPort

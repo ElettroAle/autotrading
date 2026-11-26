@@ -18,10 +18,10 @@ from autotrading.domain.flows.closed_position_page import ClosedPositionPage
 from autotrading.domain.flows.cycle_page import CyclePage
 from autotrading.domain.flows.cycle_record import CycleFailure, CycleRecord, FailedAttempt
 from autotrading.domain.flows.cycle_step import CycleStep
-from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow_ranking import FlowRanking
 from autotrading.domain.flows.flow_results import FlowResults
 from autotrading.domain.flows.flow_return import FlowReturn
+from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_statistics import FlowStatistics
 from autotrading.domain.flows.memory_entry import AssetMemory
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
@@ -138,7 +138,8 @@ class FlowListView:
 
 @dataclass(frozen=True)
 class PositionView:
-    """An open position of the flow with its exit plan in force (R1.6.1, R3.1.1)."""
+    """An open position of the flow with its exit plan in force (R1.6.1, R3.1.1) and, when the stop of the flow follows
+    the price, the largest profit it reached (R5.5.1)."""
 
     asset: str
     side: str
@@ -152,9 +153,11 @@ class PositionView:
     target_price: str | None
     stop_price: str | None
     invalidation: str | None
+    max_profit_reached: str | None
 
     @classmethod
-    def of(cls, position: AccountPosition, plan: ExitPlan) -> PositionView:
+    def of(cls, position: AccountPosition, state: FlowState) -> PositionView:
+        plan = state.exit_plan_of(position.asset)
         return cls(
             asset=position.asset,
             side=position.side.value,
@@ -168,6 +171,7 @@ class PositionView:
             target_price=optional_amount(plan.target),
             stop_price=optional_amount(plan.stop),
             invalidation=plan.invalidation,
+            max_profit_reached=optional_amount(state.max_profit_of(position.asset)),
         )
 
 
@@ -203,7 +207,7 @@ class FlowStateView:
             fees=amount_text(state.fees),
             total_value=amount_text(state.total_value),
             return_percent=optional_amount(FlowReturn.of(state).percent),
-            positions=[PositionView.of(position, state.exit_plan_of(position.asset)) for position in state.positions],
+            positions=[PositionView.of(position, state) for position in state.positions],
             summary=ResultsView.of(results),
             openings_suspension=OpeningsSuspensionView.of(results.openings_suspension),
         )

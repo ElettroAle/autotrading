@@ -2,10 +2,9 @@ from dataclasses import dataclass
 
 from autotrading.application.flows.ports import (
     AccountActivityPort,
-    ExitPlanRepositoryPort,
     FlowLedgerPort,
-    FlowProtectionLevelsPort,
     FlowRepositoryPort,
+    OpenPositionRecords,
 )
 from autotrading.domain.flows.account_activity import AccountActivity
 from autotrading.domain.flows.exit_plan import ExitPlan
@@ -13,6 +12,7 @@ from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.watched_position import WatchedPosition
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +27,9 @@ class ReadFlowStateUseCase:
 
     The stop and the target in force are the levels of the protections the platform recorded for the position, whatever
     their origin; the invalidation is the one of the agent (R5.5.3, ADR
-    stop-e-obiettivo-in-vigore-nello-stato-della-posizione).
+    stop-e-obiettivo-in-vigore-nello-stato-della-posizione). The largest profit a position reached comes only for a flow
+    whose stop follows the price, the only one the platform watches (R5.5.1, ADR
+    massimo-profitto-raggiunto-nello-stato-della-posizione).
     """
 
     def __init__(
@@ -35,26 +37,30 @@ class ReadFlowStateUseCase:
         flows: FlowRepositoryPort,
         activity: AccountActivityPort,
         ledger: FlowLedgerPort,
-        exit_plans: ExitPlanRepositoryPort,
-        protection_levels: FlowProtectionLevelsPort,
+        records: OpenPositionRecords,
     ) -> None:
         self._flows = flows
         self._activity = activity
         self._ledger = ledger
-        self._exit_plans = exit_plans
-        self._protection_levels = protection_levels
+        self._records = records
 
     def execute(self, command: ReadFlowStateCommand) -> FlowState:
         flow = self._flows.get(command.flow_id)
         activity = self._activity.execute(flow.assigned_account_id)
         totals = self._ledger.totals_of((flow.id,)).get(flow.id) or FlowTotals(flow.id)
         changes = self._flows.capital_changes_of((flow.id,)).get(flow.id, ())
-        return FlowState.attributed(flow, activity, totals, changes, self._exit_plans_of(flow, activity))
+        plans = self._exit_plans_of(flow, activity)
+        return FlowState.attributed(flow, activity, totals, changes, plans).watching(self._watched_of(flow))
 
     def _exit_plans_of(self, flow: Flow, activity: AccountActivity) -> dict[str, ExitPlan]:
         held = flow.configuration.held(activity.positions, lambda position: position.asset)
         return {position.asset: self._plan_in_force(flow, position.asset) for position in held}
 
     def _plan_in_force(self, flow: Flow, asset: str) -> ExitPlan:
-        plan = self._exit_plans.current(flow.id, asset) or ExitPlan()
-        return plan.in_force(self._protection_levels.placed_levels(flow.id, asset))
+        plan = self._records.exit_plans.current(flow.id, asset) or ExitPlan()
+        return plan.in_force(self._records.protection_levels.placed_levels(flow.id, asset))
+
+    def _watched_of(self, flow: Flow) -> dict[str, WatchedPosition]:
+        if not flow.configuration.trailing_stop.active:
+            return {}
+        return {position.asset: position for position in self._records.watched.watched_of(flow.id)}

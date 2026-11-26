@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.worker import (
     BotPolling,
     CyclePolling,
-    DailyChecks,
     OutboxProcessing,
+    ScheduledChecks,
     WorkerLoops,
     create_worker_api,
 )
@@ -168,11 +168,13 @@ def test_the_outbox_is_processed_in_the_background_while_the_worker_is_up() -> N
     assert not outbox.is_alive()
 
 
-def test_the_daily_checks_are_handed_to_their_scheduler_once_when_the_worker_starts() -> None:
-    scheduled = threading.Event()
+def test_the_checks_are_handed_to_their_schedulers_once_when_the_worker_starts() -> None:
+    daily, periodic = threading.Event(), threading.Event()
 
-    with TestClient(create_worker_api(TOKEN, Worker().for_tenant, WorkerLoops(daily=DailyChecks(scheduled.set)))):
-        assert scheduled.wait(5)
+    loops = WorkerLoops(checks=ScheduledChecks(daily.set, periodic.set))
+    with TestClient(create_worker_api(TOKEN, Worker().for_tenant, loops)):
+        assert daily.wait(5)
+        assert periodic.wait(5)
 
 
 def test_a_worker_already_stopping_hands_over_no_check() -> None:
@@ -180,6 +182,6 @@ def test_a_worker_already_stopping_hands_over_no_check() -> None:
     stopping = threading.Event()
     stopping.set()
 
-    DailyChecks(lambda: scheduled.append(1)).run(stopping)
+    ScheduledChecks(lambda: scheduled.append(1)).run(stopping)
 
     assert scheduled == []

@@ -13,5 +13,6 @@ class _ApSchedulerSettings:
 
     threads: int = 64
     daily_check_threads: int = 1
+    periodic_check_threads: int = 1
     running_per_flow: int = 64
     zone: tzinfo = UTC

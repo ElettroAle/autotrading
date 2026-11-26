@@ -10,7 +10,7 @@ import pytest
 from autotrading.application.flows.cash_out_profits import CashOutPorts, CashOutProfitsCommand, CashOutProfitsUseCase
 from autotrading.application.flows.close_flow_positions import CloseFlowPositionsUseCase, ClosingPorts
 from autotrading.application.flows.errors import FlowNotFoundError
-from autotrading.application.flows.ports import PositionToClose
+from autotrading.application.flows.ports import OpenPositionRecords, PositionToClose
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.domain.flows.capital_change import CapitalChange, CapitalChangeReason
@@ -38,6 +38,7 @@ from tests.fakes.ledger_recording import FakeLedgerRecordingAdapter
 from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
 from tests.fakes.position_closed_notices import FakePositionClosedNoticeAdapter
 from tests.fakes.protection_repository import ProtectionStore
+from tests.fakes.watched_positions import InMemoryWatchedPositionsAdapter, WatchedPositionStore
 from tests.support.activity import a_fill, a_position, an_activity
 from tests.support.flows import a_configuration, a_flow
 from tests.support.position_closings import NOTHING_TO_CLOSE, ClosingAnswer, closed_by, refused
@@ -130,8 +131,11 @@ class Bench:
             self.flows,
             self.activity,
             self.ledger,
-            self.exit_plans,
-            InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
+            OpenPositionRecords(
+                self.exit_plans,
+                InMemoryFlowProtectionLevelsAdapter(ProtectionStore(), self.tenant_id),
+                InMemoryWatchedPositionsAdapter(WatchedPositionStore(), FlowStore(), self.tenant_id),
+            ),
         )
         self.notices = FakeCashOutNoticeAdapter()
         ports = CashOutPorts(flow_state, closings, self.recording, lambda: NOW, self.notices)

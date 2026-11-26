@@ -25,7 +25,8 @@ class ModelMessage:
 
 @dataclass(frozen=True, slots=True)
 class PositionView:
-    """An open position of the flow as the exchange shows it, with the exit plan in force (R3.1.1)."""
+    """An open position of the flow as the exchange shows it, with the exit plan in force (R3.1.1) and the largest
+    unrealized profit it reached, only when the user wants the agent to see it (R5.5.1)."""
 
     asset: str
     direction: TradeDirection
@@ -36,6 +37,7 @@ class PositionView:
     unrealized_pnl: Decimal
     liquidation_price: Decimal | None
     exit_plan: ExitPlan = field(default_factory=ExitPlan)
+    max_profit: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +140,9 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
 
 def _position_document(position: PositionView) -> dict[str, object]:
     liquidation, plan = position.liquidation_price, position.exit_plan
+    # Without the option the line is not there, and the state is the one of before (ADR
+    # massimo-profitto-raggiunto-nello-stato-della-posizione).
+    reached = {} if position.max_profit is None else {"massimo_profitto_raggiunto": str(position.max_profit)}
     return {
         "asset": position.asset,
         "direzione": position.direction.value,
@@ -150,6 +155,7 @@ def _position_document(position: PositionView) -> dict[str, object]:
         "obiettivo": _text_or_none(plan.target),
         "stop": _text_or_none(plan.stop),
         "invalidazione": plan.invalidation,
+        **reached,
     }
 
 

@@ -1,8 +1,8 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 
-from autotrading.domain.flows.exit_plan import DiscardedLevel
+from autotrading.domain.flows.exit_plan import DiscardedLevel, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.risk_limits import HUNDRED, RiskLimits
 from autotrading.domain.flows.risk_outcome import (
@@ -17,6 +17,7 @@ from autotrading.domain.flows.risk_outcome import (
 )
 from autotrading.domain.flows.trade_intent import CloseIntent, OpenIntent, ReverseIntent, TradeIntent, UpdateIntent
 from autotrading.domain.flows.trade_side import TradeSide
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.italian_text import money_text, number_text
 
 
@@ -39,7 +40,8 @@ class RiskState:
     losses the openings shrink, after gains they grow (ADR 0078). The side of each open position checks the levels of
     an update of its exit plan (R3.1.3). The margin and the value of its open positions are what the overall exposure
     limits measure (R3.2.1). Suspended openings, for maximum loss (R3.2.2) or for an alarm of reconciliation on the
-    account (R3.3.1), block every opening of the cycle with the reason of the suspension.
+    account (R3.3.1), block every opening of the cycle with the reason of the suspension. The stop the platform computes
+    for each position whose stop follows the price bounds the stop of an update (R5.5.1).
     """
 
     currency: str
@@ -49,6 +51,7 @@ class RiskState:
     open_margin: Decimal = Decimal(0)
     open_value: Decimal = Decimal(0)
     openings_suspended: str | None = None
+    trailing_stops: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
 
     @property
     def open_assets(self) -> frozenset[str]:
@@ -173,7 +176,21 @@ class RiskCheck:
         if limits is None:
             return BlockedDecision.untradable(intent.asset)
         change, discarded = intent.plan_change.coherent_with(side, limits.market_price)
-        return ApprovedUpdate(intent.asset, change, _exit_plan_notes(discarded))
+        change, bounded = self._within_trailing_stop(intent.asset, side, change)
+        return ApprovedUpdate(intent.asset, change, (*_exit_plan_notes(discarded), *bounded))
+
+    def _within_trailing_stop(
+        self, asset: str, side: TradeSide, change: ExitPlanChange
+    ) -> tuple[ExitPlanChange, tuple[Adjustment, ...]]:
+        """A stop of the agent farther from the price than the one that follows it goes back to it, as a stop goes back
+        within the default (R5.5.1, ADR sorveglianza-del-prezzo-per-lo-stop-che-segue)."""
+        following = self._state.trailing_stops.get(asset)
+        if change.stop is None or following is None or not TrailingStop.farther(change.stop, following, side):
+            return change, ()
+        reason = (
+            f"stop {number_text(change.stop)} riportato a {number_text(following)}: oltre lo stop che segue il prezzo"
+        )
+        return replace(change, stop=following), (Adjustment(AdjustmentKind.EXIT_PLAN, change.stop, following, reason),)
 
     def _open(self, intent: OpenIntent, limits: AssetLimits) -> RiskOutcome:
         minimum = self._policy.minimum_confidence

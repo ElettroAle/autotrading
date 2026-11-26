@@ -23,6 +23,7 @@ from autotrading.domain.flows.openings_resume import OpeningsResume
 from autotrading.domain.flows.protection_defaults import ProtectionDefaults
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.selections import AdapterSelection, ModelSelection, SourceSelection
+from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.flows import a_configuration, a_flow
 from tests.support.source_selections import a_source
@@ -45,6 +46,7 @@ CONFIGURATION = replace(
     protection_defaults=ProtectionDefaults(Decimal("2.5"), Decimal(10)),
     minimum_confidence=MinimumConfidence(60),
     memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
+    trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
 )
 
 
@@ -76,6 +78,12 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
         "default_take_profit_percent": "10",
         "minimum_confidence": 60,
         "memory": {"active": True, "decisions": 5, "days": 14, "text_length": None, "all_decisions": True},
+        "trailing_stop": {
+            "distance_percent": "2",
+            "activation_percent": "3",
+            "breakeven_percent": "1.5",
+            "max_profit_in_context": True,
+        },
     }
 
 
@@ -249,3 +257,17 @@ def test_a_name_of_another_tenant_never_reaches_the_database() -> None:
 
     with pytest.raises(CrossTenantAccessError):
         repository.rename(a_flow(TenantId.new(), name="beta"))
+
+
+def test_the_stop_that_follows_the_price_reads_back_as_saved() -> None:
+    document = document_of(CONFIGURATION)
+
+    assert configuration_of(1, document).trailing_stop == CONFIGURATION.trailing_stop
+
+
+def test_a_version_saved_before_the_stop_that_follows_the_price_reads_it_empty() -> None:
+    """R5.5.1: the flows already there get no new version, and their stop does not follow the price."""
+    document = document_of(CONFIGURATION)
+    del document["trailing_stop"]
+
+    assert configuration_of(1, document).trailing_stop == TrailingStop()
