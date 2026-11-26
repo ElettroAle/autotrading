@@ -88,3 +88,16 @@ def test_the_value_in_the_settings_is_the_one_the_flow_set() -> None:
 
 def test_the_value_in_the_settings_is_the_default_when_the_flow_set_none() -> None:
     assert trend_days((7,)).value_in({"lunghezza_serie": 10}) == (7,)
+
+
+@pytest.mark.parametrize("value", [[0], [721]])
+def test_a_list_that_declares_its_refusal_is_refused_with_it(value: list[int]) -> None:
+    hours = SourceListParameter("estremi_ore", "estremi_ore", (), 1, 720, range_reason="estremi_ore va da 1 a 720")
+
+    with pytest.raises(SourceListValueOutOfRangeError) as raised:
+        hours.accepted(value)
+
+    assert (str(raised.value), raised.value.details) == (
+        "estremi_ore va da 1 a 720",
+        {"field": "estremi_ore", "minimum": 1, "maximum": 720},
+    )

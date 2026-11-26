@@ -1,0 +1,18 @@
+{
+  "origin": "live",
+  "recorded_at": "2026-11-26T05:55:51Z",
+  "method": "POST",
+  "url": "https://api.hyperliquid-testnet.xyz/info",
+  "request_body": {
+    "type": "candleSnapshot",
+    "req": {
+      "coin": "BTC",
+      "interval": "1h",
+      "startTime": 1793076900000,
+      "endTime": 1795672500000
+    }
+  },
+  "status": 200,
+  "content_type": "application/json",
+  "answer": "candles_btc_1h.json"
+}

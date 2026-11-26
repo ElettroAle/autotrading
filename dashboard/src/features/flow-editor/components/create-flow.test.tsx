@@ -210,7 +210,14 @@ describe('CreateFlow', () => {
             {
               name: 'Hyperliquid',
               weight: 2,
-              parameters: { lunghezza_serie: 20, medie_periodi: [20, 50], tendenza_giorni: [] },
+              parameters: {
+                lunghezza_serie: 20,
+                medie_periodi: [20, 50],
+                tendenza_giorni: [],
+                estremi_ore: [],
+                variazione_ore: [],
+                serie_chiusure: 0,
+              },
             },
           ],
         },
@@ -550,7 +557,14 @@ describe('CreateFlow', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     const { sources } = configurationOf(fakePlatform.flowNamed('alfa'));
     expect(sources.find((source) => source.name === 'indicatori')?.adapters[0]?.parameters).toEqual(
-      { lunghezza_serie: 20, medie_periodi: [20, 50], tendenza_giorni: [7, 30, 90] },
+      {
+        lunghezza_serie: 20,
+        medie_periodi: [20, 50],
+        tendenza_giorni: [7, 30, 90],
+        estremi_ore: [],
+        variazione_ore: [],
+        serie_chiusure: 0,
+      },
     );
   });
 

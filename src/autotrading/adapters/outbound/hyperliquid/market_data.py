@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import TypedDict
@@ -14,6 +15,7 @@ from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.forecast import FORECAST
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
 from autotrading.domain.sources.price_forecast import PricePoint
+from autotrading.domain.sources.regime_data import REGIME_PARAMETERS
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
 
@@ -64,6 +66,8 @@ DECLARATION = SourceAdapterDeclaration(
     (),
     offers_history=True,
 )
+# The same adapter for the indicators, with the parameters of the regime data, which the pivots do not have (R5.5.4).
+INDICATORS_DECLARATION = replace(DECLARATION, parameters=REGIME_PARAMETERS)
 # An exchange that refuses, does not answer or answers in another shape: the source is absent from the cycle.
 UNAVAILABLE = (ClientError, ServerError, requests.RequestException, KeyError, TypeError, InvalidOperation)
 
@@ -168,6 +172,9 @@ class HyperliquidMarketDataAdapter:
 
     def declaration(self) -> SourceAdapterDeclaration:
         return DECLARATION
+
+    def indicators_declaration(self) -> SourceAdapterDeclaration:
+        return INDICATORS_DECLARATION
 
     def timeframes(self) -> Sequence[Timeframe]:
         return tuple(Timeframe(minutes) for minutes in CANDLE_INTERVALS)
