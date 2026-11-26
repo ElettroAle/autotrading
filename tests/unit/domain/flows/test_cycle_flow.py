@@ -17,6 +17,7 @@ from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK, Ope
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.reopening_block import ReopeningBlock
 from autotrading.domain.flows.risk_check import RiskState
+from autotrading.domain.flows.round_trip_cost import RoundTripCost
 from autotrading.domain.flows.selections import ActiveSource, AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.flows.trailing_stop import TrailingStop
@@ -270,3 +271,13 @@ def test_the_state_view_tells_the_exposure_of_the_other_flows_only_when_read() -
 
     assert shown.account_exposure == "altri flussi del conto: long 150 USDC, short 1100 USDC"
     assert cycle_flow(attributed()).state_view().account_exposure is None
+
+
+# R5.5.6: the fee of the account read at the start of the cycle.
+
+
+def test_the_state_view_tells_the_round_trip_cost_only_when_read() -> None:
+    read = replace(cycle_flow(attributed()), round_trip_cost=RoundTripCost.of_rate(Decimal("0.00045")))
+
+    assert read.state_view().round_trip_cost_percent == Decimal("0.09")
+    assert cycle_flow(attributed()).state_view().round_trip_cost_percent is None

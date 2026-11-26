@@ -168,6 +168,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
         memory=FlowMemory(active=True, decisions=5, days=14),
         consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120),
         account_exposure_for_agent=True,
+        fees_for_agent=True,
     )
 
     assert differences(before, after) == (
@@ -203,6 +204,7 @@ def test_every_part_that_changes_is_reported_in_the_order_of_the_configuration()
             "2 perdite consecutive in 24 ore, blocco di 120 minuti, ambito asset",
         ),
         ConfigurationDifference("esposizione del conto nel contesto dell'agente", "no", "sì"),
+        ConfigurationDifference("commissioni nel contesto dell'agente", "no", "sì"),
     )
 
 

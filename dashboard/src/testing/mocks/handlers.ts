@@ -117,6 +117,7 @@ const configurationResponse = (configuration: FakeConfiguration) => ({
   trailing_stop: configuration.trailingStop,
   consecutive_loss_limit: configuration.consecutiveLossLimit,
   account_exposure_for_agent: configuration.accountExposureForAgent,
+  fees_for_agent: configuration.feesForAgent,
 });
 
 // A search the API refuses answers 400 with its reason, as the errors of the domain do (ADR 0027).

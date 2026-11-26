@@ -28,6 +28,7 @@ from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.recorded_decision import DecisionAction, RecordedDecision
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import ApprovedClose, ApprovedOpening, ApprovedUpdate, BlockedDecision
+from autotrading.domain.flows.round_trip_cost import RoundTripCost
 from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.flows.source_data import SourceData
 from autotrading.domain.flows.trade_intent import OpenIntent
@@ -315,6 +316,18 @@ def test_the_question_of_the_cycle_carries_the_flow_alone_its_sources_and_the_mi
         sources=(SourceData("news", "RSS", 2, None, {"titolo": "t"}),),
         missing=("pivots: fonte non disponibile",),
         memory=None,
+    )
+
+
+def test_a_round_trip_cost_not_read_is_declared_missing_after_the_sources() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    unread = replace(CYCLE_FLOW, round_trip_cost=RoundTripCost.unread("exchange non raggiungibile, riprovare"))
+
+    question = a_context(snapshot=FlowSnapshot(SNAPSHOT.sources, unread)).question
+
+    assert question.missing == (
+        "pivots: fonte non disponibile",
+        "costo di andata e ritorno: exchange non raggiungibile, riprovare",
     )
 
 

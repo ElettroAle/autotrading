@@ -66,6 +66,7 @@ const configurationSchema = z.object({
     })
     .nullable(),
   account_exposure_for_agent: z.boolean(),
+  fees_for_agent: z.boolean(),
 });
 
 export type Configuration = z.infer<typeof configurationSchema>;

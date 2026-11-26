@@ -37,3 +37,5 @@ class FlowSetting(StrEnum):
     LOSS_COUNT_SCOPE = "consecutive_loss_limit.count_scope"
     # A switch, never refused: it names the option in the documents that list the settings of a flow (R5.5.5).
     ACCOUNT_EXPOSURE_FOR_AGENT = "account_exposure_for_agent"
+    # A switch, never refused, like the one before (R5.5.6).
+    FEES_FOR_AGENT = "fees_for_agent"

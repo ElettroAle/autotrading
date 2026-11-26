@@ -854,3 +854,14 @@ def test_the_option_of_the_exposure_of_the_account_changes_in_a_new_version_and_
 
     assert (turned_on.version, turned_on.account_exposure_for_agent) == (2, True)
     assert kept.account_exposure_for_agent is True
+
+
+def test_the_option_of_the_fees_changes_in_a_new_version_and_is_kept_otherwise(flows: Flows) -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    flow = flows.saved()
+
+    turned_on = flows.modify.execute(ModifyFlowCommand(flow.id, fees_for_agent=True)).configuration
+    kept = flows.modify.execute(ModifyFlowCommand(flow.id, instructions="audace")).configuration
+
+    assert (turned_on.version, turned_on.fees_for_agent) == (2, True)
+    assert kept.fees_for_agent is True

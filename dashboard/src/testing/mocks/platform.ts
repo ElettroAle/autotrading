@@ -133,6 +133,7 @@ export type FakeConfiguration = {
   readonly trailingStop: FakeTrailingStop;
   readonly consecutiveLossLimit: FakeConsecutiveLossLimit;
   readonly accountExposureForAgent: boolean;
+  readonly feesForAgent: boolean;
 };
 
 export type FakeVersion = {
@@ -202,6 +203,8 @@ export type FakeFlow = {
   consecutiveLossLimit: FakeConsecutiveLossLimit;
   /** The agent sees the exposure of the other flows of the account (R5.5.5). */
   accountExposureForAgent: boolean;
+  /** The agent sees the round-trip cost of a position (R5.5.6). */
+  feesForAgent: boolean;
   /** The blocks of the reopenings in force now, as the API reads them from the closings (R5.5.2). */
   reopeningBlocks: FakeReopeningBlock[];
   /** What the agent would receive of the memory if the cycle started now, for every asset (R5.3.4). */
@@ -301,6 +304,7 @@ export type FakeFlowConfiguration = {
   trailing_stop: FakeTrailingStop;
   consecutive_loss_limit: FakeConsecutiveLossLimit;
   account_exposure_for_agent: boolean;
+  fees_for_agent: boolean;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -338,6 +342,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   trailing_stop: { ...flow.trailingStop },
   consecutive_loss_limit: flow.consecutiveLossLimit,
   account_exposure_for_agent: flow.accountExposureForAgent,
+  fees_for_agent: flow.feesForAgent,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -524,6 +529,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   trailingStop: DEFAULT_TRAILING_STOP,
   consecutiveLossLimit: null,
   accountExposureForAgent: false,
+  feesForAgent: false,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -650,6 +656,7 @@ const draftOf = (
   trailingStop: DEFAULT_TRAILING_STOP,
   consecutiveLossLimit: null,
   accountExposureForAgent: false,
+  feesForAgent: false,
   reopeningBlocks: [],
   remembered: [],
   openingsSuspension: null,
@@ -854,6 +861,7 @@ export const fakePlatform = {
       trailingStop: DEFAULT_TRAILING_STOP,
       consecutiveLossLimit: null,
       accountExposureForAgent: false,
+      feesForAgent: false,
       reopeningBlocks: [],
       remembered: [],
       openingsSuspension: null,

@@ -17,6 +17,7 @@ import { flowFormSchema, formFieldOf, type FlowFormValues } from '../utils/flow-
 
 import { AccountExposureField } from './account-exposure-field';
 import { ConsecutiveLossFields } from './consecutive-loss-fields';
+import { FeesField } from './fees-field';
 import { MemoryFields } from './memory-fields';
 import { ModelFields } from './model-fields';
 import { SourceFields } from './source-fields';
@@ -156,6 +157,7 @@ export const FlowForm = ({
           <ModelFields models={models} providers={providers} currentModel={values.model} />
           <MemoryFields />
           <AccountExposureField />
+          <FeesField />
           <FormField id="flow-instructions" label="Istruzioni" error={errors.instructions?.message}>
             {(control) => (
               <textarea

@@ -174,6 +174,7 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "remove_limit": False,
             },
             "account_exposure_for_agent": False,
+            "fees_for_agent": False,
         },
     }
 
@@ -423,3 +424,14 @@ def test_the_option_of_the_exposure_of_the_account_goes_through_the_file_and_is_
 
     assert document.command("copia").account_exposure_for_agent is True
     assert StrategyDocument.model_validate(older).command("copia").account_exposure_for_agent is False
+
+
+def test_the_option_of_the_fees_goes_through_the_file_and_is_off_when_missing() -> None:
+    # R5.5.6: a file written before the option imports it off.
+    strategy = replace(a_strategy(), fees_for_agent=True)
+    document = StrategyDocument.model_validate_json(StrategyDocument.of(strategy).model_dump_json())
+    older = document.model_dump(mode="json")
+    del older["strategy"]["fees_for_agent"]
+
+    assert document.command("copia").fees_for_agent is True
+    assert StrategyDocument.model_validate(older).command("copia").fees_for_agent is False

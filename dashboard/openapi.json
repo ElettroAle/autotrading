@@ -7276,6 +7276,10 @@
           "account_exposure_for_agent": {
             "type": "boolean",
             "title": "Account Exposure For Agent"
+          },
+          "fees_for_agent": {
+            "type": "boolean",
+            "title": "Fees For Agent"
           }
         },
         "type": "object",
@@ -7302,7 +7306,8 @@
           "memory",
           "trailing_stop",
           "consecutive_loss_limit",
-          "account_exposure_for_agent"
+          "account_exposure_for_agent",
+          "fees_for_agent"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
@@ -8531,6 +8536,11 @@
             "type": "boolean",
             "title": "Account Exposure For Agent",
             "default": false
+          },
+          "fees_for_agent": {
+            "type": "boolean",
+            "title": "Fees For Agent",
+            "default": false
           }
         },
         "type": "object",
@@ -9035,6 +9045,17 @@
               }
             ],
             "title": "Account Exposure For Agent"
+          },
+          "fees_for_agent": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees For Agent"
           }
         },
         "type": "object",
@@ -9561,6 +9582,10 @@
             "type": "boolean",
             "title": "Account Exposure For Agent"
           },
+          "fees_for_agent": {
+            "type": "boolean",
+            "title": "Fees For Agent"
+          },
           "missing": {
             "items": {
               "type": "string"
@@ -9598,6 +9623,7 @@
           "trailing_stop",
           "consecutive_loss_limit",
           "account_exposure_for_agent",
+          "fees_for_agent",
           "missing"
         ],
         "title": "FlowResponse",
@@ -12850,6 +12876,11 @@
             "type": "boolean",
             "title": "Account Exposure For Agent",
             "default": false
+          },
+          "fees_for_agent": {
+            "type": "boolean",
+            "title": "Fees For Agent",
+            "default": false
           }
         },
         "type": "object",
@@ -12999,6 +13030,11 @@
           "account_exposure_for_agent": {
             "type": "boolean",
             "title": "Account Exposure For Agent",
+            "default": false
+          },
+          "fees_for_agent": {
+            "type": "boolean",
+            "title": "Fees For Agent",
             "default": false
           }
         },

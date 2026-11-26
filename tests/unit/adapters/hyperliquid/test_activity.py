@@ -46,6 +46,8 @@ STATE = {
     ],
     "time": 1762941600000,
 }
+# The fees of an account as Hyperliquid answers them: "cross" is the side that takes the book, an order at the market.
+FEES = {"userCrossRate": "0.00042", "userAddRate": "0.00012", "activeReferralDiscount": "0.0"}
 
 
 @dataclass
@@ -56,6 +58,7 @@ class FakeSdk(HyperliquidSdkAdapter):
     ledger: Any = field(default_factory=list)
     abstraction: Any = "default"
     spot: Any = field(default_factory=lambda: {"balances": []})
+    fees: Any = field(default_factory=lambda: FEES)
     failure: Exception | None = None
     calls: list[tuple[str, Any]] = field(default_factory=list)
 
@@ -91,6 +94,12 @@ class FakeSdk(HyperliquidSdkAdapter):
             raise self.failure
         self.calls.append(("user_non_funding_ledger_updates", (user, startTime, endTime)))
         return self.ledger
+
+    def user_fees(self, address: str) -> Any:
+        if self.failure is not None:
+            raise self.failure
+        self.calls.append(("user_fees", address))
+        return self.fees
 
 
 def read(sdk: FakeSdk) -> Any:
@@ -300,5 +309,45 @@ def test_the_transfers_of_a_reference_without_the_address_are_refused_before_rea
         HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0).transfers(
             AccountReference({"wallet": ADDRESS}), TimeWindow()
         )
+
+    assert sdk.calls == []
+
+
+# R5.5.6: the fee of a market order for the account, for the agent of a flow.
+
+
+def fee_of(sdk: FakeSdk, reference: AccountReference | None = None) -> Decimal:
+    adapter = HyperliquidAccountActivityAdapter("https://exchange.invalid", sdk, 3.0)
+    return adapter.market_order_fee_rate(reference or AccountReference({"account_address": ADDRESS}))
+
+
+def test_the_fee_of_a_market_order_is_the_taker_rate_the_exchange_applies_to_the_address() -> None:
+    sdk = FakeSdk()
+
+    assert fee_of(sdk) == Decimal("0.00042")
+    assert sdk.calls == [("info", ("https://exchange.invalid", 3.0)), ("user_fees", ADDRESS)]
+
+
+@pytest.mark.parametrize(
+    "sdk",
+    [
+        FakeSdk(failure=ServerError(500, "boom")),
+        FakeSdk(failure=requests.Timeout("slow")),
+        FakeSdk(fees={"userAddRate": "0.00012"}),
+        FakeSdk(fees={"userCrossRate": "many"}),
+        FakeSdk(fees=None),
+    ],
+    ids=["server error", "out of reach", "no taker rate", "not a number", "no answer"],
+)
+def test_a_fee_that_cannot_be_read_is_unavailable(sdk: FakeSdk) -> None:
+    with pytest.raises(FlowExchangeUnavailableError):
+        fee_of(sdk)
+
+
+def test_the_fee_of_a_reference_without_the_address_is_refused_before_reaching_the_exchange() -> None:
+    sdk = FakeSdk()
+
+    with pytest.raises(FlowCredentialsFieldMissingError):
+        fee_of(sdk, AccountReference({"wallet": ADDRESS}))
 
     assert sdk.calls == []

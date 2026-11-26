@@ -226,6 +226,13 @@ class QuestionStatePort(Protocol):
         """The exposure of the other flows of the account, as the flow tells it; None with the option off (R5.5.5)."""
         ...
 
+    @property
+    def round_trip_cost_percent(self) -> Decimal | None:
+        """The cost of opening and closing a position in percent of its value; None with the option off or when the
+        exchange did not give the fee (R5.5.6).
+        """
+        ...
+
 
 class QuestionSourcePort(Protocol):
     """The values of one adapter of an active source in the cycle, with its weight; an aggregate of several adapters has

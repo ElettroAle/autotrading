@@ -83,6 +83,7 @@ class _StrategyArguments(TypedDict):
     trailing_stop: TrailingStopRequest
     consecutive_loss_limit: ConsecutiveLossLimitRequest
     account_exposure_for_agent: bool
+    fees_for_agent: bool
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -111,6 +112,7 @@ class FlowStrategy:
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
     account_exposure_for_agent: bool = False
+    fees_for_agent: bool = False
 
     def _strategy_arguments(self) -> _StrategyArguments:
         return _StrategyArguments(
@@ -136,6 +138,7 @@ class FlowStrategy:
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
             account_exposure_for_agent=self.account_exposure_for_agent,
+            fees_for_agent=self.fees_for_agent,
         )
 
 
@@ -205,6 +208,7 @@ class FlowModification:
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
     account_exposure_for_agent: bool | None = None
+    fees_for_agent: bool | None = None
     remove: list[RemovablePart] = field(default_factory=list)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
@@ -248,4 +252,5 @@ class FlowModification:
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
             account_exposure_for_agent=self.account_exposure_for_agent,
+            fees_for_agent=self.fees_for_agent,
         )

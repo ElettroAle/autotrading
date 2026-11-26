@@ -97,6 +97,7 @@ const FLOW: Flow = {
   },
   consecutive_loss_limit: null,
   account_exposure_for_agent: false,
+  fees_for_agent: false,
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -170,7 +171,13 @@ describe('creationRequestOf', () => {
         remove_limit: true,
       },
       account_exposure_for_agent: false,
+      fees_for_agent: false,
     });
+  });
+
+  // R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+  it('sends the fees for the agent as the user chose them', () => {
+    expect(creationRequestOf(filled({ fees_for_agent: true })).fees_for_agent).toBe(true);
   });
 
   // R5.5.5, ADR esposizione-del-conto-nella-dashboard.
@@ -427,6 +434,7 @@ describe('formValuesOf', () => {
         count_scope: 'asset',
       },
       account_exposure_for_agent: false,
+      fees_for_agent: false,
     });
   });
 

@@ -225,3 +225,15 @@ def test_the_option_of_the_exposure_of_the_account_is_that_of_the_api() -> None:
 
     assert body_of(modified)["account_exposure_for_agent"] is True
     assert flows.read("get_flow", {"flow_id": flows.flow_id})["account_exposure_for_agent"] is True
+
+
+def test_the_option_of_the_fees_is_that_of_the_api() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    flows = Flows()
+    modified = flows.mcp.call_as(
+        "anna", "modify_flow", {"flow_id": flows.flow_id, "modification": {"fees_for_agent": True}}
+    )
+    assert not modified.is_error, body_of(modified)
+
+    assert body_of(modified)["fees_for_agent"] is True
+    assert flows.read("get_flow", {"flow_id": flows.flow_id})["fees_for_agent"] is True

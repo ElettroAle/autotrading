@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,6 +13,7 @@ from autotrading.adapters.outbound.sqlalchemy.composition import (
     sqlalchemy_simulated_exchange_adapters,
     sqlalchemy_simulation_adapters,
 )
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.orders.direction import Direction
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.market_order import MarketOrder
@@ -90,7 +92,12 @@ def test_a_slippage_that_is_not_a_number_is_an_invalid_configuration(slippage: s
 def test_the_simulated_exchange_is_offered_by_its_name_on_the_accounts_of_the_tenant() -> None:
     simulation = sqlalchemy_simulation_adapters(ConfigurationSource({}))
 
-    simulated = sqlalchemy_simulated_exchange_adapters(create_engine("sqlite://"), simulation, TenantId.new())
+    simulated = sqlalchemy_simulated_exchange_adapters(
+        create_engine("sqlite://"), simulation, TenantId.new(), Decimal("0.00045")
+    )
 
     assert list(simulated) == ["simulato"]
     assert simulated["simulato"].network_name() == "simulato"
+    assert simulated["simulato"].market_order_fee_rate(AccountReference.without_credentials(uuid4())) == Decimal(
+        "0.00045"
+    )

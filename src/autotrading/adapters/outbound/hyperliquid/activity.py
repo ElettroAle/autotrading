@@ -25,6 +25,8 @@ from autotrading.domain.flows.trade_side import TradeSide
 FROM_THE_START = 0
 SHAPE_ERRORS = (KeyError, TypeError, ValueError, IndexError, AttributeError, ArithmeticError)
 TRANSFER_DIRECTIONS = {"deposit": TransferDirection.DEPOSIT, "withdraw": TransferDirection.WITHDRAWAL}
+# Hyperliquid calls "cross" the side of an order that takes the book, as an order at the market does.
+TAKER_RATE = "userCrossRate"
 
 
 class _LedgerDelta(TypedDict, total=False):
@@ -42,7 +44,8 @@ class _LedgerUpdate(TypedDict):
 
 class HyperliquidAccountActivityAdapter:
     """What Hyperliquid shows of an account: positions with their margin (R1.6.1), and the deposits and withdrawals
-    of its history of the capital (R3.4.2, ADR storico-delle-variazioni-di-capitale).
+    of its history of the capital (R3.4.2, ADR storico-delle-variazioni-di-capitale), and the fee it applies to the
+    account for an order at the market (R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente).
 
     Everything is public information of the address: no signature, so no secret leaves the opener. The executions,
     the funding and the movements of the balance are read apart, only the new ones, for the ledger (ADR 0063, ADR
@@ -96,6 +99,13 @@ class HyperliquidAccountActivityAdapter:
             # The exchange includes the end it is given; the window excludes it.
             transfers = (transfer for update in ledger if (transfer := _transfer_of(update)))
             return tuple(transfer for transfer in transfers if window.contains(transfer.transferred_at))
+
+    def market_order_fee_rate(self, reference: AccountReference) -> Decimal:
+        """The rate of the account, with the discounts of its volume, as a share of the value of the order."""
+        address = address_of(reference)
+        with translated():
+            fees = self._sdk.info(self._base_url, self._timeout).user_fees(address)
+            return _decimal(fees[TAKER_RATE])
 
 
 @contextmanager

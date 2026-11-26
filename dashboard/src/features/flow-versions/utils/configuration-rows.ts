@@ -144,5 +144,9 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
       part: "esposizione del conto nel contesto dell'agente",
       value: configuration.account_exposure_for_agent ? 'sì' : 'no',
     },
+    {
+      part: "commissioni nel contesto dell'agente",
+      value: configuration.fees_for_agent ? 'sì' : 'no',
+    },
   ];
 };

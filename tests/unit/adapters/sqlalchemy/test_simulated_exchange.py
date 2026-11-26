@@ -47,6 +47,8 @@ from autotrading.domain.tenancy.tenant_id import TenantId
 AT = datetime(2026, 11, 24, 9, 0, tzinfo=UTC)
 LATER = datetime(2026, 11, 24, 9, 5, tzinfo=UTC)
 SLIPPAGE = Slippage.percent(Decimal("0.1"))
+# The fee of the market the simulated exchange trades on, for an order at the market price.
+MARKET_ORDER_FEE_RATE = Decimal("0.00045")
 LONG = SimulatedPosition(
     "BTC", Direction.LONG, Decimal("0.002"), 2, Decimal(90000), Decimal(90), Decimal("0.0125"), Decimal(91000)
 )
@@ -54,7 +56,9 @@ LONG = SimulatedPosition(
 
 def adapter() -> SqlAlchemySimulatedExchangeAdapter:
     """On an engine never reached: what these tests ask is answered before any query."""
-    return SqlAlchemySimulatedExchangeAdapter(create_engine("sqlite://"), TenantId.new(), SimulatedExecution(SLIPPAGE))
+    return SqlAlchemySimulatedExchangeAdapter(
+        create_engine("sqlite://"), TenantId.new(), SimulatedExecution(SLIPPAGE), MARKET_ORDER_FEE_RATE
+    )
 
 
 def a_fill(*, fill_id: int = 1, size: str = "0.002", price: str = "90000", is_buy: bool = True) -> _FillRow:
@@ -170,6 +174,13 @@ def test_the_exchange_declares_no_credential_and_its_own_network() -> None:
     assert simulated.reads_credential_expiry()
     assert simulated.credential_expiry(Credentials.without_fields(AccountId.new())) is None
     assert simulated.reference_fields() == frozenset()
+
+
+def test_the_fee_of_a_market_order_is_the_one_the_exchange_was_given_for_every_account() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    reference = AccountReference.without_credentials(uuid4())
+
+    assert adapter().market_order_fee_rate(reference) == MARKET_ORDER_FEE_RATE
 
 
 def test_an_account_reached_by_credentials_alone_is_refused_before_any_query() -> None:

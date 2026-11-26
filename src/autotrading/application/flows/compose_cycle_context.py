@@ -21,7 +21,8 @@ class ComposeCycleContextUseCase:
     """The context of the agent for a cycle: the flow alone, the data of its sources followed by what several adapters
     of a source say together, and the data missing, declared (R1.2.5, R1.4.3, R5.1.2); with the memory of the flow
     on, its previous operative decisions before now with their outcome, in the placeholder of the system prompt
-    (R5.3.4), after the summary of the positions the flow closed when the flow wants it (R5.3.7).
+    (R5.3.4), after the summary of the positions the flow closed when the flow wants it (R5.3.7). A round-trip cost the
+    exchange did not give is missing after the sources (R5.5.6).
     """
 
     def __init__(
@@ -59,7 +60,10 @@ class ComposeCycleContextUseCase:
             now=now,
             state=cycle_flow.state_view(),
             sources=(*data, *self._aggregated(data)),
-            missing=tuple(f"{source.label}: {source.reason}" for source in absent),
+            missing=(
+                *(f"{source.label}: {source.reason}" for source in absent),
+                *cycle_flow.round_trip_cost.missing,
+            ),
             memory=memory,
         )
         return CycleContext(cycle_flow, question, self._composer.execute(question))

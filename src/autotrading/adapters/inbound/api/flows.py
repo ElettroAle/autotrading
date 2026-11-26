@@ -118,6 +118,8 @@ class FlowCreationRequest(BaseModel):
     consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
     # Missing: the agent sees the flow alone, never the other flows of its account (R5.5.5).
     account_exposure_for_agent: bool = False
+    # Missing: the agent does not see the cost of opening and closing a position (R5.5.6).
+    fees_for_agent: bool = False
 
     def command(self) -> CreateFlowCommand:
         return CreateFlowCommand(
@@ -148,6 +150,7 @@ class FlowCreationRequest(BaseModel):
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
             account_exposure_for_agent=self.account_exposure_for_agent,
+            fees_for_agent=self.fees_for_agent,
         )
 
 
@@ -195,6 +198,8 @@ class FlowModificationRequest(BaseModel):
     consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
     # Missing keeps the option in force (R5.5.5).
     account_exposure_for_agent: bool | None = None
+    # Missing keeps the option in force (R5.5.6).
+    fees_for_agent: bool | None = None
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
         return ModifyFlowCommand(
@@ -236,6 +241,7 @@ class FlowModificationRequest(BaseModel):
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
             account_exposure_for_agent=self.account_exposure_for_agent,
+            fees_for_agent=self.fees_for_agent,
         )
 
     def _sent_as_null(self, field: str) -> bool:
@@ -385,6 +391,7 @@ class ConfigurationResponse(BaseModel):
     # Null for a flow without the limit (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitResponse | None
     account_exposure_for_agent: bool
+    fees_for_agent: bool
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> ConfigurationResponse:
@@ -415,6 +422,7 @@ class ConfigurationResponse(BaseModel):
             trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
             consecutive_loss_limit=ConsecutiveLossLimitResponse.of(configuration.consecutive_loss_limit),
             account_exposure_for_agent=configuration.account_exposure_for_agent,
+            fees_for_agent=configuration.fees_for_agent,
         )
 
 
@@ -470,6 +478,7 @@ class FlowResponse(BaseModel):
     # Null for a flow without the limit (R5.5.2).
     consecutive_loss_limit: ConsecutiveLossLimitResponse | None
     account_exposure_for_agent: bool
+    fees_for_agent: bool
     missing: list[str]
 
     @classmethod
@@ -506,6 +515,7 @@ class FlowResponse(BaseModel):
             trailing_stop=TrailingStopResponse.of(configuration.trailing_stop),
             consecutive_loss_limit=ConsecutiveLossLimitResponse.of(configuration.consecutive_loss_limit),
             account_exposure_for_agent=configuration.account_exposure_for_agent,
+            fees_for_agent=configuration.fees_for_agent,
             missing=list(flow.missing_before_start),
         )
 

@@ -121,12 +121,18 @@ class SqlAlchemySimulatedExchangeAdapter:
     account, its positions, protections and history stay in the tables of the tenant, through a restart. Every change of
     an account locks its row, so the cycles, the settlement on the real prices and a reset never interleave. The
     instant of an execution is the one of its transaction.
+
+    The fee of an order at the market is the one of the real market it trades on, which the composition gives it: the
+    same for every account (R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente).
     """
 
-    def __init__(self, engine: Engine, tenant_id: TenantId, execution: SimulatedExecution) -> None:
+    def __init__(
+        self, engine: Engine, tenant_id: TenantId, execution: SimulatedExecution, market_order_fee_rate: Decimal
+    ) -> None:
         self._engine = engine
         self._tenant_id = tenant_id
         self._execution = execution
+        self._market_order_fee_rate = market_order_fee_rate
 
     # The account as the accounts context reads it (ExchangePort, VirtualBalancePort).
 
@@ -281,7 +287,7 @@ class SqlAlchemySimulatedExchangeAdapter:
             return sum(self._settled(connection, account_id, markets) for account_id in accounts)
 
     # The account as the flows context reads it (CycleAccountReaderPort, ActivityReaderPort, TransfersReaderPort,
-    # ExecutionsReaderPort): it needs no field of any credential.
+    # ExecutionsReaderPort, MarketOrderFeeReaderPort): it needs no field of any credential.
 
     def reference_fields(self) -> frozenset[str]:
         return frozenset()
@@ -318,6 +324,9 @@ class SqlAlchemySimulatedExchangeAdapter:
             rows = [cast("_MovementRow", row) for row in connection.execute(query).mappings()]
         transfers = (transfer_of(row) for row in rows)
         return tuple(transfer for transfer in transfers if window.contains(transfer.transferred_at))
+
+    def market_order_fee_rate(self, reference: AccountReference) -> Decimal:  # noqa: ARG002 - one fee for every account
+        return self._market_order_fee_rate
 
     def since(self, reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
         account_id = _reference_id_of(reference)

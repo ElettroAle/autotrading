@@ -48,6 +48,7 @@ from autotrading.application.flows.read_cycle_account import ReadCycleAccountUse
 from autotrading.application.flows.read_cycle_flow import CycleAccountReadings, ReadCycleFlowUseCase
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
+from autotrading.application.flows.read_round_trip_cost import ReadRoundTripCostUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
@@ -359,7 +360,11 @@ class FlowCycles:
         return TenantCyclePorts(
             flows=flows,
             pause=InMemoryAutomaticPauseAdapter(platform.flows, tenant_id),
-            start_cycle=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            start_cycle=StartCycleFlowUseCase(
+                reconcile_for_cycle,
+                read_cycle_flow,
+                ReadRoundTripCostUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            ),
             end_cycle=EndCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
             record_executions=record_executions,
             read_cycle_flow=read_cycle_flow,
