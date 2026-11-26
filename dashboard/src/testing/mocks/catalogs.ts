@@ -106,6 +106,12 @@ const HISTORY_DAYS = numberParameter(
   [7, 1, 90],
 );
 const HORIZONS = listParameter('orizzonti_minuti', 'orizzonti minuti', [15, 60], [15, 43200]);
+// The regime data the adapter of the market declares for the indicators only (R5.5.4).
+const REGIME_PARAMETERS = [
+  listParameter('estremi_ore', 'estremi_ore', [], [1, 720]),
+  listParameter('variazione_ore', 'variazione_ore', [], [1, 720]),
+  numberParameter('serie_chiusure', 'serie_chiusure', [0, 0, 1]),
+];
 
 /** The assets the exchange of the fake installation trades now, as the API lists them: by name (ADR 0147). */
 export const FAKE_TRADABLE_ASSETS: readonly string[] = ['BTC', 'ETH', 'SOL'];
@@ -172,7 +178,7 @@ export const FAKE_SOURCES: FakeSource[] = [
       adapterOf(
         'Hyperliquid',
         'Dati di mercato pubblici di Hyperliquid.',
-        [SERIES_LENGTH, AVERAGE_PERIODS, TREND_DAYS],
+        [SERIES_LENGTH, AVERAGE_PERIODS, TREND_DAYS, ...REGIME_PARAMETERS],
         true,
       ),
     ],

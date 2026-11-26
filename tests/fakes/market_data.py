@@ -1,10 +1,11 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
+from autotrading.domain.sources.regime_data import REGIME_PARAMETERS
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
 
@@ -13,6 +14,8 @@ DEFAULT_CLOSES = tuple(Decimal(100) + Decimal(index % 9) - 4 + Decimal(index) / 
 DEFAULT_SNAPSHOT = MarketSnapshot(Decimal(100), Decimal("100.5"), Decimal(1000), Decimal("0.0001"))
 STANDARD_INTERVALS = tuple(Timeframe(minutes) for minutes in (1, 3, 5, 15, 30, 60, 120, 240, 480, 720, 1440))
 MARKET_DECLARATION = SourceAdapterDeclaration("Hyperliquid", "dati di mercato", (), (), offers_history=True)
+# As adapter of the indicators the market declares the parameters of the regime data too, as the real one (R5.5.4).
+INDICATORS_DECLARATION = replace(MARKET_DECLARATION, parameters=REGIME_PARAMETERS)
 # Without a known range a candle spans one unit on each side of its close.
 DEFAULT_SPREAD = Decimal(1)
 
@@ -32,6 +35,9 @@ class FakeMarketDataAdapter:
 
     def declaration(self) -> SourceAdapterDeclaration:
         return self.declared
+
+    def indicators_declaration(self) -> SourceAdapterDeclaration:
+        return replace(self.declared, parameters=INDICATORS_DECLARATION.parameters)
 
     def timeframes(self) -> Sequence[Timeframe]:
         return self.published

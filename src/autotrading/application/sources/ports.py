@@ -133,6 +133,12 @@ class MarketDataPort(Protocol):
         """
         ...
 
+    def indicators_declaration(self) -> SourceAdapterDeclaration:
+        """What the same adapter declares of itself for the indicators: the same name, with the parameters of its own
+        for them, without asking the exchange (R5.5.4, ADR dati-di-regime-nella-fonte-indicatori).
+        """
+        ...
+
     def timeframes(self) -> Sequence[Timeframe]:
         """The candle intervals the exchange publishes."""
         ...

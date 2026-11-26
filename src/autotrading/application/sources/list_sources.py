@@ -49,7 +49,7 @@ class ListSourcesUseCase:
         systems = self._systems
         market = systems.market.declaration()
         offered = (
-            OfferedSource(INDICATORS, (market,)),
+            OfferedSource(INDICATORS, (systems.market.indicators_declaration(),)),
             OfferedSource(PIVOTS, (market,)),
             OfferedSource(FORECAST, (systems.forecaster.declaration(),)),
             OfferedSource(SENTIMENT, tuple(sentiment.declaration() for sentiment in systems.sentiments)),

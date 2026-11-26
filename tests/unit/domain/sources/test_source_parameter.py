@@ -138,3 +138,16 @@ def test_a_whole_number_setting_is_read_as_it_is() -> None:
 def test_a_list_where_a_whole_number_is_expected_is_a_defect_of_the_source() -> None:
     with pytest.raises(InvalidSourceParameterError):
         number_of({"numero_notizie": (12,)}, "numero_notizie")
+
+
+@pytest.mark.parametrize("value", [-1, 2])
+def test_a_parameter_that_declares_its_refusal_is_refused_with_it(value: int) -> None:
+    flag = SourceParameter("serie_chiusure", "serie_chiusure", 0, 0, 1, range_reason="serie_chiusure vale 0 oppure 1")
+
+    with pytest.raises(SourceParameterOutOfRangeError) as raised:
+        flag.accepted(value)
+
+    assert (str(raised.value), raised.value.details) == (
+        "serie_chiusure vale 0 oppure 1",
+        {"field": "serie_chiusure", "minimum": 0, "maximum": 1},
+    )

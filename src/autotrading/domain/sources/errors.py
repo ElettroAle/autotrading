@@ -31,8 +31,10 @@ class SourceParameterRefusedError(DomainError):
 
 
 class SourceParameterOutOfRangeError(SourceParameterRefusedError):
-    def __init__(self, label: str, minimum: int, maximum: int, key: str) -> None:
-        super().__init__(f"parametro fuori dai valori ammessi: {label}, da {minimum} a {maximum}", label, key)
+    """The refusal names the range, in the words the parameter declares if it declares them (R5.5.4)."""
+
+    def __init__(self, label: str, minimum: int, maximum: int, key: str, reason: str | None = None) -> None:
+        super().__init__(reason or f"parametro fuori dai valori ammessi: {label}, da {minimum} a {maximum}", label, key)
         self.minimum = minimum
         self.maximum = maximum
 
@@ -55,10 +57,12 @@ class SourceParameterNotAmongChoicesError(SourceParameterRefusedError):
 
 
 class SourceListValueOutOfRangeError(SourceParameterRefusedError):
-    """A value of a list parameter outside the range it declares (ADR parametri-delle-fonti-come-liste-libere)."""
+    """A value of a list parameter outside the range it declares (ADR parametri-delle-fonti-come-liste-libere), named
+    in the words the parameter declares if it declares them (R5.5.4).
+    """
 
-    def __init__(self, label: str, minimum: int, maximum: int, key: str) -> None:
-        super().__init__(f"{label}: ogni valore tra {minimum} e {maximum}", label, key)
+    def __init__(self, label: str, minimum: int, maximum: int, key: str, reason: str | None = None) -> None:
+        super().__init__(reason or f"{label}: ogni valore tra {minimum} e {maximum}", label, key)
         self.minimum = minimum
         self.maximum = maximum
 

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any, override
@@ -14,6 +14,7 @@ from autotrading.adapters.outbound.hyperliquid.market_data import MARKET_DATA, H
 from autotrading.application.sources.errors import SourceUnavailableError, TimeframeNotSupportedError
 from autotrading.domain.sources.candle import Candle
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
+from autotrading.domain.sources.regime_data import REGIME_PARAMETERS
 from autotrading.domain.sources.source_adapter_declaration import SourceAdapterDeclaration
 from autotrading.domain.sources.timeframe import Timeframe
 
@@ -70,6 +71,12 @@ def test_the_market_data_declare_the_adapter_of_indicators_and_pivots_without_co
         (),
         offers_history=True,
     )
+
+
+def test_as_adapter_of_the_indicators_the_market_data_declare_the_regime_parameters_too() -> None:
+    declared = adapter(FakeSdk())
+
+    assert declared.indicators_declaration() == replace(declared.declaration(), parameters=REGIME_PARAMETERS)
 
 
 def test_the_candles_are_the_closed_ones_with_close_volume_high_and_low() -> None:

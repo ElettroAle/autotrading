@@ -33,6 +33,8 @@ class SourceParameter:
     minimum: int
     maximum: int
     choices: tuple[ParameterChoice, ...] = ()
+    # The words of the refusal of a value out of the range, when the requirement fixes them (R5.5.4).
+    range_reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.minimum <= self.default <= self.maximum:
@@ -64,7 +66,7 @@ class SourceParameter:
             return value
         if self.choices:
             raise SourceParameterNotAmongChoicesError(self.label, self.choice_labels, self.key)
-        raise SourceParameterOutOfRangeError(self.label, self.minimum, self.maximum, self.key)
+        raise SourceParameterOutOfRangeError(self.label, self.minimum, self.maximum, self.key, self.range_reason)
 
     def value_in(self, settings: Mapping[str, SourceParameterValue]) -> int:
         """The whole number of the flow among its settings, the default when it set none."""

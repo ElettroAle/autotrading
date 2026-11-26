@@ -99,7 +99,14 @@ describe('the page Fonti with the trial of each adapter (R6.3.1, ADR pagina-font
         source: 'indicatori',
         adapter: 'Hyperliquid',
         asset: 'ETH',
-        parameters: { lunghezza_serie: 10, medie_periodi: [20, 50], tendenza_giorni: [] },
+        parameters: {
+          lunghezza_serie: 10,
+          medie_periodi: [20, 50],
+          tendenza_giorni: [],
+          estremi_ore: [],
+          variazione_ore: [],
+          serie_chiusure: 0,
+        },
       },
     ]);
   });

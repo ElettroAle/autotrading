@@ -38,7 +38,9 @@ def readers_of(
     readers[FORECAST.name, systems.forecaster.declaration().name] = ReadForecastUseCase(
         ForecastAssetUseCase(systems.prices, systems.forecaster, forecasts)
     )
-    readers[INDICATORS.name, market] = ReadIndicatorsUseCase(systems.market, cycle_minutes)
+    readers[INDICATORS.name, systems.market.indicators_declaration().name] = ReadIndicatorsUseCase(
+        systems.market, cycle_minutes
+    )
     readers[PIVOTS.name, market] = ReadPivotsUseCase(systems.market)
     for whales in systems.whales:
         readers[WHALE.name, whales.declaration().name] = ReadWhaleTransfersUseCase(whales, cycle_minutes)

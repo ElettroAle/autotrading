@@ -29,6 +29,8 @@ class SourceListParameter:
     minimum: int
     maximum: int
     maximum_values: int = MAXIMUM_VALUES
+    # The words of the refusal of a value out of the range, when the requirement fixes them (R5.5.4).
+    range_reason: str | None = None
 
     def __post_init__(self) -> None:
         if not self.minimum <= self.maximum or self.maximum_values < 1:
@@ -43,7 +45,7 @@ class SourceListParameter:
         too many; the refusal names the range or the maximum number of values.
         """
         if not isinstance(value, list | tuple) or not all(self._in_range(each) for each in value):
-            raise SourceListValueOutOfRangeError(self.label, self.minimum, self.maximum, self.key)
+            raise SourceListValueOutOfRangeError(self.label, self.minimum, self.maximum, self.key, self.range_reason)
         values = _sorted_once(tuple(int(each) for each in value))
         if len(values) > self.maximum_values:
             raise TooManySourceListValuesError(self.label, self.maximum_values, self.key)

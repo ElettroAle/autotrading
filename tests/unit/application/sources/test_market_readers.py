@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
@@ -14,11 +15,13 @@ from autotrading.domain.sources.extended_indicators import ExtendedIndicatorChoi
 from autotrading.domain.sources.indicator_series import WARM_UP
 from autotrading.domain.sources.long_trend import DAILY_TIMEFRAME, LongTrendChoice
 from autotrading.domain.sources.market_snapshot import MarketSnapshot
+from autotrading.domain.sources.regime_data import HOURLY_TIMEFRAME, RegimeChoice
 from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.timeframe import LONG_TIMEFRAME, Timeframe
 from tests.fakes.market_data import DEFAULT_CLOSES, FakeMarketDataAdapter
 
 NOW = datetime(2026, 11, 12, 10, 7, tzinfo=UTC)
+HOURLY_CHANGE = re.compile(r"^tendenza\.variazione_\d+h$")
 
 
 def command(asset: str | None = "BTC", length: int = 10) -> SourceRequest:
@@ -191,6 +194,64 @@ def test_a_market_without_daily_candles_cannot_give_the_long_trend() -> None:
 
     with pytest.raises(TimeframeNotAvailableError):
         ReadIndicatorsUseCase(market, 15).execute(extended(tendenza_giorni=(7,)))
+
+
+def test_without_regime_data_no_hourly_candle_is_read_and_none_of_their_values_arrives() -> None:
+    market = FakeMarketDataAdapter()
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(estremi_ore=(), variazione_ore=(), serie_chiusure=0))
+
+    assert [request[1] for request in market.requests] == ["15m", "4h"]
+    assert not [key for key in value.values if key.startswith("estremi.") or HOURLY_CHANGE.match(key)]
+    assert not [key for key in value.values if "chiusura" in key]
+
+
+def test_the_regime_data_read_the_hourly_candles_their_longest_value_needs() -> None:
+    market = priced(FakeMarketDataAdapter(), "110")
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(estremi_ore=(24,), variazione_ore=(48,)))
+
+    hourly = market.candles("BTC", HOURLY_TIMEFRAME, 49, NOW)
+    expected = RegimeChoice((24,), (48,), close_series=False).hourly_values(hourly, Decimal(110)).values
+    assert ("BTC", "1h", 49) in market.requests
+    assert {key: value.values[key] for key in expected} == {
+        key: text_of(number) for key, number in expected.items() if isinstance(number, Decimal)
+    }
+    assert set(expected) == {
+        "estremi.minimo_24h",
+        "estremi.massimo_24h",
+        "estremi.dal_minimo_24h",
+        "estremi.dal_massimo_24h",
+        "tendenza.variazione_48h",
+    }
+
+
+def test_a_short_hourly_history_declares_its_missing_regime_data() -> None:
+    market = FakeMarketDataAdapter(closes={("BTC", "1h"): DEFAULT_CLOSES[:4]})
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(variazione_ore=(3, 4)))
+
+    assert "tendenza.variazione_3h" in value.values
+    assert value.values["dati_mancanti"] == "tendenza.variazione_4h: storico di 4 candele orarie"
+
+
+def test_the_series_of_the_closes_arrives_for_both_timeframes() -> None:
+    market = FakeMarketDataAdapter()
+
+    [value] = ReadIndicatorsUseCase(market, 15).execute(extended(serie_chiusure=1, lunghezza_serie=5))
+
+    expected = "[" + ", ".join(text_of(close) for close in DEFAULT_CLOSES[-5:]) + "]"
+    assert value.values["breve.chiusura.serie"] == expected
+    assert value.values["lungo.chiusura.serie"] == expected
+    assert "breve.chiusura" not in value.values
+    assert [request[1] for request in market.requests] == ["15m", "4h"]
+
+
+def test_a_market_without_hourly_candles_cannot_give_the_regime_data() -> None:
+    market = FakeMarketDataAdapter(published=(Timeframe(15), Timeframe(240)))
+
+    with pytest.raises(TimeframeNotAvailableError):
+        ReadIndicatorsUseCase(market, 15).execute(extended(estremi_ore=(24,)))
 
 
 @pytest.mark.parametrize(
