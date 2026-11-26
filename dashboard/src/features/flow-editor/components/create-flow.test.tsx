@@ -23,6 +23,7 @@ const HORIZON: FakeSourceParameter = {
     { value: 10080, label: '1 settimana' },
   ],
   maximum_values: null,
+  description: 'Orizzonte della previsione. Nessuno, 1 giorno o 1 settimana. Predefinito: nessuno.',
 };
 const MODEL = 'openrouter/deepseek-chat';
 
@@ -213,6 +214,7 @@ describe('CreateFlow', () => {
               parameters: {
                 lunghezza_serie: 20,
                 medie_periodi: [20, 50],
+                rsi_periodi: [7, 14],
                 tendenza_giorni: [],
                 estremi_ore: [],
                 variazione_ore: [],
@@ -572,6 +574,7 @@ describe('CreateFlow', () => {
       {
         lunghezza_serie: 20,
         medie_periodi: [20, 50],
+        rsi_periodi: [7, 14],
         tendenza_giorni: [7, 30, 90],
         estremi_ore: [],
         variazione_ore: [],

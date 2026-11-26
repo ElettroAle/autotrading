@@ -15,6 +15,7 @@ import {
   useSetMaxDirectionExposure,
   type ExposureLimitInput,
 } from '../api/set-max-direction-exposure';
+import { ACCOUNT_SETTING_INFO } from '../utils/setting-info';
 
 // The name the API gives to the field of the request, as its refusals report it.
 const PERCENT = 'percent';
@@ -67,6 +68,7 @@ export const MaxDirectionExposureForm = ({ account }: { readonly account: Accoun
       <form onSubmit={(event) => void onSubmit(event)} noValidate className="space-y-3">
         <InputField
           label="Esposizione massima per direzione (% del saldo)"
+          info={ACCOUNT_SETTING_INFO.maxDirectionExposure}
           inputMode="decimal"
           hint={HINT}
           error={errors.percent}

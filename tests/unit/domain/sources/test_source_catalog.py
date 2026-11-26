@@ -23,7 +23,7 @@ from autotrading.domain.sources.source_parameter import SourceParameter
 from autotrading.domain.sources.volumes import VOLUMES
 from autotrading.domain.sources.whale import WHALE
 
-OWN = SourceParameter("profondita", "profondità", 3, 1, 5)
+OWN = SourceParameter("profondita", "profondità", 3, 1, 5, description="Che cosa fa. Valori ammessi. Predefinito.")
 
 
 def definition(name: str) -> SourceDefinition:
@@ -172,7 +172,7 @@ def test_a_trial_of_a_market_source_reads_the_whole_market() -> None:
 
 
 def test_the_settings_of_a_list_parameter_are_saved_ordered_and_without_repetitions() -> None:
-    days = SourceListParameter("giorni", "giorni", (1,), 1, 30)
+    days = SourceListParameter("giorni", "giorni", (1,), 1, 30, description="Che cosa fa. Valori ammessi. Predefinito.")
     source = OfferedSource(SourceDefinition("pivot", "fonte", per_asset=True, parameters=(days,)), (adapter("primo"),))
 
     assert source.settings("primo", {"giorni": (7, 1, 7)}) == {"giorni": (1, 7)}

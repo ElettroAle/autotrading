@@ -67,9 +67,11 @@ When(
   "{string} prova la fonte {string} per l'asset {string} con i parametri predefiniti",
   async ({ dashboard, memory }, _account: string, source: string, asset: string) => {
     const form = trialForm(dashboard, source);
-    await form.getByLabel('Asset').selectOption(asset);
+    await form.getByLabel('Asset', { exact: true }).selectOption(asset);
     for (const parameter of catalogSource(source).adapters[0]?.parameters ?? []) {
-      await expect(form.getByLabel(parameter.label)).toHaveValue(defaultTextOf(parameter));
+      await expect(form.getByLabel(parameter.label, { exact: true })).toHaveValue(
+        defaultTextOf(parameter),
+      );
     }
     memory.sourceTrial = await tryIt(dashboard, source);
   },
@@ -79,7 +81,9 @@ When(
   '{string} prova la fonte {string}',
   async ({ dashboard, memory }, _account: string, source: string) => {
     if (catalogSource(source).per_asset) {
-      await expect(trialForm(dashboard, source).getByLabel('Asset')).not.toHaveValue('');
+      await expect(
+        trialForm(dashboard, source).getByLabel('Asset', { exact: true }),
+      ).not.toHaveValue('');
     }
     memory.sourceTrial = await tryIt(dashboard, source);
   },
@@ -92,7 +96,9 @@ When(
     expect(parameter, `la fonte ${source} ha un parametro con limiti`).toBeDefined();
     memory.sourceParameter = parameter;
     const form = trialForm(dashboard, source);
-    await form.getByLabel(parameter?.label ?? '').fill(String((parameter?.maximum ?? 0) + 1));
+    await form
+      .getByLabel(parameter?.label ?? '', { exact: true })
+      .fill(String((parameter?.maximum ?? 0) + 1));
     await form.getByRole('button', { name: 'Prova' }).click();
   },
 );

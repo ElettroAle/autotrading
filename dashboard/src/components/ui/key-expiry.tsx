@@ -119,6 +119,10 @@ type ExpiryDateFormProps = {
   readonly onCancel: () => void;
 };
 
+/** The info of the expiry of a key or of credentials, the same in every form that asks it (R5.5.7). */
+export const EXPIRY_INFO =
+  'Giorno in cui la chiave o le credenziali scadono: da 30 giorni prima la dashboard lo segnala. Una data. Vuota: nessuna scadenza nota.';
+
 /** The day a key expires, given by the user when the adapter does not read it; no day forgets it (R6.2.2). */
 export const ExpiryDateForm = ({
   subject,
@@ -140,7 +144,7 @@ export const ExpiryDateForm = ({
       className="mt-2 space-y-3"
     >
       {error !== null && <ErrorMessage error={error} prefix="Impossibile salvare la scadenza" />}
-      <InputField label="Scadenza" type="date" {...register('expires_on')} />
+      <InputField label="Scadenza" info={EXPIRY_INFO} type="date" {...register('expires_on')} />
       <div className="flex gap-2">
         <CommandButton tone="primary" type="submit" disabled={pending}>
           Salva la scadenza

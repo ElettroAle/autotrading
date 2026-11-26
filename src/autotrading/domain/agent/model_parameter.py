@@ -3,22 +3,55 @@ from decimal import Decimal, InvalidOperation
 
 from autotrading.domain.agent.errors import InvalidModelDefinitionError, ParameterOutOfRangeError
 
-# The parameters the platform knows, with the label the reasons of a refusal use (R1.4.2).
-PARAMETER_LABELS = {
-    "temperature": "temperatura",
-    "max_tokens": "limite di lunghezza della risposta",
-    "reasoning_effort": "livello di ragionamento",
+
+@dataclass(frozen=True, slots=True)
+class OfferedParameter:
+    """What the platform says of a parameter of a model it offers: the label the reasons of a refusal use (R1.4.2) and
+    the description its info button shows, the same for every model that admits it (R5.5.7, ADR
+    descrizioni-dei-parametri-di-fonti-e-modelli). The range or the choices are of the model, so the description
+    points to the field for them.
+    """
+
+    label: str
+    description: str
+
+
+# The parameters the platform offers: one list, the only place of their labels and descriptions.
+OFFERED_PARAMETERS = {
+    "temperature": OfferedParameter(
+        "temperatura",
+        "Quanto variano le risposte del modello: più bassa, risposte più ripetibili; più alta, più varie. Un numero "
+        "nell'intervallo che il modello ammette. Vuoto: il valore predefinito del modello, mostrato nel campo.",
+    ),
+    "max_tokens": OfferedParameter(
+        "limite di lunghezza della risposta",
+        "Lunghezza massima della risposta del modello, in token: una risposta più lunga si interrompe. Un intero "
+        "nell'intervallo che il modello ammette. Vuoto: il valore predefinito del modello, mostrato nel campo.",
+    ),
+    "reasoning_effort": OfferedParameter(
+        "livello di ragionamento",
+        "Quanto ragiona il modello prima di rispondere: più ragionamento dà risposte più meditate, più lente e più "
+        "costose. Uno dei livelli che il modello ammette. Vuoto: il livello predefinito del modello.",
+    ),
 }
 
 type ParameterValue = Decimal | str
 
 
+def is_offered(key: str) -> bool:
+    return key in OFFERED_PARAMETERS
+
+
 def label_of(key: str) -> str:
-    return PARAMETER_LABELS[key]
+    return OFFERED_PARAMETERS[key].label
+
+
+def description_of(key: str) -> str:
+    return OFFERED_PARAMETERS[key].description
 
 
 def _require_known(key: str) -> None:
-    if key not in PARAMETER_LABELS:
+    if not is_offered(key):
         raise InvalidModelDefinitionError(key)
 
 
@@ -40,6 +73,10 @@ class RangeParameter:
     @property
     def label(self) -> str:
         return label_of(self.key)
+
+    @property
+    def description(self) -> str:
+        return description_of(self.key)
 
     def value_of(self, requested: object) -> ParameterValue:
         number = self._number(requested)
@@ -79,6 +116,10 @@ class ChoiceParameter:
     @property
     def label(self) -> str:
         return label_of(self.key)
+
+    @property
+    def description(self) -> str:
+        return description_of(self.key)
 
     def value_of(self, requested: object) -> ParameterValue:
         if not isinstance(requested, str) or requested not in self.choices:

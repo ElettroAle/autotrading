@@ -7,6 +7,7 @@ import {
   CircleAlert,
   CircleCheck,
   CircleUser,
+  Info,
   Menu,
   Pause,
   Play,
@@ -38,6 +39,7 @@ const DRAWINGS = {
   menu: Menu,
   'triangle-alert': TriangleAlert,
   bell: Bell,
+  info: Info,
 } as const;
 
 export type IconName = keyof typeof DRAWINGS;

@@ -10,7 +10,14 @@ from autotrading.domain.sources.source_parameter import ParameterChoice, SourceP
 
 
 def news_count() -> SourceParameter:
-    return SourceParameter("numero_notizie", "numero notizie", default=10, minimum=1, maximum=50)
+    return SourceParameter(
+        "numero_notizie",
+        "numero notizie",
+        default=10,
+        minimum=1,
+        maximum=50,
+        description="Quante notizie riceve l'agente. Da 1 a 50. Predefinito: 10.",
+    )
 
 
 @pytest.mark.parametrize("value", [1, 10, 50])
@@ -26,7 +33,14 @@ def test_refuses_the_values_outside_its_range(value: int) -> None:
 @pytest.mark.parametrize(("default", "minimum", "maximum"), [(0, 1, 50), (51, 1, 50), (5, 10, 1)])
 def test_a_default_outside_the_range_or_an_empty_range_is_refused(default: int, minimum: int, maximum: int) -> None:
     with pytest.raises(InvalidSourceParameterError) as raised:
-        SourceParameter("numero_notizie", "numero notizie", default=default, minimum=minimum, maximum=maximum)
+        SourceParameter(
+            "numero_notizie",
+            "numero notizie",
+            default=default,
+            minimum=minimum,
+            maximum=maximum,
+            description="Che cosa fa. Valori ammessi. Predefinito.",
+        )
 
     assert raised.value.key == "numero_notizie"
 
@@ -41,6 +55,7 @@ def long_horizon() -> SourceParameter:
             ParameterChoice(1440, "1 giorno"),
             ParameterChoice(10080, "1 settimana"),
         ),
+        description="Che cosa fa. Valori ammessi. Predefinito.",
     )
 
 
@@ -75,6 +90,7 @@ def test_a_default_outside_the_choices_is_refused() -> None:
             "orizzonte lungo",
             default=60,
             choices=(ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno")),
+            description="Che cosa fa. Valori ammessi. Predefinito.",
         )
 
     assert raised.value.key == "orizzonte_lungo"
@@ -82,7 +98,13 @@ def test_a_default_outside_the_choices_is_refused() -> None:
 
 def test_a_parameter_without_choices_to_offer_is_refused() -> None:
     with pytest.raises(InvalidSourceParameterError):
-        SourceParameter.of_choices("orizzonte_lungo", "orizzonte lungo", default=0, choices=())
+        SourceParameter.of_choices(
+            "orizzonte_lungo",
+            "orizzonte lungo",
+            default=0,
+            choices=(),
+            description="Che cosa fa. Valori ammessi. Predefinito.",
+        )
 
 
 def test_a_value_outside_the_choices_is_refused_listing_their_labels() -> None:
@@ -142,7 +164,15 @@ def test_a_list_where_a_whole_number_is_expected_is_a_defect_of_the_source() -> 
 
 @pytest.mark.parametrize("value", [-1, 2])
 def test_a_parameter_that_declares_its_refusal_is_refused_with_it(value: int) -> None:
-    flag = SourceParameter("serie_chiusure", "serie_chiusure", 0, 0, 1, range_reason="serie_chiusure vale 0 oppure 1")
+    flag = SourceParameter(
+        "serie_chiusure",
+        "serie_chiusure",
+        0,
+        0,
+        1,
+        range_reason="serie_chiusure vale 0 oppure 1",
+        description="Che cosa fa. Valori ammessi. Predefinito.",
+    )
 
     with pytest.raises(SourceParameterOutOfRangeError) as raised:
         flag.accepted(value)
@@ -151,3 +181,15 @@ def test_a_parameter_that_declares_its_refusal_is_refused_with_it(value: int) ->
         "serie_chiusure vale 0 oppure 1",
         {"field": "serie_chiusure", "minimum": 0, "maximum": 1},
     )
+
+
+def test_keeps_the_description_it_declares() -> None:
+    assert news_count().description == "Quante notizie riceve l'agente. Da 1 a 50. Predefinito: 10."
+
+
+@pytest.mark.parametrize("description", ["", "   "])
+def test_a_parameter_without_a_description_is_refused(description: str) -> None:
+    with pytest.raises(InvalidSourceParameterError) as raised:
+        SourceParameter("numero_notizie", "numero notizie", 10, 1, 50, description=description)
+
+    assert raised.value.key == "numero_notizie"

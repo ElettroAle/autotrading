@@ -12,6 +12,7 @@ import {
   useSetDeviationThreshold,
   type ThresholdInput,
 } from '../api/set-deviation-threshold';
+import { ACCOUNT_SETTING_INFO } from '../utils/setting-info';
 
 // The name the API gives to the field of the request, as its refusals report it.
 const PERCENT = 'percent';
@@ -60,6 +61,7 @@ export const DeviationThresholdForm = ({
       <FormAlert error={errors.root?.server} />
       <InputField
         label="Soglia di scostamento (%)"
+        info={ACCOUNT_SETTING_INFO.deviationThreshold}
         inputMode="decimal"
         error={errors.percent}
         {...register('percent')}

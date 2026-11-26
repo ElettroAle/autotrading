@@ -11111,16 +11111,21 @@
               }
             ],
             "title": "Choices"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
           }
         },
         "type": "object",
         "required": [
           "key",
           "label",
-          "default"
+          "default",
+          "description"
         ],
         "title": "ModelParameterResponse",
-        "description": "A range has minimum and maximum, a choice its values; the default is always there."
+        "description": "A range has minimum and maximum, a choice its values; the default and the description, the text of its info\nbutton (ADR descrizioni-dei-parametri-di-fonti-e-modelli), are always there."
       },
       "ModelResponse": {
         "properties": {
@@ -12398,6 +12403,10 @@
               }
             ],
             "title": "Maximum Values"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
           }
         },
         "type": "object",
@@ -12409,7 +12418,8 @@
           "minimum",
           "maximum",
           "choices",
-          "maximum_values"
+          "maximum_values",
+          "description"
         ],
         "title": "SourceParameterResponse"
       },

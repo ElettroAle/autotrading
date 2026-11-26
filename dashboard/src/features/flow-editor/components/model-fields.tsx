@@ -7,6 +7,7 @@ import { paths } from '@/config/paths';
 import { reasonOf } from '@/lib/form-errors';
 
 import type { Model, ModelParameter, Provider } from '../api/get-model-catalog';
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 import type { FlowFormValues } from '../utils/flow-form';
 import { missesProviderKey, modelGroupsOf, type ModelGroup } from '../utils/model-groups';
 
@@ -17,7 +18,12 @@ const ParameterField = ({ parameter }: { parameter: ModelParameter }) => {
   const { register } = useFormContext<FlowFormValues>();
   const name = `model_parameters.${parameter.key}` as const;
   return (
-    <FormField id={`flow-model-${parameter.key}`} label={parameter.label} error={undefined}>
+    <FormField
+      id={`flow-model-${parameter.key}`}
+      label={parameter.label}
+      info={parameter.description}
+      error={undefined}
+    >
       {(control) =>
         parameter.choices === undefined || parameter.choices === null ? (
           <input
@@ -79,6 +85,7 @@ export const ModelFields = ({ models, providers, currentModel }: ModelFieldsProp
       <SelectField
         id="flow-model"
         label="Modello"
+        info={FLOW_FIELD_INFO.model}
         placeholder="Scegli un modello"
         choices={groups.map(choicesOf)}
         error={errors.model}

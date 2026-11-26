@@ -4,7 +4,14 @@ import { FormAlert, InputField, SecretField } from './input-field';
 
 describe('InputField', () => {
   it('labels its input and has no reason when the value is accepted', () => {
-    render(<InputField label="Nome" name="name" defaultValue="principale" />);
+    render(
+      <InputField
+        info="Che cosa fa il campo."
+        label="Nome"
+        name="name"
+        defaultValue="principale"
+      />,
+    );
 
     const input = screen.getByLabelText('Nome');
     expect(input).toHaveValue('principale');
@@ -13,7 +20,14 @@ describe('InputField', () => {
   });
 
   it('shows the reason beside the field it concerns', () => {
-    render(<InputField label="Nome" name="name" error={{ message: 'nome obbligatorio' }} />);
+    render(
+      <InputField
+        info="Che cosa fa il campo."
+        label="Nome"
+        name="name"
+        error={{ message: 'nome obbligatorio' }}
+      />,
+    );
 
     const input = screen.getByLabelText('Nome');
     expect(input).toHaveAttribute('aria-invalid', 'true');
@@ -21,7 +35,14 @@ describe('InputField', () => {
   });
 
   it('says beside the field what it admits', () => {
-    render(<InputField label="orizzonti" name="horizons" hint="ogni valore tra 15 e 43200" />);
+    render(
+      <InputField
+        info="Che cosa fa il campo."
+        label="orizzonti"
+        name="horizons"
+        hint="ogni valore tra 15 e 43200"
+      />,
+    );
 
     expect(screen.getByLabelText('orizzonti')).toHaveAccessibleDescription(
       'ogni valore tra 15 e 43200',
@@ -31,7 +52,7 @@ describe('InputField', () => {
 
 describe('SecretField', () => {
   it('hides what is typed and keeps browser and password managers from filling it (ADR 0130, Bug 387)', () => {
-    render(<SecretField label="Chiave" name="key" />);
+    render(<SecretField info="Che cosa fa il campo." label="Chiave" name="key" />);
 
     const input = screen.getByLabelText('Chiave');
     expect(input).toHaveAttribute('type', 'password');

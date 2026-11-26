@@ -16,6 +16,9 @@ const sourceParameterSchema = z.object({
   choices: z.array(z.object({ value: z.number(), label: z.string() })),
   // How many values a list admits; none for a whole number.
   maximum_values: z.number().nullable(),
+  // What the parameter does, what it admits and its default, as its declaration says: the text of its info button
+  // (R5.5.7, ADR descrizioni-dei-parametri-di-fonti-e-modelli).
+  description: z.string(),
 });
 
 export type SourceParameter = z.infer<typeof sourceParameterSchema>;

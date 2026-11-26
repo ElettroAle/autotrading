@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from autotrading.domain.sources.errors import (
     InvalidSourceParameterError,
@@ -20,7 +20,8 @@ class SourceListParameter:
     """A setting of a source that is a list of whole numbers, each one a period, a horizon or a window that produces
     its own values; an empty list switches them off (ADR parametri-delle-fonti-come-liste-libere).
 
-    The catalog, the check of the flow, the API and the dashboard derive everything from this declaration.
+    The catalog, the check of the flow, the API and the dashboard derive everything from this declaration, the text of
+    the info button included: the description, never blank (ADR descrizioni-dei-parametri-di-fonti-e-modelli).
     """
 
     key: str
@@ -31,8 +32,11 @@ class SourceListParameter:
     maximum_values: int = MAXIMUM_VALUES
     # The words of the refusal of a value out of the range, when the requirement fixes them (R5.5.4).
     range_reason: str | None = None
+    description: str = field(kw_only=True)
 
     def __post_init__(self) -> None:
+        if not self.description.strip():
+            raise InvalidSourceParameterError(self.key)
         if not self.minimum <= self.maximum or self.maximum_values < 1:
             raise InvalidSourceParameterError(self.key)
         if self.default != _sorted_once(self.default) or len(self.default) > self.maximum_values:

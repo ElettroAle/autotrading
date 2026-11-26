@@ -11,7 +11,7 @@ from autotrading.domain.agent.errors import (
 )
 from autotrading.domain.agent.model_catalog import ModelCatalog
 from autotrading.domain.agent.model_definition import ModelDefinition
-from autotrading.domain.agent.model_parameter import ChoiceParameter, RangeParameter
+from autotrading.domain.agent.model_parameter import ChoiceParameter, RangeParameter, description_of
 from autotrading.domain.agent.provider_key_field import API_KEY_FIELD, ProviderKeyField
 from autotrading.domain.agent.provider_name import ProviderName
 
@@ -28,6 +28,15 @@ def test_a_parameter_carries_the_label_of_the_platform() -> None:
         "limite di lunghezza della risposta",
         "livello di ragionamento",
     ]
+
+
+def test_a_parameter_carries_the_description_of_the_platform() -> None:
+    assert [TEMPERATURE.description, MAX_TOKENS.description, REASONING.description] == [
+        description_of("temperature"),
+        description_of("max_tokens"),
+        description_of("reasoning_effort"),
+    ]
+    assert TEMPERATURE.description.startswith("Quanto variano le risposte del modello")
 
 
 @pytest.mark.parametrize("requested", [0, 2, "1.5", 0.7, Decimal("1.25")])

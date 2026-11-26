@@ -631,8 +631,8 @@ export class DashboardPages {
   /** Imports a strategy file, chosen from the disk of the user, as a new flow with the name. */
   async importStrategy(name: string, file: string): Promise<void> {
     const form = this.importForm();
-    await form.getByLabel('Nome del nuovo flusso').fill(name);
-    await form.getByLabel('File della strategia').setInputFiles({
+    await form.getByLabel('Nome del nuovo flusso', { exact: true }).fill(name);
+    await form.getByLabel('File della strategia', { exact: true }).setInputFiles({
       name: 'strategia.json',
       mimeType: 'application/json',
       buffer: Buffer.from(file),

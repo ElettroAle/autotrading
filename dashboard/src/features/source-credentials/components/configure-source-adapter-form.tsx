@@ -2,8 +2,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
 import { CommandButton } from '@/components/ui/command-button';
-import { DeclaredFields, declaredFieldOf } from '@/components/ui/form/declared-fields';
+import {
+  DeclaredFields,
+  declaredFieldOf,
+  declaredInfoOf,
+} from '@/components/ui/form/declared-fields';
 import { FormAlert, InputField } from '@/components/ui/form/input-field';
+import { EXPIRY_INFO } from '@/components/ui/key-expiry';
 import { showRefusal } from '@/lib/form-errors';
 
 import {
@@ -69,12 +74,17 @@ export const ConfigureSourceAdapterForm = ({
       <FormAlert error={errors.root?.server} />
       <DeclaredFields
         fields={fields}
+        infoOf={declaredInfoOf(
+          "che l'adapter chiede per leggere la fonte",
+          'il servizio della fonte',
+        )}
         registerField={(name) => register(`values.${name}`)}
         reasonOf={(name) => errors.values?.[name]?.message}
       />
       {credentials.expiry_editable && (
         <InputField
           label="Scadenza"
+          info={EXPIRY_INFO}
           type="date"
           error={errors.expires_on}
           {...register('expires_on')}

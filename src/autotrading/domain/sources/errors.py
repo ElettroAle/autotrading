@@ -4,7 +4,9 @@ from autotrading.domain.errors import DomainError
 
 
 class InvalidSourceParameterError(DomainError):
-    """A parameter declared with a default outside its range, or with an empty range: a defect of the source."""
+    """A parameter declared with a default outside its range, with an empty range or without a description: a defect
+    of the source.
+    """
 
     def __init__(self, key: str) -> None:
         super().__init__(f"parametro della fonte non valido: {key}")

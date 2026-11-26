@@ -38,6 +38,10 @@ from autotrading.domain.flows.flow_strategy import FlowStrategy
 OPTION = "fees_for_agent"
 EDITOR = Path(__file__).resolve().parents[2] / "dashboard" / "src" / "features" / "flow-editor" / "components"
 OPTION_LABEL = "Commissioni nel contesto dell&apos;agente"
+# The same label given to the shared checkbox (ADR informazioni-sui-campi-di-configurazione).
+OPTION_LABEL_PROP = 'label="Commissioni nel contesto dell\'agente"'
+# The help line, written on the checkbox or given to the shared checkbox that describes the box with it.
+HELP_LINE = re.compile(r"aria-describedby|\bhint=")
 READING = "market_order_fee_rate"
 # The name of the missing datum or the count of the orders written outside the domain: the rule repeated elsewhere.
 RULE_OUTSIDE_THE_DOMAIN = re.compile(r"andata e ritorno\"|\* *2\b")
@@ -105,7 +109,8 @@ def dashboard_violations(flow_form: str, field: str) -> list[str]:
     before, shown = flow_form.find("<AccountExposureField />"), flow_form.find("<FeesField />")
     if not 0 <= before < shown or "<" in flow_form[before + len("<AccountExposureField />") : shown].strip():
         found.append("the option is not beside the other options of the context of the agent")
-    if OPTION_LABEL not in field or "aria-describedby" not in field or f'name="{OPTION}"' not in field:
+    labelled = OPTION_LABEL in field or OPTION_LABEL_PROP in field
+    if not labelled or not HELP_LINE.search(field) or f'name="{OPTION}"' not in field:
         found.append("the option without its help line")
     return found
 

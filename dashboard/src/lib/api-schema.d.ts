@@ -3427,7 +3427,8 @@ export interface components {
         };
         /**
          * ModelParameterResponse
-         * @description A range has minimum and maximum, a choice its values; the default is always there.
+         * @description A range has minimum and maximum, a choice its values; the default and the description, the text of its info
+         *     button (ADR descrizioni-dei-parametri-di-fonti-e-modelli), are always there.
          */
         ModelParameterResponse: {
             /** Key */
@@ -3444,6 +3445,8 @@ export interface components {
             whole?: boolean | null;
             /** Choices */
             choices?: string[] | null;
+            /** Description */
+            description: string;
         };
         /** ModelResponse */
         ModelResponse: {
@@ -3924,6 +3927,8 @@ export interface components {
             choices: components["schemas"]["SourceParameterChoiceResponse"][];
             /** Maximum Values */
             maximum_values: number | null;
+            /** Description */
+            description: string;
         };
         /** SourceResponse */
         SourceResponse: {

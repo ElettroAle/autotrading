@@ -90,12 +90,48 @@ def outside_the_declaration() -> Iterator[Path]:
 @pytest.mark.parametrize(
     ("parameter", "violating"),
     [
-        (SourceListParameter("medie_periodi", "medie", (20,), 2, 10000), False),
-        (SourceListParameter("tendenza_giorni", "tendenza", (), 1, 3650), False),
-        (SourceListParameter("tendenza_giorni", "tendenza", (), 1, 10000), True),
-        (SourceListParameter("fibonacci_candele", "fibonacci", (), 10, 500), True),
-        (SourceListParameter("medie_periodi", "medie", (20,), 2, 10000, maximum_values=12), True),
-        (SourceListParameter("finestre", "finestre", (), 1, 10000), True),
+        (
+            SourceListParameter(
+                "medie_periodi", "medie", (20,), 2, 10000, description="Che cosa fa. Valori ammessi. Predefinito."
+            ),
+            False,
+        ),
+        (
+            SourceListParameter(
+                "tendenza_giorni", "tendenza", (), 1, 3650, description="Che cosa fa. Valori ammessi. Predefinito."
+            ),
+            False,
+        ),
+        (
+            SourceListParameter(
+                "tendenza_giorni", "tendenza", (), 1, 10000, description="Che cosa fa. Valori ammessi. Predefinito."
+            ),
+            True,
+        ),
+        (
+            SourceListParameter(
+                "fibonacci_candele", "fibonacci", (), 10, 500, description="Che cosa fa. Valori ammessi. Predefinito."
+            ),
+            True,
+        ),
+        (
+            SourceListParameter(
+                "medie_periodi",
+                "medie",
+                (20,),
+                2,
+                10000,
+                maximum_values=12,
+                description="Che cosa fa. Valori ammessi. Predefinito.",
+            ),
+            True,
+        ),
+        (
+            SourceListParameter(
+                "finestre", "finestre", (), 1, 10000, description="Che cosa fa. Valori ammessi. Predefinito."
+            ),
+            True,
+        ),
     ],
 )
 def test_adr_parametri_delle_fonti_come_liste_libere_a_list_beyond_the_limits_is_found(

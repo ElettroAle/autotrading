@@ -11,7 +11,9 @@ from autotrading.domain.agent.model_parameter import ChoiceParameter, ModelParam
 
 
 class ModelParameterResponse(BaseModel):
-    """A range has minimum and maximum, a choice its values; the default is always there."""
+    """A range has minimum and maximum, a choice its values; the default and the description, the text of its info
+    button (ADR descrizioni-dei-parametri-di-fonti-e-modelli), are always there.
+    """
 
     key: str
     label: str
@@ -20,10 +22,16 @@ class ModelParameterResponse(BaseModel):
     maximum: str | None = None
     whole: bool | None = None
     choices: list[str] | None = None
+    description: str
 
     @classmethod
     def of(cls, parameter: ModelParameter) -> ModelParameterResponse:
-        response = cls(key=parameter.key, label=parameter.label, default=str(parameter.default))
+        response = cls(
+            key=parameter.key,
+            label=parameter.label,
+            default=str(parameter.default),
+            description=parameter.description,
+        )
         if isinstance(parameter, RangeParameter):
             response.minimum, response.maximum = str(parameter.minimum), str(parameter.maximum)
             response.whole = parameter.whole

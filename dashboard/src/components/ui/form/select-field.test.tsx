@@ -14,7 +14,14 @@ const optionNames = () => screen.getAllByRole('option').map((option) => option.t
 
 describe('SelectField', () => {
   it('offers the choices of the list after a placeholder that leaves the field empty', () => {
-    render(<SelectField label="Exchange" placeholder="Scegli un exchange" choices={EXCHANGES} />);
+    render(
+      <SelectField
+        info="Che cosa fa il campo."
+        label="Exchange"
+        placeholder="Scegli un exchange"
+        choices={EXCHANGES}
+      />,
+    );
 
     const field = screen.getByRole('combobox', { name: 'Exchange' });
     expect(optionNames()).toEqual(['Scegli un exchange', 'hyperliquid', 'okx']);
@@ -23,7 +30,14 @@ describe('SelectField', () => {
   });
 
   it('takes no value outside the list', () => {
-    render(<SelectField label="Exchange" placeholder="Scegli un exchange" choices={EXCHANGES} />);
+    render(
+      <SelectField
+        info="Che cosa fa il campo."
+        label="Exchange"
+        placeholder="Scegli un exchange"
+        choices={EXCHANGES}
+      />,
+    );
     const field = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Exchange' });
 
     field.value = 'binance';
@@ -35,6 +49,7 @@ describe('SelectField', () => {
     const chosen = vi.fn();
     render(
       <SelectField
+        info="Che cosa fa il campo."
         label="Exchange"
         placeholder="Scegli un exchange"
         choices={EXCHANGES}
@@ -50,6 +65,7 @@ describe('SelectField', () => {
   it('shows an option that cannot be chosen with its note', () => {
     render(
       <SelectField
+        info="Che cosa fa il campo."
         label="Fornitore"
         placeholder="Scegli un fornitore"
         choices={[
@@ -73,6 +89,7 @@ describe('SelectField', () => {
   it('groups the options under the label of their group', () => {
     render(
       <SelectField
+        info="Che cosa fa il campo."
         label="Modello"
         placeholder="Scegli un modello"
         choices={[
@@ -89,7 +106,15 @@ describe('SelectField', () => {
   });
 
   it('cannot be used while the list is read', () => {
-    render(<SelectField label="Exchange" placeholder="Scegli un exchange" choices={[]} loading />);
+    render(
+      <SelectField
+        info="Che cosa fa il campo."
+        label="Exchange"
+        placeholder="Scegli un exchange"
+        choices={[]}
+        loading
+      />,
+    );
 
     expect(screen.getByRole('combobox', { name: 'Exchange' })).toBeDisabled();
     expect(optionNames()).toEqual(['Caricamento…']);
@@ -98,6 +123,7 @@ describe('SelectField', () => {
   it('says why the list is not available and cannot be used', () => {
     render(
       <SelectField
+        info="Che cosa fa il campo."
         label="Exchange"
         placeholder="Scegli un exchange"
         choices={[]}
@@ -117,6 +143,7 @@ describe('SelectField', () => {
   it('says nothing more of a list lost to an expired session, and still cannot be used', () => {
     render(
       <SelectField
+        info="Che cosa fa il campo."
         label="Exchange"
         placeholder="Scegli un exchange"
         choices={[]}
@@ -134,6 +161,7 @@ describe('SelectField', () => {
   it('shows the reason a value was refused beside the field', () => {
     render(
       <SelectField
+        info="Che cosa fa il campo."
         label="Exchange"
         placeholder="Scegli un exchange"
         choices={EXCHANGES}
@@ -148,7 +176,13 @@ describe('SelectField', () => {
 
   it('keeps the identifier it is given, so a label elsewhere can name it', () => {
     render(
-      <SelectField id="flow-model" label="Modello" placeholder="Scegli un modello" choices={[]} />,
+      <SelectField
+        info="Che cosa fa il campo."
+        id="flow-model"
+        label="Modello"
+        placeholder="Scegli un modello"
+        choices={[]}
+      />,
     );
 
     expect(screen.getByRole('combobox', { name: 'Modello' })).toHaveAttribute('id', 'flow-model');

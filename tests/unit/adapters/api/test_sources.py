@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.adapters.inbound.api.sources import SourceParameterResponse
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.sources.forecast import HORIZONS
 from autotrading.domain.sources.source_parameter import ParameterChoice, SourceParameter
 from tests.fakes.sources import FakeNewsAdapter, FakeSentimentAdapter
 from tests.support.identity_provider import IdentityProvider
@@ -96,6 +97,7 @@ def test_one_source_shows_description_scope_and_parameters(client_of: Client) ->
             "maximum": 50,
             "choices": [],
             "maximum_values": None,
+            "description": "Quante notizie, le più recenti, riceve l'agente a ogni ciclo. Da 1 a 50. Predefinito: 10.",
         },
         {
             "key": "eta_massima_ore",
@@ -106,6 +108,7 @@ def test_one_source_shows_description_scope_and_parameters(client_of: Client) ->
             "maximum": 168,
             "choices": [],
             "maximum_values": None,
+            "description": "Ore oltre le quali una notizia è troppo vecchia per l'agente. Da 1 a 168. Predefinito: 24.",
         },
     ]
 
@@ -123,12 +126,15 @@ def test_a_list_parameter_shows_its_kind_its_default_list_and_how_many_values_it
         "maximum": 43200,
         "choices": [],
         "maximum_values": 8,
+        "description": HORIZONS.description,
     }
 
 
 def test_a_parameter_with_choices_shows_their_values_and_labels() -> None:
     choices = (ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno"))
-    parameter = SourceParameter.of_choices("orizzonte", "orizzonte", default=0, choices=choices)
+    parameter = SourceParameter.of_choices(
+        "orizzonte", "orizzonte", default=0, choices=choices, description="Che cosa fa. Valori ammessi. Predefinito."
+    )
 
     response = SourceParameterResponse.of(parameter)
 

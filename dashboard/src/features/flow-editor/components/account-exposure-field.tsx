@@ -1,6 +1,6 @@
-import { AgentContextOption } from './agent-context-option';
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 
-const HINT_ID = 'flow-account-exposure-for-agent-hint';
+import { AgentContextOption } from './agent-context-option';
 
 /**
  * The option that shows the agent the exposure of the other flows of the same account, beside the other options of
@@ -9,9 +9,9 @@ const HINT_ID = 'flow-account-exposure-for-agent-hint';
 export const AccountExposureField = () => (
   <AgentContextOption
     name="account_exposure_for_agent"
-    aria-describedby={HINT_ID}
+    id="flow-account-exposure-for-agent"
+    label="Esposizione degli altri flussi del conto nel contesto dell'agente"
+    info={FLOW_FIELD_INFO.accountExposureForAgent}
     hint="lo stato inviato all'agente riporta il valore long e short delle posizioni degli altri flussi dello stesso conto"
-  >
-    Esposizione degli altri flussi del conto nel contesto dell&apos;agente
-  </AgentContextOption>
+  />
 );

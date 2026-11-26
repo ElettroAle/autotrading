@@ -49,6 +49,7 @@ export const CashOutConfirmation = ({
       <p>{question}</p>
       <InputField
         label={`Capitale da mantenere (${state.currency}, facoltativo)`}
+        info="Capitale che il flusso tiene dopo l'incasso: le posizioni si chiudono e ciò che il flusso ha oltre questo capitale torna libero nel conto. Un importo. Vuoto: il capitale allocato ora."
         inputMode="decimal"
         placeholder={state.allocated_capital}
         value={capital}

@@ -33,6 +33,9 @@ class SourceParameterResponse(BaseModel):
     choices: list[SourceParameterChoiceResponse]
     # How many values a list admits; none for a whole number.
     maximum_values: int | None
+    # What the parameter does, what it admits and its default, as its declaration says: the text of its info button
+    # (ADR descrizioni-dei-parametri-di-fonti-e-modelli).
+    description: str
 
     @classmethod
     def of(cls, parameter: DeclaredParameter) -> SourceParameterResponse:
@@ -46,6 +49,7 @@ class SourceParameterResponse(BaseModel):
                 maximum=parameter.maximum,
                 choices=[],
                 maximum_values=parameter.maximum_values,
+                description=parameter.description,
             )
         return cls(
             key=parameter.key,
@@ -58,6 +62,7 @@ class SourceParameterResponse(BaseModel):
                 SourceParameterChoiceResponse(value=choice.value, label=choice.label) for choice in parameter.choices
             ],
             maximum_values=None,
+            description=parameter.description,
         )
 
 

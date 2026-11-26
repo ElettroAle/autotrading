@@ -39,10 +39,20 @@ export const ImportStrategyForm = () => {
         className="flex flex-col gap-3"
       >
         <h2 className="font-semibold">Importa una strategia</h2>
-        <FormField id="import-name" label="Nome del nuovo flusso" error={errors.name?.message}>
+        <FormField
+          id="import-name"
+          label="Nome del nuovo flusso"
+          info="Nome del flusso creato dalla strategia importata. Testo, diverso da quello degli altri flussi. Obbligatorio."
+          error={errors.name?.message}
+        >
           {(control) => <input {...control} className={FORM_CONTROL} {...register('name')} />}
         </FormField>
-        <FormField id="import-file" label="File della strategia" error={errors.files?.message}>
+        <FormField
+          id="import-file"
+          label="File della strategia"
+          info="File JSON di una strategia esportata da un flusso: il nuovo flusso ne prende la configurazione. Un file .json. Obbligatorio."
+          error={errors.files?.message}
+        >
           {(control) => (
             <input
               {...control}

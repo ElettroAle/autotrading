@@ -11,7 +11,14 @@ from autotrading.domain.sources.whale import MINIMUM_USD
 from autotrading.domain.sources.whale_transfer import WhaleTransfer
 
 API_KEY = SourceConfigurationField("api_key", "Chiave API", secret=True)
-THRESHOLD = SourceParameter(MINIMUM_USD, "soglia USD", default=1_000_000, minimum=100_000, maximum=1_000_000_000)
+THRESHOLD = SourceParameter(
+    MINIMUM_USD,
+    "soglia USD",
+    default=1_000_000,
+    minimum=100_000,
+    maximum=1_000_000_000,
+    description="Che cosa fa. Valori ammessi. Predefinito.",
+)
 
 
 @dataclass(frozen=True, slots=True)

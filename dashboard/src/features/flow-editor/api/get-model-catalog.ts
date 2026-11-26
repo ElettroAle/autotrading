@@ -3,11 +3,13 @@ import { z } from 'zod';
 
 import { readData, useApiClient } from '@/lib/api-client';
 
-// A range has minimum and maximum, a choice its values; the default is always there (R1.4.2).
+// A range has minimum and maximum, a choice its values; the default is always there (R1.4.2), and so is the description
+// the platform gives it, the text of its info button (R5.5.7, ADR descrizioni-dei-parametri-di-fonti-e-modelli).
 const modelParameterSchema = z.object({
   key: z.string(),
   label: z.string(),
   default: z.string(),
+  description: z.string(),
   minimum: z.string().nullish(),
   maximum: z.string().nullish(),
   whole: z.boolean().nullish(),

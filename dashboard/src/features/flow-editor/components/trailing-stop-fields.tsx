@@ -1,35 +1,46 @@
 import { useFormContext } from 'react-hook-form';
 
+import { CheckboxField } from '@/components/ui/form/checkbox-field';
 import { FORM_CONTROL, FormField } from '@/components/ui/form/form-field';
 
+import { FLOW_FIELD_INFO } from '../utils/field-info';
 import type { FlowFormValues } from '../utils/flow-form';
 
 type TrailingPart = 'distance_percent' | 'activation_percent' | 'breakeven_percent';
 
 // Each part with what it admits; the API checks the values and their combination (ADR
 // stop-che-segue-il-prezzo-nella-dashboard).
-const PARTS: readonly { part: TrailingPart; id: string; label: string; hint: string }[] = [
+const PARTS: readonly {
+  part: TrailingPart;
+  id: string;
+  label: string;
+  info: string;
+  hint: string;
+}[] = [
   {
     part: 'distance_percent',
     id: 'flow-trailing-distance',
     label: 'Distanza dello stop che segue (%)',
+    info: FLOW_FIELD_INFO.trailingDistance,
     hint: 'da 0,1 a 50, dal miglior prezzo raggiunto; vuota: lo stop non segue il prezzo',
   },
   {
     part: 'activation_percent',
     id: 'flow-trailing-activation',
     label: 'Attivazione (%)',
+    info: FLOW_FIELD_INFO.trailingActivation,
     hint: "maggiore di 0, solo con la distanza; vuota: lo stop segue dall'apertura",
   },
   {
     part: 'breakeven_percent',
     id: 'flow-trailing-breakeven',
     label: 'Pareggio (%)',
+    info: FLOW_FIELD_INFO.trailingBreakeven,
     hint: "maggiore di 0; raggiunta, lo stop va al prezzo d'ingresso",
   },
 ];
 
-const MAX_PROFIT_HINT_ID = 'flow-trailing-max-profit-hint';
+const MAX_PROFIT_ID = 'flow-trailing-max-profit';
 
 /**
  * The stop that follows the price beside the default protections, each part with what it admits and the reason of a
@@ -42,11 +53,12 @@ export const TrailingStopFields = () => {
   } = useFormContext<FlowFormValues>();
   return (
     <>
-      {PARTS.map(({ part, id, label, hint }) => (
+      {PARTS.map(({ part, id, label, info, hint }) => (
         <FormField
           key={part}
           id={id}
           label={label}
+          info={info}
           error={errors.trailing_stop?.[part]?.message}
           hint={hint}
         >
@@ -60,17 +72,13 @@ export const TrailingStopFields = () => {
           )}
         </FormField>
       ))}
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          {...register('trailing_stop.max_profit_in_context')}
-          aria-describedby={MAX_PROFIT_HINT_ID}
-        />
-        Massimo profitto raggiunto nel contesto dell&apos;agente
-      </label>
-      <p id={MAX_PROFIT_HINT_ID} className="text-xs text-slate-600">
-        ha effetto solo con la distanza o il pareggio
-      </p>
+      <CheckboxField
+        id={MAX_PROFIT_ID}
+        label="Massimo profitto raggiunto nel contesto dell'agente"
+        info={FLOW_FIELD_INFO.maxProfitInContext}
+        hint="ha effetto solo con la distanza o il pareggio"
+        {...register('trailing_stop.max_profit_in_context')}
+      />
     </>
   );
 };
