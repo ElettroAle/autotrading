@@ -23,7 +23,7 @@ direzione con posizioni chiuse sull'asset nei giorni della memoria, in testa all
 - Il risultato netto è del domain (`ClosedPosition.net_pnl`).
 - Ambiguità risolta: la memoria scrive oggi i numeri col punto decimale (scelta di R5.3.5), mentre i criteri di R5.3.7
   scrivono la riga con la virgola («PnL -6,27 USDC»). Si segue il criterio: la riga di riepilogo scrive gli importi
-  con il formato italiano del domain (`number_text`), le altre parti della memoria restano come sono.
+  con il formato italiano a due decimali del domain (`money_text`), le altre parti della memoria restano come sono.
 
 ## Decisione
 
