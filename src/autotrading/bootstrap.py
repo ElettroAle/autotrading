@@ -40,6 +40,7 @@ from autotrading.adapters.outbound.hyperliquid.exchange import MARGIN_CURRENCY a
 from autotrading.adapters.outbound.hyperliquid.exchange import HyperliquidExchangeAdapter
 from autotrading.adapters.outbound.hyperliquid.executions import HyperliquidAccountExecutionsAdapter
 from autotrading.adapters.outbound.hyperliquid.markets import HyperliquidMarketsAdapter
+from autotrading.adapters.outbound.hyperliquid.orders import BASE_TAKER_FEE_RATE as HYPERLIQUID_TAKER_FEE_RATE
 from autotrading.adapters.outbound.json.cycle_journal import JsonCycleJournalAdapter
 from autotrading.adapters.outbound.libsodium.composition import (
     SealersOfTenant,
@@ -208,6 +209,7 @@ from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowSta
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
 from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
 from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
+from autotrading.application.flows.read_round_trip_cost import ReadRoundTripCostUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
 )
@@ -690,7 +692,9 @@ def cycle_of(
             records,
         )
         steps = CycleSteps(
-            start=StartCycleFlowUseCase(reconcile_for_cycle, read_cycle_flow),
+            start=StartCycleFlowUseCase(
+                reconcile_for_cycle, read_cycle_flow, ReadRoundTripCostUseCase(accounts, opener, activity_readers)
+            ),
             sources=ReadCycleSourceUseCase(
                 CollectCycleSourceUseCase(
                     systems,
@@ -882,7 +886,7 @@ def exchanges_of_tenant(
     """
     exchanges, markets, order_exchanges, activity_readers, executions_readers, real_market, *_ = hyperliquid
     real_orders, real_markets = real_market
-    simulated = sqlalchemy_simulated_exchange_adapters(engine, simulation, tenant_id)
+    simulated = sqlalchemy_simulated_exchange_adapters(engine, simulation, tenant_id, HYPERLIQUID_TAKER_FEE_RATE)
     return (
         {**exchanges, **simulated},
         {**markets, **dict.fromkeys(simulated, real_markets)},
@@ -1088,7 +1092,7 @@ def worker_cycles(
     settle_simulated_positions = SettleSimulatedPositionsUseCase(
         real_orders,
         SqlAlchemyTenantRepositoryAdapter(engine),
-        lambda tenant_id: SqlAlchemySimulatedExchangeAdapter(engine, tenant_id, simulation),
+        lambda tenant_id: SqlAlchemySimulatedExchangeAdapter(engine, tenant_id, simulation, HYPERLIQUID_TAKER_FEE_RATE),
     )
 
     def plan_round() -> None:

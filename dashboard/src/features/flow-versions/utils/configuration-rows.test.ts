@@ -63,6 +63,7 @@ const CONFIGURATION: Configuration = {
     count_scope: 'flusso',
   },
   account_exposure_for_agent: true,
+  fees_for_agent: false,
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -102,6 +103,7 @@ const PARTS_OF_FIELD = {
   consecutive_loss_limit: ['blocco delle riaperture dopo perdite consecutive'],
   memory: ['memoria'],
   account_exposure_for_agent: ["esposizione del conto nel contesto dell'agente"],
+  fees_for_agent: ["commissioni nel contesto dell'agente"],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
   readonly string[]
@@ -151,6 +153,7 @@ describe('configurationRows', () => {
         value: 'attiva, 5 decisioni, 14 giorni, motivo intero, tutte le decisioni, riepilogo',
       },
       { part: "esposizione del conto nel contesto dell'agente", value: 'sì' },
+      { part: "commissioni nel contesto dell'agente", value: 'no' },
     ]);
   });
 

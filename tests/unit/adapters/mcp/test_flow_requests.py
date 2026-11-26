@@ -153,3 +153,15 @@ def test_the_option_of_the_exposure_of_the_account_reaches_every_command_as_give
     assert StrategyImport(account_exposure_for_agent=True).command("copia").account_exposure_for_agent is True
     assert FlowModification(account_exposure_for_agent=True).command(uuid4()).account_exposure_for_agent is True
     assert FlowModification().command(uuid4()).account_exposure_for_agent is None
+
+
+def test_the_option_of_the_fees_reaches_every_command_as_given() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    creation = FlowCreation(
+        account_id=uuid4(), allocated_capital=Decimal(100), name="alfa", assets=["BTC"], fees_for_agent=True
+    )
+
+    assert creation.command().fees_for_agent is True
+    assert StrategyImport(fees_for_agent=True).command("copia").fees_for_agent is True
+    assert FlowModification(fees_for_agent=True).command(uuid4()).fees_for_agent is True
+    assert FlowModification().command(uuid4()).fees_for_agent is None

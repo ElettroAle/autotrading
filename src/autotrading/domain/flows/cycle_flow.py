@@ -12,6 +12,7 @@ from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.openings_suspension import OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
 from autotrading.domain.flows.risk_check import RiskState
+from autotrading.domain.flows.round_trip_cost import RoundTripCost
 from autotrading.domain.flows.selections import ActiveSource
 from autotrading.domain.flows.trailing_stop import TrailingStop
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -24,7 +25,8 @@ class CycleFlow:
     The amounts are the state attributed to the flow, the same the user consults (R1.6.1, ADR 0062); the account
     gives only the details of the positions and the margin it has free, which no flow may go beyond. An alarm of
     reconciliation open on the account suspends the openings of the flow (R3.3.1). The exposure of the account is what
-    the cycle read of it, for its limit and for the agent (R5.5.5).
+    the cycle read of it, for its limit and for the agent (R5.5.5), and so is the fee of the account for the agent
+    (R5.5.6).
     """
 
     tenant_id: TenantId
@@ -36,6 +38,7 @@ class CycleFlow:
     attributed: FlowState
     alarm: ReconciliationAlarm | None = None
     account_exposure: AccountExposureReading = field(default_factory=AccountExposureReading)
+    round_trip_cost: RoundTripCost = field(default_factory=RoundTripCost)
 
     @property
     def configuration(self) -> FlowConfiguration:
@@ -144,6 +147,7 @@ class CycleFlow:
             ),
             reopening_blocks=tuple(block.state_text for block in self.attributed.reopening_blocks),
             account_exposure=self._others_exposure_text(),
+            round_trip_cost_percent=self.round_trip_cost.percent,
         )
 
     def _others_exposure_text(self) -> str | None:

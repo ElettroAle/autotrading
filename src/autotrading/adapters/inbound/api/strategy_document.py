@@ -121,6 +121,8 @@ class StrategyBody(BaseModel):
     consecutive_loss_limit: ConsecutiveLossLimitRequest = Field(default_factory=ConsecutiveLossLimitRequest)
     # Missing in the files written before it: the option off (R5.5.5).
     account_exposure_for_agent: bool = False
+    # Missing in the files written before it: the option off (R5.5.6).
+    fees_for_agent: bool = False
 
 
 class StrategyDocument(BaseModel):
@@ -175,6 +177,7 @@ class StrategyDocument(BaseModel):
                 trailing_stop=TrailingStopRequest.of(strategy.trailing_stop),
                 consecutive_loss_limit=ConsecutiveLossLimitRequest.of(strategy.consecutive_loss_limit),
                 account_exposure_for_agent=strategy.account_exposure_for_agent,
+                fees_for_agent=strategy.fees_for_agent,
             ),
         )
 
@@ -207,6 +210,7 @@ class StrategyDocument(BaseModel):
             trailing_stop=strategy.trailing_stop,
             consecutive_loss_limit=strategy.consecutive_loss_limit,
             account_exposure_for_agent=strategy.account_exposure_for_agent,
+            fees_for_agent=strategy.fees_for_agent,
         )
 
     def _require_supported(self) -> None:

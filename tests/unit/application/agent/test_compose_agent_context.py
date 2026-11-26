@@ -45,6 +45,7 @@ class State:
     positions: tuple[Position, ...] = (Position(),)
     reopening_blocks: tuple[str, ...] = ()
     account_exposure: str | None = None
+    round_trip_cost_percent: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,3 +132,12 @@ def test_the_state_keeps_the_exposure_of_the_other_flows_the_flow_hands() -> Non
     state = ComposeAgentContextUseCase().execute(question).state
 
     assert state.account_exposure == line
+
+
+def test_the_state_keeps_the_round_trip_cost_the_flow_hands() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    question = replace(Question(), state=State(round_trip_cost_percent=Decimal("0.09")))
+
+    state = ComposeAgentContextUseCase().execute(question).state
+
+    assert state.round_trip_cost_percent == Decimal("0.09")

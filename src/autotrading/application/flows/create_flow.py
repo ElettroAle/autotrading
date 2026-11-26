@@ -201,6 +201,8 @@ class CreateFlowCommand:
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
     # Nothing given: the agent sees the flow alone, never the other flows of its account (R5.5.5).
     account_exposure_for_agent: bool = False
+    # Nothing given: the agent does not see the cost of opening and closing a position (R5.5.6).
+    fees_for_agent: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +271,7 @@ class CreateFlowUseCase:
             trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
             consecutive_loss_limit=command.consecutive_loss_limit.applied_to(None),
             account_exposure_for_agent=command.account_exposure_for_agent,
+            fees_for_agent=command.fees_for_agent,
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

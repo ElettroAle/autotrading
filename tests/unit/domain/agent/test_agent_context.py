@@ -241,3 +241,15 @@ def test_the_state_carries_the_exposure_of_the_other_flows_only_when_the_flow_gi
     assert isinstance(plain, dict)
     assert shown["esposizione_degli_altri_flussi"] == line
     assert "esposizione_degli_altri_flussi" not in plain
+
+
+def test_the_state_carries_the_round_trip_cost_only_when_the_flow_gives_it() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente: with the option off the state is the one of
+    # before.
+    shown = user_document(context(state=replace(STATE, round_trip_cost_percent=Decimal("0.09"))))["stato_del_flusso"]
+    plain = user_document(context())["stato_del_flusso"]
+
+    assert isinstance(shown, dict)
+    assert isinstance(plain, dict)
+    assert shown["costo_di_andata_e_ritorno_percento"] == "0.09"
+    assert "costo_di_andata_e_ritorno_percento" not in plain

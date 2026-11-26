@@ -2072,6 +2072,8 @@ export interface components {
             consecutive_loss_limit: components["schemas"]["ConsecutiveLossLimitResponse"] | null;
             /** Account Exposure For Agent */
             account_exposure_for_agent: boolean;
+            /** Fees For Agent */
+            fees_for_agent: boolean;
         };
         /**
          * ConsecutiveLossLimitRequest
@@ -2532,6 +2534,11 @@ export interface components {
              * @default false
              */
             account_exposure_for_agent: boolean;
+            /**
+             * Fees For Agent
+             * @default false
+             */
+            fees_for_agent: boolean;
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2693,6 +2700,8 @@ export interface components {
             consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
             /** Account Exposure For Agent */
             account_exposure_for_agent?: boolean | null;
+            /** Fees For Agent */
+            fees_for_agent?: boolean | null;
         };
         /**
          * FlowOverviewResponse
@@ -2854,6 +2863,8 @@ export interface components {
             consecutive_loss_limit: components["schemas"]["ConsecutiveLossLimitResponse"] | null;
             /** Account Exposure For Agent */
             account_exposure_for_agent: boolean;
+            /** Fees For Agent */
+            fees_for_agent: boolean;
             /** Missing */
             missing: string[];
         };
@@ -4072,6 +4083,11 @@ export interface components {
              * @default false
              */
             account_exposure_for_agent: boolean;
+            /**
+             * Fees For Agent
+             * @default false
+             */
+            fees_for_agent: boolean;
         };
         /**
          * StrategyBody
@@ -4120,6 +4136,11 @@ export interface components {
              * @default false
              */
             account_exposure_for_agent: boolean;
+            /**
+             * Fees For Agent
+             * @default false
+             */
+            fees_for_agent: boolean;
         };
         /**
          * StrategyDocument

@@ -180,3 +180,10 @@ def test_the_draft_of_a_strategy_keeps_the_option_of_the_exposure_of_the_account
     draft = Strategies().import_.execute(a_command(account_exposure_for_agent=True))
 
     assert draft.configuration.account_exposure_for_agent is True
+
+
+def test_the_draft_of_a_strategy_keeps_the_option_of_the_fees() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    draft = Strategies().import_.execute(a_command(fees_for_agent=True))
+
+    assert draft.configuration.fees_for_agent is True

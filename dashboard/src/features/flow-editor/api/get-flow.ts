@@ -79,6 +79,8 @@ export const flowSchema = z.object({
     .nullable(),
   // Off unless the user turns it on: the agent sees the flow alone (R5.5.5).
   account_exposure_for_agent: z.boolean(),
+  // Off unless the user turns it on: the agent does not see the cost of a position (R5.5.6).
+  fees_for_agent: z.boolean(),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

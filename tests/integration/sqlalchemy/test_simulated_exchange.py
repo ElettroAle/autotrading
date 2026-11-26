@@ -38,6 +38,7 @@ pytestmark = pytest.mark.integration
 
 SIMULATED = "simulato"
 EXECUTION = SimulatedExecution(Slippage.percent(Decimal("0.1")))
+MARKET_ORDER_FEE_RATE = Decimal("0.00045")
 SLIPPAGE = Slippage.percent(Decimal(1))
 
 
@@ -61,7 +62,7 @@ def new_tenant(database: Engine) -> TenantId:
 def opened_account(
     database: Engine, balance: Decimal = Decimal(1000)
 ) -> tuple[SqlAlchemySimulatedExchangeAdapter, AccountId]:
-    simulated = SqlAlchemySimulatedExchangeAdapter(database, new_tenant(database), EXECUTION)
+    simulated = SqlAlchemySimulatedExchangeAdapter(database, new_tenant(database), EXECUTION, MARKET_ORDER_FEE_RATE)
     account_id = AccountId.new()
     simulated.open(account_id, VirtualBalance(balance))
     return simulated, account_id
@@ -176,11 +177,11 @@ def test_a_reset_closes_everything_and_starts_again_from_the_balance_given(datab
 def test_the_state_outlives_the_adapter_as_a_restart(database: Engine) -> None:
     tenant_id = new_tenant(database)
     account_id = AccountId.new()
-    before = SqlAlchemySimulatedExchangeAdapter(database, tenant_id, EXECUTION)
+    before = SqlAlchemySimulatedExchangeAdapter(database, tenant_id, EXECUTION, MARKET_ORDER_FEE_RATE)
     before.open(account_id, VirtualBalance(Decimal(1000)))
     long_btc(before, account_id)
 
-    after = SqlAlchemySimulatedExchangeAdapter(database, tenant_id, EXECUTION)
+    after = SqlAlchemySimulatedExchangeAdapter(database, tenant_id, EXECUTION, MARKET_ORDER_FEE_RATE)
 
     reading = after.cycle_reading(CycleAccess.without_credentials(account_id.value))
     activity = after.activity(AccountReference.without_credentials(account_id.value))
@@ -192,7 +193,7 @@ def test_the_state_outlives_the_adapter_as_a_restart(database: Engine) -> None:
 def test_the_accounts_of_a_tenant_are_invisible_to_another(database: Engine) -> None:
     simulated, account_id = opened_account(database)
     long_btc(simulated, account_id)
-    other = SqlAlchemySimulatedExchangeAdapter(database, new_tenant(database), EXECUTION)
+    other = SqlAlchemySimulatedExchangeAdapter(database, new_tenant(database), EXECUTION, MARKET_ORDER_FEE_RATE)
     reference = AccountReference.without_credentials(account_id.value)
 
     assert other.open_coins() == frozenset()

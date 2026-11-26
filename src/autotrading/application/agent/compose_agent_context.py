@@ -41,6 +41,7 @@ def _state_of(state: QuestionStatePort) -> FlowStateView:
         positions=tuple(_position_of(position) for position in state.positions),
         reopening_blocks=tuple(state.reopening_blocks),
         account_exposure=state.account_exposure,
+        round_trip_cost_percent=state.round_trip_cost_percent,
     )
 
 

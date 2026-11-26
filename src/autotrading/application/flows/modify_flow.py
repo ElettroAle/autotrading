@@ -88,6 +88,8 @@ class ModifyFlowCommand:
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
     # Nothing sent keeps the option in force (R5.5.5).
     account_exposure_for_agent: bool | None = None
+    # Nothing sent keeps the option in force (R5.5.6).
+    fees_for_agent: bool | None = None
 
 
 class ModifyFlowUseCase:
@@ -198,6 +200,7 @@ class ModifyFlowUseCase:
                 if command.account_exposure_for_agent is None
                 else command.account_exposure_for_agent
             ),
+            fees_for_agent=current.fees_for_agent if command.fees_for_agent is None else command.fees_for_agent,
         )
 
     def _model(self, current: ModelSelection, command: ModifyFlowCommand) -> ModelSelection:

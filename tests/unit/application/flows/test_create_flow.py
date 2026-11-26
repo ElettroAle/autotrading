@@ -424,3 +424,14 @@ def test_a_new_flow_shows_its_agent_the_flow_alone_unless_asked() -> None:
 
     assert plain.account_exposure_for_agent is False
     assert shown.configuration.account_exposure_for_agent is True
+
+
+def test_a_new_flow_gives_its_agent_no_fees_unless_asked() -> None:
+    # R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+    flows = Flows()
+
+    plain = flows.create.execute(flows.command()).configuration
+    shown = flows.create.execute(flows.command(name="beta", assets=("SOL",), fees_for_agent=True))
+
+    assert plain.fees_for_agent is False
+    assert shown.configuration.fees_for_agent is True

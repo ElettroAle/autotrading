@@ -43,8 +43,9 @@ class PositionView:
 @dataclass(frozen=True, slots=True)
 class FlowStateView:
     """The state of the flow alone: never the balance of the account (R1.4.3); with the openings blocked after
-    consecutive losses, as the flow tells them (R5.5.2), and the exposure of the other flows of the account only when
-    the user wants the agent to see it, as the flow tells it (R5.5.5).
+    consecutive losses, as the flow tells them (R5.5.2), and the exposure of the other flows of the account and the cost
+    of opening and closing a position only when the user wants the agent to see them, as the flow tells them (R5.5.5,
+    R5.5.6).
     """
 
     currency: str
@@ -57,6 +58,8 @@ class FlowStateView:
     positions: tuple[PositionView, ...]
     reopening_blocks: tuple[str, ...] = ()
     account_exposure: str | None = None
+    # In percent of the value of the position.
+    round_trip_cost_percent: Decimal | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +141,10 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
     # Without the option the line is not there, and the state is the one of before (ADR
     # esposizione-degli-altri-flussi-nel-contesto-dell-agente).
     exposure = {} if state.account_exposure is None else {"esposizione_degli_altri_flussi": state.account_exposure}
+    # Without the option the line is not there, and the state is the one of before (ADR
+    # costo-di-andata-e-ritorno-nel-contesto-dell-agente).
+    cost = state.round_trip_cost_percent
+    round_trip = {} if cost is None else {"costo_di_andata_e_ritorno_percento": str(cost)}
     return {
         "valuta": state.currency,
         "capitale_allocato": str(state.allocated_capital),
@@ -148,6 +155,7 @@ def _state_document(state: FlowStateView) -> dict[str, object]:
         "posizioni_aperte": [_position_document(position) for position in state.positions],
         **blocked,
         **exposure,
+        **round_trip,
     }
 
 

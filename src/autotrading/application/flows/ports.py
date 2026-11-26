@@ -685,6 +685,22 @@ class ExecutionsReaderPort(Protocol):
         ...
 
 
+class MarketOrderFeeReaderPort(Protocol):
+    """The fee an exchange applies to an account for an order at the market price, for the agent of a flow (R5.5.6, ADR
+    costo-di-andata-e-ritorno-nel-contesto-dell-agente).
+    """
+
+    def reference_fields(self) -> frozenset[str]:
+        """The names of the fields of the credentials the reader needs to find the account on its exchange."""
+        ...
+
+    def market_order_fee_rate(self, reference: AccountReference) -> Decimal:
+        """The share of the value of the order. Raises FlowExchangeUnavailableError when the exchange cannot be read,
+        and FlowCredentialsFieldMissingError when the reference lacks a field the reader declares.
+        """
+        ...
+
+
 class FlowLedgerPort(Protocol):
     """Bound to the tenant of the request: the ledger of the executions and the movements of its accounts and the
     running totals of every flow, kept together (ADR 0063, ADR movimenti-del-conto-nel-registro-con-cursore).

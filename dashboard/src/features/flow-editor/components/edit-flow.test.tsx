@@ -831,6 +831,34 @@ describe('EditFlow', () => {
     expect(configurationOf(fakePlatform.flowNamed('alfa')).account_exposure_for_agent).toBe(true);
   });
 
+  // R5.5.6, ADR costo-di-andata-e-ritorno-nel-contesto-dell-agente.
+  it('turns on the fees in the context of the agent beside the exposure of the account', async () => {
+    fakePlatform.addConfiguredFlow('anna', 'alfa', { account_id: 'account-principale' });
+    await renderApp({ account: 'anna', url: EDIT_ALFA });
+
+    const option = await screen.findByRole('checkbox', {
+      name: "Commissioni nel contesto dell'agente",
+    });
+    const exposure = screen.getByRole('checkbox', {
+      name: "Esposizione degli altri flussi del conto nel contesto dell'agente",
+    });
+    expect(option).not.toBeChecked();
+    expect(
+      exposure.compareDocumentPosition(option) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(option).toHaveAccessibleDescription(
+      "lo stato inviato all'agente riporta il costo di andata e ritorno: la commissione del conto per un ordine a mercato, contata per l'apertura e per la chiusura",
+    );
+    await userEvent.click(option);
+    await userEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Modifiche salvate: versione 2'),
+    );
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).fees_for_agent).toBe(true);
+    expect(configurationOf(fakePlatform.flowNamed('alfa')).account_exposure_for_agent).toBe(false);
+  });
+
   it('says a flow outside the tenant of the user does not exist', async () => {
     await renderApp({ account: 'anna', url: '/flows/flow-omega/edit' });
 

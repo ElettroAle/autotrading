@@ -64,6 +64,7 @@ STATE: dict[str, object] = {
     "positions": [],
     "reopening_blocks": [],
     "account_exposure": None,
+    "round_trip_cost_percent": None,
 }
 
 

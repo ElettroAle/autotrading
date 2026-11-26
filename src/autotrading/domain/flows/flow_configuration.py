@@ -84,6 +84,8 @@ class FlowConfiguration:
     consecutive_loss_limit: ConsecutiveLossLimit | None = None
     # Off unless the user turns it on: the agent sees the flow alone, never the other flows of its account (R5.5.5).
     account_exposure_for_agent: bool = False
+    # Off unless the user turns it on: the agent does not see the cost of opening and closing a position (R5.5.6).
+    fees_for_agent: bool = False
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]

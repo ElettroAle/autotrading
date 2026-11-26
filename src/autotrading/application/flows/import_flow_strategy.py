@@ -55,6 +55,7 @@ class ImportFlowStrategyCommand:
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
     consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
     account_exposure_for_agent: bool = False
+    fees_for_agent: bool = False
 
 
 class ImportFlowStrategyUseCase:
@@ -115,4 +116,5 @@ class ImportFlowStrategyUseCase:
             trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
             consecutive_loss_limit=command.consecutive_loss_limit.applied_to(None),
             account_exposure_for_agent=command.account_exposure_for_agent,
+            fees_for_agent=command.fees_for_agent,
         )

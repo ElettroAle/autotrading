@@ -50,6 +50,8 @@ class FlowStrategy:
     consecutive_loss_limit: ConsecutiveLossLimit | None = None
     # What the agent sees of the account, off unless the strategy has it on (R5.5.5).
     account_exposure_for_agent: bool = False
+    # What the agent sees of the fees of the account, off unless the strategy has it on (R5.5.6).
+    fees_for_agent: bool = False
 
     @classmethod
     def of(cls, configuration: FlowConfiguration) -> FlowStrategy:
@@ -71,6 +73,7 @@ class FlowStrategy:
             configuration.trailing_stop,
             configuration.consecutive_loss_limit,
             configuration.account_exposure_for_agent,
+            configuration.fees_for_agent,
         )
 
     def draft_configuration(self, version: int) -> FlowConfiguration:
@@ -96,6 +99,7 @@ class FlowStrategy:
             trailing_stop=self.trailing_stop,
             consecutive_loss_limit=self.consecutive_loss_limit,
             account_exposure_for_agent=self.account_exposure_for_agent,
+            fees_for_agent=self.fees_for_agent,
         )
 
 

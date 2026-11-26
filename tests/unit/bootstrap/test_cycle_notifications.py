@@ -41,6 +41,7 @@ from autotrading.domain.flows.closed_position import CloseReason, PositionEnd
 from autotrading.domain.flows.cycle_flow import CycleFlow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.flow_status import FlowStatus
+from autotrading.domain.flows.round_trip_cost import RoundTripCost
 from autotrading.domain.flows.stop_outcome import PositionOpening
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.notifications.chat_id import ChatId
@@ -406,6 +407,29 @@ def test_a_flow_not_stamped_yet_began_at_the_anchor_of_its_cycles(world: World) 
     del world.cycles.platform.flows.first_starts[world.flow.id]
 
     assert started_at(world) == at("10:00")
+
+
+# StartCycleFlowUseCase: the fee of the account for the agent (R5.5.6)
+
+
+def started_flow(world: World) -> CycleFlow:
+    snapshot = world.ports.start_cycle.execute(world.flow.id.value, ANCHOR)
+    assert isinstance(snapshot.state, CycleFlow)
+    return snapshot.state
+
+
+def test_with_the_option_on_the_cycle_starts_from_the_fee_of_the_account_read_once(world: World) -> None:
+    world.cycles.reconfigure("alfa", lambda configuration: replace(configuration, fees_for_agent=True))
+    reader = world.cycles.platform.activity_reader
+    reader.market_order_fee_rates[world.address] = Decimal("0.0004")
+
+    assert started_flow(world).round_trip_cost == RoundTripCost.of_rate(Decimal("0.0004"))
+    assert reader.fee_readings == [world.address]
+
+
+def test_with_the_option_off_the_cycle_reads_no_fee(world: World) -> None:
+    assert started_flow(world).round_trip_cost == RoundTripCost()
+    assert world.cycles.platform.activity_reader.fee_readings == []
 
 
 # StartCycleFlowUseCase: the position the flow expects (Bug 155)

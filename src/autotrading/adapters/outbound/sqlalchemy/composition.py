@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy import Engine
 
 from autotrading.adapters.configuration.source import ConfigurationSource
@@ -29,7 +31,13 @@ def sqlalchemy_simulation_adapters(source: ConfigurationSource) -> SimulatedExec
 
 
 def sqlalchemy_simulated_exchange_adapters(
-    engine: SqlAlchemyEngine, simulation: SimulatedExecution, tenant_id: TenantId
+    engine: SqlAlchemyEngine, simulation: SimulatedExecution, tenant_id: TenantId, market_order_fee_rate: Decimal
 ) -> SimulatedExchangeOfTenant:
-    """The simulated exchange by its name, on the accounts of the tenant (R6.3.2, ADR 0152)."""
-    return {SIMULATED_EXCHANGE_NAME: SqlAlchemySimulatedExchangeAdapter(engine, tenant_id, simulation)}
+    """The simulated exchange by its name, on the accounts of the tenant (R6.3.2, ADR 0152), with the fee of an order
+    at the market of the real market it trades on (R5.5.6).
+    """
+    return {
+        SIMULATED_EXCHANGE_NAME: SqlAlchemySimulatedExchangeAdapter(
+            engine, tenant_id, simulation, market_order_fee_rate
+        )
+    }

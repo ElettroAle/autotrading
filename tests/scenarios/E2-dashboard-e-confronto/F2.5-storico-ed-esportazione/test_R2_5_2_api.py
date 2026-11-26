@@ -187,6 +187,9 @@ def file_without_account_capital_assets_or_keys(platform: Platform, lifecycle: L
         # What the agent sees of the account travels with the strategy (ADR
         # esposizione-degli-altri-flussi-nel-contesto-dell-agente).
         "account_exposure_for_agent",
+        # What the agent sees of the fees travels with the strategy (ADR
+        # costo-di-andata-e-ritorno-nel-contesto-dell-agente).
+        "fees_for_agent",
     }
 
 

@@ -264,6 +264,8 @@ describe('CreateFlow', () => {
       consecutive_loss_limit: null,
       // Left untouched, the agent sees the flow alone: the flow behaves as before (R5.5.5).
       account_exposure_for_agent: false,
+      // Left untouched, the agent does not see the cost of a position: the flow behaves as before (R5.5.6).
+      fees_for_agent: false,
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');
