@@ -6,7 +6,7 @@ from autotrading.domain.agent.errors import (
     ParameterNotSupportedError,
     UnknownParameterError,
 )
-from autotrading.domain.agent.model_parameter import PARAMETER_LABELS, ModelParameter, ParameterValue, label_of
+from autotrading.domain.agent.model_parameter import ModelParameter, ParameterValue, is_offered, label_of
 from autotrading.domain.agent.model_usage import ModelPrices
 from autotrading.domain.agent.provider_name import ProviderName
 
@@ -40,7 +40,7 @@ class ModelDefinition:
         return {parameter.key: chosen.get(parameter.key, parameter.default) for parameter in self.parameters}
 
     def _parameter(self, key: str) -> ModelParameter:
-        if key not in PARAMETER_LABELS:
+        if not is_offered(key):
             raise UnknownParameterError(key)
         for parameter in self.parameters:
             if parameter.key == key:

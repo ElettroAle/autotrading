@@ -10,7 +10,14 @@ from autotrading.domain.sources.source_list_parameter import MAXIMUM_VALUES, Sou
 
 
 def trend_days(default: tuple[int, ...] = ()) -> SourceListParameter:
-    return SourceListParameter("tendenza_giorni", "tendenza giorni", default=default, minimum=1, maximum=3650)
+    return SourceListParameter(
+        "tendenza_giorni",
+        "tendenza giorni",
+        default=default,
+        minimum=1,
+        maximum=3650,
+        description="Giorni delle variazioni. Da 1 a 3650. Predefinito: nessuno.",
+    )
 
 
 def test_a_list_is_saved_ordered_and_without_repetitions() -> None:
@@ -77,7 +84,15 @@ def test_a_declaration_that_breaks_its_own_rules_is_refused(
     default: tuple[int, ...], minimum: int, maximum: int, maximum_values: int
 ) -> None:
     with pytest.raises(InvalidSourceParameterError) as raised:
-        SourceListParameter("medie_periodi", "medie periodi", default, minimum, maximum, maximum_values)
+        SourceListParameter(
+            "medie_periodi",
+            "medie periodi",
+            default,
+            minimum,
+            maximum,
+            maximum_values,
+            description="Che cosa fa. Valori ammessi. Predefinito.",
+        )
 
     assert raised.value.key == "medie_periodi"
 
@@ -92,7 +107,15 @@ def test_the_value_in_the_settings_is_the_default_when_the_flow_set_none() -> No
 
 @pytest.mark.parametrize("value", [[0], [721]])
 def test_a_list_that_declares_its_refusal_is_refused_with_it(value: list[int]) -> None:
-    hours = SourceListParameter("estremi_ore", "estremi_ore", (), 1, 720, range_reason="estremi_ore va da 1 a 720")
+    hours = SourceListParameter(
+        "estremi_ore",
+        "estremi_ore",
+        (),
+        1,
+        720,
+        range_reason="estremi_ore va da 1 a 720",
+        description="Che cosa fa. Valori ammessi. Predefinito.",
+    )
 
     with pytest.raises(SourceListValueOutOfRangeError) as raised:
         hours.accepted(value)
@@ -101,3 +124,15 @@ def test_a_list_that_declares_its_refusal_is_refused_with_it(value: list[int]) -
         "estremi_ore va da 1 a 720",
         {"field": "estremi_ore", "minimum": 1, "maximum": 720},
     )
+
+
+def test_keeps_the_description_it_declares() -> None:
+    assert trend_days().description == "Giorni delle variazioni. Da 1 a 3650. Predefinito: nessuno."
+
+
+@pytest.mark.parametrize("description", ["", "   "])
+def test_a_list_without_a_description_is_refused(description: str) -> None:
+    with pytest.raises(InvalidSourceParameterError) as raised:
+        SourceListParameter("tendenza_giorni", "tendenza giorni", (), 1, 3650, description=description)
+
+    assert raised.value.key == "tendenza_giorni"

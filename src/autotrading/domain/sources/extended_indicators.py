@@ -18,9 +18,39 @@ from autotrading.domain.sources.errors import InsufficientHistoryError
 from autotrading.domain.sources.source_list_parameter import MAXIMUM_CANDLES, SourceListParameter
 from autotrading.domain.sources.source_parameter import SourceParameterValue
 
-FIBONACCI_CANDLES = SourceListParameter("fibonacci_candele", "fibonacci candele", (), 10, MAXIMUM_CANDLES)
-GANN_CANDLES = SourceListParameter("gann_candele", "gann candele", (), 10, MAXIMUM_CANDLES)
-CYCLE_CANDLES = SourceListParameter("ciclo_candele", "ciclo candele", (), 10, MAXIMUM_CANDLES)
+FIBONACCI_CANDLES = SourceListParameter(
+    "fibonacci_candele",
+    "fibonacci candele",
+    (),
+    10,
+    MAXIMUM_CANDLES,
+    description=(
+        "Finestre in candele del timeframe lungo su cui si calcolano i livelli di Fibonacci, una serie per finestra. "
+        "Da 10 a 10000, al massimo 8 valori. Vuoto: nessun livello di Fibonacci."
+    ),
+)
+GANN_CANDLES = SourceListParameter(
+    "gann_candele",
+    "gann candele",
+    (),
+    10,
+    MAXIMUM_CANDLES,
+    description=(
+        "Finestre in candele del timeframe lungo su cui si calcolano gli angoli di Gann, una serie per finestra. Da "
+        "10 a 10000, al massimo 8 valori. Vuoto: nessun angolo di Gann."
+    ),
+)
+CYCLE_CANDLES = SourceListParameter(
+    "ciclo_candele",
+    "ciclo candele",
+    (),
+    10,
+    MAXIMUM_CANDLES,
+    description=(
+        "Finestre in candele del timeframe lungo su cui si cerca il ciclo dominante del prezzo, una serie per "
+        "finestra. Da 10 a 10000, al massimo 8 valori. Vuoto: nessun ciclo."
+    ),
+)
 EXTENDED_PARAMETERS = (FIBONACCI_CANDLES, GANN_CANDLES, CYCLE_CANDLES)
 HISTORY_NOTE = "nota_storico"
 CANDLES = "candele"

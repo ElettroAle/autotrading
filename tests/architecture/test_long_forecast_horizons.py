@@ -40,7 +40,9 @@ def test_adr_orizzonti_lunghi_del_forecast_the_depth_of_the_daily_history_is_a_p
 
 def test_adr_orizzonti_lunghi_del_forecast_a_value_outside_the_choices_is_refused_listing_their_labels() -> None:
     choices = (ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno"), ParameterChoice(10080, "1 settimana"))
-    horizon = SourceParameter.of_choices("orizzonte", "orizzonte", default=0, choices=choices)
+    horizon = SourceParameter.of_choices(
+        "orizzonte", "orizzonte", default=0, choices=choices, description="Che cosa fa. Valori ammessi. Predefinito."
+    )
 
     with pytest.raises(SourceParameterNotAmongChoicesError) as raised:
         horizon.accepted(129600)

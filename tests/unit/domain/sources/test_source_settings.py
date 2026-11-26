@@ -13,8 +13,10 @@ NEWS = SourceDefinition(
     description="notizie recenti",
     per_asset=True,
     parameters=(
-        SourceParameter("max_items", "numero massimo di notizie", 10, 1, 50),
-        SourceParameter("hours", "ore indietro", 24, 1, 72),
+        SourceParameter(
+            "max_items", "numero massimo di notizie", 10, 1, 50, description="Che cosa fa. Valori ammessi. Predefinito."
+        ),
+        SourceParameter("hours", "ore indietro", 24, 1, 72, description="Che cosa fa. Valori ammessi. Predefinito."),
     ),
 )
 
@@ -57,7 +59,7 @@ def test_the_refusal_tells_the_field_and_its_limits_to_the_page_of_a_trial() -> 
 
 
 def test_the_parameters_of_an_adapter_are_checked_with_those_of_the_source() -> None:
-    own = SourceParameter("lingua", "lingua", 1, 1, 3)
+    own = SourceParameter("lingua", "lingua", 1, 1, 3, description="Che cosa fa. Valori ammessi. Predefinito.")
 
     assert NEWS.settings({"lingua": 2}, (own,)) == {"max_items": 10, "hours": 24, "lingua": 2}
 
@@ -69,7 +71,11 @@ def test_a_parameter_the_source_does_not_have_is_refused() -> None:
 
 def test_a_value_outside_the_choices_of_a_parameter_is_refused_listing_them() -> None:
     horizon = SourceParameter.of_choices(
-        "orizzonte", "orizzonte", default=0, choices=(ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno"))
+        "orizzonte",
+        "orizzonte",
+        default=0,
+        choices=(ParameterChoice(0, "nessuno"), ParameterChoice(1440, "1 giorno")),
+        description="Che cosa fa. Valori ammessi. Predefinito.",
     )
 
     with pytest.raises(SourceParameterNotAmongChoicesError, match=r"^orizzonte: ammessi nessuno, 1 giorno$"):

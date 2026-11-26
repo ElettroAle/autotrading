@@ -22,7 +22,17 @@ KEY_HEADER = "API-Key"
 LIMIT = 100
 REFUSED_CODES = frozenset({401, 403})
 API_KEY = SourceConfigurationField("api_key", "chiave API", secret=True)
-THRESHOLD = SourceParameter(MINIMUM_USD, "soglia USD", default=1_000_000, minimum=100_000, maximum=1_000_000_000)
+THRESHOLD = SourceParameter(
+    MINIMUM_USD,
+    "soglia USD",
+    default=1_000_000,
+    minimum=100_000,
+    maximum=1_000_000_000,
+    description=(
+        "Valore minimo in dollari di un trasferimento perché l'agente lo riceva. Da 100000 a 1000000000. "
+        "Predefinito: 1000000."
+    ),
+)
 # An adapter of the whale source (R5.1.1): the endpoint filters by instant, so it offers historical data too.
 DECLARATION = SourceAdapterDeclaration(
     "Arkham",

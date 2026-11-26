@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from autotrading.adapters.inbound.api.app import HealthReport, create_api
 from autotrading.adapters.inbound.api.provider_keys import ProviderKeyRegistrationRequest, ProviderKeyReplacementRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.agent.model_parameter import description_of
 from autotrading.domain.flows.flow_status import FlowStatus
 from tests.support.flows import a_flow
 from tests.support.identity_provider import IdentityProvider
@@ -163,6 +164,7 @@ def test_the_catalog_shows_models_parameters_and_the_providers_with_a_key(client
             "maximum": "1",
             "whole": False,
             "choices": None,
+            "description": description_of("temperature"),
         },
         {
             "key": "max_tokens",
@@ -172,6 +174,7 @@ def test_the_catalog_shows_models_parameters_and_the_providers_with_a_key(client
             "maximum": "64000",
             "whole": True,
             "choices": None,
+            "description": description_of("max_tokens"),
         },
         {
             "key": "reasoning_effort",
@@ -181,6 +184,7 @@ def test_the_catalog_shows_models_parameters_and_the_providers_with_a_key(client
             "maximum": None,
             "whole": None,
             "choices": ["basso", "medio", "alto"],
+            "description": description_of("reasoning_effort"),
         },
     ]
 

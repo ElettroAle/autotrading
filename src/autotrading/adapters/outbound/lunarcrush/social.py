@@ -22,7 +22,14 @@ SERIES_QUERY = {"bucket": "hour", "interval": "1d"}
 POSTS_PATH = "/public/topic/{topic}/posts/v1"
 REFUSED_CODES = frozenset({401, 403})
 API_KEY = SourceConfigurationField("api_key", "chiave API", secret=True)
-POSTS_COUNT = SourceParameter(POSTS, "numero messaggi", default=5, minimum=1, maximum=20)
+POSTS_COUNT = SourceParameter(
+    POSTS,
+    "numero messaggi",
+    default=5,
+    minimum=1,
+    maximum=20,
+    description="Quanti messaggi più rilevanti delle ultime 24 ore riceve l'agente. Da 1 a 20. Predefinito: 5.",
+)
 # An adapter of the social source (R5.1.3): the top posts are those of the last 24 hours only, so no history.
 DECLARATION = SourceAdapterDeclaration(
     "LunarCrush",

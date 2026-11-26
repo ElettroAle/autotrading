@@ -7,13 +7,37 @@ SHORTEST_HORIZON_MINUTES = 15
 LONGEST_HORIZON_MINUTES = 30 * 24 * 60
 
 HISTORY_DAYS = SourceParameter(
-    "profondita_storico_giorni", "profondità storico giorni", default=7, minimum=1, maximum=90
+    "profondita_storico_giorni",
+    "profondità storico giorni",
+    default=7,
+    minimum=1,
+    maximum=90,
+    description=(
+        "Giorni di prezzi su cui si calcola la previsione per gli orizzonti più brevi di un giorno. Da 1 a 90. "
+        "Predefinito: 7."
+    ),
 )
 HORIZONS = SourceListParameter(
-    "orizzonti_minuti", "orizzonti minuti", (15, 60), SHORTEST_HORIZON_MINUTES, LONGEST_HORIZON_MINUTES
+    "orizzonti_minuti",
+    "orizzonti minuti",
+    (15, 60),
+    SHORTEST_HORIZON_MINUTES,
+    LONGEST_HORIZON_MINUTES,
+    description=(
+        "Minuti nel futuro a cui si prevede il prezzo, uno per orizzonte. Da 15 a 43200 (30 giorni), al massimo 8 "
+        "valori. Predefinito: 15, 60; vuoto: nessuna previsione."
+    ),
 )
 LONG_HISTORY_DAYS = SourceParameter(
-    "profondita_lunga_giorni", "profondità lunga giorni", default=365, minimum=30, maximum=1000
+    "profondita_lunga_giorni",
+    "profondità lunga giorni",
+    default=365,
+    minimum=30,
+    maximum=1000,
+    description=(
+        "Giorni di candele giornaliere su cui si calcola la previsione per gli orizzonti di almeno un giorno. Da 30 a "
+        "1000. Predefinito: 365."
+    ),
 )
 
 FORECAST = SourceDefinition(

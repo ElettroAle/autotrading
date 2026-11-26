@@ -11,7 +11,9 @@ from autotrading.domain.sources.source_adapter_declaration import SourceAdapterD
 from autotrading.domain.sources.source_parameter import SourceParameter
 
 API_KEY = SourceConfigurationField("api_key", "Chiave API", secret=True)
-POSTS_COUNT = SourceParameter(POSTS, "numero messaggi", default=5, minimum=1, maximum=20)
+POSTS_COUNT = SourceParameter(
+    POSTS, "numero messaggi", default=5, minimum=1, maximum=20, description="Che cosa fa. Valori ammessi. Predefinito."
+)
 
 
 @dataclass(frozen=True, slots=True)

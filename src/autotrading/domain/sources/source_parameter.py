@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from autotrading.domain.sources.errors import (
     InvalidSourceParameterError,
@@ -24,7 +24,9 @@ class ParameterChoice:
 class SourceParameter:
     """A whole-number setting of a source, with the value a flow gets when it says nothing (R1.3.1, R1.3.2).
 
-    A parameter with choices admits only their values; one without admits every value of its range.
+    A parameter with choices admits only their values; one without admits every value of its range. Its description,
+    never blank, says what it does, the values it admits and its default: the text of its info button (ADR
+    descrizioni-dei-parametri-di-fonti-e-modelli).
     """
 
     key: str
@@ -35,20 +37,23 @@ class SourceParameter:
     choices: tuple[ParameterChoice, ...] = ()
     # The words of the refusal of a value out of the range, when the requirement fixes them (R5.5.4).
     range_reason: str | None = None
+    description: str = field(kw_only=True)
 
     def __post_init__(self) -> None:
-        if not self.minimum <= self.default <= self.maximum:
+        if not self.description.strip() or not self.minimum <= self.default <= self.maximum:
             raise InvalidSourceParameterError(self.key)
         if self.choices and self.default not in self._values:
             raise InvalidSourceParameterError(self.key)
 
     @classmethod
-    def of_choices(cls, key: str, label: str, *, default: int, choices: tuple[ParameterChoice, ...]) -> SourceParameter:
+    def of_choices(
+        cls, key: str, label: str, *, default: int, choices: tuple[ParameterChoice, ...], description: str
+    ) -> SourceParameter:
         """A parameter that admits only the values of its choices, from the lowest to the highest."""
         if not choices:
             raise InvalidSourceParameterError(key)
         values = [choice.value for choice in choices]
-        return cls(key, label, default, min(values), max(values), choices)
+        return cls(key, label, default, min(values), max(values), choices, description=description)
 
     @property
     def choice_labels(self) -> tuple[str, ...]:

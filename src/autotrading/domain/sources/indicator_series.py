@@ -21,11 +21,49 @@ from autotrading.domain.sources.technical_indicators import (
     simple_moving_average,
 )
 
-SERIES_LENGTH = SourceParameter("lunghezza_serie", "lunghezza serie", default=10, minimum=1, maximum=50)
-AVERAGE_PERIODS = SourceListParameter("medie_periodi", "medie periodi", (20, 50), 2, MAXIMUM_CANDLES)
-RSI_PERIODS = SourceListParameter("rsi_periodi", "rsi periodi", (7, 14), 2, MAXIMUM_CANDLES)
+SERIES_LENGTH = SourceParameter(
+    "lunghezza_serie",
+    "lunghezza serie",
+    default=10,
+    minimum=1,
+    maximum=50,
+    description=(
+        "Quanti valori recenti di ogni indicatore riceve l'agente, dal più vecchio al più nuovo. Da 1 a 50. "
+        "Predefinito: 10."
+    ),
+)
+AVERAGE_PERIODS = SourceListParameter(
+    "medie_periodi",
+    "medie periodi",
+    (20, 50),
+    2,
+    MAXIMUM_CANDLES,
+    description=(
+        "Periodi in candele delle medie mobili, esponenziale e semplice, una per periodo. Da 2 a 10000, al massimo 8 "
+        "valori. Predefinito: 20, 50; vuoto: nessuna media."
+    ),
+)
+RSI_PERIODS = SourceListParameter(
+    "rsi_periodi",
+    "rsi periodi",
+    (7, 14),
+    2,
+    MAXIMUM_CANDLES,
+    description=(
+        "Periodi in candele dell'RSI, uno per periodo. Da 2 a 10000, al massimo 8 valori. Predefinito: 7, 14; vuoto: "
+        "nessun RSI."
+    ),
+)
 RELATIVE_VOLUME_CANDLES = SourceListParameter(
-    "volume_relativo_candele", "volume relativo candele", (), 2, MAXIMUM_CANDLES
+    "volume_relativo_candele",
+    "volume relativo candele",
+    (),
+    2,
+    MAXIMUM_CANDLES,
+    description=(
+        "Candele con cui si confronta il volume dell'ultima candela chiusa: il volume relativo è il suo rapporto con "
+        "la media di quelle candele. Da 2 a 10000, al massimo 8 valori. Vuoto: nessun volume relativo."
+    ),
 )
 # The MACD needs history before its first value: the exchange is asked for at least this many more candles.
 WARM_UP = 100

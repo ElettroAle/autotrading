@@ -18,8 +18,28 @@ from autotrading.domain.sources.source_list_parameter import MAXIMUM_DAYS, Sourc
 from autotrading.domain.sources.source_parameter import SourceParameterValue
 from autotrading.domain.sources.timeframe import MINUTES_PER_DAY, Timeframe
 
-TREND_DAYS = SourceListParameter("tendenza_giorni", "tendenza giorni", (), 1, MAXIMUM_DAYS)
-CHANNEL_DAYS = SourceListParameter("canale_giorni", "canale giorni", (), 2, MAXIMUM_DAYS)
+TREND_DAYS = SourceListParameter(
+    "tendenza_giorni",
+    "tendenza giorni",
+    (),
+    1,
+    MAXIMUM_DAYS,
+    description=(
+        "Giorni della variazione percentuale tra l'ultima chiusura giornaliera e quella di tanti giorni prima, una "
+        "per valore. Da 1 a 3650, al massimo 8 valori. Vuoto: nessuna variazione a giorni."
+    ),
+)
+CHANNEL_DAYS = SourceListParameter(
+    "canale_giorni",
+    "canale giorni",
+    (),
+    2,
+    MAXIMUM_DAYS,
+    description=(
+        "Giorni del canale: massimo, minimo e punto medio delle chiusure giornaliere di quei giorni, uno per valore. "
+        "Da 2 a 3650, al massimo 8 valori. Vuoto: nessun canale."
+    ),
+)
 DAILY_TIMEFRAME = Timeframe(MINUTES_PER_DAY)
 PREFIX = "tendenza."
 LAST_CLOSE, LAST_CLOSE_AT = "ultima_chiusura", "ultima_chiusura_istante"

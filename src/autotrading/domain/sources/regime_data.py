@@ -28,14 +28,38 @@ CLOSE_SERIES_NAME = "chiusura"
 HUNDRED = Decimal(100)
 
 
-def _hours(key: str) -> SourceListParameter:
-    return SourceListParameter(key, key, (), 1, MAXIMUM_HOURS, range_reason=f"{key} va da 1 a {MAXIMUM_HOURS}")
+def _hours(key: str, what: str) -> SourceListParameter:
+    return SourceListParameter(
+        key,
+        key,
+        (),
+        1,
+        MAXIMUM_HOURS,
+        range_reason=f"{key} va da 1 a {MAXIMUM_HOURS}",
+        description=f"{what} Da 1 a {MAXIMUM_HOURS}, al massimo 8 valori. Vuoto: nessun valore.",
+    )
 
 
-EXTREMES_HOURS = _hours("estremi_ore")
-CHANGE_HOURS = _hours("variazione_ore")
+EXTREMES_HOURS = _hours(
+    "estremi_ore",
+    "Ore delle candele orarie chiuse di cui si danno minimo, massimo e distanza percentuale del prezzo da ciascuno, "
+    "una serie per valore.",
+)
+CHANGE_HOURS = _hours(
+    "variazione_ore",
+    "Ore della variazione percentuale del prezzo rispetto alla chiusura di tante ore fa, una per valore.",
+)
 CLOSE_SERIES = SourceParameter(
-    "serie_chiusure", "serie_chiusure", 0, 0, 1, range_reason="serie_chiusure vale 0 oppure 1"
+    "serie_chiusure",
+    "serie_chiusure",
+    0,
+    0,
+    1,
+    range_reason="serie_chiusure vale 0 oppure 1",
+    description=(
+        "Con 1 l'agente riceve anche i prezzi di chiusura delle candele dei due timeframe, tanti quanti la lunghezza "
+        "della serie. 0 oppure 1. Predefinito: 0."
+    ),
 )
 # The parameters the adapter of the market declares for the indicators, beside those of the source.
 REGIME_PARAMETERS = (EXTREMES_HOURS, CHANGE_HOURS, CLOSE_SERIES)
