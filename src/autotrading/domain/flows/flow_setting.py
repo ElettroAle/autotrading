@@ -31,3 +31,7 @@ class FlowSetting(StrEnum):
     TRAILING_STOP_DISTANCE = "trailing_stop.distance_percent"
     TRAILING_STOP_ACTIVATION = "trailing_stop.activation_percent"
     TRAILING_STOP_BREAKEVEN = "trailing_stop.breakeven_percent"
+    MAX_CONSECUTIVE_LOSSES = "consecutive_loss_limit.max_consecutive_losses"
+    LOSS_WINDOW_HOURS = "consecutive_loss_limit.loss_window_hours"
+    BLOCK_MINUTES = "consecutive_loss_limit.block_minutes"
+    LOSS_COUNT_SCOPE = "consecutive_loss_limit.count_scope"

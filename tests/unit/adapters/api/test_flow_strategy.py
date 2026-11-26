@@ -12,9 +12,15 @@ from autotrading.adapters.inbound.api.strategy_document import (
     StrategyFormatNotSupportedError,
     attachment_of,
 )
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest, TrailingStopRequest
+from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
+    MemoryRequest,
+    SourceRequest,
+    TrailingStopRequest,
+)
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.application.tenancy.resolve_tenant import ResolveTenantUseCase
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_strategy import FlowStrategy
@@ -105,6 +111,7 @@ def a_strategy() -> FlowStrategy:
         minimum_confidence=MinimumConfidence(55),
         memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
         trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
+        consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
     )
 
 
@@ -154,6 +161,13 @@ def test_the_document_carries_format_version_and_the_strategy_with_numbers_as_st
                 "remove_activation": False,
                 "remove_breakeven": False,
             },
+            "consecutive_loss_limit": {
+                "max_consecutive_losses": 2,
+                "loss_window_hours": 24,
+                "block_minutes": 120,
+                "count_scope": "flusso",
+                "remove_limit": False,
+            },
         },
     }
 
@@ -200,6 +214,7 @@ def test_the_document_becomes_the_command_of_the_import_with_the_chosen_name() -
         Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True
     )
     assert command.trailing_stop.applied_to(TrailingStop()) == a_strategy().trailing_stop
+    assert command.consecutive_loss_limit == ConsecutiveLossLimitRequest(2, 24, 120, "flusso")
 
 
 def test_a_document_without_model_or_limits_gives_them_empty() -> None:
@@ -216,6 +231,7 @@ def test_a_document_without_model_or_limits_gives_them_empty() -> None:
     )
     assert (command.max_total_margin_exposure_percent, command.max_total_value_exposure_percent) == (None, None)
     assert command.memory == MemoryRequest()
+    assert command.consecutive_loss_limit.applied_to(None) is None
 
 
 def test_a_document_before_the_adapters_gives_every_source_the_adapter_it_became() -> None:

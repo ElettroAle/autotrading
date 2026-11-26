@@ -7182,6 +7182,16 @@
           },
           "trailing_stop": {
             "$ref": "#/components/schemas/TrailingStopResponse"
+          },
+          "consecutive_loss_limit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsecutiveLossLimitResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -7206,10 +7216,95 @@
           "default_take_profit_percent",
           "minimum_confidence",
           "memory",
-          "trailing_stop"
+          "trailing_stop",
+          "consecutive_loss_limit"
         ],
         "title": "ConfigurationResponse",
         "description": "One configuration version of a flow."
+      },
+      "ConsecutiveLossLimitRequest": {
+        "properties": {
+          "max_consecutive_losses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Consecutive Losses"
+          },
+          "loss_window_hours": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loss Window Hours"
+          },
+          "block_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Minutes"
+          },
+          "count_scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count Scope"
+          },
+          "remove_limit": {
+            "type": "boolean",
+            "title": "Remove Limit",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ConsecutiveLossLimitRequest",
+        "description": "The limit of consecutive losses the user gives, whole (R5.5.2, ADR limite-di-perdite-consecutive-del-flusso).\n\nNothing given keeps the limit in force, none for a new flow; any part given replaces it, and the three numbers go\ntogether. `remove_limit` takes the whole limit away and prevails over the parts given with it."
+      },
+      "ConsecutiveLossLimitResponse": {
+        "properties": {
+          "max_consecutive_losses": {
+            "type": "integer",
+            "title": "Max Consecutive Losses"
+          },
+          "loss_window_hours": {
+            "type": "integer",
+            "title": "Loss Window Hours"
+          },
+          "block_minutes": {
+            "type": "integer",
+            "title": "Block Minutes"
+          },
+          "count_scope": {
+            "$ref": "#/components/schemas/LossCountScope"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_consecutive_losses",
+          "loss_window_hours",
+          "block_minutes",
+          "count_scope"
+        ],
+        "title": "ConsecutiveLossLimitResponse",
+        "description": "The limit of consecutive losses of a version (R5.5.2)."
       },
       "CredentialFieldResponse": {
         "properties": {
@@ -8343,6 +8438,9 @@
           },
           "trailing_stop": {
             "$ref": "#/components/schemas/TrailingStopRequest-Input"
+          },
+          "consecutive_loss_limit": {
+            "$ref": "#/components/schemas/ConsecutiveLossLimitRequest"
           }
         },
         "type": "object",
@@ -8823,6 +8921,9 @@
           },
           "trailing_stop": {
             "$ref": "#/components/schemas/TrailingStopRequest-Input"
+          },
+          "consecutive_loss_limit": {
+            "$ref": "#/components/schemas/ConsecutiveLossLimitRequest"
           }
         },
         "type": "object",
@@ -9335,6 +9436,16 @@
           "trailing_stop": {
             "$ref": "#/components/schemas/TrailingStopResponse"
           },
+          "consecutive_loss_limit": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsecutiveLossLimitResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "missing": {
             "items": {
               "type": "string"
@@ -9370,6 +9481,7 @@
           "minimum_confidence",
           "memory",
           "trailing_stop",
+          "consecutive_loss_limit",
           "missing"
         ],
         "title": "FlowResponse",
@@ -9510,6 +9622,13 @@
                 "type": "null"
               }
             ]
+          },
+          "reopening_blocks": {
+            "items": {
+              "$ref": "#/components/schemas/ReopeningBlockResponse"
+            },
+            "type": "array",
+            "title": "Reopening Blocks"
           }
         },
         "type": "object",
@@ -9526,10 +9645,11 @@
           "return_percent",
           "positions",
           "summary",
-          "openings_suspension"
+          "openings_suspension",
+          "reopening_blocks"
         ],
         "title": "FlowStateResponse",
-        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018)."
+        "description": "The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked\nfor (R6.4.2), why its openings are suspended, null when they are not (R3.3.2), and the openings blocked on a side\nafter consecutive losses, none without the limit (R5.5.2); amounts as strings (ADR 0018)."
       },
       "FlowStatisticsResponse": {
         "properties": {
@@ -10449,6 +10569,15 @@
         ],
         "title": "LinkedChatResponse",
         "description": "Whether the tenant has a linked chat, and which one as Telegram numbers it, for the dashboard to show it."
+      },
+      "LossCountScope": {
+        "type": "string",
+        "enum": [
+          "asset",
+          "flusso"
+        ],
+        "title": "LossCountScope",
+        "description": "Where the losses are counted and the openings blocked: on each asset alone, or on every asset of the flow\n(R5.5.2). The values are the words the user gives them with."
       },
       "MailSecurity": {
         "type": "string",
@@ -11707,6 +11836,47 @@
         "title": "ReconciliationAlarmResponse",
         "description": "An alarm on the balance of the account: open until confirmed (R3.3.1)."
       },
+      "ReopeningBlockResponse": {
+        "properties": {
+          "side": {
+            "$ref": "#/components/schemas/TradeSide"
+          },
+          "asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset"
+          },
+          "consecutive_losses": {
+            "type": "integer",
+            "title": "Consecutive Losses"
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "side",
+          "asset",
+          "consecutive_losses",
+          "until",
+          "text"
+        ],
+        "title": "ReopeningBlockResponse",
+        "description": "The openings on a side stopped after consecutive losses until an instant: on the asset, or on every asset of the\nflow when the asset is null, with the text the dashboard shows (R5.5.2)."
+      },
       "RiskLimitsResponse": {
         "properties": {
           "max_leverage": {
@@ -12513,6 +12683,9 @@
           },
           "trailing_stop": {
             "$ref": "#/components/schemas/TrailingStopRequest-Input"
+          },
+          "consecutive_loss_limit": {
+            "$ref": "#/components/schemas/ConsecutiveLossLimitRequest"
           }
         },
         "type": "object",
@@ -12655,6 +12828,9 @@
           },
           "trailing_stop": {
             "$ref": "#/components/schemas/TrailingStopRequest-Output"
+          },
+          "consecutive_loss_limit": {
+            "$ref": "#/components/schemas/ConsecutiveLossLimitRequest"
           }
         },
         "type": "object",

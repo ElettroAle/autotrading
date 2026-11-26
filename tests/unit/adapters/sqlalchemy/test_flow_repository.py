@@ -13,6 +13,7 @@ from autotrading.adapters.outbound.sqlalchemy.flow_repository import (
     document_of,
 )
 from autotrading.application.tenancy.errors import CrossTenantAccessError
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_memory import FlowMemory
 from autotrading.domain.flows.flow_name import FlowName
@@ -47,6 +48,7 @@ CONFIGURATION = replace(
     minimum_confidence=MinimumConfidence(60),
     memory=FlowMemory(active=True, decisions=5, days=14, text_length=None, all_decisions=True),
     trailing_stop=TrailingStop(Decimal(2), Decimal(3), Decimal("1.5"), max_profit_in_context=True),
+    consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
 )
 
 
@@ -83,6 +85,12 @@ def test_the_configuration_is_saved_as_json_with_numbers_as_text() -> None:
             "activation_percent": "3",
             "breakeven_percent": "1.5",
             "max_profit_in_context": True,
+        },
+        "consecutive_loss_limit": {
+            "max_consecutive_losses": 2,
+            "loss_window_hours": 24,
+            "block_minutes": 120,
+            "count_scope": "flusso",
         },
     }
 
@@ -271,3 +279,18 @@ def test_a_version_saved_before_the_stop_that_follows_the_price_reads_it_empty()
     del document["trailing_stop"]
 
     assert configuration_of(1, document).trailing_stop == TrailingStop()
+
+
+def test_a_flow_without_the_limit_of_consecutive_losses_saves_it_empty_and_reads_it_back_empty() -> None:
+    document = json.loads(json.dumps(document_of(replace(CONFIGURATION, consecutive_loss_limit=None))))
+
+    assert document["consecutive_loss_limit"] is None
+    assert configuration_of(1, document).consecutive_loss_limit is None
+
+
+def test_a_version_saved_before_the_limit_of_consecutive_losses_reads_it_absent() -> None:
+    """R5.5.2: the flows already there get no new version, and nothing blocks their reopenings."""
+    document = document_of(CONFIGURATION)
+    del document["consecutive_loss_limit"]
+
+    assert configuration_of(1, document).consecutive_loss_limit is None

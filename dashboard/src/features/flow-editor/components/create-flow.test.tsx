@@ -245,6 +245,8 @@ describe('CreateFlow', () => {
         breakeven_percent: null,
         max_profit_in_context: false,
       },
+      // Left untouched, no reopening is ever blocked: the flow behaves as before (R5.5.2).
+      consecutive_loss_limit: null,
     });
     const row = within(await screen.findByRole('list', { name: 'Flussi' })).getByRole('listitem');
     expect(row).toHaveTextContent('alfa');

@@ -109,7 +109,7 @@ from autotrading.application.flows.read_flow_cost import ReadFlowCostUseCase
 from autotrading.application.flows.read_flow_equity import ReadFlowEquityUseCase
 from autotrading.application.flows.read_flow_memory import ReadFlowMemoryUseCase
 from autotrading.application.flows.read_flow_results import FlowPeriodPorts, ReadFlowResultsUseCase
-from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
 from autotrading.application.flows.read_flow_statistics import ReadFlowStatisticsUseCase
 from autotrading.application.flows.read_forecast_accuracy import ReadForecastAccuracyUseCase
 from autotrading.application.flows.read_free_capital import ReadFreeCapitalUseCase
@@ -378,6 +378,7 @@ class TenantUseCases:
             ports.account_activity,
             ports.flow_ledger,
             OpenPositionRecords(ports.exit_plans, ports.protection_levels, ports.watched_positions),
+            ClosingReadings(ports.closed_positions, ports.clock),
         )
         return cls(
             register_account=RegisterAccountUseCase(

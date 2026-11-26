@@ -87,6 +87,7 @@ const FLOW: Flow = {
     breakeven_percent: null,
     max_profit_in_context: false,
   },
+  consecutive_loss_limit: null,
 };
 
 const CUSTOM: Flow = { ...FLOW, system_prompt: '{instructions}', system_prompt_is_default: false };
@@ -150,6 +151,48 @@ describe('creationRequestOf', () => {
         remove_activation: true,
         remove_breakeven: true,
       },
+      consecutive_loss_limit: {
+        max_consecutive_losses: null,
+        loss_window_hours: null,
+        block_minutes: null,
+        count_scope: null,
+        remove_limit: true,
+      },
+    });
+  });
+
+  // ADR blocco-delle-riaperture-nella-dashboard: the three blank take the limit away, the API checks the values.
+  it('sends the block of the reopenings the user typed, with its scope (R5.5.2)', () => {
+    const consecutive_loss_limit = {
+      max_consecutive_losses: ' 2 ',
+      loss_window_hours: '24',
+      block_minutes: '120',
+      count_scope: 'flusso' as const,
+    };
+
+    expect(creationRequestOf(filled({ consecutive_loss_limit })).consecutive_loss_limit).toEqual({
+      max_consecutive_losses: 2,
+      loss_window_hours: 24,
+      block_minutes: 120,
+      count_scope: 'flusso',
+      remove_limit: false,
+    });
+  });
+
+  it('sends a part left blank as missing, so the API says the three go together (R5.5.2)', () => {
+    const consecutive_loss_limit = {
+      max_consecutive_losses: '2',
+      loss_window_hours: '',
+      block_minutes: '',
+      count_scope: 'asset' as const,
+    };
+
+    expect(creationRequestOf(filled({ consecutive_loss_limit })).consecutive_loss_limit).toEqual({
+      max_consecutive_losses: 2,
+      loss_window_hours: null,
+      block_minutes: null,
+      count_scope: 'asset',
+      remove_limit: false,
     });
   });
 
@@ -333,6 +376,12 @@ describe('formValuesOf', () => {
         breakeven_percent: '',
         max_profit_in_context: false,
       },
+      consecutive_loss_limit: {
+        max_consecutive_losses: '',
+        loss_window_hours: '',
+        block_minutes: '',
+        count_scope: 'asset',
+      },
     });
   });
 
@@ -352,6 +401,31 @@ describe('formValuesOf', () => {
       activation_percent: '',
       breakeven_percent: '1.5',
       max_profit_in_context: true,
+    });
+  });
+
+  it('fills the block of the reopenings of the flow, and blanks with the scope of the asset without one (R5.5.2)', () => {
+    const flow: Flow = {
+      ...FLOW,
+      consecutive_loss_limit: {
+        max_consecutive_losses: 2,
+        loss_window_hours: 24,
+        block_minutes: 120,
+        count_scope: 'flusso',
+      },
+    };
+
+    expect(formValuesOf(flow).consecutive_loss_limit).toEqual({
+      max_consecutive_losses: '2',
+      loss_window_hours: '24',
+      block_minutes: '120',
+      count_scope: 'flusso',
+    });
+    expect(formValuesOf(FLOW).consecutive_loss_limit).toEqual({
+      max_consecutive_losses: '',
+      loss_window_hours: '',
+      block_minutes: '',
+      count_scope: 'asset',
     });
   });
 
@@ -654,6 +728,50 @@ describe('changesOf', () => {
     });
   });
 
+  it('sends the block of the reopenings the user set, and its removal when the user emptied it (R5.5.2)', () => {
+    const limited: Flow = {
+      ...FLOW,
+      consecutive_loss_limit: {
+        max_consecutive_losses: 2,
+        loss_window_hours: 24,
+        block_minutes: 120,
+        count_scope: 'asset',
+      },
+    };
+    const set = { ...formValuesOf(FLOW).consecutive_loss_limit, max_consecutive_losses: '2' };
+    const emptied = { ...formValuesOf(limited).consecutive_loss_limit, loss_window_hours: '' };
+    const values = { max_consecutive_losses: '', loss_window_hours: '', block_minutes: '' };
+    const removed = { ...formValuesOf(limited).consecutive_loss_limit, ...values };
+
+    expect(changesOf(limited, formValuesOf(limited))).toEqual({ settings: {} });
+    expect(
+      changesOf(FLOW, {
+        ...formValuesOf(FLOW),
+        consecutive_loss_limit: { ...set, loss_window_hours: '24', block_minutes: '120' },
+      }).settings.consecutive_loss_limit,
+    ).toEqual({
+      max_consecutive_losses: 2,
+      loss_window_hours: 24,
+      block_minutes: 120,
+      count_scope: 'asset',
+      remove_limit: false,
+    });
+    expect(
+      changesOf(limited, { ...formValuesOf(limited), consecutive_loss_limit: emptied }).settings
+        .consecutive_loss_limit?.loss_window_hours,
+    ).toBeNull();
+    expect(
+      changesOf(limited, { ...formValuesOf(limited), consecutive_loss_limit: removed }).settings
+        .consecutive_loss_limit,
+    ).toEqual({
+      max_consecutive_losses: null,
+      loss_window_hours: null,
+      block_minutes: null,
+      count_scope: null,
+      remove_limit: true,
+    });
+  });
+
   it('sends a system prompt the user wrote, and null to go back to the default', () => {
     const written = {
       ...formValuesOf(FLOW),
@@ -752,6 +870,21 @@ describe('formFieldOf', () => {
       'trailing_stop.activation_percent',
     );
     expect(formFieldOf('trailing_stop.breakeven_percent')).toBe('trailing_stop.breakeven_percent');
+  });
+
+  it('places a refusal of the block of the reopenings on its part (R5.5.2)', () => {
+    expect(formFieldOf('consecutive_loss_limit.max_consecutive_losses')).toBe(
+      'consecutive_loss_limit.max_consecutive_losses',
+    );
+    expect(formFieldOf('consecutive_loss_limit.loss_window_hours')).toBe(
+      'consecutive_loss_limit.loss_window_hours',
+    );
+    expect(formFieldOf('consecutive_loss_limit.block_minutes')).toBe(
+      'consecutive_loss_limit.block_minutes',
+    );
+    expect(formFieldOf('consecutive_loss_limit.count_scope')).toBe(
+      'consecutive_loss_limit.count_scope',
+    );
   });
 
   it('places nowhere a setting the form does not have', () => {

@@ -48,6 +48,12 @@ const memoryText = (memory: Configuration['memory']): string => {
   return `attiva, ${memory.decisions} decisioni, ${memory.days} giorni, ${motive}, ${which}`;
 };
 
+// The block of the reopenings as the API writes it in its differences (R5.5.2).
+const consecutiveLossLimitText = (limit: Configuration['consecutive_loss_limit']): string =>
+  limit === null
+    ? NONE
+    : `${limit.max_consecutive_losses} perdite consecutive in ${limit.loss_window_hours} ore, blocco di ${limit.block_minutes} minuti, ambito ${limit.count_scope}`;
+
 /**
  * The parts of a configuration with the names the API gives them in its differences (R1.1.3), so the comparison
  * highlights a row by the name of the part the API reports as changed.
@@ -120,6 +126,10 @@ export const configurationRows = (configuration: Configuration): ConfigurationRo
     },
     { part: 'perdita massima dal picco', value: percentText(configuration.max_drawdown_percent) },
     { part: 'ripresa delle aperture', value: RESUME_LABELS[configuration.openings_resume] },
+    {
+      part: 'blocco delle riaperture dopo perdite consecutive',
+      value: consecutiveLossLimitText(configuration.consecutive_loss_limit),
+    },
     { part: 'memoria', value: memoryText(configuration.memory) },
   ];
 };

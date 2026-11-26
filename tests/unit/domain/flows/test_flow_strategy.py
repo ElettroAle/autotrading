@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import RepeatedSourceError, StrategyModelMissingError
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
@@ -38,6 +39,7 @@ def a_strategy() -> FlowStrategy:
         protection_defaults=ProtectionDefaults(Decimal(3), Decimal(9)),
         minimum_confidence=MinimumConfidence(55),
         memory=FlowMemory(active=True, decisions=4, days=9),
+        consecutive_loss_limit=ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW),
     )
 
 
@@ -56,6 +58,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         protection_defaults=ProtectionDefaults(Decimal(2), None),
         minimum_confidence=MinimumConfidence(70),
         memory=FlowMemory(active=True, decisions=5, days=14),
+        consecutive_loss_limit=ConsecutiveLossLimit(3, 12, 60),
     )
 
     strategy = FlowStrategy.of(configuration)
@@ -75,6 +78,7 @@ def test_the_strategy_of_a_configuration_keeps_all_but_account_capital_and_asset
         protection_defaults=ProtectionDefaults(Decimal(2), None),
         minimum_confidence=MinimumConfidence(70),
         memory=FlowMemory(active=True, decisions=5, days=14),
+        consecutive_loss_limit=ConsecutiveLossLimit(3, 12, 60),
     )
 
 
@@ -90,6 +94,7 @@ def test_a_strategy_leaves_the_risk_option_off_unless_chosen() -> None:
         protection_defaults=ProtectionDefaults(),
         minimum_confidence=None,
         memory=FlowMemory(),
+        consecutive_loss_limit=None,
     )
 
     assert (

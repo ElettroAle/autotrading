@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -6,6 +7,7 @@ from autotrading.domain.flows.closed_position import CloseReason
 from autotrading.domain.flows.exit_plan import ExitPlan, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
 from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK
+from autotrading.domain.flows.reopening_block import ReopeningBlock
 from autotrading.domain.flows.risk_check import AssetLimits, RiskCheck, RiskPolicy, RiskState
 from autotrading.domain.flows.risk_limits import RiskLimits
 from autotrading.domain.flows.risk_outcome import (
@@ -39,6 +41,7 @@ def check(
     open_value: str = "0",
     openings_suspended: str | None = None,
     minimum_confidence: int | None = None,
+    reopening_blocks: tuple[ReopeningBlock, ...] = (),
 ) -> RiskCheck:
     open_sides = open_sides or {}
     limits = RiskLimits(
@@ -56,6 +59,7 @@ def check(
         Decimal(open_margin),
         Decimal(open_value),
         openings_suspended=openings_suspended,
+        reopening_blocks=reopening_blocks,
     )
     return RiskCheck(RiskPolicy(limits, bring_to_minimum, MinimumConfidence.optional(minimum_confidence)), state)
 
@@ -703,3 +707,53 @@ def test_an_update_without_a_stop_is_left_as_it_is_by_the_stop_that_follows_the_
     change = ExitPlanChange(target=Decimal(66000))
 
     assert trailing().outcome(UpdateIntent("BTC", change), market) == ApprovedUpdate("BTC", change, ())
+
+
+# R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive.
+SHORTS_ON_NEAR = ReopeningBlock(TradeSide.SHORT, "NEAR", 2, datetime(2026, 11, 26, 15, 30, tzinfo=UTC))
+SHORTS_IN_THE_FLOW = ReopeningBlock(TradeSide.SHORT, None, 2, datetime(2026, 11, 26, 15, 30, tzinfo=UTC))
+
+
+def test_an_opening_on_a_side_blocked_after_consecutive_losses_is_blocked_with_the_reason_of_the_block() -> None:
+    blocked = check(reopening_blocks=(SHORTS_ON_NEAR,))
+
+    outcome = blocked.outcome(opening("0.01", 2, "NEAR", TradeSide.SHORT), EXCHANGE)
+
+    assert outcome == BlockedDecision("NEAR", SHORTS_ON_NEAR.opening_reason("NEAR"))
+
+
+def test_a_block_after_consecutive_losses_leaves_the_other_side_and_the_other_assets_alone() -> None:
+    blocked = check(reopening_blocks=(SHORTS_ON_NEAR,))
+
+    approved(blocked.outcome(opening("0.01", 2, "NEAR", TradeSide.LONG), EXCHANGE))
+    approved(blocked.outcome(opening("0.01", 2, "SUI", TradeSide.SHORT), EXCHANGE))
+
+
+def test_a_block_of_the_flow_blocks_its_side_on_every_asset() -> None:
+    blocked = check(reopening_blocks=(SHORTS_IN_THE_FLOW,))
+
+    outcome = blocked.outcome(opening("0.01", 2, "SUI", TradeSide.SHORT), EXCHANGE)
+
+    assert outcome == BlockedDecision("SUI", SHORTS_IN_THE_FLOW.opening_reason("SUI"))
+
+
+def test_a_block_after_consecutive_losses_lets_the_close_of_a_reversal_through() -> None:
+    blocked = check(reopening_blocks=(SHORTS_ON_NEAR,), open_sides={"NEAR": TradeSide.LONG})
+
+    outcome = blocked.outcome(ReverseIntent("NEAR", Decimal("0.01"), 2, 70, ExitPlan()), EXCHANGE)
+
+    assert isinstance(outcome, ApprovedClose)
+    assert outcome.reopening is not None
+    assert outcome.reopening.side is TradeSide.SHORT
+
+
+def test_the_suspension_of_the_openings_comes_before_a_block_after_consecutive_losses() -> None:
+    both = check(openings_suspended=MAXIMUM_LOSS_BLOCK, reopening_blocks=(SHORTS_ON_NEAR,))
+
+    outcome = both.outcome(opening("0.01", 2, "NEAR", TradeSide.SHORT), EXCHANGE)
+
+    assert outcome == BlockedDecision.opening("NEAR", MAXIMUM_LOSS_BLOCK)
+
+
+def test_an_opening_without_the_limits_of_the_exchange_is_held() -> None:
+    assert check().outcome(opening("0.01", 2), None) == HeldPosition("BTC")

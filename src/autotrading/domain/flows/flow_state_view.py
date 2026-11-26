@@ -25,7 +25,8 @@ class PositionView:
 @dataclass(frozen=True, slots=True)
 class FlowStateView:
     """The state of the flow alone, as the agent and the record of the cycle see it: never the balance of the
-    account, never another flow (R1.4.3).
+    account, never another flow (R1.4.3); with the blocks of the openings in force after consecutive losses, as text
+    (R5.5.2).
     """
 
     currency: str
@@ -36,3 +37,4 @@ class FlowStateView:
     # None when no return can be measured (R3.4.3).
     return_percent: Decimal | None
     positions: tuple[PositionView, ...]
+    reopening_blocks: tuple[str, ...] = ()

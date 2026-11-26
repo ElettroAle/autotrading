@@ -160,6 +160,34 @@ class TrailingBreakevenNotPositiveError(FlowSettingError):
         super().__init__("il pareggio è maggiore di 0", FlowSetting.TRAILING_STOP_BREAKEVEN)
 
 
+class ConsecutiveLossPartsApartError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__(
+            "perdite consecutive massime, finestra delle perdite e durata del blocco si impostano insieme",
+            FlowSetting.MAX_CONSECUTIVE_LOSSES,
+        )
+
+
+class MaxConsecutiveLossesBelowOneError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("le perdite consecutive massime sono almeno 1", FlowSetting.MAX_CONSECUTIVE_LOSSES)
+
+
+class LossWindowBelowOneHourError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("la finestra delle perdite è di almeno 1 ora", FlowSetting.LOSS_WINDOW_HOURS)
+
+
+class BlockBelowOneMinuteError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("la durata del blocco è di almeno 1 minuto", FlowSetting.BLOCK_MINUTES)
+
+
+class LossCountScopeNotAllowedError(FlowSettingError):
+    def __init__(self) -> None:
+        super().__init__("l'ambito del conteggio è asset oppure flusso", FlowSetting.LOSS_COUNT_SCOPE)
+
+
 class CapitalAboveFreeCapitalError(FlowSettingError):
     def __init__(self, free_capital: str) -> None:
         super().__init__(f"capitale allocato oltre il capitale libero: {free_capital}", FlowSetting.ALLOCATED_CAPITAL)

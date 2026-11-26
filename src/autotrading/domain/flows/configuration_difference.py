@@ -24,6 +24,7 @@ TRAILING_DISTANCE = "distanza dello stop che segue"
 TRAILING_ACTIVATION = "attivazione dello stop che segue"
 TRAILING_BREAKEVEN = "pareggio"
 TRAILING_MAX_PROFIT = "massimo profitto raggiunto nel contesto dell'agente"
+CONSECUTIVE_LOSS_LIMIT = "blocco delle riaperture dopo perdite consecutive"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,4 +117,5 @@ _PARTS: tuple[tuple[str, Callable[[FlowConfiguration], str]], ...] = (
     (TRAILING_ACTIVATION, lambda configuration: _percent(configuration.trailing_stop.activation_percent)),
     (TRAILING_BREAKEVEN, lambda configuration: _percent(configuration.trailing_stop.breakeven_percent)),
     (TRAILING_MAX_PROFIT, lambda configuration: "sì" if configuration.trailing_stop.max_profit_in_context else "no"),
+    (CONSECUTIVE_LOSS_LIMIT, lambda configuration: str(configuration.consecutive_loss_limit or NONE)),
 )

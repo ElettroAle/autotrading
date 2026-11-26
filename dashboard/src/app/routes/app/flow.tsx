@@ -4,12 +4,14 @@ import { DashboardLayout } from '@/components/layouts/dashboard-layout';
 import { PeriodSelector } from '@/components/ui/period-selector/period-selector';
 import { FlowCommands } from '@/features/flow-commands/components/flow-commands';
 import { OpeningsSuspension } from '@/features/flow-commands/components/openings-suspension';
+import { ReopeningBlocks } from '@/features/flow-commands/components/reopening-blocks';
 import { FlowTabs } from '@/features/flows/components/flow-tabs';
 import { FlowView } from '@/features/flows/components/flow-view';
 import { IntervalLabel } from '@/features/flows/components/interval-label';
 import { useFlowTitle } from '@/features/flows/hooks/use-flow-title';
 
-// The page of the flow: its name, its status, the suspension of its openings whatever the cause (R3.2.2, R3.3.2) and
+// The page of the flow: its name, its status, the suspension of its openings whatever the cause (R3.2.2, R3.3.2), the
+// reopenings stopped after consecutive losses beside it (R5.5.2) and
 // the commands, the period, the tabs and the tab chosen, in this order; the period sits above the tabs and holds for
 // all of them (R6.4.3, ADR pagina-del-flusso-a-schede-sotto-un-periodo-comune). Reading and commands of every day only:
 // the emergency closing of the flow and Archivia are in its settings (ADR impostazioni-del-flusso-dall-ingranaggio).
@@ -23,6 +25,7 @@ export const FlowRoute = () => {
         renderCommands={(flow, realMoney) => (
           <>
             <OpeningsSuspension flowId={flow.id} />
+            <ReopeningBlocks flowId={flow.id} />
             <FlowCommands
               flowId={flow.id}
               flowName={flow.name}

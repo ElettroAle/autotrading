@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import (
     AllocatedCapitalNotPositiveError,
@@ -79,6 +80,8 @@ class FlowConfiguration:
     memory: FlowMemory = field(default_factory=FlowMemory)
     # Empty and off unless the user sets it: the stop moves only when the agent updates it (R5.5.1).
     trailing_stop: TrailingStop = field(default_factory=TrailingStop)
+    # None unless the user sets it: consecutive losses on a side never block the openings on it (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimit | None = None
 
     def __post_init__(self) -> None:
         names = [source.name for source in self.sources]

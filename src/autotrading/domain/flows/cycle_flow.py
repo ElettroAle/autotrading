@@ -61,7 +61,8 @@ class CycleFlow:
     def risk_state(self, *, loss_suspension: OpeningsSuspension | None = None) -> RiskState:
         """The margin of the open positions is the one the exchange declares, as in the liquidity (ADR 0067); their
         value is at the mark price (R3.2.1). The openings are suspended by what the guard of the losses found (R3.2.2)
-        or by an alarm of reconciliation on the account (R3.3.1).
+        or by an alarm of reconciliation on the account (R3.3.1), and blocked on a side after consecutive losses
+        (R5.5.2).
         """
         attributed = self.attributed
         suspension = self.openings_suspension(loss_suspension)
@@ -74,6 +75,7 @@ class CycleFlow:
             open_value=sum((position.size * position.mark_price for position in attributed.positions), Decimal(0)),
             openings_suspended=None if suspension is None else suspension.blocked_reason,
             trailing_stops=frozendict(self._trailing_stops()),
+            reopening_blocks=attributed.reopening_blocks,
         )
 
     def _trailing_stops(self) -> dict[str, Decimal]:
@@ -135,4 +137,5 @@ class CycleFlow:
                 )
                 for position in self.positions
             ),
+            reopening_blocks=tuple(block.state_text for block in self.attributed.reopening_blocks),
         )

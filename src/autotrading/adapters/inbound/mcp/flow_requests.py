@@ -9,6 +9,7 @@ from typing import Literal, TypedDict
 from uuid import UUID
 
 from autotrading.application.flows.create_flow import (
+    ConsecutiveLossLimitRequest,
     CreateFlowCommand,
     MemoryRequest,
     SourceRequest,
@@ -80,6 +81,7 @@ class _StrategyArguments(TypedDict):
     minimum_confidence: int | None
     memory: MemoryRequest
     trailing_stop: TrailingStopRequest
+    consecutive_loss_limit: ConsecutiveLossLimitRequest
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -106,6 +108,7 @@ class FlowStrategy:
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
 
     def _strategy_arguments(self) -> _StrategyArguments:
         return _StrategyArguments(
@@ -129,6 +132,7 @@ class FlowStrategy:
             minimum_confidence=self.minimum_confidence,
             memory=self.memory,
             trailing_stop=self.trailing_stop,
+            consecutive_loss_limit=self.consecutive_loss_limit,
         )
 
 
@@ -196,6 +200,7 @@ class FlowModification:
     minimum_confidence: int | None = None
     memory: MemoryRequest = field(default_factory=MemoryRequest)
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
     remove: list[RemovablePart] = field(default_factory=list)
 
     def command(self, flow_id: UUID) -> ModifyFlowCommand:
@@ -237,4 +242,5 @@ class FlowModification:
             remove_minimum_confidence="minimum_confidence" in removed,
             memory=self.memory,
             trailing_stop=self.trailing_stop,
+            consecutive_loss_limit=self.consecutive_loss_limit,
         )

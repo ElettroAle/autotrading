@@ -207,7 +207,7 @@ from autotrading.application.flows.read_cycle_flow import CycleAccountReadings, 
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_cycle_source import ReadCycleSourceUseCase
 from autotrading.application.flows.read_flow_activity import ReadFlowActivityUseCase
-from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
+from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
 )
@@ -639,6 +639,7 @@ def cycle_of(
                     activity,
                     ledger,
                     records,
+                    ClosingReadings(closed_positions, clock.now),
                 ),
                 reconcile_for_cycle,
             ),

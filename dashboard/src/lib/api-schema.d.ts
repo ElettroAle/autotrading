@@ -2035,6 +2035,42 @@ export interface components {
             minimum_confidence: number | null;
             memory: components["schemas"]["FlowMemory"];
             trailing_stop: components["schemas"]["TrailingStopResponse"];
+            consecutive_loss_limit: components["schemas"]["ConsecutiveLossLimitResponse"] | null;
+        };
+        /**
+         * ConsecutiveLossLimitRequest
+         * @description The limit of consecutive losses the user gives, whole (R5.5.2, ADR limite-di-perdite-consecutive-del-flusso).
+         *
+         *     Nothing given keeps the limit in force, none for a new flow; any part given replaces it, and the three numbers go
+         *     together. `remove_limit` takes the whole limit away and prevails over the parts given with it.
+         */
+        ConsecutiveLossLimitRequest: {
+            /** Max Consecutive Losses */
+            max_consecutive_losses?: number | null;
+            /** Loss Window Hours */
+            loss_window_hours?: number | null;
+            /** Block Minutes */
+            block_minutes?: number | null;
+            /** Count Scope */
+            count_scope?: string | null;
+            /**
+             * Remove Limit
+             * @default false
+             */
+            remove_limit: boolean;
+        };
+        /**
+         * ConsecutiveLossLimitResponse
+         * @description The limit of consecutive losses of a version (R5.5.2).
+         */
+        ConsecutiveLossLimitResponse: {
+            /** Max Consecutive Losses */
+            max_consecutive_losses: number;
+            /** Loss Window Hours */
+            loss_window_hours: number;
+            /** Block Minutes */
+            block_minutes: number;
+            count_scope: components["schemas"]["LossCountScope"];
         };
         /** CredentialFieldResponse */
         CredentialFieldResponse: {
@@ -2454,6 +2490,7 @@ export interface components {
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
+            consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
         };
         /**
          * FlowEmergencyOutcomeResponse
@@ -2600,6 +2637,7 @@ export interface components {
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
+            consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
         };
         /**
          * FlowOverviewResponse
@@ -2758,6 +2796,7 @@ export interface components {
             minimum_confidence: number | null;
             memory: components["schemas"]["FlowMemory"];
             trailing_stop: components["schemas"]["TrailingStopResponse"];
+            consecutive_loss_limit: components["schemas"]["ConsecutiveLossLimitResponse"] | null;
             /** Missing */
             missing: string[];
         };
@@ -2786,7 +2825,8 @@ export interface components {
         /**
          * FlowStateResponse
          * @description The state of a flow attributed from the exchange at the request (R1.6.1), with its results in the period asked
-         *     for (R6.4.2) and why its openings are suspended, null when they are not (R3.3.2); amounts as strings (ADR 0018).
+         *     for (R6.4.2), why its openings are suspended, null when they are not (R3.3.2), and the openings blocked on a side
+         *     after consecutive losses, none without the limit (R5.5.2); amounts as strings (ADR 0018).
          */
         FlowStateResponse: {
             /**
@@ -2816,6 +2856,8 @@ export interface components {
             positions: components["schemas"]["FlowPositionResponse"][];
             summary: components["schemas"]["FlowResultsResponse"];
             openings_suspension: components["schemas"]["OpeningsSuspensionResponse"] | null;
+            /** Reopening Blocks */
+            reopening_blocks: components["schemas"]["ReopeningBlockResponse"][];
         };
         /**
          * FlowStatisticsResponse
@@ -3183,6 +3225,13 @@ export interface components {
             /** Chat Id */
             chat_id: number | null;
         };
+        /**
+         * LossCountScope
+         * @description Where the losses are counted and the openings blocked: on each asset alone, or on every asset of the flow
+         *     (R5.5.2). The values are the words the user gives them with.
+         * @enum {string}
+         */
+        LossCountScope: "asset" | "flusso";
         /**
          * MailSecurity
          * @description How the connection to the mail server of the tenant is protected, by the words the user reads (R3.5.5): from the
@@ -3665,6 +3714,25 @@ export interface components {
             /** Confirmed At */
             confirmed_at: string | null;
         };
+        /**
+         * ReopeningBlockResponse
+         * @description The openings on a side stopped after consecutive losses until an instant: on the asset, or on every asset of the
+         *     flow when the asset is null, with the text the dashboard shows (R5.5.2).
+         */
+        ReopeningBlockResponse: {
+            side: components["schemas"]["TradeSide"];
+            /** Asset */
+            asset: string | null;
+            /** Consecutive Losses */
+            consecutive_losses: number;
+            /**
+             * Until
+             * Format: date-time
+             */
+            until: string;
+            /** Text */
+            text: string;
+        };
         /** RiskLimitsResponse */
         RiskLimitsResponse: {
             /** Max Leverage */
@@ -3928,6 +3996,7 @@ export interface components {
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Input"];
+            consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
         };
         /**
          * StrategyBody
@@ -3970,6 +4039,7 @@ export interface components {
             minimum_confidence?: number | null;
             memory?: components["schemas"]["MemoryRequest"];
             trailing_stop?: components["schemas"]["TrailingStopRequest-Output"];
+            consecutive_loss_limit?: components["schemas"]["ConsecutiveLossLimitRequest"];
         };
         /**
          * StrategyDocument

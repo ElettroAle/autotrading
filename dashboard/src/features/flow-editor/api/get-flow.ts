@@ -65,6 +65,15 @@ export const flowSchema = z.object({
     breakeven_percent: z.string().nullable(),
     max_profit_in_context: z.boolean(),
   }),
+  // Null unless the user sets it: no reopening is ever blocked (R5.5.2).
+  consecutive_loss_limit: z
+    .object({
+      max_consecutive_losses: z.number(),
+      loss_window_hours: z.number(),
+      block_minutes: z.number(),
+      count_scope: z.enum(['asset', 'flusso']),
+    })
+    .nullable(),
 });
 
 export type Flow = z.infer<typeof flowSchema>;

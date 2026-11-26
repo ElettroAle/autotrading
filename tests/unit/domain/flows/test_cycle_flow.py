@@ -13,6 +13,7 @@ from autotrading.domain.flows.flow_state import FlowState
 from autotrading.domain.flows.flow_state_view import FlowStateView, PositionView
 from autotrading.domain.flows.openings_suspension import MAXIMUM_LOSS_BLOCK, OpeningsSuspension
 from autotrading.domain.flows.reconciliation_alarm import ReconciliationAlarm
+from autotrading.domain.flows.reopening_block import ReopeningBlock
 from autotrading.domain.flows.risk_check import RiskState
 from autotrading.domain.flows.selections import ActiveSource, AdapterSelection, SourceSelection
 from autotrading.domain.flows.trade_side import TradeSide
@@ -211,3 +212,25 @@ def test_the_agent_sees_the_largest_profit_reached_only_with_the_option_on() -> 
 
     assert [position.max_profit for position in on.state_view().positions] == [Decimal(10)]
     assert [position.max_profit for position in off.state_view().positions] == [None]
+
+
+# R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive.
+SHORTS_ON_BTC = ReopeningBlock(TradeSide.SHORT, "BTC", 2, datetime(2026, 11, 12, 11, 30, tzinfo=UTC))
+
+
+def test_the_risk_receives_the_blocks_of_the_openings_the_state_has() -> None:
+    flow = cycle_flow(attributed().blocking((SHORTS_ON_BTC,)))
+
+    assert flow.risk_state().reopening_blocks == (SHORTS_ON_BTC,)
+
+
+def test_the_agent_reads_the_blocks_of_the_openings_as_the_state_tells_them() -> None:
+    flow = cycle_flow(attributed().blocking((SHORTS_ON_BTC,)))
+
+    assert flow.state_view().reopening_blocks == (
+        "riaperture short su BTC ferme fino alle 11:30: 2 perdite consecutive",
+    )
+
+
+def test_without_a_block_the_agent_reads_none() -> None:
+    assert cycle_flow(attributed()).state_view().reopening_blocks == ()

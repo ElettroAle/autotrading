@@ -182,3 +182,25 @@ def test_the_accounts_are_read_without_their_credentials(flows: Flows) -> None:
     assert account == {
         name: shown[name] for name in ("id", "name", "exchange", "network", "allocated_capital", "currency")
     }
+
+
+def test_the_limit_of_consecutive_losses_and_its_blocks_are_those_of_the_api() -> None:
+    # R5.5.2, ADR controllo-delle-riaperture-dopo-perdite-consecutive.
+    flows = Flows()
+    limit = {"max_consecutive_losses": 1, "loss_window_hours": 24, "block_minutes": 600}
+    modified = flows.mcp.call_as(
+        "anna", "modify_flow", {"flow_id": flows.flow_id, "modification": {"consecutive_loss_limit": limit}}
+    )
+    assert not modified.is_error, body_of(modified)
+    flows.cycles.platform.closed_positions.positions[0] = replace(
+        flows.cycles.platform.closed_positions.positions[0], fees=Decimal(5)
+    )
+    flows.cycles.platform.now = at("10:00")
+
+    state = flows.read("read_flow_state", {"flow_id": flows.flow_id})
+
+    assert body_of(modified)["consecutive_loss_limit"] == {**limit, "count_scope": "asset"}
+    assert state == flows.shown(f"/flows/{flows.flow_id}/state")
+    assert [block["text"] for block in state["reopening_blocks"]] == [
+        "riaperture short su BTC ferme fino alle 19:00: 1 perdita consecutiva"
+    ]

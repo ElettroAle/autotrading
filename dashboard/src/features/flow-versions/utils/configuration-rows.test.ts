@@ -48,6 +48,12 @@ const CONFIGURATION: Configuration = {
     breakeven_percent: '1.5',
     max_profit_in_context: true,
   },
+  consecutive_loss_limit: {
+    max_consecutive_losses: 2,
+    loss_window_hours: 24,
+    block_minutes: 120,
+    count_scope: 'flusso',
+  },
 };
 
 // Every field of a configuration the API returns, with the names of the parts its differences give it; no part for the
@@ -84,6 +90,7 @@ const PARTS_OF_FIELD = {
   max_daily_loss_percent: ['perdita giornaliera massima'],
   max_drawdown_percent: ['perdita massima dal picco'],
   openings_resume: ['ripresa delle aperture'],
+  consecutive_loss_limit: ['blocco delle riaperture dopo perdite consecutive'],
   memory: ['memoria'],
 } as const satisfies Record<
   keyof components['schemas']['ConfigurationResponse'],
@@ -125,6 +132,10 @@ describe('configurationRows', () => {
       { part: 'perdita giornaliera massima', value: '5%' },
       { part: 'perdita massima dal picco', value: '12.5%' },
       { part: 'ripresa delle aperture', value: 'il giorno dopo' },
+      {
+        part: 'blocco delle riaperture dopo perdite consecutive',
+        value: '2 perdite consecutive in 24 ore, blocco di 120 minuti, ambito flusso',
+      },
       {
         part: 'memoria',
         value: 'attiva, 5 decisioni, 14 giorni, motivo intero, tutte le decisioni',

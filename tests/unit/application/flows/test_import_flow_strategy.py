@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from autotrading.application.flows.create_flow import MemoryRequest, SourceRequest
+from autotrading.application.flows.create_flow import ConsecutiveLossLimitRequest, MemoryRequest, SourceRequest
 from autotrading.application.flows.errors import FlowNameInUseError, InvalidFlowSettingError
 from autotrading.application.flows.export_flow_strategy import (
     ExportFlowStrategyCommand,
@@ -12,6 +12,7 @@ from autotrading.application.flows.export_flow_strategy import (
 from autotrading.application.flows.import_flow_strategy import ImportFlowStrategyCommand
 from autotrading.application.flows.ports import AdapterRequest
 from autotrading.domain.errors import AutotradingError
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit, LossCountScope
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.errors import (
     ExposureLimitRequiredError,
@@ -164,3 +165,11 @@ def test_a_name_taken_by_another_flow_is_refused_before_the_strategy_is_checked(
 
     assert strategies.models.asked == []
     assert len(strategies.repository.list()) == 1
+
+
+def test_the_import_saves_the_limit_of_consecutive_losses_of_the_file(strategies: Strategies) -> None:
+    command = a_command(consecutive_loss_limit=ConsecutiveLossLimitRequest(2, 24, 120, "flusso"))
+
+    draft = strategies.import_.execute(command)
+
+    assert draft.configuration.consecutive_loss_limit == ConsecutiveLossLimit(2, 24, 120, LossCountScope.FLOW)

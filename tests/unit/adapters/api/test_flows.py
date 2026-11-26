@@ -116,6 +116,7 @@ def test_a_created_flow_answers_stopped_with_its_whole_configuration(client_of: 
             "breakeven_percent": None,
             "max_profit_in_context": False,
         },
+        "consecutive_loss_limit": None,
         "missing": [],
     }
     assert [(source["name"], source["adapters"][0]["weight"]) for source in sources] == [("notizie", 7)]
@@ -899,4 +900,59 @@ def test_every_part_of_the_stop_that_follows_the_price_is_in_the_answer_even_whe
         "activation_percent",
         "breakeven_percent",
         "max_profit_in_context",
+    }
+
+
+def test_the_limit_of_consecutive_losses_is_created_kept_and_removed(client_of: Client, platform: Platform) -> None:
+    # R5.5.2, ADR limite-di-perdite-consecutive-del-flusso.
+    anna = client_of("anna")
+    limit = {"max_consecutive_losses": 2, "loss_window_hours": 24, "block_minutes": 120}
+    flow_id = anna.post("/flows", json=a_request(platform, "anna", consecutive_loss_limit=limit)).json()["id"]
+
+    untouched = anna.patch(f"/flows/{flow_id}", json={"instructions": "aggressivo"}).json()
+    scoped = anna.patch(f"/flows/{flow_id}", json={"consecutive_loss_limit": {**limit, "count_scope": "flusso"}})
+    removed = anna.patch(f"/flows/{flow_id}", json={"consecutive_loss_limit": {"remove_limit": True}}).json()
+
+    assert untouched["consecutive_loss_limit"] == {**limit, "count_scope": "asset"}
+    assert scoped.json()["consecutive_loss_limit"] == {**limit, "count_scope": "flusso"}
+    assert (removed["version"], removed["consecutive_loss_limit"]) == (4, None)
+    assert anna.get(f"/flows/{flow_id}/versions/3").json()["consecutive_loss_limit"]["count_scope"] == "flusso"
+    assert anna.get(f"/flows/{flow_id}/versions/3/differences/4").json() == [
+        {
+            "part": "blocco delle riaperture dopo perdite consecutive",
+            "before": "2 perdite consecutive in 24 ore, blocco di 120 minuti, ambito flusso",
+            "after": "nessuno",
+        },
+    ]
+
+
+def test_a_limit_of_consecutive_losses_given_in_part_is_refused_naming_the_setting(
+    client_of: Client, platform: Platform
+) -> None:
+    anna = client_of("anna")
+
+    response = anna.post(
+        "/flows", json=a_request(platform, "anna", consecutive_loss_limit={"max_consecutive_losses": 2})
+    )
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {
+            "detail": "perdite consecutive massime, finestra delle perdite e durata del blocco si impostano insieme",
+            "field": "consecutive_loss_limit.max_consecutive_losses",
+        },
+    )
+
+
+def test_every_part_of_the_limit_of_consecutive_losses_is_in_the_answer(platform: Platform) -> None:
+    # R5.5.2: the dashboard generates its types from the document; the limit is whole or a null.
+    api = create_api(HealthReport("1.0.0", "dev"), ResolveTenantUseCase(platform.tenants), platform.for_tenant)
+    schemas = api.openapi()["components"]["schemas"]
+    [limit, _] = schemas["FlowResponse"]["properties"]["consecutive_loss_limit"]["anyOf"]
+
+    assert set(schemas[limit["$ref"].rsplit("/", 1)[-1]]["required"]) == {
+        "max_consecutive_losses",
+        "loss_window_hours",
+        "block_minutes",
+        "count_scope",
     }

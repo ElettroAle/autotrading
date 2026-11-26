@@ -8,6 +8,7 @@ from autotrading.domain.flows.exit_plan import ExitPlan
 from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_id import FlowId
 from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.reopening_block import ReopeningBlock
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.flows.watched_position import WatchedPosition
 
@@ -43,7 +44,8 @@ class FlowState:
     the platform keeps (ADR 0063), never from the executions the exchange still holds. The changes of its capital,
     oldest first, carry the profits it cashed out and chain its return (R3.4.1, R3.4.3). Every open position carries
     the exit plan in force, while it stays open (R3.1.1), and, when the stop of the flow follows the price, the
-    position as the platform watches it (R5.5.1).
+    position as the platform watches it (R5.5.1). The openings blocked after consecutive losses come only for a flow
+    with the limit (R5.5.2).
     """
 
     flow_id: FlowId
@@ -57,6 +59,7 @@ class FlowState:
     exit_plans: Mapping[str, ExitPlan] = field(default_factory=lambda: frozendict({}))
     capital_changes: tuple[CapitalChange, ...] = ()
     watched: Mapping[str, WatchedPosition] = field(default_factory=lambda: frozendict({}))
+    reopening_blocks: tuple[ReopeningBlock, ...] = ()
 
     @classmethod
     def attributed(
@@ -88,6 +91,10 @@ class FlowState:
     def watching(self, watched: Mapping[str, WatchedPosition]) -> FlowState:
         """The state with the positions the platform watches among those still open (R5.5.1)."""
         return replace(self, watched=_of_held(self.positions, watched))
+
+    def blocking(self, blocks: Sequence[ReopeningBlock]) -> FlowState:
+        """The state with the blocks of the openings in force after consecutive losses (R5.5.2)."""
+        return replace(self, reopening_blocks=tuple(blocks))
 
     def max_profit_of(self, asset: str) -> Decimal | None:
         """The largest unrealized profit the position open on the asset reached, in the currency of the account; None

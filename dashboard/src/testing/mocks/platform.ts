@@ -43,6 +43,15 @@ export type FakeOpeningsResume = 'manual' | 'next_day';
 /** The openings of a flow suspended for maximum loss, as the API says it (R3.2.2). */
 export type FakeOpeningsSuspension = { readonly reason: string; readonly suspendedAt: string };
 
+/** A block of the reopenings of one side in force, as the state of the flow gives it (R5.5.2). */
+export type FakeReopeningBlock = {
+  readonly side: 'long' | 'short';
+  readonly asset: string | null;
+  readonly consecutive_losses: number;
+  readonly until: string;
+  readonly text: string;
+};
+
 /**
  * A price forecast the flow recorded (R1.3.5): asset, horizon, the instant it expires, the price it forecast and the
  * actual price at that instant, null when never read.
@@ -92,6 +101,14 @@ export const DEFAULT_TRAILING_STOP: FakeTrailingStop = {
   max_profit_in_context: false,
 };
 
+/** The block of the reopenings after consecutive losses of a flow, null unless the user sets it (R5.5.2). */
+export type FakeConsecutiveLossLimit = {
+  readonly max_consecutive_losses: number;
+  readonly loss_window_hours: number;
+  readonly block_minutes: number;
+  readonly count_scope: 'asset' | 'flusso';
+} | null;
+
 export type FakeConfiguration = {
   readonly assets: string[];
   readonly cycleMinutes: number;
@@ -109,6 +126,7 @@ export type FakeConfiguration = {
   readonly minimumConfidence: number | null;
   readonly memory: FakeMemory;
   readonly trailingStop: FakeTrailingStop;
+  readonly consecutiveLossLimit: FakeConsecutiveLossLimit;
 };
 
 export type FakeVersion = {
@@ -175,6 +193,9 @@ export type FakeFlow = {
   openingsResume: FakeOpeningsResume;
   memory: FakeMemory;
   trailingStop: FakeTrailingStop;
+  consecutiveLossLimit: FakeConsecutiveLossLimit;
+  /** The blocks of the reopenings in force now, as the API reads them from the closings (R5.5.2). */
+  reopeningBlocks: FakeReopeningBlock[];
   /** What the agent would receive of the memory if the cycle started now, for every asset (R5.3.4). */
   remembered: FakeAssetMemory[];
   /** The suspension of the openings in force, null when the flow may open (R3.2.2). */
@@ -268,6 +289,7 @@ export type FakeFlowConfiguration = {
   openings_resume: FakeOpeningsResume;
   memory: FakeMemory;
   trailing_stop: FakeTrailingStop;
+  consecutive_loss_limit: FakeConsecutiveLossLimit;
 };
 
 /** The configuration of the flow in force, in the shape of the answers of the API. */
@@ -303,6 +325,7 @@ export const configurationOf = (flow: FakeFlow): FakeFlowConfiguration => ({
   openings_resume: flow.openingsResume,
   memory: { ...flow.memory },
   trailing_stop: { ...flow.trailingStop },
+  consecutive_loss_limit: flow.consecutiveLossLimit,
 });
 
 export const emptyHistory = (): FakeFlowHistory => ({ closedPositions: [], modelCalls: [] });
@@ -487,6 +510,7 @@ export const FIRST_CONFIGURATION: FakeConfiguration = {
   minimumConfidence: null,
   memory: DEFAULT_MEMORY,
   trailingStop: DEFAULT_TRAILING_STOP,
+  consecutiveLossLimit: null,
 };
 
 const FIRST_CREATION = Date.UTC(2026, 10, 1, 9, 30);
@@ -611,6 +635,8 @@ const draftOf = (
   openingsResume: 'manual',
   memory: DEFAULT_MEMORY,
   trailingStop: DEFAULT_TRAILING_STOP,
+  consecutiveLossLimit: null,
+  reopeningBlocks: [],
   remembered: [],
   openingsSuspension: null,
   cycles: 0,
@@ -812,6 +838,8 @@ export const fakePlatform = {
       openingsResume: 'manual',
       memory: DEFAULT_MEMORY,
       trailingStop: DEFAULT_TRAILING_STOP,
+      consecutiveLossLimit: null,
+      reopeningBlocks: [],
       remembered: [],
       openingsSuspension: null,
       cycles: 0,

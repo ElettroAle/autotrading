@@ -216,6 +216,11 @@ class QuestionStatePort(Protocol):
     @property
     def positions(self) -> Sequence[QuestionPositionPort]: ...
 
+    @property
+    def reopening_blocks(self) -> Sequence[str]:
+        """The openings blocked after consecutive losses, as the flow tells them; none without the limit (R5.5.2)."""
+        ...
+
 
 class QuestionSourcePort(Protocol):
     """The values of one adapter of an active source in the cycle, with its weight; an aggregate of several adapters has

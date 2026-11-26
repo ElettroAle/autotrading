@@ -16,6 +16,7 @@ from autotrading.application.flows.ports import (
 )
 from autotrading.application.flows.tradable_assets import require_tradable
 from autotrading.domain.flows.asset_conflict import require_assets_free
+from autotrading.domain.flows.consecutive_loss_limit import ConsecutiveLossLimit
 from autotrading.domain.flows.cycle_interval import CycleInterval
 from autotrading.domain.flows.flow import FIRST_VERSION, Flow
 from autotrading.domain.flows.flow_configuration import FlowConfiguration, assets_of
@@ -118,6 +119,36 @@ class TrailingStopRequest:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class ConsecutiveLossLimitRequest:
+    """The limit of consecutive losses the user gives, whole (R5.5.2, ADR limite-di-perdite-consecutive-del-flusso).
+
+    Nothing given keeps the limit in force, none for a new flow; any part given replaces it, and the three numbers go
+    together. `remove_limit` takes the whole limit away and prevails over the parts given with it.
+    """
+
+    max_consecutive_losses: int | None = None
+    loss_window_hours: int | None = None
+    block_minutes: int | None = None
+    count_scope: str | None = None
+    remove_limit: bool = False
+
+    @classmethod
+    def of(cls, limit: ConsecutiveLossLimit | None) -> ConsecutiveLossLimitRequest:
+        """Every part given, so a strategy file brings it back as it was (R2.5.2)."""
+        if limit is None:
+            return cls()
+        return cls(limit.max_consecutive_losses, limit.loss_window_hours, limit.block_minutes, limit.count_scope.value)
+
+    def applied_to(self, limit: ConsecutiveLossLimit | None) -> ConsecutiveLossLimit | None:
+        if self.remove_limit:
+            return None
+        given = ConsecutiveLossLimit.of(
+            self.max_consecutive_losses, self.loss_window_hours, self.block_minutes, self.count_scope
+        )
+        return limit if given is None else given
+
+
 def _given[T](sent: T | None, current: T) -> T:
     return current if sent is None else sent
 
@@ -160,6 +191,8 @@ class CreateFlowCommand:
     memory: MemoryRequest = field(default_factory=MemoryRequest)
     # Nothing given: no stop that follows the price (R5.5.1).
     trailing_stop: TrailingStopRequest = field(default_factory=TrailingStopRequest)
+    # Nothing given: no block of the openings after consecutive losses (R5.5.2).
+    consecutive_loss_limit: ConsecutiveLossLimitRequest = field(default_factory=ConsecutiveLossLimitRequest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,6 +259,7 @@ class CreateFlowUseCase:
             minimum_confidence=MinimumConfidence.optional(command.minimum_confidence),
             memory=command.memory.applied_to(FlowMemory()),
             trailing_stop=command.trailing_stop.applied_to(TrailingStop()),
+            consecutive_loss_limit=command.consecutive_loss_limit.applied_to(None),
         )
 
     def _source(self, request: SourceRequest) -> SourceSelection:

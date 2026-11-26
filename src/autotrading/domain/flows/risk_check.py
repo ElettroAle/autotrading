@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from autotrading.domain.flows.exit_plan import DiscardedLevel, ExitPlanChange
 from autotrading.domain.flows.minimum_confidence import MinimumConfidence
+from autotrading.domain.flows.reopening_block import ReopeningBlock
 from autotrading.domain.flows.risk_limits import HUNDRED, RiskLimits
 from autotrading.domain.flows.risk_outcome import (
     Adjustment,
@@ -41,7 +42,8 @@ class RiskState:
     an update of its exit plan (R3.1.3). The margin and the value of its open positions are what the overall exposure
     limits measure (R3.2.1). Suspended openings, for maximum loss (R3.2.2) or for an alarm of reconciliation on the
     account (R3.3.1), block every opening of the cycle with the reason of the suspension. The stop the platform computes
-    for each position whose stop follows the price bounds the stop of an update (R5.5.1).
+    for each position whose stop follows the price bounds the stop of an update (R5.5.1). A block after consecutive
+    losses stops the openings on its side, on its asset or on every asset of the flow (R5.5.2).
     """
 
     currency: str
@@ -52,10 +54,15 @@ class RiskState:
     open_value: Decimal = Decimal(0)
     openings_suspended: str | None = None
     trailing_stops: Mapping[str, Decimal] = field(default_factory=lambda: frozendict({}))
+    reopening_blocks: tuple[ReopeningBlock, ...] = ()
 
     @property
     def open_assets(self) -> frozenset[str]:
         return frozenset(self.open_positions)
+
+    def reopening_block_of(self, side: TradeSide, asset: str) -> ReopeningBlock | None:
+        """The block in force on the side of an opening on the asset, if any."""
+        return next((block for block in self.reopening_blocks if block.blocks(side, asset)), None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +128,7 @@ class RiskCheck:
 
     An opening the agent is less convinced of than the minimum confidence of the flow is blocked before any of them
     (R3.1.4). An opening beyond a limit is reduced and executed; a decision incoherent with the state is blocked.
+    An opening on a side blocked after consecutive losses is blocked with the reason of the block (R5.5.2).
     The decisions of a cycle are checked in their order on one instance: every approved opening commits its margin,
     so the next ones see only the liquidity left; a close frees nothing before it is executed (ADR 0065). The overall
     exposure limits come after the limit per operation and the openings consume their residual in the same order
@@ -139,13 +147,24 @@ class RiskCheck:
             return self._close(intent)
         if isinstance(intent, ReverseIntent):
             return self._reverse(intent)
-        if isinstance(intent, OpenIntent) and self._state.openings_suspended is not None:
-            return BlockedDecision.opening(intent.asset, self._state.openings_suspended)
-        if isinstance(intent, OpenIntent) and limits is not None:
-            return self._committed(self._open(intent, limits))
+        if isinstance(intent, OpenIntent):
+            return self._opening(intent, limits)
         if isinstance(intent, UpdateIntent):
             return self._update(intent, limits)
         return HeldPosition(intent.asset)
+
+    def _opening(self, intent: OpenIntent, limits: AssetLimits | None) -> RiskOutcome:
+        """Suspended openings (R3.2.2, R3.3.1) and a block of the side after consecutive losses (R5.5.2) come before any
+        limit; without the limits of the exchange nothing opens.
+        """
+        if self._state.openings_suspended is not None:
+            return BlockedDecision.opening(intent.asset, self._state.openings_suspended)
+        block = self._state.reopening_block_of(intent.side, intent.asset)
+        if block is not None:
+            return BlockedDecision(intent.asset, block.opening_reason(intent.asset))
+        if limits is None:
+            return HeldPosition(intent.asset)
+        return self._committed(self._open(intent, limits))
 
     def _committed(self, outcome: RiskOutcome) -> RiskOutcome:
         if isinstance(outcome, ApprovedOpening):
