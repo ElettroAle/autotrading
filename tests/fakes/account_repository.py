@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -87,6 +88,14 @@ class InMemoryAccountRepositoryAdapter:
         if account is None:
             raise FlowAccountNotFoundError
         return account.max_direction_exposure_percent
+
+    def reconciliation_interval(self, account_id: UUID) -> timedelta:
+        """How often the periodic check reconciles the account while its flows hold open positions (ADR
+        intervallo-di-riconciliazione-del-conto)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.reconciliation_interval_in_force.duration
 
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         account = self.get(AccountId(account_id))

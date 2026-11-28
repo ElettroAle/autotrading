@@ -47,6 +47,8 @@ const accountResponse = (user: FakeUser, account: FakeAccount) => ({
   // The exchange of the fake platform reads the expiry of the credentials, unless a test says otherwise (R6.2.2).
   ...keyExpiryResponse(account.expiry, account.expiryEditable ?? false),
   max_direction_exposure_percent: account.maxDirectionExposurePercent ?? null,
+  reconciliation_interval_minutes:
+    account.reconciliationIntervalMinutes ?? DEFAULT_RECONCILIATION_MINUTES,
 });
 
 const EXPIRY_READ_BY_EXCHANGE = "la scadenza di queste credenziali la legge l'exchange";
@@ -71,6 +73,19 @@ const exposureLimitOf = (body: unknown): string | null | Response => {
   return Number.isFinite(amount) && amount > 0
     ? String(percent)
     : problem(422, 'Unprocessable Content', EXPOSURE_NOT_POSITIVE);
+};
+
+// The interval of an account that set none, and the reason the API gives for one out of range (Bug 778).
+const DEFAULT_RECONCILIATION_MINUTES = 5;
+const INTERVAL_OUT_OF_RANGE = 'intervallo di riconciliazione da 1 a 1440 minuti';
+
+// A whole number of minutes from 1 to 1440 sets the interval; anything else is refused as the API refuses it.
+const reconciliationIntervalOf = (body: unknown): number | Response => {
+  const minutes: unknown =
+    typeof body === 'object' && body !== null ? Reflect.get(body, 'minutes') : undefined;
+  return typeof minutes === 'number' && Number.isInteger(minutes) && minutes >= 1 && minutes <= 1440
+    ? minutes
+    : problem(422, 'Unprocessable Content', INTERVAL_OUT_OF_RANGE, { minutes });
 };
 
 // The reasons the API gives about a virtual balance, with the same words (R6.3.2).
@@ -384,6 +399,18 @@ export const accountHandlers = [
           return limit;
         }
         account.maxDirectionExposurePercent = limit;
+        return new HttpResponse(null, { status: 204 });
+      });
+    }),
+  ),
+  http.put('*/accounts/:accountId/reconciliation-interval', ({ request, params }) =>
+    withUser(request, async (user) => {
+      const interval = reconciliationIntervalOf(await request.json().catch(() => ({})));
+      return withAccount(user, String(params.accountId), (account) => {
+        if (interval instanceof Response) {
+          return interval;
+        }
+        account.reconciliationIntervalMinutes = interval;
         return new HttpResponse(null, { status: 204 });
       });
     }),

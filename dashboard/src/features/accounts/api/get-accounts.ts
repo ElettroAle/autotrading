@@ -21,6 +21,8 @@ export const accountSchema = z.object({
   ...keyExpiryFields,
   // The exposure of its flows on one side, in percent of the balance; null unless the user sets it (R5.5.5).
   max_direction_exposure_percent: z.string().nullable(),
+  // How often the periodic check reconciles the account, in minutes, the default included (Bug 778).
+  reconciliation_interval_minutes: z.number().int(),
 });
 
 export type Account = z.infer<typeof accountSchema>;

@@ -131,3 +131,18 @@ class MaxDirectionExposureNotPositiveError(DomainError):
     @property
     def details(self) -> Mapping[str, object]:
         return {"percent": str(self.percent)}
+
+
+class ReconciliationIntervalOutOfRangeError(DomainError):
+    """The periodic check reconciles an account every one to 1440 minutes (Bug 778, ADR
+    intervallo-di-riconciliazione-del-conto)."""
+
+    status_code = 422
+
+    def __init__(self, minutes: int) -> None:
+        super().__init__("intervallo di riconciliazione da 1 a 1440 minuti")
+        self.minutes = minutes
+
+    @property
+    def details(self) -> Mapping[str, object]:
+        return {"minutes": self.minutes}

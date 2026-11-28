@@ -87,6 +87,7 @@ def test_the_list_shows_the_accounts_of_the_tenant(
             "days_left": None,
             "expiry_editable": True,
             "max_direction_exposure_percent": None,
+            "reconciliation_interval_minutes": 5,
         }
     ]
 
@@ -421,5 +422,38 @@ def test_the_max_direction_exposure_of_an_account_of_another_tenant_is_not_found
     client_of: Client, account_id: str
 ) -> None:
     response = client_of("bruno").put(f"/accounts/{account_id}/max-direction-exposure", json={"percent": "60"})
+
+    assert response.status_code == 404
+
+
+def test_the_reconciliation_interval_is_set_and_shown(client_of: Client, account_id: str) -> None:
+    """ADR intervallo-di-riconciliazione-del-conto: the reading of the account always carries the interval."""
+    anna = client_of("anna")
+
+    before = anna.get(f"/accounts/{account_id}").json()
+    response = anna.put(f"/accounts/{account_id}/reconciliation-interval", json={"minutes": 15})
+    [listed] = anna.get("/accounts").json()
+
+    assert before["reconciliation_interval_minutes"] == 5
+    assert response.status_code == 204
+    assert listed["reconciliation_interval_minutes"] == 15
+
+
+@pytest.mark.parametrize("minutes", [0, 1441])
+def test_a_reconciliation_interval_out_of_range_is_refused_with_the_reason(
+    client_of: Client, account_id: str, minutes: int
+) -> None:
+    response = client_of("anna").put(f"/accounts/{account_id}/reconciliation-interval", json={"minutes": minutes})
+
+    assert (response.status_code, reason_of(response)) == (
+        422,
+        {"detail": "intervallo di riconciliazione da 1 a 1440 minuti", "minutes": minutes},
+    )
+
+
+def test_the_reconciliation_interval_of_an_account_of_another_tenant_is_not_found(
+    client_of: Client, account_id: str
+) -> None:
+    response = client_of("bruno").put(f"/accounts/{account_id}/reconciliation-interval", json={"minutes": 15})
 
     assert response.status_code == 404

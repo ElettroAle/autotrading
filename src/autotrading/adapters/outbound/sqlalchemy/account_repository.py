@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -19,6 +20,7 @@ from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.key_expiry import KeyExpiry, KeyExpirySource
+from autotrading.domain.accounts.reconciliation_interval import ReconciliationInterval
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
@@ -87,6 +89,14 @@ class SqlAlchemyAccountRepositoryAdapter:
         if account is None:
             raise FlowAccountNotFoundError
         return account.max_direction_exposure_percent
+
+    def reconciliation_interval(self, account_id: UUID) -> timedelta:
+        """How often the periodic check reconciles the account while its flows hold open positions (ADR
+        intervallo-di-riconciliazione-del-conto)."""
+        account = self.get(AccountId(account_id))
+        if account is None:
+            raise FlowAccountNotFoundError
+        return account.reconciliation_interval_in_force.duration
 
     def sealed_address(self, account_id: UUID) -> SealedAddress:
         """The account as the flows context opens it to read it on its exchange (ADR 0044)."""
@@ -174,6 +184,7 @@ def _row_of(account: Account) -> dict[str, object]:
         "expires_on": None if account.expiry is None else account.expiry.expires_on,
         "expiry_source": None if account.expiry is None else account.expiry.source.value,
         "max_direction_exposure_percent": account.max_direction_exposure_percent,
+        "reconciliation_interval_minutes": _minutes_of(account.reconciliation_interval),
     }
 
 
@@ -188,7 +199,16 @@ def _account_of(row: RowMapping) -> Account:
         DeviationThreshold(row["deviation_threshold"]),
         _expiry_of(row),
         row["max_direction_exposure_percent"],
+        _interval_of(row["reconciliation_interval_minutes"]),
     )
+
+
+def _minutes_of(interval: ReconciliationInterval | None) -> int | None:
+    return None if interval is None else interval.minutes
+
+
+def _interval_of(minutes: int | None) -> ReconciliationInterval | None:
+    return None if minutes is None else ReconciliationInterval(minutes)
 
 
 def _expiry_of(row: RowMapping) -> KeyExpiry | None:

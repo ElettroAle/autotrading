@@ -245,6 +245,8 @@ export type FakeAccount = {
   expiryEditable?: boolean;
   /** The exposure of its flows on one side, in percent of the balance; none unless the user sets it (R5.5.5). */
   maxDirectionExposurePercent?: string | null;
+  /** The reconciliation interval the user set, in minutes; the default of the API without (Bug 778). */
+  reconciliationIntervalMinutes?: number;
 };
 
 /**

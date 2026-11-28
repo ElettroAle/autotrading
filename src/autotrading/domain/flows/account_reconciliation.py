@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -30,6 +30,13 @@ class AccountReading:
     open_assets: Mapping[FlowId, frozenset[str]]
     reference_balance: Decimal | None = None
     comparison: BalanceComparison | None = None
+
+    def due_for_reconciliation(self, now: datetime, interval: timedelta) -> bool:
+        """Whether the periodic check reads the account now: only while its flows held open positions at this reading,
+        and once the interval of the account has passed since (Bug 778, ADR
+        riconciliazione-periodica-dei-conti-con-posizioni-aperte).
+        """
+        return any(self.open_assets.values()) and now - self.read_at >= interval
 
     def confirmed(self) -> AccountReading:
         """The user checked the account: the balance read becomes the reference of the next comparison (R3.3.1)."""

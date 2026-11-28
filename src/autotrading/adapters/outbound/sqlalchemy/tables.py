@@ -64,6 +64,9 @@ accounts = Table(
     Column("expiry_source", Text),
     # In percent of the balance read from the exchange, empty unless the user sets it (R5.5.5).
     Column("max_direction_exposure_percent", Numeric),
+    # In minutes, empty unless the user sets it: the default of the domain applies (ADR
+    # intervallo-di-riconciliazione-del-conto).
+    Column("reconciliation_interval_minutes", Integer),
     CheckConstraint("expiry_source IN ('read', 'entered')", name="accounts_expiry_source_known"),
     CheckConstraint("(expires_on IS NULL) = (expiry_source IS NULL)", name="accounts_expiry_complete"),
     Index(

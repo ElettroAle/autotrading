@@ -13,6 +13,7 @@ from autotrading.application.tenancy.errors import CrossTenantAccessError
 from autotrading.domain.accounts.account import Account
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
+from autotrading.domain.accounts.reconciliation_interval import ReconciliationInterval
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.support.accounts import ADDRESS, an_account
@@ -41,6 +42,7 @@ def test_a_row_carries_tenant_name_exchange_account_and_the_sealed_credentials()
         "expires_on": None,
         "expiry_source": None,
         "max_direction_exposure_percent": None,
+        "reconciliation_interval_minutes": None,
     }
 
 
@@ -88,3 +90,20 @@ def test_the_max_direction_exposure_of_the_account_is_read_back_as_saved() -> No
     read = _account_of(_row_of(account))  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
 
     assert read.max_direction_exposure_percent == Decimal(60)
+
+
+def test_the_reconciliation_interval_of_the_account_is_read_back_as_saved() -> None:
+    account = account_of(TenantId.new()).with_reconciliation_interval(ReconciliationInterval(15))
+
+    read = _account_of(_row_of(account))  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
+
+    assert read.reconciliation_interval == ReconciliationInterval(15)
+
+
+def test_an_account_without_a_reconciliation_interval_keeps_the_column_empty() -> None:
+    account = account_of(TenantId.new())
+
+    read = _account_of(_row_of(account))  # type: ignore[arg-type]  # a dict stands for the row mapping of a query
+
+    assert _row_of(account)["reconciliation_interval_minutes"] is None
+    assert read.reconciliation_interval is None

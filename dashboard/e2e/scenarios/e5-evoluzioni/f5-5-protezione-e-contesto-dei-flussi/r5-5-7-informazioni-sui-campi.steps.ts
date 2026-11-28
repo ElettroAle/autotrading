@@ -229,20 +229,6 @@ Given(
   },
 );
 
-Given(
-  'che {string} ha aperto la pagina del conto {string}',
-  async ({ dashboard, memory }, account: string, name: string) => {
-    expectSignedIn(memory, account);
-    await dashboard.openAccounts();
-    await dashboard.openAccount(name, 'Impostazioni');
-    // The credentials are asked only once the user chooses to replace them: their fields are settings too.
-    await dashboard.content().getByRole('button', { name: 'Sostituisci le credenziali' }).click();
-    await expect(
-      dashboard.content().getByRole('form', { name: `Nuove credenziali del conto ${name}` }),
-    ).toBeVisible();
-  },
-);
-
 Then(
   "ogni impostazione del conto ha accanto all'etichetta un pulsante \"Informazioni su\" seguito dall'etichetta dell'impostazione",
   async ({ dashboard }) => {

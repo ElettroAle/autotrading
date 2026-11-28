@@ -8,6 +8,7 @@ from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError,
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.exchange_name import ExchangeName
 from autotrading.domain.accounts.key_expiry import KeyExpiry
+from autotrading.domain.accounts.reconciliation_interval import ReconciliationInterval
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
@@ -28,11 +29,19 @@ class Account(TenantOwned):
     expiry: KeyExpiry | None = None
     # None unless the user sets it: the flows of the account open on a side whatever the others hold (R5.5.5).
     max_direction_exposure_percent: Decimal | None = None
+    # None unless the user sets it: the account is reconciled every default interval (ADR
+    # intervallo-di-riconciliazione-del-conto).
+    reconciliation_interval: ReconciliationInterval | None = None
 
     def __post_init__(self) -> None:
         percent = self.max_direction_exposure_percent
         if percent is not None and not (percent.is_finite() and percent > 0):
             raise MaxDirectionExposureNotPositiveError(percent)
+
+    @property
+    def reconciliation_interval_in_force(self) -> ReconciliationInterval:
+        """How often the periodic check reconciles the account while its flows hold open positions (Bug 778)."""
+        return self.reconciliation_interval or ReconciliationInterval.default()
 
     def require_same_exchange_account(self, exchange_account: ExchangeAccount) -> None:
         """New credentials must operate the same account on the exchange (R0.2.4)."""
@@ -62,3 +71,8 @@ class Account(TenantOwned):
         """The largest exposure the flows of the account may have together on one side, in percent of its balance read
         from the exchange; None takes the limit away (R5.5.5, ADR esposizione-massima-per-direzione-del-conto)."""
         return replace(self, max_direction_exposure_percent=percent)
+
+    def with_reconciliation_interval(self, interval: ReconciliationInterval) -> Account:
+        """How often the periodic check reconciles the account while its flows hold open positions (ADR
+        intervallo-di-riconciliazione-del-conto)."""
+        return replace(self, reconciliation_interval=interval)

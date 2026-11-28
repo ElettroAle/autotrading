@@ -108,6 +108,9 @@ describe('ADR informazioni-sui-campi-di-configurazione: every field has its info
     expect(
       within(page).getByLabelText('Esposizione massima per direzione (% del saldo)'),
     ).toBeInTheDocument();
+    expect(
+      within(page).getByLabelText('Intervallo di riconciliazione (minuti)'),
+    ).toBeInTheDocument();
     expect(withoutInfo(page)).toEqual([]);
   });
 });

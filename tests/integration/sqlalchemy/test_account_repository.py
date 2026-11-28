@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -19,6 +19,7 @@ from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.accounts.account_name import AccountName
 from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.key_expiry import KeyExpiry
+from autotrading.domain.accounts.reconciliation_interval import ReconciliationInterval
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.flows.sealed_address import SealedAddress
 from autotrading.domain.orders.sealed_access import SealedAccess
@@ -321,6 +322,33 @@ def test_the_max_direction_exposure_is_set_taken_away_and_read_for_its_tenant_on
     assert repository.max_direction_exposure_percent(account.id.value) is None
     with pytest.raises(FlowAccountNotFoundError):
         SqlAlchemyAccountRepositoryAdapter(database, bruno).max_direction_exposure_percent(account.id.value)
+
+
+def test_an_account_saved_before_the_interval_is_reconciled_every_five_minutes(database: Engine) -> None:
+    """ADR intervallo-di-riconciliazione-del-conto: the accounts that existed before read the column empty."""
+    anna = new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    read = repository.get(account.id)
+    assert read is not None
+    assert read.reconciliation_interval is None
+    assert repository.reconciliation_interval(account.id.value) == timedelta(minutes=5)
+
+
+def test_the_reconciliation_interval_is_set_and_read_for_its_tenant_only(database: Engine) -> None:
+    """ADR intervallo-di-riconciliazione-del-conto."""
+    anna, bruno = new_tenant(database), new_tenant(database)
+    repository = SqlAlchemyAccountRepositoryAdapter(database, anna)
+    account = account_of(anna)
+    repository.add(account)
+
+    repository.replace(account.with_reconciliation_interval(ReconciliationInterval(15)))
+
+    assert repository.reconciliation_interval(account.id.value) == timedelta(minutes=15)
+    with pytest.raises(FlowAccountNotFoundError):
+        SqlAlchemyAccountRepositoryAdapter(database, bruno).reconciliation_interval(account.id.value)
 
 
 def test_the_expiry_of_the_credentials_and_who_gave_it_read_back_and_can_be_forgotten(database: Engine) -> None:

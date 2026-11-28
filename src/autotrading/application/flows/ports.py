@@ -626,6 +626,18 @@ class AccountExposureLimitPort(Protocol):
         ...
 
 
+class AccountReconciliationIntervalPort(Protocol):
+    """Bound to the tenant of the request: how often the periodic check reconciles one of its accounts while its flows
+    hold open positions, from the accounts context (Bug 778, ADR intervallo-di-riconciliazione-del-conto).
+    """
+
+    def reconciliation_interval(self, account_id: UUID) -> timedelta:
+        """The interval the user set, or the default; raises FlowAccountNotFoundError for an account the tenant does
+        not have.
+        """
+        ...
+
+
 class ReconciliationAlarmNoticePort(Protocol):
     """In the worker: NotifyReconciliationAlarmUseCase (R3.3.1)."""
 

@@ -20,6 +20,9 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
   posizioni chiuse con il motivo "stop loss" o "take profit" e con l'esito letto dall'exchange.
   Quando la posizione si chiude, per qualunque motivo, gli ordini di protezione rimasti si annullano.
   Una posizione aperta prima che il flusso avesse lo stop predefinito riceve lo stop loss al ciclo successivo.
+  Una chiusura eseguita dall'exchange tra due cicli entra nello storico senza aspettare il ciclo successivo: un
+  controllo periodico riconcilia i soli conti con posizioni dei flussi aperte, ogni intervallo di riconciliazione del
+  conto, da 1 a 1440 minuti, predefinito 5. Vale per ogni exchange (Bug 778).
 
   Fuori ambito: lo spostamento dei livelli di una posizione aperta (R3.1.3); lo stop del flusso, che continua a
   chiudere le posizioni (R1.1.5); le notifiche di stop loss e take profit (R3.5.1).
@@ -89,3 +92,40 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
     Dato che "anna" ha impostato lo stop loss predefinito di "alfa" a 3%
     Quando "alfa" apre long su "BTC" al prezzo d'ingresso 60000 senza piano di uscita
     Allora sull'exchange c'è un ordine di stop loss a 58200 sull'intera posizione di "alfa" su "BTC"
+
+  Regola: un controllo periodico riconcilia i conti con posizioni dei flussi aperte, senza aspettare il ciclo (Bug 778)
+
+    Contesto:
+      Dato che il flusso "alfa" opera sul conto "principale" con un ciclo ogni 24 ore
+      E che "alfa" ha una posizione long su "BLUR" con stop loss sull'exchange
+
+    Scenario: Chiusura per stop registrata entro l'intervallo del conto
+      Dato che il conto "principale" non ha un intervallo di riconciliazione impostato
+      Quando lo stop loss di "BLUR" si esegue sull'exchange
+      E passano 5 minuti senza un ciclo di "alfa"
+      Allora lo storico di "alfa" ha la posizione "BLUR" chiusa con il motivo "stop loss" e l'esito letto dall'exchange
+      E i soldi di "alfa" includono il risultato della chiusura
+
+    Scenario: Intervallo del conto non ancora trascorso
+      Dato che il conto "principale" ha l'intervallo di riconciliazione di 15 minuti
+      Quando lo stop loss di "BLUR" si esegue sull'exchange
+      E passano 5 minuti senza un ciclo di "alfa"
+      Allora il conto "principale" non è stato letto dall'exchange
+      E dopo altri 10 minuti lo storico di "alfa" ha la posizione "BLUR" chiusa con il motivo "stop loss"
+
+    Scenario: Conto senza posizioni aperte
+      Dato che i flussi del conto "secondario" non hanno posizioni aperte all'ultima lettura
+      Quando passano 5 minuti
+      Allora il conto "secondario" non è stato letto dall'exchange
+
+    Scenario: Ciclo in corso
+      Dato che un ciclo di "alfa" è in corso
+      Quando passano 5 minuti
+      Allora il controllo periodico non legge il conto "principale"
+      E la riconciliazione del conto resta al ciclo
+
+    Scenario: Exchange non disponibile
+      Dato che l'exchange del conto "principale" non risponde
+      Quando passano 5 minuti
+      Allora "alfa" resta attivo
+      E al controllo successivo il conto "principale" si legge di nuovo
