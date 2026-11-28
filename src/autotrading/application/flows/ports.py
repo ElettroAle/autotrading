@@ -626,6 +626,35 @@ class AccountExposureLimitPort(Protocol):
         ...
 
 
+class AccountReconciliationIntervalPort(Protocol):
+    """Bound to the tenant of the request: how often the periodic check reconciles one of its accounts while its flows
+    hold open positions, from the accounts context (Bug 778, ADR intervallo-di-riconciliazione-del-conto).
+    """
+
+    def reconciliation_interval(self, account_id: UUID) -> timedelta:
+        """The interval the user set, or the default; raises FlowAccountNotFoundError for an account the tenant does
+        not have.
+        """
+        ...
+
+
+class AccountReconciliationLockPort(Protocol):
+    """The exclusion of the reconciliation of one account, across processes and apart from the exclusion of the cycles:
+    two reconciliations of the same account never write the ledger together, and holding it leaves the cycles of the
+    flows free to start (Bug 778, ADR riconciliazione-periodica-dei-conti-con-posizioni-aperte).
+
+    Not bound to a tenant: it names an account, and an account belongs to one tenant only.
+    """
+
+    def hold(self, account_id: UUID) -> AbstractContextManager[None]:
+        """Holds the account for one reconciliation of a cycle, waiting for the one running."""
+        ...
+
+    def try_hold(self, account_id: UUID) -> AbstractContextManager[bool]:
+        """Holds the account for one periodic reconciliation; yields False at once when another one is running."""
+        ...
+
+
 class ReconciliationAlarmNoticePort(Protocol):
     """In the worker: NotifyReconciliationAlarmUseCase (R3.3.1)."""
 

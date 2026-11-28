@@ -435,6 +435,58 @@
         }
       }
     },
+    "/accounts/{account_id}/reconciliation-interval": {
+      "put": {
+        "tags": [
+          "conti"
+        ],
+        "summary": "Set Reconciliation Interval",
+        "description": "Sets how often the periodic check reconciles the account while its flows hold open positions (Bug 778).",
+        "operationId": "set_reconciliation_interval_accounts__account_id__reconciliation_interval_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconciliationIntervalRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/accounts/{account_id}/state": {
       "get": {
         "tags": [
@@ -6241,6 +6293,10 @@
               }
             ],
             "title": "Max Direction Exposure Percent"
+          },
+          "reconciliation_interval_minutes": {
+            "type": "integer",
+            "title": "Reconciliation Interval Minutes"
           }
         },
         "type": "object",
@@ -6258,10 +6314,11 @@
           "expiry_status",
           "days_left",
           "expiry_editable",
-          "max_direction_exposure_percent"
+          "max_direction_exposure_percent",
+          "reconciliation_interval_minutes"
         ],
         "title": "AccountSummaryResponse",
-        "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state\n(`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it\n(R6.2.2); the largest exposure its flows may have together on one side, in percent of its balance, null without a\nlimit (R5.5.5)."
+        "description": "An account in the list of its owner (R2.2.1, ADR 0126): network and capital its flows hold, never the balance,\nwhich the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state\n(`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it\n(R6.2.2); the largest exposure its flows may have together on one side, in percent of its balance, null without a\nlimit (R5.5.5); how often, in minutes, the periodic check reconciles it, the default included (ADR\nintervallo-di-riconciliazione-del-conto)."
       },
       "AdapterSelectionRequest": {
         "properties": {
@@ -12025,6 +12082,20 @@
         ],
         "title": "ReconciliationAlarmResponse",
         "description": "An alarm on the balance of the account: open until confirmed (R3.3.1)."
+      },
+      "ReconciliationIntervalRequest": {
+        "properties": {
+          "minutes": {
+            "type": "integer",
+            "title": "Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "minutes"
+        ],
+        "title": "ReconciliationIntervalRequest",
+        "description": "How often, in minutes, the periodic check reconciles the account while its flows hold open positions (ADR\nintervallo-di-riconciliazione-del-conto)."
       },
       "ReopeningBlockResponse": {
         "properties": {

@@ -509,3 +509,28 @@ def test_a_confirmed_reading_takes_the_balance_read_as_reference() -> None:
 
 def test_a_reading_without_comparison_keeps_its_reference_when_confirmed() -> None:
     assert previous(reference=Decimal(1000)).confirmed().reference_balance == Decimal(1000)
+
+
+# Bug 778, ADR riconciliazione-periodica-dei-conti-con-posizioni-aperte: the periodic check reads an account only when
+# its flows held open positions at the last reading and the interval of the account has passed since.
+
+INTERVAL = timedelta(minutes=5)
+
+
+def test_a_reading_with_open_positions_is_due_once_the_interval_has_passed() -> None:
+    reading = previous({FlowId.new(): frozenset({"BTC"})})
+
+    assert reading.due_for_reconciliation(BEFORE + INTERVAL, INTERVAL)
+    assert reading.due_for_reconciliation(BEFORE + INTERVAL * 2, INTERVAL)
+
+
+def test_a_reading_with_open_positions_is_not_due_before_the_interval() -> None:
+    reading = previous({FlowId.new(): frozenset({"BTC"})})
+
+    assert not reading.due_for_reconciliation(BEFORE + INTERVAL - timedelta(seconds=1), INTERVAL)
+
+
+def test_a_reading_without_open_positions_is_never_due() -> None:
+    reading = previous({FlowId.new(): frozenset(), FlowId.new(): frozenset()})
+
+    assert not reading.due_for_reconciliation(BEFORE + INTERVAL * 100, INTERVAL)

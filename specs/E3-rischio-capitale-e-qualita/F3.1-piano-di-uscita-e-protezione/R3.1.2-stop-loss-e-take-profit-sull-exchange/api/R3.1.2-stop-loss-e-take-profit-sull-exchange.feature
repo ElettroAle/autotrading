@@ -20,6 +20,9 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
   posizioni chiuse con il motivo "stop loss" o "take profit" e con l'esito letto dall'exchange.
   Quando la posizione si chiude, per qualunque motivo, gli ordini di protezione rimasti si annullano.
   Una posizione aperta prima che il flusso avesse lo stop predefinito riceve lo stop loss al ciclo successivo.
+  Una chiusura eseguita dall'exchange tra due cicli entra nello storico senza aspettare il ciclo successivo: un
+  controllo periodico riconcilia i soli conti con posizioni dei flussi aperte, ogni intervallo di riconciliazione del
+  conto, da 1 a 1440 minuti, predefinito 5. Vale per ogni exchange (Bug 778).
 
   Fuori ambito: lo spostamento dei livelli di una posizione aperta (R3.1.3); lo stop del flusso, che continua a
   chiudere le posizioni (R1.1.5); le notifiche di stop loss e take profit (R3.5.1).
@@ -55,3 +58,20 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
     Quando la piattaforma passa alla versione con gli stop loss predefiniti
     Allora "alfa" ha lo stop loss predefinito 5% e nessun take profit predefinito
     E la configurazione di "alfa" resta alla stessa versione
+
+  Scenario: Intervallo predefinito
+    Quando "anna" legge il conto "principale" senza aver impostato l'intervallo di riconciliazione
+    Allora l'intervallo di riconciliazione del conto è 5 minuti
+
+  Scenario: Intervallo impostato
+    Quando "anna" imposta l'intervallo di riconciliazione del conto "principale" a 15 minuti
+    Allora l'intervallo di riconciliazione del conto "principale" è 15 minuti
+
+  Schema dello scenario: Intervallo non valido
+    Quando "anna" imposta l'intervallo di riconciliazione del conto "principale" a <valore>
+    Allora la richiesta è respinta con il motivo "intervallo di riconciliazione da 1 a 1440 minuti"
+
+    Esempi:
+      | valore |
+      | 0      |
+      | 1441   |

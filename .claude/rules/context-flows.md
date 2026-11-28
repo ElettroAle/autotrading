@@ -52,7 +52,9 @@ Il flusso di trading: che cosa opera, con quali regole e con quale capitale.
   esatta della posizione attesa sono del flusso dell'asset; il funding è del flusso che ha la posizione (ADR 0063).
   La piattaforma non tocca ciò che non attribuisce.
 - Il registro si scrive solo con `RecordAccountExecutionsUseCase`, dalla riconciliazione del conto all'inizio e alla
-  fine di ogni ciclo, leggendo dall'exchange solo ciò che è nuovo; il ciclo legge i totali, mai lo storico. Se
+  fine di ogni ciclo e dal controllo periodico dei conti con posizioni aperte (ADR
+  riconciliazione-periodica-dei-conti-con-posizioni-aperte), leggendo dall'exchange solo ciò che è nuovo; il ciclo
+  legge i totali, mai lo storico. Se
   l'exchange non conserva più tutto ciò che è avvenuto dall'ultima lettura, tutti i flussi del conto vanno in pausa
   con il motivo "registro delle esecuzioni incompleto" (ADR 0063).
 - All'inizio del ciclo, dopo la riconciliazione, una posizione del conto su un asset del flusso diversa da quella

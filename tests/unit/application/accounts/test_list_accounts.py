@@ -7,6 +7,7 @@ from autotrading.application.accounts.account_summary import AccountSummary
 from autotrading.application.accounts.list_accounts import ListAccountsUseCase
 from autotrading.domain.accounts.exchange_network import ExchangeNetwork
 from autotrading.domain.accounts.key_expiry import KeyExpiry, KeyExpiryStatus
+from autotrading.domain.accounts.reconciliation_interval import ReconciliationInterval
 from autotrading.domain.flows.flow_status import FlowStatus
 from autotrading.domain.tenancy.tenant_id import TenantId
 from tests.fakes.account_repository import AccountStore, InMemoryAccountRepositoryAdapter
@@ -123,3 +124,17 @@ def test_each_account_carries_its_max_direction_exposure_if_any(store: AccountSt
     listed = list_accounts(store, flows)
 
     assert [summary.max_direction_exposure_percent for summary in listed] == [None, Decimal(60)]
+
+
+def test_each_account_carries_its_reconciliation_interval_the_default_included(
+    store: AccountStore, flows: FlowStore
+) -> None:
+    """ADR intervallo-di-riconciliazione-del-conto: the interval is read always set, the default included."""
+    store.accounts += [
+        an_account(ANNA, "predefinito"),
+        an_account(ANNA, "impostato").with_reconciliation_interval(ReconciliationInterval(15)),
+    ]
+
+    listed = list_accounts(store, flows)
+
+    assert [summary.reconciliation_interval_minutes for summary in listed] == [5, 15]

@@ -152,6 +152,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts/{account_id}/reconciliation-interval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Reconciliation Interval
+         * @description Sets how often the periodic check reconciles the account while its flows hold open positions (Bug 778).
+         */
+        put: operations["set_reconciliation_interval_accounts__account_id__reconciliation_interval_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/accounts/{account_id}/state": {
         parameters: {
             query?: never;
@@ -1632,7 +1652,8 @@ export interface components {
          *     which the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state
          *     (`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it
          *     (R6.2.2); the largest exposure its flows may have together on one side, in percent of its balance, null without a
-         *     limit (R5.5.5).
+         *     limit (R5.5.5); how often, in minutes, the periodic check reconciles it, the default included (ADR
+         *     intervallo-di-riconciliazione-del-conto).
          */
         AccountSummaryResponse: {
             /** Id */
@@ -1663,6 +1684,8 @@ export interface components {
             expiry_editable: boolean;
             /** Max Direction Exposure Percent */
             max_direction_exposure_percent: string | null;
+            /** Reconciliation Interval Minutes */
+            reconciliation_interval_minutes: number;
         };
         /** AdapterSelectionRequest */
         AdapterSelectionRequest: {
@@ -3799,6 +3822,15 @@ export interface components {
             confirmed_at: string | null;
         };
         /**
+         * ReconciliationIntervalRequest
+         * @description How often, in minutes, the periodic check reconciles the account while its flows hold open positions (ADR
+         *     intervallo-di-riconciliazione-del-conto).
+         */
+        ReconciliationIntervalRequest: {
+            /** Minutes */
+            minutes: number;
+        };
+        /**
          * ReopeningBlockResponse
          * @description The openings on a side stopped after consecutive losses until an instant: on the asset, or on every asset of the
          *     flow when the asset is null, with the text the dashboard shows (R5.5.2).
@@ -4720,6 +4752,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MaxDirectionExposureRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_reconciliation_interval_accounts__account_id__reconciliation_interval_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationIntervalRequest"];
             };
         };
         responses: {

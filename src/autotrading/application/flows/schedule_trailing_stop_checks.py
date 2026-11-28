@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import timedelta
 
+from autotrading.application.flows.every_tenant import every_tenant
 from autotrading.application.flows.ports import FlowTenantsPort, PeriodicCheckSchedulerPort
 from autotrading.domain.tenancy.tenant_id import TenantId
 
@@ -25,8 +26,6 @@ class ScheduleTrailingStopChecksUseCase:
         self._follow_of = follow_of
 
     def execute(self) -> None:
-        self._scheduler.keep_every(TRAILING_STOP_CHECK_NAME, TRAILING_STOP_CHECK_EVERY, self._follow_every_tenant)
-
-    def _follow_every_tenant(self) -> None:
-        for tenant_id in self._tenants.tenant_ids():
-            self._follow_of(tenant_id)
+        self._scheduler.keep_every(
+            TRAILING_STOP_CHECK_NAME, TRAILING_STOP_CHECK_EVERY, every_tenant(self._tenants, self._follow_of)
+        )

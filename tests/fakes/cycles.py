@@ -246,6 +246,38 @@ class InMemoryFlowLockAdapter:
                 lock.release()
 
 
+class InMemoryAccountReconciliationLockAdapter:
+    """One lock per account, as the advisory locks of PostgreSQL, apart from the locks of the flows: the reconciliation
+    of a cycle waits for the one running, at most LONGEST_HOLD real seconds, and the periodic one gives up at once."""
+
+    def __init__(self) -> None:
+        self._guard = threading.Lock()
+        self._locks: dict[UUID, threading.Lock] = {}
+
+    def _lock_of(self, account_id: UUID) -> threading.Lock:
+        with self._guard:
+            return self._locks.setdefault(account_id, threading.Lock())
+
+    @contextmanager
+    def hold(self, account_id: UUID) -> Iterator[None]:
+        lock = self._lock_of(account_id)
+        assert lock.acquire(timeout=LONGEST_HOLD), "la riconciliazione del conto non si è mai liberata"
+        try:
+            yield
+        finally:
+            lock.release()
+
+    @contextmanager
+    def try_hold(self, account_id: UUID) -> Iterator[bool]:
+        lock = self._lock_of(account_id)
+        acquired = lock.acquire(blocking=False)
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                lock.release()
+
+
 class FakeCycleSchedulerAdapter:
     """Runs every job it keeps at once, each in a thread of its own, as the scheduler does at the instant of the tick.
 

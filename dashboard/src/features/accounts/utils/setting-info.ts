@@ -15,6 +15,8 @@ export const ACCOUNT_SETTING_INFO = {
     'Saldo da cui riparte il conto: azzerarlo chiude le posizioni aperte e cancella gli ordini. Un importo maggiore di 0. Obbligatorio.',
   maxDirectionExposure:
     "Valore massimo delle posizioni long, e separatamente di quelle short, di tutti i flussi del conto, in percentuale del saldo letto dall'exchange: un'apertura che lo supera si blocca. Maggiore di 0. Vuoto: nessun limite.",
+  reconciliationInterval:
+    "Ogni quanti minuti la piattaforma rilegge dall'exchange un conto i cui flussi hanno posizioni aperte, per registrare nello storico le chiusure avvenute tra due cicli, come stop loss, take profit e liquidazioni. Da 1 a 1440 minuti. Predefinito: 5.",
   deviationThreshold:
     "Scostamento del saldo letto dall'exchange da quello atteso, in percentuale, oltre il quale la riconciliazione del conto segnala un allarme. Da 0,1 a 100. Predefinito: 1.",
 } as const;

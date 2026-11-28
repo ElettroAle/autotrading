@@ -8,6 +8,7 @@ from autotrading.domain.accounts.deviation_threshold import DeviationThreshold
 from autotrading.domain.accounts.errors import CredentialsOfAnotherAccountError, MaxDirectionExposureNotPositiveError
 from autotrading.domain.accounts.exchange_account import ExchangeAccount
 from autotrading.domain.accounts.key_expiry import KeyExpiry
+from autotrading.domain.accounts.reconciliation_interval import ReconciliationInterval
 from autotrading.domain.accounts.sealed_credentials import SealedCredentials
 from autotrading.domain.tenancy.tenant_id import TenantId
 from autotrading.domain.tenancy.tenant_owned import TenantOwned
@@ -139,3 +140,17 @@ def test_an_account_refuses_a_max_direction_exposure_not_above_zero(percent: str
     assert str(raised.value) == "l'esposizione massima per direzione è maggiore di 0"
     assert raised.value.status_code == 422
     assert raised.value.details == {"percent": percent}
+
+
+def test_an_account_without_a_reconciliation_interval_is_reconciled_every_default_interval() -> None:
+    account = an_account(TenantId.new())
+
+    assert account.reconciliation_interval is None
+    assert account.reconciliation_interval_in_force == ReconciliationInterval.default()
+
+
+def test_an_account_takes_a_reconciliation_interval() -> None:
+    account = an_account(TenantId.new()).with_reconciliation_interval(ReconciliationInterval(15))
+
+    assert account.reconciliation_interval == ReconciliationInterval(15)
+    assert account.reconciliation_interval_in_force == ReconciliationInterval(15)

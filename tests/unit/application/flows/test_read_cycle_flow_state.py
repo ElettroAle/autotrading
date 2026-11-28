@@ -10,6 +10,8 @@ from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowSta
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
 from autotrading.application.flows.reconcile_account_for_cycle import (
+    AccountReconciliation,
+    AccountReconciliationExclusion,
     ReconcileAccountForCycleCommand,
     ReconcileAccountForCycleUseCase,
 )
@@ -23,6 +25,7 @@ from tests.fakes.account_activity import FakeAccountActivityAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.cycles import InMemoryAccountReconciliationLockAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
@@ -83,7 +86,10 @@ class Bench:
             ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
             InMemoryAlertRepositoryAdapter({}, TENANT),
         )
-        self.reconcile = ReconcileAccountForCycleUseCase(reconcile_account, self.notices)
+        self.reconcile = ReconcileAccountForCycleUseCase(
+            AccountReconciliation(reconcile_account, self.notices),
+            AccountReconciliationExclusion(flows, InMemoryAccountReconciliationLockAdapter()),
+        )
         self.read = ReadCycleFlowStateUseCase(
             ReadFlowStateUseCase(
                 flows,

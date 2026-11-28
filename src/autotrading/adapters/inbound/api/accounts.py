@@ -20,6 +20,7 @@ from autotrading.application.accounts.replace_credentials import ReplaceCredenti
 from autotrading.application.accounts.reset_virtual_balance import ResetVirtualBalanceCommand
 from autotrading.application.accounts.set_account_key_expiry import SetAccountKeyExpiryCommand
 from autotrading.application.accounts.set_max_direction_exposure import SetMaxDirectionExposureCommand
+from autotrading.application.accounts.set_reconciliation_interval import SetReconciliationIntervalCommand
 from autotrading.application.flows.remove_account_with_flows import RemoveAccountWithFlowsCommand
 from autotrading.domain.accounts.account_id import AccountId
 from autotrading.domain.tenancy.user_id import UserId
@@ -61,6 +62,13 @@ class MaxDirectionExposureRequest(BaseModel):
     percent: Decimal | None = None
 
 
+class ReconciliationIntervalRequest(BaseModel):
+    """How often, in minutes, the periodic check reconciles the account while its flows hold open positions (ADR
+    intervallo-di-riconciliazione-del-conto)."""
+
+    minutes: int
+
+
 class AccountDetailsResponse(BaseModel):
     """An account as its owner reads it: secret credentials are only declared present, never returned (R0.2.3); the
     public fields the exchange declares are shown by name (Bug 401)."""
@@ -87,7 +95,8 @@ class AccountSummaryResponse(AccountDetailsResponse):
     which the exchange gives at /accounts/{id}/state; the expiry of its credentials as of today, with its state
     (`unknown`, `valid`, `expiring` within 30 days, `expired`) and the days left, and whether the user may give it
     (R6.2.2); the largest exposure its flows may have together on one side, in percent of its balance, null without a
-    limit (R5.5.5)."""
+    limit (R5.5.5); how often, in minutes, the periodic check reconciles it, the default included (ADR
+    intervallo-di-riconciliazione-del-conto)."""
 
     network: str
     network_name: str
@@ -98,6 +107,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
     days_left: int | None
     expiry_editable: bool
     max_direction_exposure_percent: str | None
+    reconciliation_interval_minutes: int
 
     @classmethod
     def of_summary(cls, summary: AccountSummary) -> AccountSummaryResponse:
@@ -116,6 +126,7 @@ class AccountSummaryResponse(AccountDetailsResponse):
             days_left=summary.expiry.reading.days_left,
             expiry_editable=summary.expiry.editable,
             max_direction_exposure_percent=_percent_text(summary.max_direction_exposure_percent),
+            reconciliation_interval_minutes=summary.reconciliation_interval_minutes,
         )
 
 
@@ -216,6 +227,16 @@ def accounts_router(
         """Sets or takes away the limit of the exposure of the flows of the account on one side (R5.5.5)."""
         command = SetMaxDirectionExposureCommand(AccountId(account_id), request.percent)
         use_cases.set_max_direction_exposure.execute(command)
+
+    @router.put("/{account_id}/reconciliation-interval", status_code=status.HTTP_204_NO_CONTENT)
+    def set_reconciliation_interval(
+        account_id: UUID,
+        request: ReconciliationIntervalRequest,
+        use_cases: Annotated[TenantUseCases, Depends(use_cases_of_request)],
+    ) -> None:
+        """Sets how often the periodic check reconciles the account while its flows hold open positions (Bug 778)."""
+        command = SetReconciliationIntervalCommand(AccountId(account_id), request.minutes)
+        use_cases.set_reconciliation_interval.execute(command)
 
     @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
     def remove_account(

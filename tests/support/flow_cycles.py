@@ -50,7 +50,12 @@ from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowSta
 from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
 from autotrading.application.flows.read_round_trip_cost import ReadRoundTripCostUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
-from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import (
+    AccountReconciliation,
+    AccountReconciliationExclusion,
+    ReconcileAccountForCycleUseCase,
+)
+from autotrading.application.flows.reconcile_open_accounts import OpenAccountReadings, ReconcileOpenAccountsUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
 from autotrading.application.flows.record_flow_closing import RecordFlowClosingUseCase
@@ -110,6 +115,7 @@ from tests.fakes.consecutive_failures import InMemoryConsecutiveFailuresAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.cycles import (
     FakeClockAdapter,
+    InMemoryAccountReconciliationLockAdapter,
     InMemoryCycleCheckpointsAdapter,
     InMemoryFlowLockAdapter,
 )
@@ -227,6 +233,8 @@ class FlowCycles:
         self.records = self.platform.cycles
         # One lock per installation, as the advisory locks of PostgreSQL: a cycle asked for now meets the one running.
         self.lock = InMemoryFlowLockAdapter()
+        # One lock per account, apart from the flows: two reconciliations of an account never write the ledger together.
+        self.account_locks = InMemoryAccountReconciliationLockAdapter()
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
         self.pause = FakePauseAdapter()
@@ -281,38 +289,12 @@ class FlowCycles:
         records = OpenPositionRecords(exit_plans, protection_levels, watched)
         order_exchanges = {HYPERLIQUID: connection_of(platform.order_exchange, platform.protection_exchange)}
         cancel_protections = platform.cancel_protections(tenant_id)
-        record_executions = RecordAccountExecutionsUseCase(
-            flows,
-            ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
-            platform.platform_orders,
-            platform.ledger,
-        )
+        record_executions = self.record_executions_of(tenant_id)
         alerts = platform.alerts_of(tenant_id)
-        reconcile_account = ReconcileAccountUseCase(
-            flows,
-            activity,
-            self.readings,
-            RecordOutsideClosingUseCase(
-                flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
-            ),
-            record_executions,
-            platform.ledger,
-            RecordProtectionClosingUseCase(
-                flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
-            ),
-            ReconciliationAlarmPorts(
-                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, alerts, HYPERLIQUID_SETTLEMENT_CURRENCY)
-            ),
-            alerts,
-        )
         reconcile_for_cycle = ReconcileAccountForCycleUseCase(
-            reconcile_account,
-            NotifyUnattributableUseCase(
-                accounts,
-                UnattributableNotices(
-                    NotifyUnattributablePositionUseCase(notify, alerts),
-                    NotifyUnattributableFillUseCase(notify, alerts),
-                ),
+            self.reconciliation_of(tenant_id, closing_notice, record_executions),
+            AccountReconciliationExclusion(
+                InMemoryFlowRepositoryAdapter(self.platform.flows, tenant_id), self.account_locks
             ),
         )
         read_cycle_flow = ReadCycleFlowUseCase(
@@ -406,6 +388,80 @@ class FlowCycles:
             past_decisions=InMemoryPastDecisionsAdapter(
                 self.records, platform.orders_of(tenant_id), platform.closed_positions
             ),
+        )
+
+    def record_executions_of(self, tenant_id: TenantId) -> RecordAccountExecutionsUseCase:
+        platform = self.platform
+        accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
+        opener = FakeCredentialOpenerAdapter(platform.vault, platform.openings)
+        return RecordAccountExecutionsUseCase(
+            InMemoryFlowRepositoryAdapter(platform.flows, tenant_id),
+            ReadAccountExecutionsUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            platform.platform_orders,
+            platform.ledger,
+        )
+
+    def reconciliation_of(
+        self,
+        tenant_id: TenantId,
+        closing_notice: PositionClosedNoticePort,
+        record_executions: RecordAccountExecutionsUseCase,
+    ) -> AccountReconciliation:
+        """The reconciliation of an account with the notices of its new cases, as the worker composes it for the cycles
+        and for the periodic check of the accounts with open positions (ADR 0045, Bug 778)."""
+        platform = self.platform
+        accounts = InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id)
+        opener = FakeCredentialOpenerAdapter(platform.vault, platform.openings)
+        flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
+        openings = InMemoryFlowOpeningsAdapter(platform.orders_of(tenant_id))
+        exit_plans = InMemoryExitPlanRepositoryAdapter(platform.exit_plans, tenant_id)
+        closed_positions = InMemoryClosedPositionRepositoryAdapter(platform.closed_positions, tenant_id)
+        cancel_protections = platform.cancel_protections(tenant_id)
+        notify = platform.worker_for(tenant_id).notify
+        alerts = platform.alerts_of(tenant_id)
+        reconcile_account = ReconcileAccountUseCase(
+            flows,
+            ReadAccountActivityUseCase(accounts, opener, {HYPERLIQUID: platform.activity_reader}),
+            self.readings,
+            RecordOutsideClosingUseCase(
+                flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
+            ),
+            record_executions,
+            platform.ledger,
+            RecordProtectionClosingUseCase(
+                flows, openings, closed_positions, closing_notice, exit_plans, cancel_protections
+            ),
+            ReconciliationAlarmPorts(
+                accounts, accounts, NotifyReconciliationAlarmUseCase(notify, alerts, HYPERLIQUID_SETTLEMENT_CURRENCY)
+            ),
+            alerts,
+        )
+        return AccountReconciliation(
+            reconcile_account,
+            NotifyUnattributableUseCase(
+                accounts,
+                UnattributableNotices(
+                    NotifyUnattributablePositionUseCase(notify, alerts),
+                    NotifyUnattributableFillUseCase(notify, alerts),
+                ),
+            ),
+        )
+
+    def open_accounts_of(self, tenant_id: TenantId) -> ReconcileOpenAccountsUseCase:
+        """The periodic check of the accounts with open positions of the tenant, as the worker composes it every minute
+        (Bug 778, ADR riconciliazione-periodica-dei-conti-con-posizioni-aperte): it holds the account, never the flows,
+        and tells a closing at once, as no cycle holds its notices."""
+        platform = self.platform
+        flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
+        notify_flow = NotifyFlowEventUseCase(platform.worker_for(tenant_id).notify, self.flow_status)
+        closing_notice = NotifyPositionClosedUseCase(notify_flow, HYPERLIQUID_SETTLEMENT_CURRENCY)
+        return ReconcileOpenAccountsUseCase(
+            flows,
+            OpenAccountReadings(
+                self.readings, InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id), self.clock
+            ),
+            self.account_locks,
+            self.reconciliation_of(tenant_id, closing_notice, self.record_executions_of(tenant_id)),
         )
 
     def trailing_stops_of(self, tenant_id: TenantId) -> FollowTrailingStopsUseCase:
