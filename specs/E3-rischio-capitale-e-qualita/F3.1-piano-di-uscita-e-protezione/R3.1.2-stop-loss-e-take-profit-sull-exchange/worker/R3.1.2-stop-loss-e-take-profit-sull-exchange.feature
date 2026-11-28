@@ -118,11 +118,15 @@ Funzionalità: R3.1.2 Stop loss e take profit sull'exchange
       Quando passano 5 minuti
       Allora il conto "secondario" non è stato letto dall'exchange
 
-    Scenario: Ciclo in corso
-      Dato che un ciclo di "alfa" è in corso
+    Scenario: Riconciliazione del conto già in corso
+      Dato che una riconciliazione del conto "principale" è in corso
       Quando passano 5 minuti
       Allora il controllo periodico non legge il conto "principale"
-      E la riconciliazione del conto resta al ciclo
+
+    Scenario: Il ciclo previsto parte durante il controllo periodico
+      Dato che il controllo periodico sta riconciliando il conto "principale"
+      Quando arriva l'istante previsto del ciclo di "alfa"
+      Allora il ciclo di "alfa" parte e non è saltato
 
     Scenario: Exchange non disponibile
       Dato che l'exchange del conto "principale" non risponde

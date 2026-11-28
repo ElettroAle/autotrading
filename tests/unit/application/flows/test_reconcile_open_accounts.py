@@ -7,97 +7,10 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from autotrading.application.flows.ports import ReconciliationAlarmPorts
-from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
-from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
-from autotrading.application.flows.reconcile_open_accounts import (
-    OpenAccountReadings,
-    ReconcileOpenAccountsCommand,
-    ReconcileOpenAccountsUseCase,
-)
-from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.domain.flows.account_activity import AccountActivity
-from autotrading.domain.flows.account_reconciliation import AccountReading
-from autotrading.domain.flows.flow import Flow
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.tenancy.tenant_id import TenantId
-from tests.fakes.account_activity import FakeAccountActivityAdapter
-from tests.fakes.account_reconciliation_intervals import FakeAccountReconciliationIntervalsAdapter
-from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
-from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
-from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
-from tests.fakes.cycles import FakeClockAdapter, InMemoryFlowLockAdapter
-from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
-from tests.fakes.flow_repository import FlowStore, InMemoryFlowRepositoryAdapter
-from tests.fakes.platform_orders import InMemoryPlatformOrdersAdapter
-from tests.fakes.protection_closings import InMemoryProtectionClosingsAdapter
-from tests.fakes.protection_repository import ProtectionStore
-from tests.fakes.reconciliation_alarm_notices import FakeReconciliationAlarmNoticeAdapter
-from tests.fakes.reconciliation_repository import InMemoryReconciliationRepositoryAdapter
+from tests.support.account_reconciliations import ACCOUNT, OTHER_ACCOUNT, WARNING, Bench
 from tests.support.activity import READ_AT, an_activity
-from tests.support.flows import a_configuration, a_flow
-
-TENANT = TenantId(uuid4())
-ACCOUNT, OTHER_ACCOUNT = uuid4(), uuid4()
-INTERVAL = timedelta(minutes=5)
-WARNING = "riconciliazione periodica del conto interrotta"
-
-
-class Notices:
-    """The new cases the check tells the user, as the cycle tells them (R1.8.2)."""
-
-    def __init__(self) -> None:
-        self.told: list[object] = []
-
-    def execute(self, items: object) -> None:
-        self.told.append(items)
-
-
-class Bench:
-    def __init__(self) -> None:
-        self.store = FlowStore()
-        self.activity = FakeAccountActivityAdapter()
-        self.readings = InMemoryReconciliationRepositoryAdapter()
-        self.intervals = FakeAccountReconciliationIntervalsAdapter({ACCOUNT, OTHER_ACCOUNT})
-        self.lock = InMemoryFlowLockAdapter()
-        self.clock = FakeClockAdapter(READ_AT)
-        self.notices = Notices()
-        flows = InMemoryFlowRepositoryAdapter(self.store, TENANT)
-        thresholds = FakeAccountThresholdsAdapter({ACCOUNT: "principale", OTHER_ACCOUNT: "secondario"})
-        ledger = InMemoryFlowLedgerAdapter()
-        reconcile_account = ReconcileAccountUseCase(
-            flows,
-            self.activity,
-            self.readings,
-            InMemoryClosedPositionsAdapter(),
-            RecordAccountExecutionsUseCase(
-                flows, self.activity, InMemoryPlatformOrdersAdapter(ProtectionStore()), ledger
-            ),
-            ledger,
-            InMemoryProtectionClosingsAdapter(),
-            ReconciliationAlarmPorts(thresholds, thresholds, FakeReconciliationAlarmNoticeAdapter()),
-            InMemoryAlertRepositoryAdapter({}, TENANT),
-        )
-        self.use_case = ReconcileOpenAccountsUseCase(
-            flows,
-            OpenAccountReadings(self.readings, self.intervals, self.clock),
-            self.lock,
-            ReconcileAccountForCycleUseCase(reconcile_account, self.notices),
-        )
-
-    def flow(self, *assets: str, account_id: UUID = ACCOUNT, status: FlowStatus = FlowStatus.ACTIVE) -> Flow:
-        flow = a_flow(TENANT, account_id=account_id, status=status, configuration=a_configuration(assets=assets))
-        self.store.flows.append(flow)
-        return flow
-
-    def read_with(self, flow: Flow, *assets: str, ago: timedelta = INTERVAL) -> AccountReading:
-        """The last reading of the account of the flow, that long ago, with those assets open."""
-        reading = AccountReading(flow.assigned_account_id, READ_AT - ago, {flow.id: frozenset(assets)})
-        self.readings.save_reading(reading)
-        return reading
-
-    def check(self) -> None:
-        self.use_case.execute(ReconcileOpenAccountsCommand())
 
 
 @pytest.fixture
@@ -159,29 +72,30 @@ def test_drafts_and_archived_flows_take_no_account(bench: Bench) -> None:
     assert bench.activity.read == []
 
 
-def test_an_account_whose_cycle_is_running_is_left_to_the_cycle(bench: Bench) -> None:
-    alfa = bench.flow("BTC")
-    beta = bench.flow("ETH")
-    before = bench.read_with(alfa, "BTC")
+def test_an_account_with_another_reconciliation_running_is_left_to_it(bench: Bench) -> None:
+    flow = bench.flow("BTC")
+    before = bench.read_with(flow, "BTC")
 
-    with bench.lock.hold(beta.id.value) as running:
+    with bench.lock.try_hold(ACCOUNT) as running:
         assert running
         bench.check()
 
     assert bench.activity.read == []
     assert bench.readings.last_reading(ACCOUNT) == before
-    with bench.lock.hold(alfa.id.value) as free:
+    with bench.lock.try_hold(ACCOUNT) as free:
         assert free
 
 
-def test_every_flow_of_the_account_is_held_while_it_is_reconciled(bench: Bench) -> None:
+def test_the_account_is_held_while_it_is_reconciled_and_its_flows_are_left_free(bench: Bench) -> None:
     alfa, beta = bench.flow("BTC"), bench.flow("ETH")
     bench.read_with(alfa, "BTC")
     held: list[bool] = []
 
     def reading_under_the_lock(_: UUID) -> AccountActivity:
+        with bench.lock.try_hold(ACCOUNT) as free:
+            held.append(not free)
         for flow in (alfa, beta):
-            with bench.lock.hold(flow.id.value) as free:
+            with bench.cycles.hold(flow.id.value) as free:
                 held.append(not free)
         return an_activity()
 
@@ -189,8 +103,8 @@ def test_every_flow_of_the_account_is_held_while_it_is_reconciled(bench: Bench) 
 
     bench.check()
 
-    assert held == [True, True]
-    with bench.lock.hold(alfa.id.value) as free:
+    assert held == [True, False, False]
+    with bench.lock.try_hold(ACCOUNT) as free:
         assert free
 
 
@@ -206,7 +120,7 @@ def test_an_exchange_that_does_not_answer_leaves_the_account_for_the_next_check(
 
     assert bench.readings.last_reading(ACCOUNT) == before
     assert bench.store.flows == [flow]
-    assert "riconciliazione del conto non riuscita" in caplog.messages
+    assert WARNING in caplog.messages
 
 
 def test_an_error_on_one_account_leaves_the_others_going(bench: Bench, caplog: pytest.LogCaptureFixture) -> None:

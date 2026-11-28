@@ -22,8 +22,9 @@ stato del flusso, ma i suoi soldi non contano il risultato. Rilevato il 27 novem
   5 minuti.
 - ADR 0063: il registro si scrive solo con `RecordAccountExecutionsUseCase`, leggendo dall'exchange solo ciò che è
   nuovo. Resta valido: cambia solo quando si scrive.
-- ADR 0042: due cicli dello stesso flusso non sono mai in corso insieme. La riconciliazione periodica non si sovrappone
-  al ciclo.
+- ADR 0042: due cicli dello stesso flusso non sono mai in corso insieme, e un ciclo previsto mentre il flusso è tenuto
+  viene saltato. La riconciliazione periodica non deve quindi tenere i flussi: un ciclo giornaliero saltato perderebbe
+  un giorno.
 - Nessuna regola per un exchange: vale per Hyperliquid e per l'exchange simulato.
 
 ## Decisione
@@ -33,12 +34,17 @@ stato del flusso, ma i suoi soldi non contano il risultato. Rilevato il 27 novem
   - salta il conto se nessun flusso aveva posizioni aperte in quella lettura;
   - salta il conto se dall'istante di quella lettura non è passato l'intervallo del conto (ADR
     intervallo-di-riconciliazione-del-conto);
-  - prende senza attesa l'esclusione di ogni flusso del conto (`FlowLockPort.hold`). Se un ciclo è in corso salta il
-    conto, perché il ciclo lo riconcilia da sé;
+  - prende senza attesa l'esclusione della riconciliazione del conto, un advisory lock PostgreSQL per conto distinto
+    da quello dei cicli. Se un'altra riconciliazione dello stesso conto è in corso salta il conto. Non prende
+    l'esclusione dei flussi (`FlowLockPort`): un ciclo previsto in quell'istante deve partire, non essere saltato;
   - poi riconcilia il conto con `ReconcileAccountUseCase`, che già registra esecuzioni, chiusure per protezione e
     chiusure fuori dalla piattaforma, e avvisa dei casi nuovi come nel ciclo.
 
   La regola «posizioni aperte e intervallo trascorso» sta nel domain.
+- **Esclusione della riconciliazione.** Ogni riconciliazione di un conto, del ciclo o periodica, tiene l'esclusione del
+  conto per la sua durata: quella del ciclo la attende, quella periodica la prova senza attesa. Due riconciliazioni dello
+  stesso conto non scrivono mai il registro insieme. L'esclusione è una porta di `flows` realizzata nella cartella
+  `sqlalchemy`, con una chiave distinta da quella dei cicli.
 - **Errori.** Un exchange non disponibile lascia il conto com'è: si registra un avviso e il controllo successivo ritenta.
   Nessuna pausa dei flussi da questo controllo.
 - **Pianificazione.** Un controllo periodico del worker ogni minuto, per ogni tenant, con la base condivisa dei
@@ -52,6 +58,7 @@ stato del flusso, ma i suoi soldi non contano il risultato. Rilevato il 27 novem
 
 - **Riconciliare solo dopo una chiusura del simulato**: lascia il ritardo su Hyperliquid.
 - **Leggere tutti i conti a ogni controllo**: consuma il limite di richieste anche senza posizioni.
+- **Tenere l'esclusione dei flussi del conto** (`FlowLockPort`): un ciclo previsto in quell'istante verrebbe saltato.
 - **Aspettare il ciclo in corso**: bloccherebbe il controllo per la durata del ciclo, che riconcilia comunque.
 
 ## Conseguenze

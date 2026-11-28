@@ -50,7 +50,11 @@ from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowSta
 from autotrading.application.flows.read_flow_state import ClosingReadings, ReadFlowStateUseCase
 from autotrading.application.flows.read_round_trip_cost import ReadRoundTripCostUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
-from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import (
+    AccountReconciliation,
+    AccountReconciliationExclusion,
+    ReconcileAccountForCycleUseCase,
+)
 from autotrading.application.flows.reconcile_open_accounts import OpenAccountReadings, ReconcileOpenAccountsUseCase
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.application.flows.record_cycle_equity import RecordCycleEquityUseCase
@@ -111,6 +115,7 @@ from tests.fakes.consecutive_failures import InMemoryConsecutiveFailuresAdapter
 from tests.fakes.credential_opener import FakeCredentialOpenerAdapter
 from tests.fakes.cycles import (
     FakeClockAdapter,
+    InMemoryAccountReconciliationLockAdapter,
     InMemoryCycleCheckpointsAdapter,
     InMemoryFlowLockAdapter,
 )
@@ -228,6 +233,8 @@ class FlowCycles:
         self.records = self.platform.cycles
         # One lock per installation, as the advisory locks of PostgreSQL: a cycle asked for now meets the one running.
         self.lock = InMemoryFlowLockAdapter()
+        # One lock per account, apart from the flows: two reconciliations of an account never write the ledger together.
+        self.account_locks = InMemoryAccountReconciliationLockAdapter()
         self.directory = ThreadsPlannedFlowsAdapter()
         self.model = FakeModelCallAdapter()
         self.pause = FakePauseAdapter()
@@ -284,7 +291,12 @@ class FlowCycles:
         cancel_protections = platform.cancel_protections(tenant_id)
         record_executions = self.record_executions_of(tenant_id)
         alerts = platform.alerts_of(tenant_id)
-        reconcile_for_cycle = self.reconciliation_of(tenant_id, closing_notice, record_executions)
+        reconcile_for_cycle = ReconcileAccountForCycleUseCase(
+            self.reconciliation_of(tenant_id, closing_notice, record_executions),
+            AccountReconciliationExclusion(
+                InMemoryFlowRepositoryAdapter(self.platform.flows, tenant_id), self.account_locks
+            ),
+        )
         read_cycle_flow = ReadCycleFlowUseCase(
             flows,
             InMemoryFlowTimingAdapter(platform.flows, tenant_id),
@@ -394,7 +406,7 @@ class FlowCycles:
         tenant_id: TenantId,
         closing_notice: PositionClosedNoticePort,
         record_executions: RecordAccountExecutionsUseCase,
-    ) -> ReconcileAccountForCycleUseCase:
+    ) -> AccountReconciliation:
         """The reconciliation of an account with the notices of its new cases, as the worker composes it for the cycles
         and for the periodic check of the accounts with open positions (ADR 0045, Bug 778)."""
         platform = self.platform
@@ -424,7 +436,7 @@ class FlowCycles:
             ),
             alerts,
         )
-        return ReconcileAccountForCycleUseCase(
+        return AccountReconciliation(
             reconcile_account,
             NotifyUnattributableUseCase(
                 accounts,
@@ -437,8 +449,8 @@ class FlowCycles:
 
     def open_accounts_of(self, tenant_id: TenantId) -> ReconcileOpenAccountsUseCase:
         """The periodic check of the accounts with open positions of the tenant, as the worker composes it every minute
-        (Bug 778, ADR riconciliazione-periodica-dei-conti-con-posizioni-aperte): it meets the lock of the cycles, and
-        tells a closing at once, as no cycle holds its notices."""
+        (Bug 778, ADR riconciliazione-periodica-dei-conti-con-posizioni-aperte): it holds the account, never the flows,
+        and tells a closing at once, as no cycle holds its notices."""
         platform = self.platform
         flows = InMemoryFlowRepositoryAdapter(platform.flows, tenant_id)
         notify_flow = NotifyFlowEventUseCase(platform.worker_for(tenant_id).notify, self.flow_status)
@@ -448,7 +460,7 @@ class FlowCycles:
             OpenAccountReadings(
                 self.readings, InMemoryAccountRepositoryAdapter(platform.accounts, tenant_id), self.clock
             ),
-            self.lock,
+            self.account_locks,
             self.reconciliation_of(tenant_id, closing_notice, self.record_executions_of(tenant_id)),
         )
 

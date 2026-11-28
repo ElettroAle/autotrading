@@ -1,20 +1,16 @@
 import logging
 from collections.abc import Sequence
-from contextlib import ExitStack
 from dataclasses import dataclass
 from uuid import UUID
 
 from autotrading.application.flows.ports import (
     AccountReconciliationIntervalPort,
+    AccountReconciliationLockPort,
     ClockPort,
-    FlowLockPort,
     FlowRepositoryPort,
     ReconciliationRepositoryPort,
 )
-from autotrading.application.flows.reconcile_account_for_cycle import (
-    ReconcileAccountForCycleCommand,
-    ReconcileAccountForCycleUseCase,
-)
+from autotrading.application.flows.reconcile_account_for_cycle import AccountReconciliation
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.flow import Flow
 
@@ -42,22 +38,22 @@ class ReconcileOpenAccountsUseCase:
     riconciliazione-periodica-dei-conti-con-posizioni-aperte): a stop loss, a take profit, a liquidation or a closing
     outside the platform enters the history without waiting for the next cycle.
 
-    The flows of the account are held as their cycles hold them, without waiting: an account with a cycle running is
-    left to it, which reconciles it itself. An exchange that does not answer leaves the account for the next check, and
-    an error on one account leaves the others going: no flow is paused from here.
+    The account is held without waiting, apart from the flows: an account with another reconciliation running is left
+    to it, and a cycle planned meanwhile starts. An exchange that does not answer leaves the account for the next check,
+    and an error on one account leaves the others going: no flow is paused from here.
     """
 
     def __init__(
         self,
         flows: FlowRepositoryPort,
         due: OpenAccountReadings,
-        lock: FlowLockPort,
-        reconcile: ReconcileAccountForCycleUseCase,
+        lock: AccountReconciliationLockPort,
+        reconciliation: AccountReconciliation,
     ) -> None:
         self._flows = flows
         self._due = due
         self._lock = lock
-        self._reconcile = reconcile
+        self._reconciliation = reconciliation
 
     def execute(self, command: ReconcileOpenAccountsCommand) -> None:  # noqa: ARG002 - a check carries no data
         for account_id, flows in self._flows_by_account().items():
@@ -73,7 +69,7 @@ class ReconcileOpenAccountsUseCase:
     def _reconcile_apart(self, account_id: UUID, flows: Sequence[Flow]) -> None:
         try:
             if self._is_due(account_id):
-                self._reconcile_unless_cycling(flows)
+                self._reconcile_unless_running(account_id, flows)
         except AutotradingError as error:
             operations.warning(
                 "riconciliazione periodica del conto interrotta",
@@ -87,8 +83,8 @@ class ReconcileOpenAccountsUseCase:
         interval = self._due.intervals.reconciliation_interval(account_id)
         return reading.due_for_reconciliation(self._due.clock.now(), interval)
 
-    def _reconcile_unless_cycling(self, flows: Sequence[Flow]) -> None:
-        with ExitStack() as held:
-            if not all(held.enter_context(self._lock.hold(flow.id.value)) for flow in flows):
+    def _reconcile_unless_running(self, account_id: UUID, flows: Sequence[Flow]) -> None:
+        with self._lock.try_hold(account_id) as held:
+            if not held:
                 return
-            self._reconcile.execute(ReconcileAccountForCycleCommand(flows[0].id))
+            self._reconciliation.reconcile(flows[0].id)

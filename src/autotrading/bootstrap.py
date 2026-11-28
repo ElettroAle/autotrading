@@ -73,6 +73,9 @@ from autotrading.adapters.outbound.process_memory.cycle_notices import (
 )
 from autotrading.adapters.outbound.rss.composition import rss_adapters
 from autotrading.adapters.outbound.smtp.composition import smtp_adapters
+from autotrading.adapters.outbound.sqlalchemy.account_reconciliation_locks import (
+    SqlAlchemyAccountReconciliationLockAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.alert_repository import SqlAlchemyAlertRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.automatic_pause import SqlAlchemyAutomaticPauseAdapter
@@ -215,6 +218,8 @@ from autotrading.application.flows.reconcile_account import (
     ReconcileAccountUseCase,
 )
 from autotrading.application.flows.reconcile_account_for_cycle import (
+    AccountReconciliation,
+    AccountReconciliationExclusion,
     ReconcileAccountForCycleUseCase,
 )
 from autotrading.application.flows.reconcile_open_accounts import (
@@ -611,8 +616,11 @@ def cycle_of(
         )
         readings = SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id)
         alerts = SqlAlchemyAlertRepositoryAdapter(engine, tenant_id)
-        reconcile_for_cycle = account_reconciliation(
-            engine, tenant_id, (notify, closing_notice), (activity, record_executions, cancel_protections)
+        reconcile_for_cycle = ReconcileAccountForCycleUseCase(
+            account_reconciliation(
+                engine, tenant_id, (notify, closing_notice), (activity, record_executions, cancel_protections)
+            ),
+            AccountReconciliationExclusion(flows, SqlAlchemyAccountReconciliationLockAdapter(engine)),
         )
         read_cycle_flow = ReadCycleFlowUseCase(
             flows,
@@ -776,7 +784,7 @@ def account_reconciliation(
     tenant_id: TenantId,
     notices: tuple[NotifyUseCase, PositionClosedNoticePort],
     readings: tuple[ReadAccountActivityUseCase, RecordAccountExecutionsUseCase, CancelProtectionsUseCase],
-) -> ReconcileAccountForCycleUseCase:
+) -> AccountReconciliation:
     """The reconciliation of an account of the tenant with the notices of its new cases, for the cycles and for the
     periodic check of the accounts with open positions (ADR 0045, Bug 778)."""
     notify, closing_notice = notices
@@ -802,7 +810,7 @@ def account_reconciliation(
         ),
         alerts,
     )
-    return ReconcileAccountForCycleUseCase(
+    return AccountReconciliation(
         reconcile_account,
         NotifyUnattributableUseCase(
             accounts,
@@ -822,7 +830,7 @@ def reconcile_open_accounts(
     tenant_id: TenantId,
 ) -> None:
     """The check of one tenant: its accounts whose flows hold open positions, reconciled once their interval has passed,
-    with the lock the cycles hold; a closing is told at once, as no cycle holds its notices (Bug 778, ADR
+    holding the account apart from the flows; a closing is told at once, as no cycle holds its notices (Bug 778, ADR
     riconciliazione-periodica-dei-conti-con-posizioni-aperte)."""
     hyperliquid, simulation = markets
     _, _, order_exchanges, activity_readers, executions_readers, _ = exchanges_of_tenant(
@@ -850,7 +858,7 @@ def reconcile_open_accounts(
         OpenAccountReadings(
             SqlAlchemyReconciliationRepositoryAdapter(engine, tenant_id), accounts, system_clock_adapters()
         ),
-        SqlAlchemyFlowLockAdapter(engine),
+        SqlAlchemyAccountReconciliationLockAdapter(engine),
         account_reconciliation(
             engine,
             tenant_id,

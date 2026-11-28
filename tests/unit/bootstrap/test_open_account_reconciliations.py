@@ -11,15 +11,18 @@ from autotrading import bootstrap
 from autotrading.adapters.outbound.apscheduler.periodic_check_scheduler import ApSchedulerPeriodicCheckSchedulerAdapter
 from autotrading.adapters.outbound.dashboard.notification_links import DashboardNotificationLinkAdapter
 from autotrading.adapters.outbound.libsodium.opener import SodiumCredentialOpenerAdapter
+from autotrading.adapters.outbound.sqlalchemy.account_reconciliation_locks import (
+    SqlAlchemyAccountReconciliationLockAdapter,
+)
 from autotrading.adapters.outbound.sqlalchemy.account_repository import SqlAlchemyAccountRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.flow_repository import SqlAlchemyFlowRepositoryAdapter
 from autotrading.adapters.outbound.sqlalchemy.outbox import SqlAlchemyOutboxAdapter
 from autotrading.adapters.outbound.sqlalchemy.reconciliation_repository import (
     SqlAlchemyReconciliationRepositoryAdapter,
 )
-from autotrading.adapters.outbound.sqlalchemy.scheduling import SqlAlchemyFlowLockAdapter
 from autotrading.adapters.outbound.sqlalchemy.tenant_repository import SqlAlchemyTenantRepositoryAdapter
-from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
+from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import AccountReconciliation
 from autotrading.application.flows.reconcile_open_accounts import OpenAccountReadings, ReconcileOpenAccountsCommand
 from autotrading.bootstrap import create_worker_application, reconcile_open_accounts
 from autotrading.domain.tenancy.tenant_id import TenantId
@@ -88,11 +91,13 @@ def test_the_check_of_a_tenant_reconciles_its_accounts_on_the_adapters_bound_to_
         TenantId.new(),
     )
 
-    [(flows, due, lock, reconcile)] = RecordedReconciliation.built
+    [(flows, due, lock, reconciliation)] = RecordedReconciliation.built
     assert isinstance(flows, SqlAlchemyFlowRepositoryAdapter)
     assert isinstance(due, OpenAccountReadings)
     assert isinstance(due.readings, SqlAlchemyReconciliationRepositoryAdapter)
     assert isinstance(due.intervals, SqlAlchemyAccountRepositoryAdapter)
-    assert isinstance(lock, SqlAlchemyFlowLockAdapter)
-    assert isinstance(reconcile, ReconcileAccountForCycleUseCase)
+    # The account is held apart from the flows: a cycle planned meanwhile starts.
+    assert isinstance(lock, SqlAlchemyAccountReconciliationLockAdapter)
+    assert isinstance(reconciliation, AccountReconciliation)
+    assert isinstance(reconciliation.reconcile_account, ReconcileAccountUseCase)
     assert RecordedReconciliation.executed == [ReconcileOpenAccountsCommand()]

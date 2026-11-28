@@ -6,10 +6,11 @@ riconciliazione-periodica-dei-conti-con-posizioni-aperte, ADR intervallo-di-rico
 runs the periodic check once, as the worker does, with the exchange reading the account at that minute.
 """
 
+import threading
 from collections.abc import Iterator
 from contextlib import ExitStack
 from dataclasses import dataclass, field, replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -24,15 +25,18 @@ from autotrading.domain.accounts.reconciliation_interval import ReconciliationIn
 from autotrading.domain.errors import AutotradingError
 from autotrading.domain.flows.account_activity import AccountPosition
 from autotrading.domain.flows.account_reconciliation import AccountReading
+from autotrading.domain.flows.account_reference import AccountReference
 from autotrading.domain.flows.closed_position import ClosedPosition
 from autotrading.domain.flows.cycle_interval import CycleInterval
+from autotrading.domain.flows.cycle_record import CycleOutcome
 from autotrading.domain.flows.flow_status import FlowStatus
-from autotrading.domain.flows.ledger import FlowTotals
+from autotrading.domain.flows.ledger import ExecutionsWindow, FlowTotals
 from autotrading.domain.flows.trade_side import TradeSide
 from autotrading.domain.orders.market import Market
 from autotrading.domain.orders.protection_kind import ProtectionKind
+from tests.fakes.cycles import LONGEST_HOLD
 from tests.support.activity import a_fill, an_activity
-from tests.support.flow_cycles import ACCOUNT, FlowCycles
+from tests.support.flow_cycles import ACCOUNT, FlowCycles, at
 from tests.support.platform import HYPERLIQUID
 from tests.support.steps import quoted
 from tests.support.steps_r3_1_2 import Protection, plan_of
@@ -50,7 +54,11 @@ STOP_PNL = Decimal("-1.10")
 STOP_FEE = Decimal("0.01")
 STOP_DELAY = timedelta(seconds=30)
 ONE_MINUTE = timedelta(minutes=1)
-WARNING = "riconciliazione del conto non riuscita"
+WARNING = "riconciliazione periodica del conto interrotta"
+# The cycle planned while the periodic check reconciles the account: the next instant of its schedule of a quarter.
+PLANNED_HOUR = "10:30"
+# Real seconds the exchange takes to answer the periodic check, well within the wait of the reconciliation of a cycle.
+EXCHANGE_ANSWERS_AFTER = 0.2
 
 
 @dataclass
@@ -64,6 +72,8 @@ class PeriodicReconciliation:
     readings_before: int = 0
     summary: AccountSummary | None = None
     error: AutotradingError | None = None
+    check: threading.Thread | None = None
+    going_on: threading.Event = field(default_factory=threading.Event)
 
     @property
     def flow_cycles(self) -> FlowCycles:
@@ -91,6 +101,38 @@ class PeriodicReconciliation:
                 activities[address] = replace(activity, read_at=flow_cycles.clock.now())
             check = flow_cycles.open_accounts_of(flow_cycles.platform.tenant_of(USER))
             check.execute(ReconcileOpenAccountsCommand())
+
+    def check_held_in_reading(self, account: str, instant: datetime) -> None:
+        """The periodic check of that instant running in a thread of its own, held while it reads the new executions of
+        the account from the exchange, as a slow exchange would hold it: the account is held until it goes on."""
+        flow_cycles = self.flow_cycles
+        reader = flow_cycles.platform.activity_reader
+        flow_cycles.clock.current = instant
+        self.show(account, flow_cycles.platform.activity_reader.activities[self.address(account)].positions)
+        reading, read = reader.since, threading.Event()
+
+        def held_reading(reference: AccountReference, since: datetime | None) -> ExecutionsWindow:
+            read.set()
+            self.going_on.wait(LONGEST_HOLD)
+            return reading(reference, since)
+
+        reader.since = held_reading  # type: ignore[method-assign]  # the reading of this check alone is held
+        check = flow_cycles.open_accounts_of(flow_cycles.platform.tenant_of(USER))
+        self.check = threading.Thread(target=check.execute, args=(ReconcileOpenAccountsCommand(),))
+        self.check.start()
+        assert read.wait(LONGEST_HOLD)
+        reader.since = reading  # type: ignore[method-assign]  # every other reading goes straight to the exchange
+
+    def cycle_meanwhile(self, flow: str) -> None:
+        """The cycle of the flow at this instant, while the check still reads the exchange: the exchange answers the
+        check a moment later, and the reconciliation of the cycle waits for it."""
+        answer = threading.Timer(EXCHANGE_ANSWERS_AFTER, self.going_on.set)
+        answer.start()
+        self.flow_cycles.run(flow)
+        answer.join()
+        assert self.check is not None
+        self.check.join(LONGEST_HOLD)
+        assert not self.check.is_alive()
 
     def readings_of(self, account: str) -> int:
         """How many times the account was read from the exchange: every reconciliation reads its new executions."""
@@ -194,11 +236,15 @@ def account_without_positions(periodic: PeriodicReconciliation, account: str) ->
     periodic.readings_before = periodic.readings_of(account)
 
 
-@given(quoted('che un ciclo di "{flow}" è in corso'))
-def cycle_running(periodic: PeriodicReconciliation, flow: str) -> None:
-    flow_cycles = periodic.flow_cycles
-    assert periodic.held.enter_context(flow_cycles.lock.hold(flow_cycles.flow(flow).id.value))
-    periodic.readings_before = periodic.readings_of("principale")
+@given(quoted('che una riconciliazione del conto "{account}" è in corso'))
+def reconciliation_running(periodic: PeriodicReconciliation, account: str) -> None:
+    periodic.held.enter_context(periodic.flow_cycles.account_locks.hold(periodic.account_id(account).value))
+    periodic.readings_before = periodic.readings_of(account)
+
+
+@given(quoted('che il controllo periodico sta riconciliando il conto "{account}"'))
+def periodic_check_reconciling(periodic: PeriodicReconciliation, account: str) -> None:
+    periodic.check_held_in_reading(account, at(PLANNED_HOUR))
 
 
 @given(quoted('che l\'exchange del conto "{account}" non risponde'))
@@ -237,6 +283,11 @@ def minutes_pass(periodic: PeriodicReconciliation, minutes: str) -> None:
     cycles_before = len(periodic.flow_cycles.records.records)
     periodic.minutes_pass(int(minutes))
     assert len(periodic.flow_cycles.records.records) == cycles_before
+
+
+@when(quoted('arriva l\'istante previsto del ciclo di "{flow}"'))
+def planned_instant_comes(periodic: PeriodicReconciliation, flow: str) -> None:
+    periodic.cycle_meanwhile(flow)
 
 
 @when(quoted('"{user}" legge il conto "{account}" senza aver impostato l\'intervallo di riconciliazione'))
@@ -293,11 +344,6 @@ def closed_later(periodic: PeriodicReconciliation, minutes: str, flow: str, asse
     assert closed.reason.value == reason
 
 
-@then("la riconciliazione del conto resta al ciclo")
-def reconciliation_left_to_the_cycle(periodic: PeriodicReconciliation) -> None:
-    assert periodic.last_reading("principale") == periodic.reading_of_the_cycle
-
-
 @then(quoted('"{flow}" resta attivo'))
 def flow_still_active(periodic: PeriodicReconciliation, flow: str, caplog: pytest.LogCaptureFixture) -> None:
     assert periodic.flow_cycles.flow(flow).status is FlowStatus.ACTIVE
@@ -330,3 +376,9 @@ def interval_refused(periodic: PeriodicReconciliation, reason: str) -> None:
     periodic.read_account(USER, "principale")
     assert periodic.summary is not None
     assert periodic.summary.reconciliation_interval_minutes == ReconciliationInterval.default().minutes
+
+
+@then(quoted('il ciclo di "{flow}" parte e non è saltato'))
+def cycle_started(periodic: PeriodicReconciliation, flow: str) -> None:
+    record = periodic.flow_cycles.last_record(flow)
+    assert (record.planned_at, record.outcome) == (at(PLANNED_HOUR), CycleOutcome.COMPLETED)

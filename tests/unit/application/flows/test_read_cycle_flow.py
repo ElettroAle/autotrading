@@ -18,7 +18,11 @@ from autotrading.application.flows.read_cycle_flow import (
 from autotrading.application.flows.read_cycle_flow_state import ReadCycleFlowStateUseCase
 from autotrading.application.flows.read_flow_state import ReadFlowStateUseCase
 from autotrading.application.flows.reconcile_account import ReconcileAccountUseCase
-from autotrading.application.flows.reconcile_account_for_cycle import ReconcileAccountForCycleUseCase
+from autotrading.application.flows.reconcile_account_for_cycle import (
+    AccountReconciliation,
+    AccountReconciliationExclusion,
+    ReconcileAccountForCycleUseCase,
+)
 from autotrading.application.flows.record_account_executions import RecordAccountExecutionsUseCase
 from autotrading.domain.flows.account_exposure import AccountExposure, AccountExposureLimit
 from autotrading.domain.flows.account_exposure_reading import AccountExposureReading
@@ -37,6 +41,7 @@ from tests.fakes.account_exposure_limits import FakeAccountExposureLimitsAdapter
 from tests.fakes.account_thresholds import FakeAccountThresholdsAdapter
 from tests.fakes.alert_repository import InMemoryAlertRepositoryAdapter
 from tests.fakes.closed_positions import InMemoryClosedPositionsAdapter
+from tests.fakes.cycles import InMemoryAccountReconciliationLockAdapter
 from tests.fakes.exit_plan_repository import ExitPlanStore, InMemoryExitPlanRepositoryAdapter
 from tests.fakes.flow_ledger import InMemoryFlowLedgerAdapter
 from tests.fakes.flow_protection_levels import InMemoryFlowProtectionLevelsAdapter
@@ -131,7 +136,10 @@ class Bench:
                     ),
                     closing_readings(TENANT),
                 ),
-                ReconcileAccountForCycleUseCase(reconcile, Notices()),
+                ReconcileAccountForCycleUseCase(
+                    AccountReconciliation(reconcile, Notices()),
+                    AccountReconciliationExclusion(flows, InMemoryAccountReconciliationLockAdapter()),
+                ),
             ),
             self.readings,
         )
